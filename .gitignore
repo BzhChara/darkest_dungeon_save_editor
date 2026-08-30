@@ -1,0 +1,38 @@
+# .NET build and test output
+bin/
+obj/
+artifacts/
+publish/
+TestResults/
+*.trx
+*.coverage
+*.coveragexml
+
+# IDE and per-user state
+.vs/
+.idea/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Save-editor runtime data (may contain local paths or save data)
+workspaces/
+backups/
+logs/
+*.log
+
+# Local-only configuration and transient files
+.env
+.env.*
+!.env.example
+*.tmp
+*.temp
+*.bak
+*.orig
+*.pid
+
+# Operating-system metadata
+.DS_Store
+Thumbs.db
+Desktop.ini

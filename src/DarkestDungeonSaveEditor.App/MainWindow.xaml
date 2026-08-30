@@ -1,0 +1,365 @@
+<Window x:Class="DarkestDungeonSaveEditor.App.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Darkest Dungeon 存档修改器"
+        Width="1440"
+        Height="900"
+        MinWidth="1120"
+        MinHeight="720"
+        Icon="Assets/save-editor.ico"
+        Background="{StaticResource AppTextureBrush}"
+        Foreground="{StaticResource TextPrimaryBrush}"
+        FontFamily="SimHei, Microsoft YaHei UI"
+        FontSize="14"
+        UseLayoutRounding="True"
+        SnapsToDevicePixels="True"
+        WindowStartupLocation="CenterScreen">
+    <Grid Background="{StaticResource AppTextureBrush}">
+        <Border Margin="8"
+                Background="#E8050505"
+                BorderBrush="{StaticResource GoldDarkBrush}"
+                BorderThickness="1">
+            <Border Margin="3"
+                    BorderBrush="#4B5351"
+                    BorderThickness="1">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="124" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <Border Grid.Row="0"
+                Padding="22,10"
+                Background="{StaticResource HeaderBrush}"
+                BorderBrush="#59615E"
+                BorderThickness="0,0,0,1">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <Grid Grid.Column="0"
+                      Width="320" Height="100"
+                      Margin="2,0,0,0"
+                      HorizontalAlignment="Left"
+                      VerticalAlignment="Center">
+                    <Image x:Name="TitleLogoImage"
+                           Width="320" Height="100"
+                           Stretch="Uniform"
+                           Loaded="TitleLogoImage_Loaded"
+                           Unloaded="TitleLogoImage_Unloaded"
+                           SnapsToDevicePixels="True"
+                           RenderOptions.BitmapScalingMode="HighQuality" />
+                </Grid>
+                <Border Grid.Column="1" Padding="17,9" VerticalAlignment="Center"
+                        Background="{StaticResource RedBandBrush}"
+                        BorderBrush="#8F2826"
+                        BorderThickness="1" CornerRadius="0">
+                    <StackPanel>
+                        <TextBlock HorizontalAlignment="Center" FontFamily="SimSun, Microsoft YaHei UI"
+                                   FontSize="16" FontWeight="Bold"
+                                   Foreground="{StaticResource GoldBrush}" Text="写入前自动备份" />
+                        <TextBlock Margin="0,2,0,0" HorizontalAlignment="Center" FontSize="12"
+                                   Foreground="{StaticResource TextSecondaryBrush}"
+                                   Text="仅在游戏完全关闭时操作" />
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </Border>
+
+                    <Grid Grid.Row="1" Margin="14">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="370" />
+                <ColumnDefinition Width="12" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <!-- Left rail: all paths and catalog preparation stay together. -->
+            <Border x:Name="PathInputsBorder" Grid.Column="0"
+                    Style="{StaticResource OpenPanelStyle}" Padding="0">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <StackPanel Grid.Row="0">
+                        <ContentControl Style="{StaticResource PanelHeaderStyle}"
+                                        Content="档案与内容来源" />
+                        <TextBlock Margin="18,10,18,11"
+                                   Style="{StaticResource MutedTextStyle}"
+                                   TextWrapping="Wrap"
+                                   Text="选择游戏、Mod 与存档目录，然后载入当前 Profile 的真实活动内容。" />
+                    </StackPanel>
+
+                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled">
+                        <StackPanel Margin="18,16,18,18">
+                            <Border Margin="0,0,0,12" Padding="0,2"
+                                    Background="Transparent" BorderThickness="0">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="4" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Border Grid.Column="0" Background="{StaticResource GoldBrush}" />
+                                    <TextBlock Grid.Column="1" Margin="11,0,0,0"
+                                               Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap"
+                                               Text="建议先点击自动发现。所有路径仍可手动修改；不会在启动时写死你的本机目录。" />
+                                </Grid>
+                            </Border>
+
+                            <Button Style="{StaticResource GoldButtonStyle}" Margin="0,0,0,16"
+                                    Content="自动发现游戏、Mod 与 profile_0"
+                                    Click="Discover_Click" />
+
+                            <TextBlock Style="{StaticResource FieldLabelStyle}" Text="游戏根目录" />
+                            <Grid Margin="0,4,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBox x:Name="GameDirectoryTextBox" Grid.Column="0" Margin="0,0,8,0"
+                                         TextChanged="InputPath_TextChanged"
+                                         ToolTip="启动时保持为空；点击自动发现后按 Steam 库填写" />
+                                <Button Grid.Column="1" MinWidth="82" Margin="0"
+                                        Style="{StaticResource GhostButtonStyle}"
+                                        Content="浏览…" Click="BrowseGame_Click" />
+                            </Grid>
+                            <TextBlock Margin="1,4,0,14" Style="{StaticResource MutedTextStyle}"
+                                       Text="DarkestDungeon 安装目录" />
+
+                            <TextBlock Style="{StaticResource FieldLabelStyle}" Text="Steam 创意工坊目录（可选）" />
+                            <Grid Margin="0,4,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBox x:Name="WorkshopDirectoryTextBox" Grid.Column="0" Margin="0,0,8,0"
+                                         TextChanged="InputPath_TextChanged"
+                                         ToolTip="启动时保持为空；点击自动发现后按 Steam 库默认路径填写，之后仍可手动修改" />
+                                <Button Grid.Column="1" MinWidth="82" Margin="0"
+                                        Style="{StaticResource GhostButtonStyle}"
+                                        Content="浏览…" Click="BrowseWorkshop_Click" />
+                            </Grid>
+                            <TextBlock Margin="1,4,0,14" Style="{StaticResource MutedTextStyle}"
+                                       Text="Steam Workshop / content / 262060" />
+
+                            <TextBlock Style="{StaticResource FieldLabelStyle}" Text="额外本地 Mod 目录（可选）" />
+                            <Grid Margin="0,4,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBox x:Name="LocalModDirectoryTextBox" Grid.Column="0" Margin="0,0,8,0"
+                                         TextChanged="InputPath_TextChanged"
+                                         ToolTip="启动时保持为空；点击自动发现后填写游戏目录下的 mods，也可改选其他根目录或含 project.xml 的单个 Mod 目录" />
+                                <Button Grid.Column="1" MinWidth="82" Margin="0"
+                                        Style="{StaticResource GhostButtonStyle}"
+                                        Content="浏览…" Click="BrowseLocalMods_Click" />
+                            </Grid>
+                            <TextBlock Margin="1,4,0,14" Style="{StaticResource MutedTextStyle}"
+                                       TextWrapping="Wrap"
+                                       Text="默认 mods 目录仍会扫描；这里可补充其他位置。" />
+
+                            <TextBlock Style="{StaticResource FieldLabelStyle}" Text="存档 Profile 目录" />
+                            <Grid Margin="0,4,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBox x:Name="ProfileDirectoryTextBox" Grid.Column="0" Margin="0,0,8,0"
+                                         TextChanged="InputPath_TextChanged"
+                                         ToolTip="启动时保持为空；点击自动发现后优先填写 profile_0" />
+                                <Button Grid.Column="1" MinWidth="82" Margin="0"
+                                        Style="{StaticResource GhostButtonStyle}"
+                                        Content="浏览…" Click="BrowseProfile_Click" />
+                            </Grid>
+                            <TextBlock Margin="1,4,0,16" Style="{StaticResource MutedTextStyle}"
+                                       Text="当前要读取和修改的 profile_* 目录" />
+
+                            <Button Style="{StaticResource PrimaryButtonStyle}" Margin="0"
+                                    Content="载入当前档案的内容目录"
+                                    Click="LoadCatalog_Click" />
+                        </StackPanel>
+                    </ScrollViewer>
+                </Grid>
+            </Border>
+
+            <!-- Right workspace: select, preview, apply, and inspect logs in one flow. -->
+            <Grid Grid.Column="2">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="165" />
+                </Grid.RowDefinitions>
+
+                <Border Grid.Row="0" Style="{StaticResource OpenPanelStyle}"
+                        BorderThickness="0" Padding="0" Margin="0,0,0,10">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <ContentControl Grid.Row="0"
+                                        Style="{StaticResource RedPanelHeaderStyle}"
+                                        Content="选择要生成的内容" />
+                        <TextBlock x:Name="CatalogSummaryTextBlock" Grid.Row="1"
+                                   Margin="15,8,15,5"
+                                   TextAlignment="Right" TextWrapping="Wrap"
+                                   Style="{StaticResource MutedTextStyle}" />
+
+                        <Grid Grid.Row="2" Margin="14,3,14,12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="3*" MinWidth="140" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="2*" MinWidth="190" MaxWidth="260" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Margin="2,0,8,0"
+                                       Style="{StaticResource FieldLabelStyle}" Text="筛选" />
+                            <TextBox x:Name="SearchTextBox" Grid.Column="1" Margin="0,0,8,0"
+                                     TextChanged="SearchTextBox_TextChanged"
+                                     ToolTip="按 ID、中文名、英文名、稀有度或来源筛选" />
+                            <TextBlock x:Name="CopiesLabel" Grid.Column="2" Margin="8,0,6,0"
+                                       Style="{StaticResource FieldLabelStyle}" Text="添加数量" />
+                            <TextBox x:Name="CopiesTextBox" Grid.Column="3" Width="116"
+                                     HorizontalAlignment="Left" Margin="0" Text="1" />
+                            <TextBlock x:Name="HeroLevelLabel" Grid.Column="2" Margin="8,0,6,0"
+                                       Style="{StaticResource FieldLabelStyle}" Text="人物等级"
+                                       Visibility="Collapsed" />
+                            <ComboBox x:Name="HeroLevelComboBox" Grid.Column="3" Margin="0"
+                                      Visibility="Collapsed" DisplayMemberPath="DisplayName"
+                                      SelectionChanged="HeroLevelComboBox_SelectionChanged"
+                                      ToolTip="XP、武器 rank、护甲 rank 与 HP 将按当前存档游戏模式和职业模板联动" />
+                            <Button x:Name="InitialQuirksButton" Grid.Column="4" Margin="12,0,0,0"
+                                    Style="{StaticResource GhostButtonStyle}"
+                                    Content="选择初始怪癖… (0)"
+                                    Visibility="Collapsed" IsEnabled="False"
+                                    Click="SelectInitialQuirks_Click" />
+                        </Grid>
+
+                        <TextBlock x:Name="InitialQuirkSelectionSummaryTextBlock" Grid.Row="3"
+                                   Margin="16,0,16,10" Foreground="{StaticResource GoldBrush}"
+                                   FontWeight="SemiBold" TextWrapping="Wrap" Visibility="Collapsed" />
+                    </Grid>
+                </Border>
+
+                <Grid Grid.Row="1" Margin="0,0,0,10">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <TabControl x:Name="CatalogTabs" Grid.Row="0" Margin="0,0,0,8"
+                                SelectionChanged="CatalogTabs_SelectionChanged">
+                        <TabItem Header="饰品  /  TRINKETS">
+                            <DataGrid x:Name="TrinketGrid"
+                                      AutoGenerateColumns="False"
+                                      IsReadOnly="True"
+                                      SelectionMode="Single"
+                                      SelectionChanged="TrinketGrid_SelectionChanged"
+                                      CanUserAddRows="False"
+                                      HeadersVisibility="Column">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="饰品 ID" Binding="{Binding Id}" Width="1.3*" MinWidth="105"
+                                                        ElementStyle="{StaticResource DataGridTextElementStyle}" />
+                                    <DataGridTextColumn Header="中文名" Binding="{Binding ChineseName}" Width="1.1*" MinWidth="90"
+                                                        ElementStyle="{StaticResource DataGridTextElementStyle}" />
+                                    <DataGridTextColumn Header="English" Binding="{Binding EnglishName}" Width="1.1*" MinWidth="90"
+                                                        ElementStyle="{StaticResource DataGridTextElementStyle}" />
+                                    <DataGridTextColumn Header="稀有度" Binding="{Binding Rarity}" Width="95"
+                                                        ElementStyle="{StaticResource DataGridTextElementStyle}" />
+                                    <DataGridTextColumn Header="来源" Binding="{Binding Source}" Width="1.8*" MinWidth="125"
+                                                        ElementStyle="{StaticResource DataGridTextElementStyle}" />
+                                    <DataGridTextColumn Header="定义上限" Binding="{Binding LimitDisplay}" Width="78"
+                                                        ElementStyle="{StaticResource DataGridTextElementStyle}" />
+                                    </DataGrid.Columns>
+                            </DataGrid>
+                        </TabItem>
+                        <TabItem Header="人物  /  HEROES">
+                            <DataGrid x:Name="HeroGrid"
+                                      AutoGenerateColumns="False"
+                                      IsReadOnly="True"
+                                      SelectionMode="Single"
+                                      SelectionChanged="HeroGrid_SelectionChanged"
+                                      CanUserAddRows="False"
+                                      HeadersVisibility="Column">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="职业 ID" Binding="{Binding Id}" Width="1.35*" MinWidth="105"
+                                                        ElementStyle="{StaticResource DataGridTextElementStyle}" />
+                                    <DataGridTextColumn Header="中文名" Binding="{Binding ChineseName}" Width="1.05*" MinWidth="82"
+                                                        ElementStyle="{StaticResource DataGridTextElementStyle}" />
+                                    <DataGridTextColumn Header="English" Binding="{Binding EnglishName}" Width="1.05*" MinWidth="82"
+                                                        ElementStyle="{StaticResource DataGridTextElementStyle}" />
+                                    <DataGridTextColumn Header="来源" Binding="{Binding Source}" Width="1.55*" MinWidth="115"
+                                                        ElementStyle="{StaticResource DataGridTextElementStyle}" />
+                                    <DataGridTextColumn Header="生成方式" Binding="{Binding GenerationMode}" Width="180"
+                                                        ElementStyle="{StaticResource DataGridTextElementStyle}" />
+                                    <DataGridTextColumn Header="等级范围" Binding="{Binding LevelSummary}" Width="1.15*" MinWidth="92"
+                                                        ElementStyle="{StaticResource DataGridTextElementStyle}" />
+                                    <DataGridTextColumn Header="自然怪癖范围" Binding="{Binding QuirkRange}" Width="1.25*" MinWidth="135"
+                                                        ElementStyle="{StaticResource DataGridTextElementStyle}" />
+                                    </DataGrid.Columns>
+                            </DataGrid>
+                        </TabItem>
+                    </TabControl>
+
+                    <Grid Grid.Row="1">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <TextBlock x:Name="PreviewSummaryTextBlock" Grid.Row="0" Grid.Column="0"
+                                   Margin="2,0,16,0" VerticalAlignment="Center"
+                                   TextWrapping="Wrap" />
+                        <Button x:Name="PreviewButton" Grid.Row="0" Grid.Column="1"
+                                MinWidth="210" Margin="0,0,8,0"
+                                Style="{StaticResource GoldButtonStyle}"
+                                Content="生成饰品安全预览"
+                                IsEnabled="False" Click="Preview_Click" />
+                        <Button x:Name="ApplyButton" Grid.Row="0" Grid.Column="2"
+                                MinWidth="140" Margin="0"
+                                Style="{StaticResource PrimaryButtonStyle}"
+                                Content="应用到存档"
+                                IsEnabled="False" Click="Apply_Click" />
+                        <TextBlock x:Name="PreviewWarningTextBlock" Grid.Row="1" Grid.ColumnSpan="3"
+                                   Margin="2,8,2,0" Padding="10,7"
+                                   Background="#3A2D17"
+                                   Foreground="{StaticResource WarningBrush}" TextWrapping="Wrap"
+                                   Visibility="Collapsed" />
+                    </Grid>
+                </Grid>
+
+                <Border Grid.Row="2" Style="{StaticResource OpenPanelStyle}"
+                        BorderThickness="0" Padding="0">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+                        <ContentControl Grid.Row="0" Style="{StaticResource PanelHeaderStyle}"
+                                        Content="运行日志" />
+                        <TextBox x:Name="StatusTextBox" Grid.Row="1" Margin="10"
+                                 Style="{StaticResource LogTextBoxStyle}"
+                                 IsReadOnly="True"
+                                 AcceptsReturn="True"
+                                 VerticalScrollBarVisibility="Auto"
+                                 TextWrapping="Wrap" />
+                    </Grid>
+                </Border>
+            </Grid>
+                    </Grid>
+                </Grid>
+            </Border>
+        </Border>
+    </Grid>
+</Window>
