@@ -103,17 +103,21 @@ public static class StagecoachHeroCandidateFactory
         var selectedQuirks = ResolveSelectedQuirks(
             catalog.InitialQuirks,
             selectedInitialQuirkIds);
+        var initialQuirkStates = selectedQuirks
+            .Select(quirk => new InitialQuirkPersistenceState(
+                quirk,
+                ResolveEvolutionDuration(seed, quirk)))
+            .ToArray();
         var upgradePurchases = BuildUpgradePurchases(heroClass, levelProfile.ResolveLevel);
 
-        var evolvingQuirkIds = selectedQuirks
-            .Where(quirk => quirk.HasEvolution)
-            .Select(quirk => quirk.Id)
+        var evolvingQuirkSummaries = initialQuirkStates
+            .Where(state => state.Definition.Evolution is not null)
+            .Select(FormatEvolutionSummary)
             .ToArray();
-        if (evolvingQuirkIds.Length > 0)
+        if (evolvingQuirkSummaries.Length > 0)
         {
             warnings.Add(
-                $"进化怪癖 [{string.Join(", ", evolvingQuirkIds)}] 按真实马车样本写入 " +
-                "evolution_duration_remaining=0；请在招募并保存后确认游戏已初始化进化倒计时。");
+                $"进化怪癖倒计时已按活动内容定义初始化：{string.Join("；", evolvingQuirkSummaries)}。");
         }
 
         warnings.Add("buff_group_next_guid 使用已通过测试档实机载入验证的观测基线 2。");
@@ -147,7 +151,7 @@ public static class StagecoachHeroCandidateFactory
             levelProfile.ArmourRank,
             currentHp,
             colourVariation,
-            selectedQuirks.Select(quirk => quirk.Id),
+            initialQuirkStates,
             combatSkills,
             campingSkills);
         return new GeneratedStagecoachHeroCandidate(
@@ -206,10 +210,15 @@ public static class StagecoachHeroCandidateFactory
         var applicableTrees = heroClass.UpgradeTrees
             .Where(tree => tree.Kind != HeroUpgradeTreeKind.CombatSkill)
             .Concat(expectedCombatTreeIds.Select(treeId => combatTrees[treeId]));
+        var campingPurchases = heroClass.SharedCampingSkillIds
+            .Concat(heroClass.ClassCampingSkillIds)
+            .Distinct(StringComparer.Ordinal)
+            .Select(skillId => new HeroUpgradePurchase($"{heroClass.Id}.{skillId}", "0"));
         var purchases = applicableTrees
             .SelectMany(tree => tree.Requirements
                 .Where(requirement => requirement.PrerequisiteResolveLevel <= resolveLevel)
                 .Select(requirement => new HeroUpgradePurchase(tree.Id, requirement.Code)))
+            .Concat(campingPurchases)
             .OrderBy(purchase => purchase.TreeId, StringComparer.Ordinal)
             .ThenBy(purchase => purchase.RequirementCode, StringComparer.Ordinal)
             .ToArray();
@@ -385,7 +394,11 @@ public static class StagecoachHeroCandidateFactory
             {
                 throw new InvalidOperationException($"初始怪癖 '{quirk.Id}' 没有明确的正负类型。");
             }
-            if (quirk.WriteStatus != HeroInitialQuirkWriteStatus.Direct)
+            var canWriteWithPreviewLimitCheck =
+                quirk.WriteStatus == HeroInitialQuirkWriteStatus.RequiresSaveContext &&
+                quirk.DefinitionLimit is > 0;
+            if (quirk.WriteStatus != HeroInitialQuirkWriteStatus.Direct &&
+                !canWriteWithPreviewLimitCheck)
             {
                 throw new InvalidOperationException(
                     $"初始怪癖 '{quirk.Id}' 当前不能显式写入：{quirk.WriteStatusReason}");
@@ -440,6 +453,58 @@ public static class StagecoachHeroCandidateFactory
         return modifierTotal;
     }
 
+    private static int ResolveEvolutionDuration(int seed, HeroInitialQuirkDefinition quirk)
+    {
+        if (quirk.Evolution is not { } evolution)
+        {
+            return 0;
+        }
+
+        if (evolution.DurationMin == evolution.DurationMax)
+        {
+            return evolution.DurationMin;
+        }
+
+        var span = (ulong)((long)evolution.DurationMax - evolution.DurationMin + 1L);
+        var offset = (int)(ComputeStableEvolutionHash(seed, quirk.Id) % span);
+        return evolution.DurationMin + offset;
+    }
+
+    private static ulong ComputeStableEvolutionHash(int seed, string quirkId)
+    {
+        const ulong offsetBasis = 14695981039346656037UL;
+        const ulong prime = 1099511628211UL;
+        var hash = offsetBasis;
+        var seedBits = unchecked((uint)seed);
+        for (var shift = 0; shift < 32; shift += 8)
+        {
+            hash ^= (byte)(seedBits >> shift);
+            hash *= prime;
+        }
+
+        foreach (var character in quirkId)
+        {
+            hash ^= (byte)character;
+            hash *= prime;
+            hash ^= (byte)(character >> 8);
+            hash *= prime;
+        }
+
+        return hash;
+    }
+
+    private static string FormatEvolutionSummary(InitialQuirkPersistenceState state)
+    {
+        var evolution = state.Definition.Evolution!;
+        var outcome = evolution.CausesDeath
+            ? string.IsNullOrWhiteSpace(evolution.TargetQuirkId)
+                ? "到期死亡"
+                : $"→ {evolution.TargetQuirkId} / 到期死亡"
+            : $"→ {evolution.TargetQuirkId}";
+        return $"{state.Definition.Id}={state.EvolutionDurationRemaining}" +
+               $"（配置 {evolution.DurationMin}–{evolution.DurationMax}，{outcome}）";
+    }
+
     private static JsonObject BuildCandidate(
         string heroClass,
         string name,
@@ -448,21 +513,21 @@ public static class StagecoachHeroCandidateFactory
         int armourRank,
         double currentHp,
         int colourVariation,
-        IEnumerable<string> quirks,
+        IEnumerable<InitialQuirkPersistenceState> quirks,
         IEnumerable<string> combatSkills,
         IEnumerable<string> campingSkills)
     {
         var quirkMap = new JsonObject();
         foreach (var quirk in quirks)
         {
-            quirkMap[quirk] = new JsonObject
+            quirkMap[quirk.Definition.Id] = new JsonObject
             {
                 ["is_new"] = true,
                 ["is_locked"] = false,
                 ["mission_count"] = 0,
                 ["replaces_quirk"] = 0,
                 ["replaces_quirk_viewed"] = false,
-                ["evolution_duration_remaining"] = 0
+                ["evolution_duration_remaining"] = quirk.EvolutionDurationRemaining
             };
         }
 
@@ -557,4 +622,8 @@ public static class StagecoachHeroCandidateFactory
             (values[index], values[replacement]) = (values[replacement], values[index]);
         }
     }
+
+    private sealed record InitialQuirkPersistenceState(
+        HeroInitialQuirkDefinition Definition,
+        int EvolutionDurationRemaining);
 }

@@ -115,6 +115,15 @@ Assert(
     mainWindowCode.Contains("0 => \"无限\"", StringComparison.Ordinal) &&
     mainWindowCode.Contains("PreviewWarningTextBlock", StringComparison.Ordinal),
     "The trinket UI must render limit zero as unlimited and expose a dedicated preview warning area.");
+Assert(
+    mainWindowCode.Contains(
+        "FormatHeroQuirkLimitWarnings(preparedHeroEdit.Preview)",
+        StringComparison.Ordinal) &&
+    mainWindowCode.Contains("全部马车池", StringComparison.Ordinal) &&
+    mainWindowCode.Contains("（singleton）", StringComparison.Ordinal) &&
+    mainWindowCode.Contains("编辑器会按控制台模式保留写入能力", StringComparison.Ordinal) &&
+    !mainWindowCode.Contains("HeroQuirkLimitKind.RosterLimit", StringComparison.Ordinal),
+    "Hero quirk warnings must remain scoped to singleton duplication across the roster and all stagecoach pools.");
 System.Xml.Linq.XElement ReadNamedMainElement(string elementName, string name) => mainWindowXaml
     .Descendants(presentationNamespace + elementName)
     .Single(element => element.Attribute(xamlName)?.Value == name);
@@ -593,9 +602,26 @@ Assert(
         .Single(column => column.Attribute("Header")?.Value == "不可用原因")
         .Attribute("MinWidth")?.Value == "190" &&
     !initialQuirkDialogXaml.ToString().Contains("职业禁用项", StringComparison.Ordinal) &&
+    initialQuirkDialogXaml.ToString().Contains(
+        "roster_limit 由游戏在招募进入 roster 时执行，生成马车候选不检查也不警告",
+        StringComparison.Ordinal) &&
     !initialQuirkDialogCode.Contains("selectedIds.Append(row.Id)", StringComparison.Ordinal) &&
     initialQuirkDialogCode.Contains("IncompatibleQuirkIds.Contains", StringComparison.Ordinal),
     "The initial quirk dialog must fully show fixed/special kind text, keep quota feedback in the summary/click validation, and reserve row-level dynamic reasons for actual incompatibilities.");
+var initialQuirkGrid = initialQuirkDialogXaml
+    .Descendants(presentationNamespace + "DataGrid")
+    .Single(grid => grid.Attribute(xamlName)?.Value == "QuirkGrid");
+var initialQuirkCheckBox = initialQuirkGrid
+    .Descendants(presentationNamespace + "CheckBox")
+    .Single(checkBox => checkBox.Attribute("Click")?.Value == "QuirkCheckBox_Click");
+Assert(
+    initialQuirkGrid.Attribute("IsReadOnly")?.Value == "True" &&
+    initialQuirkCheckBox.Attribute("IsChecked")?.Value == "{Binding IsSelected, Mode=OneWay}" &&
+    initialQuirkDialogCode.Contains("_view is IEditableCollectionView editableView", StringComparison.Ordinal) &&
+    initialQuirkDialogCode.Contains("editableView.CommitEdit();", StringComparison.Ordinal) &&
+    mainWindowCode.Contains("if (dialog?.IsVisible == true)", StringComparison.Ordinal) &&
+    mainWindowCode.Contains("dialog.Close();", StringComparison.Ordinal),
+    "The quirk selector must not open DataGrid edit transactions and must close an orphaned dialog if ShowDialog unwinds unexpectedly.");
 
 var jarPath = Path.Combine(repositoryRoot, "tools", "DDSaveEditor", "DDSaveEditor.jar");
 var runRoot = Path.Combine(
@@ -811,6 +837,13 @@ File.WriteAllText(
         { "id": "semantic_priority_quirk", "random_chance": 1, "is_positive": false, "is_disease": false, "buffs": [] },
         { "id": "unknown_hp_rule", "random_chance": 100, "is_positive": true, "is_disease": false, "buffs": ["MAXHP_CONDITIONAL"] },
         { "id": "evolving_quirk", "random_chance": 100, "is_positive": true, "is_disease": false, "buffs": [], "evolution_duration_min": 60, "evolution_duration_max": 60, "evolution_class_id": "evolved_quirk" },
+        { "id": "evolving_variable", "random_chance": 100, "is_positive": true, "is_disease": false, "buffs": [], "evolution_duration_min": 3, "evolution_duration_max": 15, "evolution_town_progression_duration_change": 1, "evolution_class_id": "evolved_variable" },
+        { "id": "evolving_zero", "random_chance": 100, "is_positive": true, "is_disease": false, "buffs": [], "evolution_duration_min": 0, "evolution_duration_max": 0, "evolution_class_id": "evolved_immediately" },
+        { "id": "evolving_death", "random_chance": 100, "is_positive": false, "is_disease": true, "buffs": [], "evolution_duration_min": 61, "evolution_duration_max": 61, "evolution_town_progression_duration_change": 30, "evolution_town_attempt_use_item_duration_threshold": 61, "evolution_causes_death": true },
+        { "id": "evolution_missing_max", "random_chance": 100, "is_positive": false, "is_disease": false, "buffs": [], "evolution_duration_min": 3, "evolution_class_id": "broken_target" },
+        { "id": "evolution_inverted", "random_chance": 100, "is_positive": false, "is_disease": false, "buffs": [], "evolution_duration_min": 15, "evolution_duration_max": 3, "evolution_class_id": "broken_target" },
+        { "id": "evolution_fractional", "random_chance": 100, "is_positive": false, "is_disease": false, "buffs": [], "evolution_duration_min": 3.5, "evolution_duration_max": 15, "evolution_class_id": "broken_target" },
+        { "id": "evolution_missing_outcome", "random_chance": 100, "is_positive": false, "is_disease": false, "buffs": [], "evolution_duration_min": 3, "evolution_duration_max": 15 },
         { "id": "evolving_unknown_hp", "random_chance": 100, "is_positive": true, "is_disease": false, "buffs": ["MAXHP_CONDITIONAL"], "evolution_duration_min": 30, "evolution_duration_max": 60, "evolution_class_id": "evolved_unknown_hp" },
         { "id": "flat_hp_quirk", "random_chance": 1, "is_positive": true, "is_disease": false, "buffs": ["MAXHP_FLAT"] },
         { "id": "multiple_hp_quirk", "random_chance": 1, "is_positive": true, "is_disease": false, "buffs": ["MAXHP10", "MAXHP-5"] },
@@ -2045,7 +2078,15 @@ File.WriteAllText(
                 "deck_history_version_0": {}
               },
               "shard_hero_recruit": {
-                "generated": {},
+                "generated": {
+                  "300": {
+                    "heroClass": "shieldbreaker",
+                    "actor": {},
+                    "quirks": {
+                      "context_roster_limited": {}
+                    }
+                  }
+                },
                 "deck_history_version_0": {}
               }
             }
@@ -2064,6 +2105,21 @@ for (var index = 0; index < 36; index++)
         ["heroClass"] = "crusader"
     };
 }
+
+((JsonObject)rosterHeroesSeed["0"]!)["hero_file_data"] = new JsonObject
+{
+    ["raw_data"] = new JsonObject
+    {
+        ["base_root"] = new JsonObject
+        {
+            ["quirks"] = new JsonObject
+            {
+                ["context_special"] = new JsonObject(),
+                ["context_roster_limited"] = new JsonObject()
+            }
+        }
+    }
+};
 
 var rosterSeed = new JsonObject
 {
@@ -2546,6 +2602,7 @@ Assert(
     heroCatalog.InitialQuirks.Single(item => item.Id == "identical_evolution_quirk") is
     {
         HasEvolution: true,
+        Evolution: { DurationMin: 30, DurationMax: 60, TargetQuirkId: "same_target" },
         WriteStatus: HeroInitialQuirkWriteStatus.Direct
     } &&
     heroCatalog.Issues.All(issue => !issue.Contains("identical_evolution_quirk", StringComparison.Ordinal)),
@@ -2625,13 +2682,19 @@ Assert(
     contextualQuirk is
     {
         Kind: HeroInitialQuirkKind.Special,
-        WriteStatus: HeroInitialQuirkWriteStatus.RequiresSaveContext
-    },
-    "A singleton special quirk should remain visible but require whole-save context.");
+        WriteStatus: HeroInitialQuirkWriteStatus.RequiresSaveContext,
+        DefinitionLimit: 1
+    } &&
+    contextualQuirk.WriteStatusReason.Contains("超限仅警告", StringComparison.Ordinal),
+    "A singleton special quirk should expose limit one and remain selectable through preview-time context checking.");
+var rosterLimitedQuirk = heroCatalog.InitialQuirks.Single(item => item.Id == "context_roster_limited");
 Assert(
-    heroCatalog.InitialQuirks.Single(item => item.Id == "context_roster_limited").WriteStatus ==
-    HeroInitialQuirkWriteStatus.RequiresSaveContext,
-    "A roster_limit quirk should remain blocked until every roster and stagecoach pool is checked.");
+    rosterLimitedQuirk is
+    {
+        WriteStatus: HeroInitialQuirkWriteStatus.Direct,
+        DefinitionLimit: null
+    },
+    "A positive roster_limit must remain directly writable because the game enforces it when the candidate is recruited, not when it is generated in the stagecoach.");
 var diseaseQuirk = heroCatalog.InitialQuirks.Single(item => item.Id == "test_disease");
 Assert(
     diseaseQuirk is
@@ -2646,9 +2709,16 @@ Assert(
     evolvingQuirk is
     {
         HasEvolution: true,
+        Evolution:
+        {
+            DurationMin: 60,
+            DurationMax: 60,
+            TargetQuirkId: "evolved_quirk",
+            CausesDeath: false
+        },
         WriteStatus: HeroInitialQuirkWriteStatus.Direct
     },
-    "Evolution metadata alone should not block a stagecoach candidate because real stagecoach samples persist a zero remaining duration.");
+    "A complete evolution definition should expose its structured duration and target metadata.");
 Assert(
     heroCatalog.InitialQuirks.Single(item => item.Id == "evolving_disease") is
     {
@@ -2656,7 +2726,64 @@ Assert(
         HasEvolution: true,
         WriteStatus: HeroInitialQuirkWriteStatus.Direct
     },
-    "An evolving disease without an unknown HP rule should use the same stagecoach persistence contract.");
+    "An evolving disease without an unknown HP rule should use the same initialized-duration contract.");
+Assert(
+    heroCatalog.InitialQuirks.Single(item => item.Id == "evolving_variable").Evolution is
+    {
+        DurationMin: 3,
+        DurationMax: 15,
+        TownProgressionDurationChange: 1,
+        TargetQuirkId: "evolved_variable",
+        CausesDeath: false
+    },
+    "A variable Mod evolution range should remain attached to its own quirk definition.");
+Assert(
+    heroCatalog.InitialQuirks.Single(item => item.Id == "evolving_death") is
+    {
+        WriteStatus: HeroInitialQuirkWriteStatus.Direct,
+        Evolution:
+        {
+            DurationMin: 61,
+            DurationMax: 61,
+            TownProgressionDurationChange: 30,
+            TargetQuirkId: null,
+            CausesDeath: true,
+            TownAttemptUseItemDurationThreshold: 61
+        }
+    },
+    "The original-game death evolution shape should be valid without an evolution_class_id.");
+Assert(
+    heroCatalog.InitialQuirks.Single(item => item.Id == "evolution_missing_max") is
+    {
+        HasEvolution: false,
+        WriteStatus: HeroInitialQuirkWriteStatus.Unverified
+    } missingMaximumEvolution &&
+    missingMaximumEvolution.WriteStatusReason.Contains("evolution_duration_max", StringComparison.Ordinal),
+    "A missing evolution maximum must remain visible but unavailable.");
+Assert(
+    heroCatalog.InitialQuirks.Single(item => item.Id == "evolution_inverted") is
+    {
+        HasEvolution: false,
+        WriteStatus: HeroInitialQuirkWriteStatus.Unverified
+    } invertedEvolution &&
+    invertedEvolution.WriteStatusReason.Contains("下限不能大于上限", StringComparison.Ordinal),
+    "An inverted evolution range must not silently fall back to zero.");
+Assert(
+    heroCatalog.InitialQuirks.Single(item => item.Id == "evolution_fractional") is
+    {
+        HasEvolution: false,
+        WriteStatus: HeroInitialQuirkWriteStatus.Unverified
+    } fractionalEvolution &&
+    fractionalEvolution.WriteStatusReason.Contains("32 位整数", StringComparison.Ordinal),
+    "A fractional evolution duration cannot be represented by the integer save field.");
+Assert(
+    heroCatalog.InitialQuirks.Single(item => item.Id == "evolution_missing_outcome") is
+    {
+        HasEvolution: false,
+        WriteStatus: HeroInitialQuirkWriteStatus.Unverified
+    } missingOutcomeEvolution &&
+    missingOutcomeEvolution.WriteStatusReason.Contains("evolution_class_id", StringComparison.Ordinal),
+    "An evolution definition without a target or death outcome must be rejected.");
 Assert(
     heroCatalog.InitialQuirks.Single(item => item.Id == "unknown_hp_disease").WriteStatus ==
     HeroInitialQuirkWriteStatus.Unverified,
@@ -2705,9 +2832,15 @@ StagecoachHeroCandidateFactory.ValidateInitialQuirkSelection(
     heroCatalog,
     localHero,
     ["test_disease", "test_disease_two", "test_disease_three"]);
+StagecoachHeroCandidateFactory.ValidateInitialQuirkSelection(
+    heroCatalog,
+    localHero,
+    ["context_special", "context_roster_limited"]);
 AssertInitialQuirkSelectionRejected(heroCatalog, localHero, ["tough", "fragile"], "互斥");
-AssertInitialQuirkSelectionRejected(heroCatalog, localHero, ["context_special"], "当前不能显式写入");
-AssertInitialQuirkSelectionRejected(heroCatalog, localHero, ["context_roster_limited"], "当前不能显式写入");
+AssertInitialQuirkSelectionRejected(heroCatalog, localHero, ["evolution_missing_max"], "当前不能显式写入");
+AssertInitialQuirkSelectionRejected(heroCatalog, localHero, ["evolution_inverted"], "当前不能显式写入");
+AssertInitialQuirkSelectionRejected(heroCatalog, localHero, ["evolution_fractional"], "当前不能显式写入");
+AssertInitialQuirkSelectionRejected(heroCatalog, localHero, ["evolution_missing_outcome"], "当前不能显式写入");
 AssertInitialQuirkSelectionRejected(heroCatalog, localHero, ["unknown_hp_rule"], "当前不能显式写入");
 AssertInitialQuirkSelectionRejected(heroCatalog, localHero, ["evolving_unknown_hp"], "当前不能显式写入");
 AssertInitialQuirkSelectionRejected(heroCatalog, localHero, ["flat_hp_quirk"], "当前不能显式写入");
@@ -2747,12 +2880,24 @@ Assert(
     "A level-zero candidate should write zero XP and equipment ranks.");
 var generatedQuirkMap = generatedCandidate.Candidate["quirks"] as JsonObject;
 Assert(generatedQuirkMap?.Count == 0, "Default candidate JSON should contain an empty quirk map.");
+var expectedCampingTreeIds = localHero.SharedCampingSkillIds
+    .Concat(localHero.ClassCampingSkillIds)
+    .Select(skillId => $"local_hero.{skillId}")
+    .ToHashSet(StringComparer.Ordinal);
 Assert(
-    generatedCandidate.UpgradePurchases.Count == 2 &&
-    generatedCandidate.UpgradePurchases.All(purchase => purchase.RequirementCode == "a") &&
-    generatedCandidate.UpgradePurchases.Select(purchase => purchase.TreeId).ToHashSet(StringComparer.Ordinal)
-        .SetEquals(["local_hero.local_skill", "local_hero.local_skill_two"]),
-    "A level-zero candidate should unlock the base requirement for every combat skill tree.");
+    generatedCandidate.UpgradePurchases.Count == 6 &&
+    generatedCandidate.UpgradePurchases.Count(purchase =>
+        (purchase.TreeId == "local_hero.local_skill" ||
+         purchase.TreeId == "local_hero.local_skill_two") &&
+        purchase.RequirementCode == "a") == 2 &&
+    generatedCandidate.UpgradePurchases.Count(purchase =>
+        expectedCampingTreeIds.Contains(purchase.TreeId) &&
+        purchase.RequirementCode == "0") == 4,
+    "A level-zero candidate should unlock every combat tree base requirement and every available camping skill.");
+Assert(
+    generatedPreview.CampingSkills.Count == 2 &&
+    expectedCampingTreeIds.Count == 4,
+    "Unlocking every camping skill must not equip every camping skill in the candidate selection map.");
 
 var partialCombatUpgradeHero = localHero with
 {
@@ -2814,8 +2959,9 @@ Assert(explicitQuirkMap?.Count == 3, "Explicit candidate JSON quirk map does not
 Assert(
     explicitQuirkMap!.All(pair =>
         pair.Value?["is_new"]?.GetValue<bool>() == true &&
-        pair.Value?["mission_count"]?.GetValue<int>() == 0),
-    "Explicit initial quirk state should use canonical new-candidate flags and a zero mission count.");
+        pair.Value?["mission_count"]?.GetValue<int>() == 0 &&
+        pair.Value?["evolution_duration_remaining"]?.GetValue<int>() == 0),
+    "Non-evolving initial quirks should retain canonical flags, a zero mission count, and a zero evolution field.");
 
 var specialCandidate = StagecoachHeroCandidateFactory.Generate(
     heroCatalog,
@@ -2825,6 +2971,16 @@ var specialCandidate = StagecoachHeroCandidateFactory.Generate(
 Assert(
     specialCandidate.Preview.PositiveQuirks.SequenceEqual(["priority_top_quirk"]),
     "A directly writable fixed/special quirk should be preserved exactly in the generated candidate.");
+
+var contextLimitedCandidate = StagecoachHeroCandidateFactory.Generate(
+    heroCatalog,
+    localHero,
+    seed: 1729,
+    selectedInitialQuirkIds: ["context_special", "context_roster_limited"]);
+Assert(
+    contextLimitedCandidate.Preview.PositiveQuirks.SequenceEqual(["context_special"]) &&
+    contextLimitedCandidate.Preview.NegativeQuirks.SequenceEqual(["context_roster_limited"]),
+    "A singleton or roster-limited quirk should generate normally before its save-context limit is previewed.");
 
 var classExcludedCandidate = StagecoachHeroCandidateFactory.Generate(
     heroCatalog,
@@ -2842,11 +2998,72 @@ var evolvingCandidate = StagecoachHeroCandidateFactory.Generate(
     selectedInitialQuirkIds: ["evolving_quirk"]);
 var evolvingCandidateQuirk = evolvingCandidate.Candidate["quirks"]?["evolving_quirk"];
 Assert(
-    evolvingCandidateQuirk?["evolution_duration_remaining"]?.GetValue<int>() == 0 &&
+    evolvingCandidateQuirk?["evolution_duration_remaining"]?.GetValue<int>() == 60 &&
     evolvingCandidate.Preview.Warnings.Any(warning =>
         warning.Contains("evolving_quirk", StringComparison.Ordinal) &&
-        warning.Contains("招募并保存", StringComparison.Ordinal)),
-    "An evolving stagecoach quirk should persist a zero remaining duration and surface the required post-recruit validation warning.");
+        warning.Contains("evolving_quirk=60", StringComparison.Ordinal) &&
+        warning.Contains("60–60", StringComparison.Ordinal)) &&
+    evolvingCandidate.Preview.Warnings.All(warning =>
+        !warning.Contains("招募并保存", StringComparison.Ordinal)),
+    "A fixed evolution range should be written directly without the disproven game-initialization warning.");
+
+var variableEvolutionCandidate = StagecoachHeroCandidateFactory.Generate(
+    heroCatalog,
+    localHero,
+    seed: 1729,
+    selectedInitialQuirkIds: ["evolving_variable"]);
+var repeatedVariableEvolutionCandidate = StagecoachHeroCandidateFactory.Generate(
+    heroCatalog,
+    localHero,
+    seed: 1729,
+    selectedInitialQuirkIds: ["evolving_variable"]);
+var variableEvolutionDuration = variableEvolutionCandidate.Candidate["quirks"]?["evolving_variable"]?
+    ["evolution_duration_remaining"]?.GetValue<int>();
+var repeatedVariableEvolutionDuration = repeatedVariableEvolutionCandidate.Candidate["quirks"]?["evolving_variable"]?
+    ["evolution_duration_remaining"]?.GetValue<int>();
+Assert(
+    variableEvolutionDuration is >= 3 and <= 15 &&
+    repeatedVariableEvolutionDuration == variableEvolutionDuration,
+    "A variable evolution duration should be deterministic for one seed and stay inside its own inclusive range.");
+Assert(
+    variableEvolutionCandidate.Preview.Name == generatedCandidate.Preview.Name &&
+    variableEvolutionCandidate.Preview.ColourVariation == generatedCandidate.Preview.ColourVariation &&
+    variableEvolutionCandidate.Preview.CombatSkills.SequenceEqual(generatedCandidate.Preview.CombatSkills) &&
+    variableEvolutionCandidate.Preview.CampingSkills.SequenceEqual(generatedCandidate.Preview.CampingSkills),
+    "Evolution-duration initialization must not shift the existing hero name, skin, or skill random sequence.");
+var reversedEvolutionSelectionCandidate = StagecoachHeroCandidateFactory.Generate(
+    heroCatalog,
+    localHero,
+    seed: 1729,
+    selectedInitialQuirkIds: ["steady", "evolving_variable"]);
+Assert(
+    reversedEvolutionSelectionCandidate.Candidate["quirks"]?["evolving_variable"]?
+        ["evolution_duration_remaining"]?.GetValue<int>() == variableEvolutionDuration,
+    "An evolution duration should depend on the seed and quirk ID, not selection order or neighboring quirks.");
+
+var zeroEvolutionCandidate = StagecoachHeroCandidateFactory.Generate(
+    heroCatalog,
+    localHero,
+    seed: 1729,
+    selectedInitialQuirkIds: ["evolving_zero"]);
+Assert(
+    zeroEvolutionCandidate.Candidate["quirks"]?["evolving_zero"]?
+        ["evolution_duration_remaining"]?.GetValue<int>() == 0 &&
+    zeroEvolutionCandidate.Preview.Warnings.Any(warning =>
+        warning.Contains("配置 0–0", StringComparison.Ordinal)),
+    "An author-defined zero-to-zero evolution range should preserve its intentional immediate expiry.");
+
+var deathEvolutionCandidate = StagecoachHeroCandidateFactory.Generate(
+    heroCatalog,
+    localHero,
+    seed: 1729,
+    selectedInitialQuirkIds: ["evolving_death"]);
+Assert(
+    deathEvolutionCandidate.Candidate["quirks"]?["evolving_death"]?
+        ["evolution_duration_remaining"]?.GetValue<int>() == 61 &&
+    deathEvolutionCandidate.Preview.Warnings.Any(warning =>
+        warning.Contains("到期死亡", StringComparison.Ordinal)),
+    "A death evolution should initialize its configured duration without requiring a target quirk ID.");
 
 var diseaseCandidate = StagecoachHeroCandidateFactory.Generate(
     heroCatalog,
@@ -2916,12 +3133,15 @@ Assert(
     ((JsonObject)levelFourCandidate.Candidate["skills"]!["selected_camping_skills"]!).All(pair => pair.Value?.GetValue<int>() == 0),
     "Selected skill maps should retain zero values at non-zero hero levels.");
 Assert(
-    levelFourCandidate.UpgradePurchases.Count == 14 &&
+    levelFourCandidate.UpgradePurchases.Count == 18 &&
     levelFourCandidate.UpgradePurchases.Count(purchase => purchase.TreeId == "local_hero.weapon") == 3 &&
     levelFourCandidate.UpgradePurchases.Count(purchase => purchase.TreeId == "local_hero.armour") == 3 &&
     levelFourCandidate.UpgradePurchases.Count(purchase =>
         purchase.TreeId == "local_hero.local_skill" ||
         purchase.TreeId == "local_hero.local_skill_two") == 8 &&
+    levelFourCandidate.UpgradePurchases.Count(purchase =>
+        expectedCampingTreeIds.Contains(purchase.TreeId) &&
+        purchase.RequirementCode == "0") == 4 &&
     levelFourCandidate.UpgradePurchases.Any(purchase =>
         purchase.TreeId == "local_hero.local_skill" &&
         purchase.RequirementCode == "B") &&
@@ -2929,7 +3149,7 @@ Assert(
         purchase.TreeId == "local_hero.local_skill" &&
         purchase.RequirementCode == "A") &&
     levelFourCandidate.UpgradePurchases.All(purchase => purchase.RequirementCode != "c"),
-    "A level-four candidate should unlock every combat skill through the selected level while preserving case-sensitive custom requirement codes.");
+    "A level-four candidate should unlock every camping skill and every combat skill through the selected level while preserving case-sensitive custom requirement codes.");
 
 var levelSixCandidate = StagecoachHeroCandidateFactory.Generate(
     heroCatalog,
@@ -2979,7 +3199,6 @@ AssertHeroGenerationRejected(
     ["clumsy", "slowdraw", "off_guard", "nervous", "weak_grip", "fearful"],
     "负面 5 个");
 AssertHeroGenerationRejected(heroCatalog, localHero, ["tough", "fragile"], "互斥");
-AssertHeroGenerationRejected(heroCatalog, localHero, ["context_special"], "当前不能显式写入");
 AssertHeroGenerationRejected(heroCatalog, localHero, ["unknown_hp_rule"], "当前不能显式写入");
 AssertHeroGenerationRejected(heroCatalog, localHero, ["unknown_hp_disease"], "当前不能显式写入");
 AssertHeroGenerationRejected(
@@ -3102,12 +3321,23 @@ var existingCandidateTown = JsonNode.Parse(
             "store": {
               "hero_recruit": {
                 "generated": {
-                  "100": { "heroClass": "hellion", "actor": {} }
+                  "100": {
+                    "heroClass": "hellion",
+                    "actor": {},
+                    "quirks": { "context_special": {} }
+                  }
                 }
               },
               "shard_hero_recruit": {
                 "generated": {
-                  "200": { "heroClass": "shieldbreaker", "actor": {} }
+                  "200": {
+                    "heroClass": "shieldbreaker",
+                    "actor": {},
+                    "quirks": {
+                      "context_special": {},
+                      "context_roster_limited": {}
+                    }
+                  }
                 }
               }
             }
@@ -3122,7 +3352,19 @@ var existingCandidateRoster = JsonNode.Parse(
       "base_root": {
         "nextGuid": 364,
         "heroes": {
-          "1": { "heroClass": "crusader" }
+          "1": {
+            "heroClass": "crusader",
+            "hero_file_data": {
+              "raw_data": {
+                "base_root": {
+                  "quirks": {
+                    "context_special": {},
+                    "context_roster_limited": {}
+                  }
+                }
+              }
+            }
+          }
         }
       }
     }
@@ -3143,6 +3385,27 @@ var existingCandidateUpgrades = JsonNode.Parse(
       }
     }
     """) as JsonObject ?? throw new InvalidDataException("Stagecoach mutation upgrades fixture is invalid.");
+var contextualLimitPreviews = StagecoachHeroSaveEditor.AnalyzeQuirkLimits(
+    existingCandidateTown,
+    existingCandidateRoster,
+    contextLimitedCandidate.Candidate,
+    heroCatalog.InitialQuirks);
+Assert(
+    contextualLimitPreviews.Count == 1 &&
+    contextualLimitPreviews.All(item => item.QuirkId == "context_special"),
+    "roster_limit must not enter stagecoach-generation limit analysis because the game enforces it later during recruitment.");
+var singletonLimitPreview = contextualLimitPreviews.Single(item => item.QuirkId == "context_special");
+Assert(
+    singletonLimitPreview is
+    {
+        ExistingRosterHeroes: 1,
+        ExistingStagecoachCandidates: 2,
+        ExistingHeroes: 3,
+        ResultingHeroes: 4,
+        DefinitionLimit: 1,
+        ExceedsDefinitionLimit: true
+    },
+    "A singleton preview must count the owned roster, ordinary and shard stagecoach candidates before adding one.");
 var (mutatedTown, mutatedRoster, mutatedUpgrades, mutationPreview) = StagecoachHeroSaveEditor.AddCandidate(
     existingCandidateTown,
     existingCandidateRoster,
@@ -3153,7 +3416,7 @@ var mutatedGenerated = mutatedTown["base_root"]?["buildings"]?["stage_coach"]?["
 var mutatedPurchases = mutatedUpgrades["base_root"]?["purchases"] as JsonObject;
 Assert(mutationPreview.CandidateGuid == 364, "Stagecoach candidate should use roster nextGuid without filling holes.");
 Assert(
-    mutationPreview is { ResolveXp: 24, WeaponRank: 3, ArmourRank: 3, UpgradePurchaseCount: 14 },
+    mutationPreview is { ResolveXp: 24, WeaponRank: 3, ArmourRank: 3, UpgradePurchaseCount: 18 },
     "Stagecoach mutation preview should preserve the candidate progression metadata.");
 Assert(mutationPreview.ExistingCandidates == 1 && mutationPreview.ResultingCandidates == 2, "Existing normal recruits must be preserved while appending.");
 Assert(mutatedGenerated?.ContainsKey("100") == true && mutatedGenerated.ContainsKey("364"), "Normal recruit append removed an existing candidate or missed the new GUID.");
@@ -3168,12 +3431,12 @@ Assert(
 Assert((existingCandidateTown["base_root"]?["buildings"]?["stage_coach"]?["store"]?["hero_recruit"]?["generated"] as JsonObject)?.Count == 1, "Pure mutation changed the input town document.");
 Assert(existingCandidateRoster["base_root"]?["nextGuid"]?.GetValue<int>() == 364, "Pure mutation changed the input roster document.");
 Assert(
-    mutatedPurchases?.Count == 15 &&
+    mutatedPurchases?.Count == 19 &&
     mutatedPurchases.ContainsKey("7") &&
     mutatedPurchases.ContainsKey("8") &&
     mutatedPurchases.Select(pair => pair.Value)
         .OfType<JsonObject>()
-        .Count(purchase => purchase["instance_number"]?.GetValue<int>() == 364) == 14,
+        .Count(purchase => purchase["instance_number"]?.GetValue<int>() == 364) == 18,
     "Stagecoach mutation should append every level-derived upgrade purchase after the highest existing key.");
 var expectedLocalSkillHash = unchecked((int)HashLoc2Key("local_hero.local_skill"));
 Assert(
@@ -3190,6 +3453,13 @@ Assert(
         .ToHashSet(StringComparer.Ordinal)
         .IsSupersetOf(["a", "A"]),
     "Requirement codes that differ only by case must remain distinct purchases.");
+var expectedCampingSkillHash = unchecked((int)HashLoc2Key("local_hero.local_camp_two"));
+Assert(
+    mutatedPurchases!.Select(pair => pair.Value).OfType<JsonObject>().Any(purchase =>
+        purchase["instance_number"]?.GetValue<int>() == 364 &&
+        purchase["tree_id"]?.GetValue<int>() == expectedCampingSkillHash &&
+        purchase["requirement_code"]?.GetValue<string>() == "0"),
+    "Stagecoach mutation should persist implicit class-prefixed camping unlock trees with requirement code zero.");
 Assert(
     (existingCandidateUpgrades["base_root"]?["purchases"] as JsonObject)?.Count == 1,
     "Pure mutation changed the input upgrades document.");
@@ -3267,6 +3537,27 @@ var stagecoachLocations = new SaveEditorLocations(
     Path.Combine(runRoot, "stagecoach-appdata", "workspaces"),
     Path.Combine(runRoot, "stagecoach-appdata", "backups"));
 var stagecoachService = new SaveEditService(codec, stagecoachLocations);
+var preparedContextLimitedStagecoach = await stagecoachService.PrepareStagecoachHeroEditAsync(
+    profile,
+    contextLimitedCandidate,
+    heroCatalog,
+    activeContent);
+var preparedSingletonLimit = preparedContextLimitedStagecoach.Preview.QuirkLimits.Single(item =>
+    item.QuirkId == "context_special");
+Assert(
+    preparedSingletonLimit is
+    {
+        ExistingRosterHeroes: 1,
+        ExistingStagecoachCandidates: 0,
+        ResultingHeroes: 2,
+        DefinitionLimit: 1,
+        ExceedsDefinitionLimit: true
+    },
+    "Prepared hero preview should retain an over-limit singleton warning without blocking the candidate edit.");
+Assert(
+    !preparedContextLimitedStagecoach.Preview.QuirkLimits.Any(item =>
+        item.QuirkId == "context_roster_limited"),
+    "A roster_limit quirk must not create a stagecoach preview warning because the editor does not recruit the candidate into the owned roster.");
 var preparedStagecoach = await stagecoachService.PrepareStagecoachHeroEditAsync(
     profile,
     levelFourCandidate,
@@ -3274,7 +3565,7 @@ var preparedStagecoach = await stagecoachService.PrepareStagecoachHeroEditAsync(
     activeContent);
 Assert(preparedStagecoach.Preview.CandidateGuid == 364, "Prepared stagecoach candidate should use save nextGuid 364.");
 Assert(
-    preparedStagecoach.Preview is { ResolveXp: 24, WeaponRank: 3, ArmourRank: 3, UpgradePurchaseCount: 14 },
+    preparedStagecoach.Preview is { ResolveXp: 24, WeaponRank: 3, ArmourRank: 3, UpgradePurchaseCount: 18 },
     "Prepared stagecoach preview should retain non-zero XP and equipment ranks.");
 Assert(preparedStagecoach.Preview.ExistingCandidates == 0 && preparedStagecoach.Preview.ResultingCandidates == 1, "Empty normal recruit pool should receive exactly one candidate.");
 Assert(preparedStagecoach.Preview.RosterHeroCount == 36, "A full 36-hero roster should remain valid for stagecoach generation.");
@@ -3376,7 +3667,7 @@ Assert(
     stagecoachBackupManifest?["resolveXp"]?.GetValue<int>() == 24 &&
     stagecoachBackupManifest["weaponRank"]?.GetValue<int>() == 3 &&
     stagecoachBackupManifest["armourRank"]?.GetValue<int>() == 3 &&
-    stagecoachBackupManifest["upgradePurchaseCount"]?.GetValue<int>() == 14,
+    stagecoachBackupManifest["upgradePurchaseCount"]?.GetValue<int>() == 18,
     "Stagecoach backup manifest should record the generated level profile metadata.");
 Assert(File.Exists(Path.Combine(stagecoachCommit.BackupDirectory, "transaction-state.json")), "Stagecoach transaction state is missing.");
 Assert(File.Exists(Path.Combine(stagecoachCommit.BackupDirectory, "commit-result.json")), "Stagecoach commit result is missing.");
@@ -3403,7 +3694,7 @@ Assert(
 var committedPurchases = committedUpgradesRoot["base_root"]?["purchases"] as JsonObject;
 Assert(
     committedPurchases?.Select(pair => pair.Value).OfType<JsonObject>().Count(purchase =>
-        purchase["instance_number"]?.GetValue<int>() == 364) == 14,
+        purchase["instance_number"]?.GetValue<int>() == 364) == 18,
     "Committed upgrades are missing the candidate's complete level-derived purchase plan.");
 
 var unfinishedBackupDirectory = Path.Combine(

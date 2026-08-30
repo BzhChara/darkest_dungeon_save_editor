@@ -133,6 +133,14 @@ public sealed record HeroMaxHpModifier(
     double Amount,
     string RuleType);
 
+public sealed record HeroQuirkEvolutionDefinition(
+    int DurationMin,
+    int DurationMax,
+    int? TownProgressionDurationChange,
+    string? TargetQuirkId,
+    bool CausesDeath,
+    int? TownAttemptUseItemDurationThreshold);
+
 public enum HeroInitialQuirkKind
 {
     Natural,
@@ -153,7 +161,7 @@ public sealed record HeroInitialQuirkDefinition(
     bool? IsPositive,
     double? RandomChance,
     bool IsDisease,
-    bool HasEvolution,
+    HeroQuirkEvolutionDefinition? Evolution,
     IReadOnlyList<string> IncompatibleQuirkIds,
     HeroMaxHpModifier? MaxHpModifier,
     HeroInitialQuirkKind Kind,
@@ -166,6 +174,8 @@ public sealed record HeroInitialQuirkDefinition(
 {
     public BilingualContentName LocalizedName { get; init; } = BilingualContentName.Empty;
     public string SourceLabel { get; init; } = string.Empty;
+    public int? DefinitionLimit { get; init; }
+    public bool HasEvolution => Evolution is not null;
 }
 
 public sealed record HeroClassCatalogResult(
@@ -238,7 +248,21 @@ public sealed record StagecoachHeroMutationPreview(
     int ResultingCandidates,
     int OriginalNextGuid,
     int ResultingNextGuid,
-    int RosterHeroCount);
+    int RosterHeroCount)
+{
+    public IReadOnlyList<HeroQuirkLimitPreview> QuirkLimits { get; init; } = [];
+}
+
+public sealed record HeroQuirkLimitPreview(
+    string QuirkId,
+    int ExistingRosterHeroes,
+    int ExistingStagecoachCandidates,
+    int ResultingHeroes,
+    int DefinitionLimit)
+{
+    public int ExistingHeroes => ExistingRosterHeroes + ExistingStagecoachCandidates;
+    public bool ExceedsDefinitionLimit => ResultingHeroes > DefinitionLimit;
+}
 
 public sealed record StagecoachHeroCandidatePreview(
     string Name,

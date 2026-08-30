@@ -90,7 +90,7 @@ public partial class InitialQuirkSelectionDialog : Window
         }
     }
 
-    private void SearchTextBox_TextChanged(object sender, TextChangedEventArgs e) => _view?.Refresh();
+    private void SearchTextBox_TextChanged(object sender, TextChangedEventArgs e) => RefreshView();
 
     private bool FilterRow(object item)
     {
@@ -153,20 +153,22 @@ public partial class InitialQuirkSelectionDialog : Window
 
     private void Ok_Click(object sender, RoutedEventArgs e)
     {
+        var selectedIds = GetSelectedIds();
         try
         {
-            var selectedIds = GetSelectedIds();
             StagecoachHeroCandidateFactory.ValidateInitialQuirkSelection(
                 _catalog,
                 _heroClass,
                 selectedIds);
-            SelectedQuirkIds = selectedIds;
-            DialogResult = true;
         }
         catch (InvalidOperationException ex)
         {
             ValidationTextBlock.Text = ex.Message;
+            return;
         }
+
+        SelectedQuirkIds = selectedIds;
+        DialogResult = true;
     }
 
     private void ValidateCurrentSelection()
@@ -220,6 +222,24 @@ public partial class InitialQuirkSelectionDialog : Window
             // Keep row-level dynamic reasons for actual quirk incompatibilities only; a sixth
             // positive/negative quirk or fourth disease is rejected when the user clicks it.
             row.SetAvailability(true, string.Empty);
+        }
+
+        RefreshView();
+    }
+
+    private void RefreshView()
+    {
+        if (_view is IEditableCollectionView editableView)
+        {
+            if (editableView.IsAddingNew)
+            {
+                editableView.CommitNew();
+            }
+
+            if (editableView.IsEditingItem)
+            {
+                editableView.CommitEdit();
+            }
         }
 
         _view?.Refresh();
