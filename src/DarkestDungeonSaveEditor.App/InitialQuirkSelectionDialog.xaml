@@ -77,7 +77,7 @@
                                     Content="写入规则" />
                     <TextBlock Grid.Row="1" Margin="15,10,15,11" TextWrapping="Wrap"
                                Style="{StaticResource MutedTextStyle}"
-                               Text="可验证为安全直写的自然怪癖、固定/特殊怪癖和疾病均可选择，编辑器不限制怪癖对应的职业。正负怪癖各最多 5 个，疾病单独最多 3 个；进化怪癖在马车中按实测样本写入倒计时 0。需要存档上下文和未验证 HP 规则仍不可勾选，怪癖互斥会随当前选择更新。" />
+                               Text="可验证为安全直写的自然怪癖、固定/特殊怪癖和疾病均可选择，编辑器不限制怪癖对应的职业。正负怪癖各最多 5 个，疾病单独最多 3 个；进化怪癖按各自内容定义初始化持续值。singleton 统计 roster 与全部马车池，超限只警告；roster_limit 由游戏在招募进入 roster 时执行，生成马车候选不检查也不警告。未验证的 HP 或进化规则仍不可勾选，怪癖互斥会随当前选择更新。" />
                 </Grid>
             </Border>
 
@@ -112,6 +112,7 @@
 
             <DataGrid x:Name="QuirkGrid" Grid.Row="2"
                           AutoGenerateColumns="False"
+                          IsReadOnly="True"
                           CanUserAddRows="False"
                           CanUserDeleteRows="False"
                           HeadersVisibility="Column"
@@ -123,7 +124,7 @@
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
                                     <CheckBox HorizontalAlignment="Center" VerticalAlignment="Center"
-                                              IsChecked="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                              IsChecked="{Binding IsSelected, Mode=OneWay}"
                                               IsEnabled="{Binding IsSelectable}"
                                               ToolTip="{Binding UnavailableReason}"
                                               ToolTipService.ShowOnDisabled="True"

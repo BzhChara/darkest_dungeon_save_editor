@@ -88,6 +88,74 @@ public static class StagecoachHeroSaveEditor
                 heroes.Count));
     }
 
+    public static IReadOnlyList<HeroQuirkLimitPreview> AnalyzeQuirkLimits(
+        JsonObject townRoot,
+        JsonObject rosterRoot,
+        JsonObject candidate,
+        IReadOnlyList<HeroInitialQuirkDefinition> initialQuirks)
+    {
+        ArgumentNullException.ThrowIfNull(townRoot);
+        ArgumentNullException.ThrowIfNull(rosterRoot);
+        ArgumentNullException.ThrowIfNull(candidate);
+        ArgumentNullException.ThrowIfNull(initialQuirks);
+
+        if (candidate["quirks"] is not JsonObject candidateQuirks || candidateQuirks.Count == 0)
+        {
+            return [];
+        }
+
+        var rosterHeroes = JsonSupport.RequireObject(rosterRoot, "base_root", "heroes");
+        var stagecoachStore = JsonSupport.RequireObject(
+            townRoot,
+            "base_root",
+            "buildings",
+            "stage_coach",
+            "store");
+        var previews = new List<HeroQuirkLimitPreview>();
+
+        foreach (var candidateQuirkId in candidateQuirks
+                     .Select(pair => pair.Key)
+                     .Order(StringComparer.OrdinalIgnoreCase))
+        {
+            var matchingDefinitions = initialQuirks
+                .Where(quirk =>
+                    quirk.Id.Equals(candidateQuirkId, StringComparison.OrdinalIgnoreCase) &&
+                    quirk.DefinitionLimit is > 0)
+                .ToArray();
+            if (matchingDefinitions.Length == 0)
+            {
+                continue;
+            }
+            if (matchingDefinitions.Length != 1)
+            {
+                throw new InvalidDataException(
+                    $"Limited quirk '{candidateQuirkId}' has multiple unresolved active definitions.");
+            }
+
+            var definition = matchingDefinitions[0];
+            var existingRosterHeroes = rosterHeroes
+                .Select(pair => pair.Value)
+                .OfType<JsonObject>()
+                .Count(hero => ContainsQuirk(hero, definition.Id));
+            var existingStagecoachCandidates = stagecoachStore
+                .Select(pair => pair.Value)
+                .OfType<JsonObject>()
+                .Select(pool => pool["generated"])
+                .OfType<JsonObject>()
+                .SelectMany(pool => pool.Select(pair => pair.Value))
+                .OfType<JsonObject>()
+                .Count(hero => ContainsQuirk(hero, definition.Id));
+            previews.Add(new HeroQuirkLimitPreview(
+                definition.Id,
+                existingRosterHeroes,
+                existingStagecoachCandidates,
+                existingRosterHeroes + existingStagecoachCandidates + 1,
+                definition.DefinitionLimit!.Value));
+        }
+
+        return previews;
+    }
+
     private static void AddUpgradePurchases(
         JsonObject upgradesRoot,
         int candidateGuid,
@@ -177,6 +245,13 @@ public static class StagecoachHeroSaveEditor
             };
             nextPurchaseKey++;
         }
+    }
+
+    private static bool ContainsQuirk(JsonObject hero, string quirkId)
+    {
+        var quirks = hero["quirks"] as JsonObject ??
+                     hero["hero_file_data"]?["raw_data"]?["base_root"]?["quirks"] as JsonObject;
+        return quirks?.Any(pair => pair.Key.Equals(quirkId, StringComparison.OrdinalIgnoreCase)) == true;
     }
 
     private static int ReadRequiredNonNegativeInt(JsonObject candidate, string propertyName)

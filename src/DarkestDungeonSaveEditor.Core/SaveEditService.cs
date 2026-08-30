@@ -261,12 +261,18 @@ public sealed class SaveEditService
         var townRoot = JsonSupport.ReadObject(townDecodedPath);
         var rosterRoot = JsonSupport.ReadObject(rosterDecodedPath);
         var upgradesRoot = JsonSupport.ReadObject(upgradesDecodedPath);
-        var (updatedTown, updatedRoster, updatedUpgrades, preview) = StagecoachHeroSaveEditor.AddCandidate(
+        var quirkLimits = StagecoachHeroSaveEditor.AnalyzeQuirkLimits(
+            townRoot,
+            rosterRoot,
+            generatedCandidate.Candidate,
+            currentCatalog.InitialQuirks);
+        var (updatedTown, updatedRoster, updatedUpgrades, mutationPreview) = StagecoachHeroSaveEditor.AddCandidate(
             townRoot,
             rosterRoot,
             upgradesRoot,
             generatedCandidate.Candidate,
             generatedCandidate.UpgradePurchases);
+        var preview = mutationPreview with { QuirkLimits = quirkLimits };
         JsonSupport.WriteObject(townProposedPath, updatedTown);
         JsonSupport.WriteObject(rosterProposedPath, updatedRoster);
         JsonSupport.WriteObject(upgradesProposedPath, updatedUpgrades);

@@ -434,7 +434,7 @@ public static class HeroClassCatalog
         BuffIds = SortSemanticValues(definition.BuffIds),
         Tags = SortSemanticValues(definition.Tags),
         definition.RosterLimit,
-        definition.EvolutionSignature
+        EvolutionSignature = definition.Evolution?.Signature
     });
 
     private static string GetBuffSignature(BuffDefinition definition) => JsonSerializer.Serialize(new
@@ -984,6 +984,7 @@ public static class HeroClassCatalog
     {
         var contextReasons = new List<string>();
         var unverifiedReasons = new List<string>();
+        var definitionLimits = new List<int>();
 
         if (quirk.IsPositive is null)
         {
@@ -992,13 +993,11 @@ public static class HeroClassCatalog
 
         if (quirk.Tags.Contains("singleton"))
         {
-            contextReasons.Add("singleton 需要检查 roster 与全部马车池");
+            definitionLimits.Add(1);
+            contextReasons.Add("singleton 定义上限 1；预览统计 roster 与全部马车池，超限仅警告");
         }
 
-        if (quirk.RosterLimit is > 0)
-        {
-            contextReasons.Add("roster_limit 需要检查 roster 与全部马车池");
-        }
+        int? definitionLimit = definitionLimits.Count == 0 ? null : definitionLimits.Min();
 
         var referencedBuffs = new List<BuffDefinition>();
         foreach (var buffId in quirk.BuffIds)
@@ -1049,6 +1048,24 @@ public static class HeroClassCatalog
             }
         }
 
+        HeroQuirkEvolutionDefinition? evolution = null;
+        if (quirk.Evolution is { } parsedEvolution)
+        {
+            unverifiedReasons.AddRange(parsedEvolution.ValidationErrors);
+            if (parsedEvolution.ValidationErrors.Count == 0 &&
+                parsedEvolution.DurationMin is { } durationMin &&
+                parsedEvolution.DurationMax is { } durationMax)
+            {
+                evolution = new HeroQuirkEvolutionDefinition(
+                    durationMin,
+                    durationMax,
+                    parsedEvolution.TownProgressionDurationChange,
+                    parsedEvolution.TargetQuirkId,
+                    parsedEvolution.CausesDeath,
+                    parsedEvolution.TownAttemptUseItemDurationThreshold);
+            }
+        }
+
         var kind = quirk.IsDisease
             ? HeroInitialQuirkKind.Disease
             : quirk.RandomChance is > 0 and < double.PositiveInfinity
@@ -1068,7 +1085,7 @@ public static class HeroClassCatalog
             quirk.IsPositive,
             quirk.RandomChance,
             quirk.IsDisease,
-            quirk.HasEvolution,
+            evolution,
             quirk.IncompatibleQuirks,
             maxHpModifier,
             kind,
@@ -1077,7 +1094,10 @@ public static class HeroClassCatalog
             writeStatusReason,
             quirk.Source,
             quirk.SourcePath,
-            quirk.AllSources);
+            quirk.AllSources)
+        {
+            DefinitionLimit = definitionLimit
+        };
     }
 
     private static HeroRuntimeQuirkSignal? ResolveRuntimeQuirk(
@@ -1274,7 +1294,7 @@ public static class HeroClassCatalog
                 isPositive = positiveNode.GetBoolean();
             }
 
-            var evolutionSignature = ReadEvolutionSignature(item);
+            var evolution = ReadEvolutionDefinition(item);
 
             yield return new QuirkDefinition(
                 idNode.GetString()!,
@@ -1285,7 +1305,7 @@ public static class HeroClassCatalog
                 ReadJsonStringArray(item, "buffs"),
                 ReadJsonStringArray(item, "tags"),
                 ReadJsonInt(item, "roster_limit"),
-                evolutionSignature,
+                evolution,
                 source,
                 Path.GetFullPath(path),
                 providerSources);
@@ -1808,6 +1828,147 @@ public static class HeroClassCatalog
         return fields.Length == 0 ? null : string.Join("|", fields);
     }
 
+    private static ParsedQuirkEvolutionDefinition? ReadEvolutionDefinition(JsonElement element)
+    {
+        var signature = ReadEvolutionSignature(element);
+        if (signature is null)
+        {
+            return null;
+        }
+
+        var validationErrors = new List<string>();
+        var durationMin = ReadEvolutionInteger(
+            element,
+            "evolution_duration_min",
+            required: true,
+            validationErrors);
+        var durationMax = ReadEvolutionInteger(
+            element,
+            "evolution_duration_max",
+            required: true,
+            validationErrors);
+        var townProgressionDurationChange = ReadEvolutionInteger(
+            element,
+            "evolution_town_progression_duration_change",
+            required: false,
+            validationErrors);
+        var townAttemptUseItemDurationThreshold = ReadEvolutionInteger(
+            element,
+            "evolution_town_attempt_use_item_duration_threshold",
+            required: false,
+            validationErrors);
+
+        string? targetQuirkId = null;
+        if (element.TryGetProperty("evolution_class_id", out var targetNode))
+        {
+            if (targetNode.ValueKind == JsonValueKind.String &&
+                !string.IsNullOrWhiteSpace(targetNode.GetString()))
+            {
+                targetQuirkId = targetNode.GetString()!.Trim();
+            }
+            else
+            {
+                validationErrors.Add("进化字段 'evolution_class_id' 必须是非空字符串");
+            }
+        }
+
+        var causesDeath = false;
+        if (element.TryGetProperty("evolution_causes_death", out var causesDeathNode))
+        {
+            if (causesDeathNode.ValueKind is JsonValueKind.True or JsonValueKind.False)
+            {
+                causesDeath = causesDeathNode.GetBoolean();
+            }
+            else
+            {
+                validationErrors.Add("进化字段 'evolution_causes_death' 必须是布尔值");
+            }
+        }
+
+        if (durationMin is < 0)
+        {
+            validationErrors.Add("进化字段 'evolution_duration_min' 不能为负数");
+        }
+        if (durationMax is < 0)
+        {
+            validationErrors.Add("进化字段 'evolution_duration_max' 不能为负数");
+        }
+        if (durationMin is { } minimum && durationMax is { } maximum && minimum > maximum)
+        {
+            validationErrors.Add("进化持续值下限不能大于上限");
+        }
+        if (townAttemptUseItemDurationThreshold is < 0)
+        {
+            validationErrors.Add("进化字段 'evolution_town_attempt_use_item_duration_threshold' 不能为负数");
+        }
+        if (string.IsNullOrWhiteSpace(targetQuirkId) && !causesDeath)
+        {
+            validationErrors.Add(
+                "进化配置必须声明非空 evolution_class_id，或设置 evolution_causes_death=true");
+        }
+
+        return new ParsedQuirkEvolutionDefinition(
+            signature,
+            durationMin,
+            durationMax,
+            townProgressionDurationChange,
+            targetQuirkId,
+            causesDeath,
+            townAttemptUseItemDurationThreshold,
+            validationErrors);
+    }
+
+    private static int? ReadEvolutionInteger(
+        JsonElement element,
+        string propertyName,
+        bool required,
+        List<string> validationErrors)
+    {
+        if (!element.TryGetProperty(propertyName, out var property))
+        {
+            if (required)
+            {
+                validationErrors.Add($"进化配置缺少 '{propertyName}'");
+            }
+
+            return null;
+        }
+
+        if (TryReadExactInt32(property, out var value))
+        {
+            return value;
+        }
+
+        validationErrors.Add($"进化字段 '{propertyName}' 必须是 32 位整数");
+        return null;
+    }
+
+    private static bool TryReadExactInt32(JsonElement element, out int value)
+    {
+        if (element.ValueKind != JsonValueKind.Number)
+        {
+            value = default;
+            return false;
+        }
+
+        if (element.TryGetInt32(out value))
+        {
+            return true;
+        }
+
+        if (element.TryGetDecimal(out var decimalValue) &&
+            decimalValue == decimal.Truncate(decimalValue) &&
+            decimalValue >= int.MinValue &&
+            decimalValue <= int.MaxValue)
+        {
+            value = (int)decimalValue;
+            return true;
+        }
+
+        value = default;
+        return false;
+    }
+
     private static string NormalizeSemanticJsonValue(JsonElement value)
     {
         return value.ValueKind switch
@@ -2176,13 +2337,20 @@ public static class HeroClassCatalog
         IReadOnlyList<string> BuffIds,
         IReadOnlyList<string> Tags,
         int? RosterLimit,
-        string? EvolutionSignature,
+        ParsedQuirkEvolutionDefinition? Evolution,
         string Source,
         string SourcePath,
-        IReadOnlyList<string> AllSources)
-    {
-        public bool HasEvolution => EvolutionSignature is not null;
-    }
+        IReadOnlyList<string> AllSources);
+
+    private sealed record ParsedQuirkEvolutionDefinition(
+        string Signature,
+        int? DurationMin,
+        int? DurationMax,
+        int? TownProgressionDurationChange,
+        string? TargetQuirkId,
+        bool CausesDeath,
+        int? TownAttemptUseItemDurationThreshold,
+        IReadOnlyList<string> ValidationErrors);
 
     private sealed record BuffDefinition(
         string Id,

@@ -438,8 +438,18 @@ public partial class MainWindow : Window
             _editService = editService;
             _preparedHeroEdit = preparedHeroEdit;
             _preparedHeroCandidatePreview = generated.Preview;
-            PreviewWarningTextBlock.Visibility = Visibility.Collapsed;
-            PreviewWarningTextBlock.Text = string.Empty;
+            var heroLimitWarning = FormatHeroQuirkLimitWarnings(preparedHeroEdit.Preview);
+            if (string.IsNullOrWhiteSpace(heroLimitWarning))
+            {
+                PreviewWarningTextBlock.Visibility = Visibility.Collapsed;
+                PreviewWarningTextBlock.Text = string.Empty;
+            }
+            else
+            {
+                PreviewWarningTextBlock.Text = heroLimitWarning;
+                PreviewWarningTextBlock.Visibility = Visibility.Visible;
+                AppendStatus($"人物怪癖上限提示：{heroLimitWarning.Replace(Environment.NewLine, "；", StringComparison.Ordinal)}");
+            }
             var heroPreview = generated.Preview;
             PreviewSummaryTextBlock.Text =
                 $"{heroPreview.Name} / {heroPreview.HeroClass}：{heroPreview.ResolveLevel}级，XP {heroPreview.ResolveXp}，" +
@@ -494,13 +504,18 @@ public partial class MainWindow : Window
               $"GUID {_preparedHeroEdit!.Preview.CandidateGuid}；" +
               $"初始怪癖 [{FormatSelectedQuirks(_preparedHeroCandidatePreview)}]）"
             : $"加入 {_preparedTrinketEdit!.Preview.RequestedCopies} 个 {_preparedTrinketEdit.Trinket.Id}";
-        var trinketLimitWarning = !isHeroEdit && _preparedTrinketEdit!.Preview.ExceedsDefinitionLimit
-            ? $"\n\n注意：写入后仓库内该饰品将有 {_preparedTrinketEdit.Preview.ResultingCopies} 个，" +
-              $"超过定义上限 {_preparedTrinketEdit.Preview.DefinitionLimit}。"
-            : string.Empty;
+        var definitionLimitWarningText = isHeroEdit
+            ? FormatHeroQuirkLimitWarnings(_preparedHeroEdit!.Preview)
+            : _preparedTrinketEdit!.Preview.ExceedsDefinitionLimit
+                ? $"写入后仓库内该饰品将有 {_preparedTrinketEdit.Preview.ResultingCopies} 个，" +
+                  $"超过定义上限 {_preparedTrinketEdit.Preview.DefinitionLimit}。"
+                : string.Empty;
+        var definitionLimitWarning = string.IsNullOrWhiteSpace(definitionLimitWarningText)
+            ? string.Empty
+            : $"\n\n注意：\n{definitionLimitWarningText}";
         var confirmation = MessageBox.Show(
             $"将对以下档案执行：{changeSummary}\n\n" +
-            $"{profileDirectory}" + trinketLimitWarning + "\n\n" +
+            $"{profileDirectory}" + definitionLimitWarning + "\n\n" +
             "程序会先完整备份 profile 中所有 persist*.json。确认游戏已经关闭并继续吗？",
             "确认应用存档修改",
             MessageBoxButton.YesNo,
@@ -558,9 +573,10 @@ public partial class MainWindow : Window
             return;
         }
 
+        InitialQuirkSelectionDialog? dialog = null;
         try
         {
-            var dialog = new InitialQuirkSelectionDialog(
+            dialog = new InitialQuirkSelectionDialog(
                 _heroCatalog,
                 selectedHero.Definition,
                 _selectedInitialQuirkIds)
@@ -585,6 +601,11 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
+            if (dialog?.IsVisible == true)
+            {
+                dialog.Close();
+            }
+
             AppendStatus($"打开初始怪癖选择失败：{ex.Message}");
         }
     }
@@ -808,6 +829,18 @@ public partial class MainWindow : Window
     {
         var ids = quirkIds.ToArray();
         return ids.Length == 0 ? "空白" : string.Join(", ", ids);
+    }
+
+    private static string FormatHeroQuirkLimitWarnings(StagecoachHeroMutationPreview preview)
+    {
+        return string.Join(
+            Environment.NewLine,
+            preview.QuirkLimits
+                .Where(limit => limit.ExceedsDefinitionLimit)
+                .Select(limit =>
+                    $"怪癖 {limit.QuirkId}（singleton）：当前 roster {limit.ExistingRosterHeroes} 名、" +
+                    $"全部马车池 {limit.ExistingStagecoachCandidates} 名；写入后合计 {limit.ResultingHeroes} 名，" +
+                    $"超过定义上限 {limit.DefinitionLimit}。编辑器会按控制台模式保留写入能力。"));
     }
 
     private static string FormatDefinitionLimit(int? limit)
