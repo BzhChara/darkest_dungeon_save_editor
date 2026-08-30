@@ -1,0 +1,67 @@
+# Darkest Dungeon Save Editor
+
+一个独立的 Windows 离线存档修改器。项目从 `DarkestDungeonRuntimeFramework` 中只抽取存档编解码、内容目录和安全写入思想，不依赖其 RuntimeHook、ManagedAction、Boss Gauntlet 或任务板实现。
+
+## 当前能力
+
+- 程序启动时游戏、Workshop、本地 Mod 和存档路径都保持为空，不会使用开发者本机路径。用户点击“自动发现”后，程序才从 Steam 注册表与 `libraryfolders.vdf` 定位 Darkest Dungeon 和 Steam `profile_*` 存档；存档优先选择 `profile_0`，不存在时才回退到发现列表中的第一个档案。自动发现会按该游戏所在 Steam 库填入 `steamapps\workshop\content\262060`，并按游戏目录填入 `DarkestDungeon\mods`；所有路径之后都可手动修改，本地 Mod 目录也可改为包含多个 Mod 的其他根目录或单个含 `project.xml` 的 Mod 目录。
+- 从 `persist.game.json/base_root.applied_ugcs_1_0` 读取当前档案实际启用的 Mod 及界面自上而下的数字顺序；文件覆盖按游戏规则从底部 Mod 向顶部 Mod 应用。
+- 从原版、档案启用的官方 DLC、Workshop Mod 和本地 `mods` 内容读取饰品 ID、稀有度、上限和来源；禁用内容不会进入目录。人物、怪癖和饰品会同时解析活动本地化中的 `schinese` 与 `english` 名称，界面保留内部 ID 并分列显示中英文；缺少某种语言时显示 `—`，不会伪造翻译。
+- 同一套活动内容覆盖顺序也用于解析 `trinket_storage.max_slots`，解析时忽略 `.darkest` 文件的 `//` 行注释，并要求生效条目只有一个完整的正整数 `max_slots` token。饰品预览显示仓库内该 ID 的当前/结果数量、定义上限，以及仓库总槽位的当前/结果/有效容量；定义 `limit=0` 显示为“无限”。控制台模式允许用户显式写入超过单种饰品定义上限的普通副本并给出醒目警告，但核心写入链路会阻止超过当前活动配置的仓库总槽位；若最高优先级容量缺失、无效或存在无法消解的冲突，则直接禁用饰品预览与应用，不回退到原版容量。装备在英雄身上的副本不计入这里显示的仓库内数量。
+- 饰品预览会保存所选档案的 `persist.game.json` 哈希、活动内容来源、所有活动 Workshop/本地 Mod 的 `modfiles.txt` 存在状态与哈希、生效容量文件和所选饰品定义文件指纹；应用前与最终替换前都会重建相关目录并核对定义。最终替换阶段会对这些已存在的 Manifest 和三个来源文件加只读锁，并在真实 estate 读锁内再次重验后执行原子替换。预览后若 Mod/DLC 状态、Manifest、所选饰品定义、容量文件、容量来源、有效槽位或真实存档发生变化，旧预览会被拒绝，必须重新加载目录并生成预览。
+- 官方 DLC 的包根共享内容与 `features/<name>` 分开处理；`districts`、`flagellant`、`fires_edge`、`duelist`、`runaway` 等 feature 只有在当前档案明确启用时才进入目录。
+- Workshop Mod 按工坊 ID 映射；本地 Mod 会同时扫描默认 `游戏目录\mods`、`游戏目录\dlc` 与可选额外目录，再按 `project.xml` 的 `Title` 映射。重叠目录会去重，缺失或同名歧义来源只报告、不猜测。
+- 内容目录先按规范化相对路径处理 `原版 → DLC → Mod` 文件覆盖；Mod 内底部先应用、顶部最终保留。同一路径的来源链会保留用于诊断。来源列显示内容起源：原版人物、饰品或怪癖被 Mod 覆盖时仍标记“原版”，并同时注明当前实际覆盖它的 Workshop/本地 Mod，不再把两种含义混成单个 Mod 来源。人物相关的 hero/effect/quirk/buff/event/upgrade ID 即使来自不同文件，语义相同也会合并；语义不同时继续使用相同的活动内容优先级选出胜者。只有同一最高优先级仍存在不同定义时才保持未解析。不同路径的重复饰品仍采用更保守的只读策略，不能进入存档预览。
+- 人物目录会按活动内容优先级解析完整 `.info.darkest`，再叠加同职业的局部 `.override.darkest`；局部装备行只覆盖实际出现的 HP/升级代码，`generation_guaranteed=false` 可以撤销低层标记，技能的 `effect` 与各类 `*_effects` 也按各自字段替换而不会误删未触及字段。修改原版职业但未携带美术的 Mod 会继续继承仍然生效的低层皮肤目录。目录同时读取生成规则、各级武器/护甲、连续皮肤配色、0 级战斗技能、无值的 `generation_guaranteed` 标记、露营技能、`bonus_recruit` 城镇事件，以及“职业技能 → effect → `random_chance=0` 怪癖”的后续玩法线索。列表中的“游戏自然 / 编辑器手动”表示游戏能自然刷新且编辑器也能手动创建，“仅编辑器手动”表示 `is_generation_enabled=false`、游戏不自然刷新但模板仍可手动使用；模板未声明该标志时显示“自然状态未知 / 编辑器手动”，不会擅自推断。“自然怪癖范围”只是游戏自然生成时的正负怪癖数量范围，不限制玩家在编辑器中的主动选择。后续玩法线索不属于初始怪癖，也不会作为人物创建字段。
+- 编辑器从当前档案的 `game_mode` 读取有效 `resolve_level_thresholds`，再把职业 `.info.darkest` 的装备 rank 与对应 `.upgrades.json` 的 `prerequisite_resolve_level` 组合成 0～满级模板。升级模板兼容原版 `upgrades/heroes/<hero>.upgrades.json` 和 Mod 常用的 `upgrades/<hero>.upgrades.json`。玩家选择等级后，`resolveXp`、`weapon_rank`、`armour_rank` 和护甲基础 HP 会联动写入；同时按当前有效 upgrade 模板，把该等级已经满足前置条件的武器、护甲和每一个战斗技能购买链写入 `persist.upgrades.json`，因此生成的人物会在该等级范围内全技能解锁，0 级也包含每棵技能树的基础购买项。当前装备的技能数量仍按职业/Mod 自己的 `can_select_combat_skills`、`number_of_random_combat_skills` 与 `number_of_selected_combat_skills_max` 模板决定，不会把“已解锁”误写成“全部同时装备”，也不会硬编码成原版常见的 4 个。若任一活动技能缺少精确对应的升级树，或对应树在所选等级还没有任何可购买 requirement，则拒绝生成并列出问题树。树 ID 使用游戏已有的名称哈希规则，requirement code 原样且区分大小写地取自模板，不假定必须是数字；由于存档格式本身只容纳一个 ASCII 字符，多字符或非 ASCII code 会明确拒绝而不会静默截断，不同树 ID 的游戏哈希碰撞也会阻止写入。原版与模板完整的活动 Mod 职业共用同一套解析逻辑。不要求 roster 已经拥有该职业，也不挤占或改写现有人物。
+- 候选人物默认不添加怪癖；玩家可显式选择 0 到多个初始怪癖。目录把“是否属于自然随机池”与“是否能安全显式写入”分开：结构已验证的固定/特殊怪癖即使 `random_chance=0` 也可以选择；控制台模式不执行职业模板中的 `incompatible_class_ids`，因此任何已识别且可直接写入的怪癖都可选给任意职业。普通疾病使用与怪癖相同的马车记录结构并允许选择，独立执行原版最多 3 个疾病的规则，不占正负怪癖各 5 个的名额。达到正面、负面或疾病上限后，目录行不会重复填入“再加一项”的配额原因；顶部计数和实际点击拦截负责说明上限，行内动态不可用原因只保留真正的 `incompatible_quirks` 互斥。进化怪癖按真实马车样本写入 `evolution_duration_remaining=0`，预览会提示玩家在招募并保存后确认游戏已初始化倒计时。需要全存档检查的 `singleton`/`roster_limit`、重复定义和未知 HP 规则仍会保留显示但禁止选择。非 HP Buff 的属性效果不在存档候选中预计算，交给游戏运行时应用，因此其重复或覆盖不会单独阻止怪癖；缺失或同优先级未解析的 `max_hp` Buff 仍会阻止写入。`always` 与空饰品候选下的 `no_trinkets` 最大生命修正会先相加，再作用于所选等级的护甲 HP，得到初始满血 `current_hp`；不会把怪癖 Buff 再写进 `actor.buff_group`，招募后穿脱饰品造成的重算交由游戏处理。
+- 战斗技能先保留 0 级必选技能，再随机选择；候选保存数量取生成数量与选择上限的较小值。候选 JSON 中的技能映射仍保持游戏原生的 0 值，技能等级由 `persist.upgrades.json` 的个人购买记录表达，不会把两个概念混写。技能伤害、命中、效果或其他职业战斗属性不复制进存档，而由游戏在载入时从当前最高优先级的原版/Mod 模板解析。露营技能按共享/职业池分别选择，共享池不足时按真实样本少取，不用职业技能补位。
+- 人物预览同时修改临时 `persist.town.json`、`persist.roster.json` 与 `persist.upgrades.json`：在普通马车追加候选、推进 `nextGuid`，并为同一个 GUID 追加等级对应的个人升级购买记录。预览前、预览结束和提交期间会重建人物目录语义指纹；若活动 Mod/DLC、Manifest、职业、怪癖、等级阈值或升级模板发生变化，旧预览会被拒绝。三个文件都通过 DSON 编码—解码全量一致性校验后，才允许用户确认写入；提交顺序为 upgrades、roster、town，任何一步失败都会从完整备份回滚所有已替换文件，备份清单同时记录候选 XP、装备 rank 和个人升级记录数。
+- 在临时工作区中解码 `persist.estate.json`，添加用户明确选择的普通饰品。
+- 主窗口与怪癖选择窗口使用统一的现代深色界面、卡片层级、强调按钮、目录摘要和独立风险提示区；这只改变呈现，不改变既有预览—确认—备份—提交步骤。
+- 编码后再次解码，验证目标饰品数量、档案概要和 DSON 修订字段。
+- 只有用户再次确认后才覆盖真实 `persist.estate.json`。
+- 覆盖前检查游戏未运行、源文件哈希未变化，并备份 profile 目录下全部 `persist*.json`。
+
+The Fire's Edge 中带 `quest_uses`、`trigger_limit`、渐进变形或消耗状态的饰品在第一阶段只展示、不允许写入。当前尚无足够的新版本实例存档证据来安全构造这些字段。
+
+## 构建与测试
+
+要求：
+
+- Windows
+- .NET 8 Desktop Runtime / SDK
+- Java 8 或更高版本
+
+```powershell
+dotnet build .\DarkestDungeonSaveEditor.sln -c Release -m:1
+.\tests\TestTrinketEditRoundTrip.ps1
+```
+
+当前机器上的 .NET 10 SDK/MSBuild 在解决方案并行 Restore 时可能无诊断地返回退出码 1；`-m:1` 只关闭项目级并行，不改变生成结果。三个项目的独立 Restore 均已验证正常。
+
+运行界面：
+
+```powershell
+dotnet run --project .\src\DarkestDungeonSaveEditor.App\DarkestDungeonSaveEditor.App.csproj
+```
+
+## 写入与恢复边界
+
+1. “生成安全预览”只复制、解码、修改和编码临时工作区。
+2. 预览生成后，如果原存档哈希发生变化，应用会被拒绝。
+3. “应用到存档”会检查 `Darkest.exe` 未运行。
+4. 写入前会在 `%LOCALAPPDATA%\DarkestDungeonSaveEditor\backups` 建立完整时间戳备份和清单。
+5. 文件替换或最终哈希校验失败时，程序会尝试立即恢复备份。
+
+当前人物能力只向普通马车加入新候选，不修改已拥有英雄、马车卡池历史、周数、铁匠铺升级、任务、城镇事件历史或游戏内容文件。高等级候选携带相应人物 XP、个人装备 rank 与个人技能/装备购买链，但不会替玩家解锁铁匠铺、公会等城镇建筑。“从陵墓归来”等事件会在后续阶段基于原版存档差异单独实现。
+
+应用的阶段、异常、界面状态和完整目录提示会写入 `logs/app-日期.log`。开发运行时从程序目录向上定位 `DarkestDungeonSaveEditor.sln`，因此日志位于项目根目录的 `logs`；独立发布目录没有解决方案文件时，日志位于 EXE 同目录的 `logs`。界面最多展示前 30 条目录提示，日志保留全部提示。工作区和存档备份仍位于 `%LOCALAPPDATA%\DarkestDungeonSaveEditor`。
+
+本机开发约定：用户已授权游戏界面的第 4 号存档作为可破坏测试档；其本机目录是 `profile_3`（界面从 1、目录从 0 编号）。需要启动游戏或验证真实写入时仍先自动备份并记录哈希；其他档案继续按正式存档处理。`DarkestDungeonRuntimeFramework` 中的参考项目和实验存档可作为只读证据与夹具来源，但其自定义插件优先级不等同于游戏原生 Mod 顺序。
+
+英雄生成不以玩家已经拥有同职业实例为前提。活动内容中的 `.info.darkest` 提供职业生成规则、技能和装备定义，通用英雄存档结构来自真实马车候选。部分 Mod 会禁用随机怪癖，再由技能中带 `disease` 赋值的效果、或城镇事件在游戏运行时授予专属怪癖；目录只扫描这种实际赋值 Effect，普通战斗 Effect 不再产生无关冲突提示。人物、怪癖和饰品显示名同时支持容错 `.string_table.xml` 与游戏编译后的 English/简中 `.loc2`；同一内容来源同时提供两种格式时，以游戏实际读取的 `.loc2` 为准。有 `modfiles.txt` 时仍补充读取 Mod 顶层 `localization` 目录内的直接 `.string_table.xml` 源表，用于兼容只把旧 `.loc` 写入清单、却保留可读 XML 源表的 Mod；不会递归进入 `unused` 或平台目录。LOC2 的编译颜色开始/结束标记可能跨字符串出现，因此分别剥离而不要求单条内成对；偏移、长度、NUL 和去除色码后的 UTF-8 仍严格检查，真正损坏或越界的二进制表只产生目录提示，不阻断其他文件。随机英雄姓名仍从可枚举键名的 XML 源表读取。清单中的 `.string_table.xml.unused` 和 `.loc2.unused` 不会被误当成活动文件。无 `modfiles.txt` 时会按标准内容目录回退扫描并为每个 Mod 输出一条可去重信息。职业若缺失连续装备 rank、对应升级代码或有效 HP，仍可在证据充分时保留 0 级模板，但不可选择无法证明的高等级。带 `singleton`、`roster_limit`、缺失或未解析的 HP Buff、未知条件型 HP 规则的怪癖暂不允许显式写入；仅进化字段本身不再阻止马车写入。
+
+`actor.buff_group_next_guid=2` 采用真实已保存马车候选中的最小观测值；它不参与 HP 计算，`buff_group` 仍保持为空。该结构已经通过 DSON 回环和第 4 号测试档实机载入：在完整备份后，编辑器向 `profile_3` 的普通马车加入 GUID 364 的原版蛮族战士 `Cumin`，游戏成功显示该候选，已拥有英雄仍为 36 人。
+
+该候选以 `current_hp=23.4`、基础生命 26 和 `fragile`（生命上限 -10%）写入；游戏界面显示最大生命 24，并明确列出“基础 26 / 特质 -10%”，因此读取与显示链路没有重复计算怪癖效果。游戏加载并正常退出后没有改写 `persist.town.json` 或 `persist.roster.json`，所以这次验证尚不能证明游戏重新序列化后的 `buff_group_next_guid`、`buff_group` 或招募进入 roster 的结果。

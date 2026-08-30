@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <ApplicationIcon>Assets\save-editor.ico</ApplicationIcon>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DarkestDungeonSaveEditor.Core\DarkestDungeonSaveEditor.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\charcoal-cloth.png" />
+    <Resource Include="Assets\darkest-dungeon-title-atlas.png" />
+    <Resource Include="Assets\dd-title-logo-loop.png" />
+    <Resource Include="Assets\save-editor.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="..\..\tools\DDSaveEditor\DDSaveEditor.jar"
+             Link="tools\DDSaveEditor\DDSaveEditor.jar"
+             CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\tools\DDSaveEditor\LICENSE"
+             Link="tools\DDSaveEditor\LICENSE"
+             CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>
