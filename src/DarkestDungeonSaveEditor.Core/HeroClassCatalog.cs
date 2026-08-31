@@ -99,12 +99,21 @@ public static class HeroClassCatalog
         {
             try
             {
+                var providerSourcesById = ReadProviderSourcesByQuirkId(file);
                 foreach (var quirk in ReadQuirkDefinitions(
                              file.Path,
                              file.Source.Id,
-                             file.ProviderSources))
+                             [file.Source.Id]))
                 {
-                    AddCandidate(quirkCandidates, quirk.Id, quirk);
+                    var providerSources = providerSourcesById.TryGetValue(
+                        quirk.Id,
+                        out var declaringSources)
+                        ? declaringSources
+                        : [file.Source.Id];
+                    AddCandidate(
+                        quirkCandidates,
+                        quirk.Id,
+                        quirk with { AllSources = providerSources });
                 }
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
@@ -1310,6 +1319,45 @@ public static class HeroClassCatalog
                 Path.GetFullPath(path),
                 providerSources);
         }
+    }
+
+    private static IReadOnlyDictionary<string, IReadOnlyList<string>> ReadProviderSourcesByQuirkId(
+        EffectiveContentFile file)
+    {
+        var sourcesById = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+        foreach (var provider in file.Providers)
+        {
+            try
+            {
+                foreach (var quirk in ReadQuirkDefinitions(
+                             provider.Path,
+                             provider.SourceId,
+                             [provider.SourceId]))
+                {
+                    if (!sourcesById.TryGetValue(quirk.Id, out var sources))
+                    {
+                        sources = [];
+                        sourcesById[quirk.Id] = sources;
+                    }
+
+                    if (!sources.Contains(provider.SourceId, StringComparer.OrdinalIgnoreCase))
+                    {
+                        sources.Add(provider.SourceId);
+                    }
+                }
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
+            {
+                // Provenance is optional evidence. The effective file is parsed separately;
+                // an unreadable overridden provider must not make a winning Mod-only entry
+                // inherit an unverified official origin.
+            }
+        }
+
+        return sourcesById.ToDictionary(
+            pair => pair.Key,
+            pair => (IReadOnlyList<string>)pair.Value.ToArray(),
+            StringComparer.OrdinalIgnoreCase);
     }
 
     private static IEnumerable<BuffDefinition> ReadBuffDefinitions(string path, string source)

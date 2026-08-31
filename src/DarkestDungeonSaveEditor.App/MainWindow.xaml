@@ -295,13 +295,13 @@
                                                         ElementStyle="{StaticResource DataGridTextElementStyle}" />
                                     <DataGridTextColumn Header="English" Binding="{Binding EnglishName}" Width="1.05*" MinWidth="82"
                                                         ElementStyle="{StaticResource DataGridTextElementStyle}" />
-                                    <DataGridTextColumn Header="来源" Binding="{Binding Source}" Width="1.55*" MinWidth="115"
+                                    <DataGridTextColumn Header="来源" Binding="{Binding Source}" Width="1.25*" MinWidth="105"
                                                         ElementStyle="{StaticResource DataGridTextElementStyle}" />
                                     <DataGridTextColumn Header="生成方式" Binding="{Binding GenerationMode}" Width="180"
                                                         ElementStyle="{StaticResource DataGridTextElementStyle}" />
-                                    <DataGridTextColumn Header="等级范围" Binding="{Binding LevelSummary}" Width="1.15*" MinWidth="92"
+                                    <DataGridTextColumn Header="等级范围" Binding="{Binding LevelSummary}" Width="1.0*" MinWidth="90"
                                                         ElementStyle="{StaticResource DataGridTextElementStyle}" />
-                                    <DataGridTextColumn Header="自然怪癖范围" Binding="{Binding QuirkRange}" Width="1.25*" MinWidth="135"
+                                    <DataGridTextColumn Header="自然怪癖范围" Binding="{Binding QuirkRange}" Width="1.75*" MinWidth="170"
                                                         ElementStyle="{StaticResource DataGridTextElementStyle}" />
                                     </DataGrid.Columns>
                             </DataGrid>

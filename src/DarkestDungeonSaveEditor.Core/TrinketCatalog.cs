@@ -77,6 +77,7 @@ public static class TrinketCatalog
         var path = file.Path;
         try
         {
+            var providerSourcesById = ReadProviderSourcesByTrinketId(file);
             using var document = JsonDocument.Parse(
                 File.ReadAllBytes(path),
                 new JsonDocumentOptions
@@ -106,6 +107,10 @@ public static class TrinketCatalog
                     continue;
                 }
 
+                var providerSources = providerSourcesById.TryGetValue(id, out var declaringSources)
+                    ? declaringSources
+                    : [file.Source.Id];
+
                 var statefulFields = StatefulFieldNames
                     .Where(name => entry.TryGetProperty(name, out _))
                     .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
@@ -120,7 +125,7 @@ public static class TrinketCatalog
                     statefulFields.Length > 0,
                     statefulFields,
                     false,
-                    file.ProviderSources);
+                    providerSources);
 
                 if (!definitions.TryGetValue(id, out var candidates))
                 {
@@ -134,6 +139,69 @@ public static class TrinketCatalog
         catch (Exception ex)
         {
             issues.Add($"Failed to read trinket file '{path}': {ex.Message}");
+        }
+    }
+
+    private static IReadOnlyDictionary<string, IReadOnlyList<string>> ReadProviderSourcesByTrinketId(
+        EffectiveContentFile file)
+    {
+        var sourcesById = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+        foreach (var provider in file.Providers)
+        {
+            try
+            {
+                foreach (var id in ReadTrinketIds(provider.Path))
+                {
+                    if (!sourcesById.TryGetValue(id, out var sources))
+                    {
+                        sources = [];
+                        sourcesById[id] = sources;
+                    }
+
+                    if (!sources.Contains(provider.SourceId, StringComparer.OrdinalIgnoreCase))
+                    {
+                        sources.Add(provider.SourceId);
+                    }
+                }
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
+            {
+                // Provenance is optional evidence. The effective file is parsed separately below;
+                // if an overridden provider cannot be inspected, fail closed by not attributing
+                // its origin to entries from the winning file.
+            }
+        }
+
+        return sourcesById.ToDictionary(
+            pair => pair.Key,
+            pair => (IReadOnlyList<string>)pair.Value.ToArray(),
+            StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static IEnumerable<string> ReadTrinketIds(string path)
+    {
+        using var document = JsonDocument.Parse(
+            File.ReadAllBytes(path),
+            new JsonDocumentOptions
+            {
+                AllowTrailingCommas = true,
+                CommentHandling = JsonCommentHandling.Skip
+            });
+        if (!document.RootElement.TryGetProperty("entries", out var entries) ||
+            entries.ValueKind != JsonValueKind.Array)
+        {
+            yield break;
+        }
+
+        foreach (var entry in entries.EnumerateArray())
+        {
+            if (entry.ValueKind == JsonValueKind.Object &&
+                entry.TryGetProperty("id", out var idNode) &&
+                idNode.ValueKind == JsonValueKind.String &&
+                !string.IsNullOrWhiteSpace(idNode.GetString()))
+            {
+                yield return idNode.GetString()!.Trim();
+            }
         }
     }
 

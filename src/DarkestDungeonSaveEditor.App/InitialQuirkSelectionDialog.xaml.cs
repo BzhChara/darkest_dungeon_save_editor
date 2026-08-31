@@ -10,6 +10,9 @@ namespace DarkestDungeonSaveEditor.App;
 
 public partial class InitialQuirkSelectionDialog : Window
 {
+    private const string DetailedSingletonReason =
+        "singleton 定义上限 1；预览统计 roster 与全部马车池，超限仅警告";
+    private const string CompactSingletonReason = "singleton 定义上限 1";
     private readonly HeroClassCatalogResult _catalog;
     private readonly HeroClassDefinition _heroClass;
     private readonly ObservableCollection<QuirkChoiceRow> _rows = [];
@@ -203,7 +206,7 @@ public partial class InitialQuirkSelectionDialog : Window
 
             if (row.IsSelected)
             {
-                row.SetAvailability(true, string.Empty);
+                row.SetAvailability(true, row.ContextReason);
                 continue;
             }
 
@@ -212,20 +215,40 @@ public partial class InitialQuirkSelectionDialog : Window
                 row.Definition.IncompatibleQuirkIds.Contains(selected.Id, StringComparer.OrdinalIgnoreCase));
             if (incompatible is not null)
             {
+                var incompatibilityReason =
+                    $"初始怪癖 '{incompatible.Id}' 与 '{row.Id}' 互斥，不能同时选择。";
                 row.SetAvailability(
                     false,
-                    $"初始怪癖 '{incompatible.Id}' 与 '{row.Id}' 互斥，不能同时选择。");
+                    CombineReasons(row.ContextReason, incompatibilityReason));
                 continue;
             }
 
             // The counters above the grid already communicate the three independent quotas.
             // Keep row-level dynamic reasons for actual quirk incompatibilities only; a sixth
             // positive/negative quirk or fourth disease is rejected when the user clicks it.
-            row.SetAvailability(true, string.Empty);
+            row.SetAvailability(true, row.ContextReason);
         }
 
         RefreshView();
     }
+
+    private static string CombineReasons(string first, string second)
+    {
+        if (string.IsNullOrWhiteSpace(first))
+        {
+            return second;
+        }
+
+        return string.IsNullOrWhiteSpace(second)
+            ? first
+            : $"{first}；{second}";
+    }
+
+    private static string CompactRowReason(string reason) =>
+        reason.Replace(
+            DetailedSingletonReason,
+            CompactSingletonReason,
+            StringComparison.Ordinal);
 
     private void RefreshView()
     {
@@ -272,9 +295,14 @@ public partial class InitialQuirkSelectionDialog : Window
         {
             Definition = definition;
             Source = source;
-            BaseUnavailableReason = baseUnavailableReason;
-            _unavailableReason = baseUnavailableReason;
-            _isSelectable = string.IsNullOrWhiteSpace(baseUnavailableReason);
+            BaseUnavailableReason = CompactRowReason(baseUnavailableReason);
+            ContextReason = definition.WriteStatus == HeroInitialQuirkWriteStatus.RequiresSaveContext
+                ? CompactRowReason(definition.WriteStatusReason)
+                : string.Empty;
+            _unavailableReason = string.IsNullOrWhiteSpace(BaseUnavailableReason)
+                ? ContextReason
+                : BaseUnavailableReason;
+            _isSelectable = string.IsNullOrWhiteSpace(BaseUnavailableReason);
             _isSelected = isSelected;
         }
 
@@ -307,11 +335,15 @@ public partial class InitialQuirkSelectionDialog : Window
             HeroInitialQuirkWriteStatus.Unsupported => "暂不支持",
             _ => "未知"
         };
-        public string MaxHpSummary => Definition.MaxHpModifier is not { } modifier
-            ? string.Empty
-            : $"{FormatSignedPercent(modifier.Amount)} / {modifier.RuleType}";
+        public string MaxHpSummary =>
+            Definition.WriteStatusReason.Contains("max_hp", StringComparison.OrdinalIgnoreCase)
+                ? "待验证"
+                : Definition.MaxHpModifier is { } modifier
+                    ? $"{FormatSignedPercent(modifier.Amount)} / {modifier.RuleType}"
+                    : "无";
         public string Source { get; }
         public string BaseUnavailableReason { get; }
+        public string ContextReason { get; }
 
         public bool IsSelected
         {
