@@ -100,7 +100,7 @@
                                    Style="{StaticResource FieldLabelStyle}" Text="筛选" />
                         <TextBox x:Name="SearchTextBox" Grid.Column="1" Margin="0"
                                  TextChanged="SearchTextBox_TextChanged"
-                                 ToolTip="按怪癖 ID、中英文名、类别、来源、HP 规则或不可用原因筛选" />
+                                 ToolTip="按怪癖 ID、中英文名、类别、来源、HP 规则、限制或不可用原因筛选" />
                         <TextBlock x:Name="SelectionSummaryTextBlock" Grid.Column="2"
                                    Margin="18,0,4,0" VerticalAlignment="Center"
                                    TextAlignment="Right" TextWrapping="Wrap"
@@ -140,7 +140,7 @@
                         <DataGridTextColumn Header="写入状态" Binding="{Binding WriteStatus}" Width="92" IsReadOnly="True" ElementStyle="{StaticResource DataGridTextElementStyle}" />
                         <DataGridTextColumn Header="HP 修正" Binding="{Binding MaxHpSummary}" Width="110" IsReadOnly="True" ElementStyle="{StaticResource DataGridTextElementStyle}" />
                         <DataGridTextColumn Header="来源" Binding="{Binding Source}" Width="1.2*" MinWidth="135" IsReadOnly="True" ElementStyle="{StaticResource DataGridTextElementStyle}" />
-                        <DataGridTextColumn Header="不可用原因" Binding="{Binding UnavailableReason}" Width="1.8*" MinWidth="190" IsReadOnly="True" ElementStyle="{StaticResource DataGridTextElementStyle}" />
+                        <DataGridTextColumn Header="限制 / 不可用原因" Binding="{Binding UnavailableReason}" Width="1.8*" MinWidth="190" IsReadOnly="True" ElementStyle="{StaticResource DataGridTextElementStyle}" />
                     </DataGrid.Columns>
             </DataGrid>
 

@@ -20,6 +20,7 @@ TestResults/
 workspaces/
 backups/
 logs/
+local-analysis/
 *.log
 
 # Local-only configuration and transient files

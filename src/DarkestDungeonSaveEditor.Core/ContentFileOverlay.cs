@@ -4,12 +4,17 @@ internal sealed record ContentFileCandidate(
     ActiveContentSource Source,
     string Path);
 
+internal sealed record ContentFileProvider(
+    string SourceId,
+    string Path);
+
 internal sealed record EffectiveContentFile(
     ActiveContentSource Source,
     string Path,
     string RelativePath,
     IReadOnlyList<string> ProviderSources,
-    IReadOnlyList<string> ProviderPaths);
+    IReadOnlyList<string> ProviderPaths,
+    IReadOnlyList<ContentFileProvider> Providers);
 
 internal static class ContentFileOverlay
 {
@@ -101,16 +106,21 @@ internal static class ContentFileOverlay
             }
 
             var winner = winners[0];
-            var providerSources = pair.Value
+            var providers = pair.Value
                 .OrderBy(candidate => GetApplicationOrder(candidate.Source))
                 .ThenBy(candidate => candidate.Source.Id, StringComparer.OrdinalIgnoreCase)
-                .Select(candidate => candidate.Source.Id)
+                .ThenBy(candidate => candidate.Path, StringComparer.OrdinalIgnoreCase)
+                .Select(candidate => new ContentFileProvider(candidate.Source.Id, candidate.Path))
+                .DistinctBy(
+                    provider => $"{provider.SourceId}\n{provider.Path}",
+                    StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            var providerSources = providers
+                .Select(provider => provider.SourceId)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToArray();
-            var providerPaths = pair.Value
-                .OrderBy(candidate => GetApplicationOrder(candidate.Source))
-                .ThenBy(candidate => candidate.Source.Id, StringComparer.OrdinalIgnoreCase)
-                .Select(candidate => candidate.Path)
+            var providerPaths = providers
+                .Select(provider => provider.Path)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToArray();
             effectiveFiles.Add(new EffectiveContentFile(
@@ -118,7 +128,8 @@ internal static class ContentFileOverlay
                 winner.Path,
                 winner.RelativePath,
                 providerSources,
-                providerPaths));
+                providerPaths,
+                providers));
         }
 
         return effectiveFiles;

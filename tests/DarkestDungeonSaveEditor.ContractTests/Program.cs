@@ -144,6 +144,9 @@ var heroColumnHeaders = heroGridElement
                       element.Name == presentationNamespace + "DataGridCheckBoxColumn")
     .Select(element => element.Attribute("Header")?.Value)
     .ToArray();
+var heroQuirkRangeColumn = heroGridElement
+    .Descendants(presentationNamespace + "DataGridTextColumn")
+    .Single(column => column.Attribute("Header")?.Value == "自然怪癖范围");
 Assert(
     trinketColumnHeaders.SequenceEqual(
         new[] { "饰品 ID", "中文名", "English", "稀有度", "来源", "定义上限" },
@@ -151,6 +154,8 @@ Assert(
     heroColumnHeaders.SequenceEqual(
         new[] { "职业 ID", "中文名", "English", "来源", "生成方式", "等级范围", "自然怪癖范围" },
         StringComparer.Ordinal) &&
+    heroQuirkRangeColumn.Attribute("Width")?.Value == "1.75*" &&
+    heroQuirkRangeColumn.Attribute("MinWidth")?.Value == "170" &&
     ReadStyleSetter(dataGridStyle, "HorizontalContentAlignment") == "Stretch" &&
     ReadStyleSetter(dataGridStyle, "VerticalContentAlignment") == "Top" &&
     trinketGridElement.Descendants(presentationNamespace + "DataGridTextColumn")
@@ -589,6 +594,12 @@ var initialQuirkBindings = initialQuirkDialogXaml
     .Descendants(presentationNamespace + "DataGridTextColumn")
     .Select(column => column.Attribute("Binding")?.Value)
     .ToArray();
+var unknownHpDisplayIndex = initialQuirkDialogCode.IndexOf(
+    "WriteStatusReason.Contains(\"max_hp\"",
+    StringComparison.Ordinal);
+var knownHpDisplayIndex = initialQuirkDialogCode.IndexOf(
+    "Definition.MaxHpModifier is { } modifier",
+    StringComparison.Ordinal);
 Assert(
     initialQuirkBindings.Contains("{Binding Kind}", StringComparer.Ordinal) &&
     initialQuirkBindings.Contains("{Binding WriteStatus}", StringComparer.Ordinal) &&
@@ -599,15 +610,32 @@ Assert(
         .Single(column => column.Attribute("Header")?.Value == "来源")
         .Attribute("MinWidth")?.Value == "135" &&
     initialQuirkDialogXaml.Descendants(presentationNamespace + "DataGridTextColumn")
-        .Single(column => column.Attribute("Header")?.Value == "不可用原因")
+        .Single(column => column.Attribute("Header")?.Value == "限制 / 不可用原因")
         .Attribute("MinWidth")?.Value == "190" &&
     !initialQuirkDialogXaml.ToString().Contains("职业禁用项", StringComparison.Ordinal) &&
     initialQuirkDialogXaml.ToString().Contains(
         "roster_limit 由游戏在招募进入 roster 时执行，生成马车候选不检查也不警告",
         StringComparison.Ordinal) &&
     !initialQuirkDialogCode.Contains("selectedIds.Append(row.Id)", StringComparison.Ordinal) &&
-    initialQuirkDialogCode.Contains("IncompatibleQuirkIds.Contains", StringComparison.Ordinal),
-    "The initial quirk dialog must fully show fixed/special kind text, keep quota feedback in the summary/click validation, and reserve row-level dynamic reasons for actual incompatibilities.");
+    initialQuirkDialogCode.Contains("IncompatibleQuirkIds.Contains", StringComparison.Ordinal) &&
+    initialQuirkDialogCode.Contains(
+        "CombineReasons(row.ContextReason, incompatibilityReason)",
+        StringComparison.Ordinal) &&
+    initialQuirkDialogCode.Contains("row.SetAvailability(true, row.ContextReason);", StringComparison.Ordinal) &&
+    initialQuirkDialogCode.Contains(
+        "BaseUnavailableReason = CompactRowReason(baseUnavailableReason)",
+        StringComparison.Ordinal) &&
+    initialQuirkDialogCode.Contains(
+        "CompactRowReason(definition.WriteStatusReason)",
+        StringComparison.Ordinal) &&
+    initialQuirkDialogCode.Contains(
+        "private const string CompactSingletonReason = \"singleton 定义上限 1\"",
+        StringComparison.Ordinal) &&
+    unknownHpDisplayIndex >= 0 &&
+    knownHpDisplayIndex > unknownHpDisplayIndex &&
+    initialQuirkDialogCode.Contains("? \"待验证\"", StringComparison.Ordinal) &&
+    initialQuirkDialogCode.Contains(": \"无\"", StringComparison.Ordinal),
+    "The initial quirk dialog must fully show fixed/special kind text, distinguish absent from unverified HP modifiers, keep context-limit explanations visible, keep quota feedback in the summary/click validation, and reserve row-level dynamic reasons for actual incompatibilities.");
 var initialQuirkGrid = initialQuirkDialogXaml
     .Descendants(presentationNamespace + "DataGrid")
     .Single(grid => grid.Attribute(xamlName)?.Value == "QuirkGrid");
@@ -832,6 +860,7 @@ File.WriteAllText(
         { "id": "same_path_duplicate", "random_chance": 0, "is_positive": false, "is_disease": false, "buffs": [] },
         { "id": "same_path_duplicate", "random_chance": 1, "is_positive": true, "is_disease": false, "buffs": [] },
         { "id": "context_special", "random_chance": 0, "is_positive": true, "is_disease": false, "tags": ["singleton"], "buffs": [] },
+        { "id": "context_unverified_singleton", "random_chance": 0, "is_positive": true, "is_disease": false, "tags": ["singleton"], "buffs": ["MAXHP_CONDITIONAL"] },
         { "id": "context_roster_limited", "random_chance": 0, "is_positive": false, "is_disease": false, "roster_limit": 2, "buffs": [] },
         { "id": "excluded_quirk", "random_chance": 100, "is_positive": true, "is_disease": false, "buffs": [] },
         { "id": "semantic_priority_quirk", "random_chance": 1, "is_positive": false, "is_disease": false, "buffs": [] },
@@ -1046,7 +1075,12 @@ File.WriteAllText(
 File.WriteAllText(
     Path.Combine(activeWorkshopRoot, "trinkets", "origin_probe.entries.trinkets.json"),
     """
-    { "entries": [ { "id": "origin_probe_trinket", "rarity": "rare", "price": 500 } ] }
+    {
+      "entries": [
+        { "id": "origin_probe_trinket", "rarity": "rare", "price": 500 },
+        { "id": "mod_only_in_overridden_trinket_file", "rarity": "common", "price": 250 }
+      ]
+    }
     """,
     new UTF8Encoding(false));
 File.WriteAllText(
@@ -1428,7 +1462,8 @@ File.WriteAllText(
     """
     {
       "quirks": [
-        { "id": "source_probe_quirk", "random_chance": 1, "is_positive": true, "is_disease": false, "buffs": [] }
+        { "id": "source_probe_quirk", "random_chance": 1, "is_positive": true, "is_disease": false, "buffs": [] },
+        { "id": "mod_only_in_overridden_quirk_file", "random_chance": 0, "is_positive": true, "is_disease": false, "buffs": [] }
       ]
     }
     """,
@@ -2277,7 +2312,7 @@ var catalogWithEmptyDlc = TrinketCatalog.Load(activeContent with
 Assert(
     catalogWithEmptyDlc.Trinkets.Count == activeCatalog.Trinkets.Count,
     "An enabled DLC source without a trinkets directory should be ignored without failing the catalog.");
-Assert(activeCatalog.Trinkets.Count == 10, "Active catalog should contain base, enabled DLC package/feature, active Workshop, default/extra local Mods, provenance probe, and one unresolved duplicate trinket.");
+Assert(activeCatalog.Trinkets.Count == 11, "Active catalog should contain base, enabled DLC package/feature, active Workshop, default/extra local Mods, provenance probes, and one unresolved duplicate trinket.");
 var activeWorkshopTrinket = activeCatalog.Trinkets.Single(item => item.Id == "active_workshop_trinket");
 Assert(
     activeWorkshopTrinket.LocalizedName == new BilingualContentName("编译工坊饰品", "Compiled Workshop Trinket"),
@@ -2388,6 +2423,8 @@ var unlimited = activeCatalog.Trinkets.Single(item => item.Id == "unlimited_prob
 var stateful = activeCatalog.Trinkets.Single(item => item.Id == "fire_probe");
 var prioritizedTrinket = activeCatalog.Trinkets.Single(item => item.Id == "local_mod_trinket");
 var originProbeTrinket = activeCatalog.Trinkets.Single(item => item.Id == "origin_probe_trinket");
+var modOnlyOverrideFileTrinket = activeCatalog.Trinkets.Single(item =>
+    item.Id == "mod_only_in_overridden_trinket_file");
 var overriddenDlcTrinket = activeCatalog.Trinkets.Single(item => item.Id == "dlc_shared_trinket");
 var overriddenDlcFeatureTrinket = activeCatalog.Trinkets.Single(item => item.Id == "enabled_dlc_trinket");
 var ambiguousTrinket = activeCatalog.Trinkets.Single(item => item.Id == "ambiguous_trinket");
@@ -2412,6 +2449,11 @@ Assert(
     originProbeTrinket.Source == "workshop:111" &&
     originProbeTrinket.SourceLabel == "原版（当前由 创意工坊 Mod：111 覆盖）",
     "A base trinket overridden by a Mod should keep its original-game provenance while naming the effective provider.");
+Assert(
+    modOnlyOverrideFileTrinket.Source == "workshop:111" &&
+    modOnlyOverrideFileTrinket.AllSources.SequenceEqual(["workshop:111"]) &&
+    modOnlyOverrideFileTrinket.SourceLabel == "创意工坊 Mod：111",
+    "A Mod-only trinket added inside an overridden base file must not inherit original-game provenance from unrelated entries in that file.");
 Assert(
     activeCatalog.Issues.Any(issue =>
         issue.Contains("broken_english.loc2", StringComparison.OrdinalIgnoreCase) &&
@@ -2637,11 +2679,18 @@ Assert(
     "A quirk should expose distinct Simplified Chinese and English names.");
 Assert(naturalQuirk.SourceLabel == "原版", "An untouched base quirk should display its original-game provenance.");
 var sourceProbeQuirk = heroCatalog.InitialQuirks.Single(item => item.Id == "source_probe_quirk");
+var modOnlyOverrideFileQuirk = heroCatalog.InitialQuirks.Single(item =>
+    item.Id == "mod_only_in_overridden_quirk_file");
 Assert(
     sourceProbeQuirk.Source == "workshop:111" &&
     sourceProbeQuirk.SourceLabel == "原版（当前由 创意工坊 Mod：111 覆盖）" &&
     sourceProbeQuirk.AllSources.Count == 2,
     "A base quirk overridden at the same virtual path should retain and display its full provider provenance.");
+Assert(
+    modOnlyOverrideFileQuirk.Source == "workshop:111" &&
+    modOnlyOverrideFileQuirk.AllSources.SequenceEqual(["workshop:111"]) &&
+    modOnlyOverrideFileQuirk.SourceLabel == "创意工坊 Mod：111",
+    "A Mod-only quirk added inside an overridden base file must not inherit original-game provenance from unrelated entries in that file.");
 Assert(
     naturalQuirk is
     {
@@ -2687,6 +2736,17 @@ Assert(
     } &&
     contextualQuirk.WriteStatusReason.Contains("超限仅警告", StringComparison.Ordinal),
     "A singleton special quirk should expose limit one and remain selectable through preview-time context checking.");
+var unverifiedSingletonQuirk = heroCatalog.InitialQuirks.Single(item =>
+    item.Id == "context_unverified_singleton");
+Assert(
+    unverifiedSingletonQuirk is
+    {
+        WriteStatus: HeroInitialQuirkWriteStatus.Unverified,
+        DefinitionLimit: 1
+    } &&
+    unverifiedSingletonQuirk.WriteStatusReason.Contains("max_hp", StringComparison.OrdinalIgnoreCase) &&
+    unverifiedSingletonQuirk.WriteStatusReason.Contains("预览统计 roster", StringComparison.Ordinal),
+    "A singleton with an independent unsafe HP rule must retain both its blocking core reason and full preview-context detail; only the table display compacts the latter.");
 var rosterLimitedQuirk = heroCatalog.InitialQuirks.Single(item => item.Id == "context_roster_limited");
 Assert(
     rosterLimitedQuirk is
