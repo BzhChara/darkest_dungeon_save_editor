@@ -15,12 +15,14 @@ public partial class InitialQuirkSelectionDialog : Window
     private const string CompactSingletonReason = "singleton 定义上限 1";
     private readonly HeroClassCatalogResult _catalog;
     private readonly HeroClassDefinition _heroClass;
+    private readonly int _resolveLevel;
     private readonly ObservableCollection<QuirkChoiceRow> _rows = [];
     private ICollectionView? _view;
 
     public InitialQuirkSelectionDialog(
         HeroClassCatalogResult catalog,
         HeroClassDefinition heroClass,
+        int resolveLevel,
         IReadOnlyCollection<string> selectedQuirkIds)
     {
         ArgumentNullException.ThrowIfNull(catalog);
@@ -29,7 +31,7 @@ public partial class InitialQuirkSelectionDialog : Window
 
         _catalog = catalog;
         _heroClass = heroClass;
-        StagecoachHeroCandidateFactory.ValidateInitialQuirkSelection(catalog, heroClass, selectedQuirkIds);
+        _resolveLevel = resolveLevel;
 
         InitializeComponent();
         var selectedIds = selectedQuirkIds.ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -67,6 +69,14 @@ public partial class InitialQuirkSelectionDialog : Window
         _view.Filter = FilterRow;
         RefreshAvailability();
         UpdateSelectionSummary();
+        try
+        {
+            ValidateCurrentSelection();
+        }
+        catch (InvalidOperationException ex)
+        {
+            ValidationTextBlock.Text = ex.Message;
+        }
     }
 
     protected override void OnSourceInitialized(EventArgs e)
@@ -84,6 +94,7 @@ public partial class InitialQuirkSelectionDialog : Window
             StagecoachHeroCandidateFactory.ValidateInitialQuirkSelection(
                 _catalog,
                 _heroClass,
+                _resolveLevel,
                 [quirkId]);
             return string.Empty;
         }
@@ -111,8 +122,7 @@ public partial class InitialQuirkSelectionDialog : Window
                row.Polarity.Contains(keyword, StringComparison.OrdinalIgnoreCase) ||
                row.WriteStatus.Contains(keyword, StringComparison.OrdinalIgnoreCase) ||
                row.MaxHpSummary.Contains(keyword, StringComparison.OrdinalIgnoreCase) ||
-               row.Source.Contains(keyword, StringComparison.OrdinalIgnoreCase) ||
-               row.UnavailableReason.Contains(keyword, StringComparison.OrdinalIgnoreCase);
+               row.Source.Contains(keyword, StringComparison.OrdinalIgnoreCase);
     }
 
     private void QuirkCheckBox_Click(object sender, RoutedEventArgs e)
@@ -131,8 +141,13 @@ public partial class InitialQuirkSelectionDialog : Window
         }
         catch (InvalidOperationException ex)
         {
-            row.IsSelected = !requestedValue;
-            checkBox.IsChecked = row.IsSelected;
+            // Removing one invalid legacy selection must remain possible even when
+            // another invalid selection is still present after a level change.
+            if (requestedValue)
+            {
+                row.IsSelected = false;
+                checkBox.IsChecked = false;
+            }
             ValidationTextBlock.Text = ex.Message;
         }
 
@@ -162,6 +177,7 @@ public partial class InitialQuirkSelectionDialog : Window
             StagecoachHeroCandidateFactory.ValidateInitialQuirkSelection(
                 _catalog,
                 _heroClass,
+                _resolveLevel,
                 selectedIds);
         }
         catch (InvalidOperationException ex)
@@ -179,6 +195,7 @@ public partial class InitialQuirkSelectionDialog : Window
         StagecoachHeroCandidateFactory.ValidateInitialQuirkSelection(
             _catalog,
             _heroClass,
+            _resolveLevel,
             GetSelectedIds());
     }
 
@@ -200,7 +217,9 @@ public partial class InitialQuirkSelectionDialog : Window
         {
             if (!string.IsNullOrWhiteSpace(row.BaseUnavailableReason))
             {
-                row.SetAvailability(false, row.BaseUnavailableReason);
+                // A level change can make a previously valid flat-HP selection invalid.
+                // Keep an already selected row enabled so the user can remove it.
+                row.SetAvailability(row.IsSelected, row.BaseUnavailableReason);
                 continue;
             }
 
@@ -338,9 +357,9 @@ public partial class InitialQuirkSelectionDialog : Window
         public string MaxHpSummary =>
             Definition.WriteStatusReason.Contains("max_hp", StringComparison.OrdinalIgnoreCase)
                 ? "待验证"
-                : Definition.MaxHpModifier is { } modifier
-                    ? $"{FormatSignedPercent(modifier.Amount)} / {modifier.RuleType}"
-                    : "无";
+                : Definition.MaxHpModifiers.Count == 0
+                    ? "无"
+                    : string.Join("；", Definition.MaxHpModifiers.Select(FormatMaxHpModifier));
         public string Source { get; }
         public string BaseUnavailableReason { get; }
         public string ContextReason { get; }
@@ -401,6 +420,30 @@ public partial class InitialQuirkSelectionDialog : Window
             var percent = (amount * 100).ToString("0.##", CultureInfo.InvariantCulture);
             return amount > 0 ? $"+{percent}%" : $"{percent}%";
         }
+
+        private static string FormatMaxHpModifier(HeroMaxHpModifier modifier)
+        {
+            var amount = modifier.Kind == HeroMaxHpModifierKind.Percentage
+                ? FormatSignedPercent(modifier.Amount)
+                : modifier.Amount.ToString("+0.###;-0.###;0", CultureInfo.InvariantCulture);
+            var condition = modifier.RuleType.ToLowerInvariant() switch
+            {
+                "always" => modifier.IsFalseRule ? "永不生效" : "常驻",
+                "no_trinkets" => modifier.IsFalseRule ? "有饰品时" : "无饰品时",
+                "afflicted" => modifier.IsFalseRule ? "未折磨时" : "折磨时",
+                "in_mode" => modifier.IsFalseRule
+                    ? $"非 {modifier.RuleString} 模式"
+                    : $"{modifier.RuleString} 模式",
+                "lightabove" => modifier.IsFalseRule
+                    ? $"火光 ≤ {FormatRuleNumber(modifier.RuleFloat)}"
+                    : $"火光 > {FormatRuleNumber(modifier.RuleFloat)}",
+                _ => modifier.RuleType
+            };
+            return $"{amount} / {condition}";
+        }
+
+        private static string FormatRuleNumber(double? value) =>
+            value?.ToString("0.###", CultureInfo.InvariantCulture) ?? "?";
 
         private static string FormatLocalizedName(string value) =>
             string.IsNullOrWhiteSpace(value) ? "—" : value;

@@ -16,7 +16,10 @@ public sealed record SaveProfile(
     string ProfileDirectory,
     string EstateSavePath,
     string SteamUserId,
-    DateTime LastWriteTimeUtc);
+    DateTime LastWriteTimeUtc)
+{
+    public string RaidSavePath => Path.Combine(ProfileDirectory, "persist.raid.json");
+}
 
 public sealed record DiscoverySnapshot(
     IReadOnlyList<GameInstallation> GameInstallations,
@@ -115,6 +118,7 @@ public sealed record HeroClassDefinition(
     string ProgressionUnsupportedReason,
     int ColourVariationCount,
     IReadOnlyList<string> CombatSkillIds,
+    IReadOnlyList<string> SingleLevelCombatSkillIds,
     IReadOnlyList<string> GuaranteedCombatSkillIds,
     IReadOnlyList<string> ClassCampingSkillIds,
     IReadOnlyList<string> SharedCampingSkillIds,
@@ -128,10 +132,20 @@ public sealed record HeroClassDefinition(
     public string SourceLabel { get; init; } = string.Empty;
 }
 
+public enum HeroMaxHpModifierKind
+{
+    Flat,
+    Percentage
+}
+
 public sealed record HeroMaxHpModifier(
     string BuffId,
+    HeroMaxHpModifierKind Kind,
     double Amount,
-    string RuleType);
+    string RuleType,
+    bool IsFalseRule,
+    double? RuleFloat,
+    string RuleString);
 
 public sealed record HeroQuirkEvolutionDefinition(
     int DurationMin,
@@ -163,7 +177,7 @@ public sealed record HeroInitialQuirkDefinition(
     bool IsDisease,
     HeroQuirkEvolutionDefinition? Evolution,
     IReadOnlyList<string> IncompatibleQuirkIds,
-    HeroMaxHpModifier? MaxHpModifier,
+    IReadOnlyList<HeroMaxHpModifier> MaxHpModifiers,
     HeroInitialQuirkKind Kind,
     bool IsNaturalRandomEligible,
     HeroInitialQuirkWriteStatus WriteStatus,
@@ -206,6 +220,104 @@ public sealed record TrinketDefinition(
 public sealed record TrinketCatalogResult(
     IReadOnlyList<TrinketDefinition> Trinkets,
     TrinketStorageDefinition? Storage,
+    IReadOnlyList<string> Issues);
+
+public enum QuantityItemStorageKind
+{
+    Wallet,
+    EstateItems,
+    RaidInventory
+}
+
+public enum QuantityItemSaveContext
+{
+    Town,
+    Raid
+}
+
+public enum QuantityItemReferenceStatus
+{
+    OfficialContent,
+    ConfirmedActive,
+    SuspectedUnused,
+    AnalysisIncomplete,
+    SaveOnly
+}
+
+public sealed record QuantityItemDefinition(
+    string InventoryType,
+    string ItemId,
+    QuantityItemStorageKind StorageKind,
+    int? BaseStackLimit,
+    bool? EstateCanBeProvision,
+    int CurrentAmount,
+    string Source,
+    string SourcePath,
+    bool HasProviderConflict,
+    IReadOnlyList<string> AllSources)
+{
+    public BilingualContentName LocalizedName { get; init; } = BilingualContentName.Empty;
+    public string SourceLabel { get; init; } = string.Empty;
+    public QuantityItemReferenceStatus ReferenceStatus { get; init; } =
+        QuantityItemReferenceStatus.AnalysisIncomplete;
+    public IReadOnlyList<string> ReferenceEvidence { get; init; } = [];
+    public bool IsPresentInSave { get; init; }
+    public int SavedEntryCount { get; init; }
+    public string DisplayId => string.IsNullOrWhiteSpace(ItemId) ? InventoryType : ItemId;
+    public string PersistedType => StorageKind == QuantityItemStorageKind.Wallet
+        ? InventoryType.Equals("heirloom", StringComparison.OrdinalIgnoreCase) &&
+          !string.IsNullOrWhiteSpace(ItemId)
+            ? ItemId
+            : InventoryType
+        : InventoryType;
+    public string PersistedId => StorageKind is QuantityItemStorageKind.EstateItems or
+        QuantityItemStorageKind.RaidInventory
+        ? ItemId
+        : string.Empty;
+    public string CatalogKey =>
+        $"{StorageKind}:{PersistedType}:{PersistedId}".ToUpperInvariant();
+    public bool IsSaveOnly => string.IsNullOrWhiteSpace(SourcePath);
+    public bool IsHiddenByDefault =>
+        !IsPresentInSave && ReferenceStatus == QuantityItemReferenceStatus.SuspectedUnused;
+}
+
+public sealed record QuantityItemCatalogResult(
+    IReadOnlyList<QuantityItemDefinition> Items,
+    IReadOnlyList<string> Issues,
+    string SourceSaveSha256)
+{
+    public QuantityItemSaveContext SaveContext { get; init; } = QuantityItemSaveContext.Town;
+    public RaidInventoryStorageDefinition? RaidStorage { get; init; }
+
+    // Compatibility alias for callers compiled against the original town-only catalog.
+    public string SourceEstateSha256 => SourceSaveSha256;
+}
+
+public sealed record QuantityItemMutationPreview(
+    string ItemId,
+    QuantityItemStorageKind StorageKind,
+    int ExistingAmount,
+    int TargetAmount,
+    int MatchingEntries,
+    bool CreatedEntry)
+{
+    public int ResultingMatchingEntries { get; init; } = MatchingEntries + (CreatedEntry ? 1 : 0);
+    public int ExistingInventoryEntries { get; init; }
+    public int ResultingInventoryEntries { get; init; }
+    public int CreatedEntries { get; init; } = CreatedEntry ? 1 : 0;
+    public int RemovedEntries { get; init; }
+    public int? InventoryCapacity { get; init; }
+}
+
+public sealed record RaidInventoryStorageDefinition(
+    int MaxSlots,
+    string Source,
+    string SourcePath,
+    ActiveContentSource ContentSource,
+    string SourceSha256);
+
+public sealed record RaidInventoryStorageCatalogResult(
+    RaidInventoryStorageDefinition? Storage,
     IReadOnlyList<string> Issues);
 
 public sealed record TrinketStorageDefinition(
@@ -331,6 +443,35 @@ public sealed record PreparedTrinketEdit(
     string EncodedSha256,
     bool SourceWasDson,
     DateTime PreparedAtUtc);
+
+public sealed record PreparedQuantityItemEdit(
+    string SessionId,
+    SaveProfile Profile,
+    QuantityItemDefinition Item,
+    QuantityItemMutationPreview Preview,
+    PreparedQuantityItemContentGuard ContentGuard,
+    string WorkspaceDirectory,
+    string SourceCopyPath,
+    string ProposedDecodedPath,
+    string EncodedPath,
+    string RoundTripDecodedPath,
+    string OriginalSha256,
+    string EncodedSha256,
+    bool SourceWasDson,
+    DateTime PreparedAtUtc);
+
+public sealed record PreparedQuantityItemContentGuard(
+    string SourceGameSha256,
+    IReadOnlyList<ActiveContentSource> Sources,
+    string ItemSourcePath,
+    string ItemSourceSha256,
+    IReadOnlyList<PreparedContentFileFingerprint> ManifestFingerprints)
+{
+    public QuantityItemSaveContext SaveContext { get; init; } = QuantityItemSaveContext.Town;
+    public int? RaidInventoryCapacity { get; init; }
+    public string RaidStorageSourcePath { get; init; } = string.Empty;
+    public string RaidStorageSourceSha256 { get; init; } = string.Empty;
+}
 
 public sealed record PreparedTrinketContentGuard(
     string SourceGameSha256,

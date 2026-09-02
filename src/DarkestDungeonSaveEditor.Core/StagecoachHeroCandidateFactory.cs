@@ -5,6 +5,7 @@ namespace DarkestDungeonSaveEditor.Core;
 
 public static class StagecoachHeroCandidateFactory
 {
+    private const double HpSafetyTolerance = 1e-9;
     public const int MaximumPositiveInitialQuirks = 5;
     public const int MaximumNegativeInitialQuirks = 5;
     public const int MaximumInitialDiseases = 3;
@@ -12,6 +13,31 @@ public static class StagecoachHeroCandidateFactory
     public static void ValidateInitialQuirkSelection(
         HeroClassCatalogResult catalog,
         HeroClassDefinition heroClass,
+        IReadOnlyCollection<string> selectedInitialQuirkIds)
+    {
+        var levelZero = heroClass.LevelProfiles
+            .SingleOrDefault(profile => profile.ResolveLevel == 0);
+        var baseHp = levelZero?.ArmourHp ?? heroClass.BaseHp ??
+            throw new InvalidOperationException($"职业 '{heroClass.Id}' 没有可用于验证初始怪癖的 0 级生命模板。");
+        ValidateInitialQuirkSelection(catalog, heroClass, baseHp, selectedInitialQuirkIds);
+    }
+
+    public static void ValidateInitialQuirkSelection(
+        HeroClassCatalogResult catalog,
+        HeroClassDefinition heroClass,
+        int resolveLevel,
+        IReadOnlyCollection<string> selectedInitialQuirkIds)
+    {
+        ArgumentNullException.ThrowIfNull(catalog);
+        ArgumentNullException.ThrowIfNull(heroClass);
+        var levelProfile = ResolveLevelProfile(catalog, heroClass, resolveLevel);
+        ValidateInitialQuirkSelection(catalog, heroClass, levelProfile.ArmourHp, selectedInitialQuirkIds);
+    }
+
+    private static void ValidateInitialQuirkSelection(
+        HeroClassCatalogResult catalog,
+        HeroClassDefinition heroClass,
+        double baseHp,
         IReadOnlyCollection<string> selectedInitialQuirkIds)
     {
         ArgumentNullException.ThrowIfNull(catalog);
@@ -25,7 +51,7 @@ public static class StagecoachHeroCandidateFactory
         var selectedQuirks = ResolveSelectedQuirks(
             catalog.InitialQuirks,
             selectedInitialQuirkIds);
-        _ = GetValidatedMaxHpModifierTotal(heroClass.Id, selectedQuirks);
+        _ = GetValidatedInitialCurrentHp(heroClass.Id, baseHp, selectedQuirks);
     }
 
     public static GeneratedStagecoachHeroCandidate Generate(
@@ -122,12 +148,7 @@ public static class StagecoachHeroCandidateFactory
 
         warnings.Add("buff_group_next_guid 使用已通过测试档实机载入验证的观测基线 2。");
 
-        var maxHpModifierTotal = GetValidatedMaxHpModifierTotal(heroClass.Id, selectedQuirks);
-        var currentHp = baseHp * (1.0 + maxHpModifierTotal);
-        if (!double.IsFinite(currentHp) || currentHp <= 0)
-        {
-            throw new InvalidOperationException($"职业 '{heroClass.Id}' 的初始怪癖计算出了无效当前生命：{currentHp}。");
-        }
+        var currentHp = GetValidatedInitialCurrentHp(heroClass.Id, baseHp, selectedQuirks);
 
         var name = catalog.HeroNames[random.Next(catalog.HeroNames.Count)];
         var colourVariation = random.Next(heroClass.ColourVariationCount);
@@ -185,8 +206,16 @@ public static class StagecoachHeroCandidateFactory
             .Select(skillId => $"{heroClass.Id}.{skillId}")
             .Distinct(StringComparer.Ordinal)
             .ToArray();
+        var singleLevelCombatTreeIds = heroClass.SingleLevelCombatSkillIds
+            .Select(skillId => $"{heroClass.Id}.{skillId}")
+            .ToHashSet(StringComparer.Ordinal);
+        var syntheticCombatTreeIds = expectedCombatTreeIds
+            .Where(treeId => !combatTrees.ContainsKey(treeId) &&
+                             singleLevelCombatTreeIds.Contains(treeId))
+            .ToArray();
         var missingCombatTreeIds = expectedCombatTreeIds
-            .Where(treeId => !combatTrees.ContainsKey(treeId))
+            .Where(treeId => !combatTrees.ContainsKey(treeId) &&
+                             !singleLevelCombatTreeIds.Contains(treeId))
             .ToArray();
         if (missingCombatTreeIds.Length > 0)
         {
@@ -197,6 +226,7 @@ public static class StagecoachHeroCandidateFactory
         }
 
         var unavailableCombatTreeIds = expectedCombatTreeIds
+            .Where(combatTrees.ContainsKey)
             .Where(treeId => combatTrees[treeId].Requirements.All(requirement =>
                 requirement.PrerequisiteResolveLevel > resolveLevel))
             .ToArray();
@@ -209,7 +239,11 @@ public static class StagecoachHeroCandidateFactory
 
         var applicableTrees = heroClass.UpgradeTrees
             .Where(tree => tree.Kind != HeroUpgradeTreeKind.CombatSkill)
-            .Concat(expectedCombatTreeIds.Select(treeId => combatTrees[treeId]));
+            .Concat(expectedCombatTreeIds
+                .Where(combatTrees.ContainsKey)
+                .Select(treeId => combatTrees[treeId]));
+        var syntheticCombatPurchases = syntheticCombatTreeIds
+            .Select(treeId => new HeroUpgradePurchase(treeId, "0"));
         var campingPurchases = heroClass.SharedCampingSkillIds
             .Concat(heroClass.ClassCampingSkillIds)
             .Distinct(StringComparer.Ordinal)
@@ -218,6 +252,7 @@ public static class StagecoachHeroCandidateFactory
             .SelectMany(tree => tree.Requirements
                 .Where(requirement => requirement.PrerequisiteResolveLevel <= resolveLevel)
                 .Select(requirement => new HeroUpgradePurchase(tree.Id, requirement.Code)))
+            .Concat(syntheticCombatPurchases)
             .Concat(campingPurchases)
             .OrderBy(purchase => purchase.TreeId, StringComparer.Ordinal)
             .ThenBy(purchase => purchase.RequirementCode, StringComparer.Ordinal)
@@ -436,21 +471,217 @@ public static class StagecoachHeroCandidateFactory
         return selected;
     }
 
-    private static double GetValidatedMaxHpModifierTotal(
+    private static double GetValidatedInitialCurrentHp(
         string heroClassId,
+        double baseHp,
         IEnumerable<HeroInitialQuirkDefinition> selectedQuirks)
     {
-        var modifierTotal = selectedQuirks
-            .Where(quirk => quirk.MaxHpModifier is not null)
-            .Sum(quirk => quirk.MaxHpModifier!.Amount);
-
-        if (!double.IsFinite(modifierTotal) || 1.0 + modifierTotal <= 0.0)
+        if (!double.IsFinite(baseHp) || baseHp <= 0.0)
         {
-            throw new InvalidOperationException(
-                $"职业 '{heroClassId}' 的初始怪癖合计 HP 修正无效：{modifierTotal}。");
+            throw new InvalidOperationException($"职业 '{heroClassId}' 的基础生命无效：{baseHp}。");
         }
 
-        return modifierTotal;
+        var modifiers = selectedQuirks
+            .SelectMany(quirk => quirk.MaxHpModifiers)
+            .ToArray();
+        ValidateAllReachableMaxHpStates(heroClassId, baseHp, modifiers);
+
+        var generationModifiers = modifiers
+            .Where(IsActiveAtGeneration)
+            .ToArray();
+        var flatTotal = generationModifiers
+            .Where(modifier => modifier.Kind == HeroMaxHpModifierKind.Flat)
+            .Sum(modifier => modifier.Amount);
+        var percentageTotal = generationModifiers
+            .Where(modifier => modifier.Kind == HeroMaxHpModifierKind.Percentage)
+            .Sum(modifier => modifier.Amount);
+        return ValidateMaxHpState(heroClassId, baseHp, flatTotal, percentageTotal, generationModifiers);
+    }
+
+    private static void ValidateAllReachableMaxHpStates(
+        string heroClassId,
+        double baseHp,
+        IReadOnlyList<HeroMaxHpModifier> modifiers)
+    {
+        var trinketStates = modifiers.Any(modifier =>
+                modifier.RuleType.Equals("no_trinkets", StringComparison.OrdinalIgnoreCase))
+            ? new[] { false, true }
+            : new[] { false };
+        var afflictedStates = modifiers.Any(modifier =>
+                modifier.RuleType.Equals("afflicted", StringComparison.OrdinalIgnoreCase))
+            ? new[] { false, true }
+            : new[] { false };
+        var modes = BuildReachableModes(modifiers);
+        var lightLevels = BuildReachableLightLevels(modifiers);
+        var validatedStates = new HashSet<string>(StringComparer.Ordinal);
+
+        foreach (var hasTrinkets in trinketStates)
+        {
+            foreach (var isAfflicted in afflictedStates)
+            {
+                foreach (var mode in modes)
+                {
+                    foreach (var lightLevel in lightLevels)
+                    {
+                        var active = modifiers
+                            .Where(modifier => IsActiveAtRuntime(
+                                modifier,
+                                hasTrinkets,
+                                isAfflicted,
+                                mode,
+                                lightLevel))
+                            .ToArray();
+                        var stateKey = string.Join('\u001f', active
+                            .Select(modifier => modifier.BuffId)
+                            .OrderBy(id => id, StringComparer.OrdinalIgnoreCase));
+                        if (!validatedStates.Add(stateKey))
+                        {
+                            continue;
+                        }
+
+                        var flatTotal = active
+                            .Where(modifier => modifier.Kind == HeroMaxHpModifierKind.Flat)
+                            .Sum(modifier => modifier.Amount);
+                        var percentageTotal = active
+                            .Where(modifier => modifier.Kind == HeroMaxHpModifierKind.Percentage)
+                            .Sum(modifier => modifier.Amount);
+                        _ = ValidateMaxHpState(
+                            heroClassId,
+                            baseHp,
+                            flatTotal,
+                            percentageTotal,
+                            active);
+                    }
+                }
+            }
+        }
+    }
+
+    private static IReadOnlyList<string?> BuildReachableModes(
+        IEnumerable<HeroMaxHpModifier> modifiers)
+    {
+        var declaredModes = modifiers
+            .Where(modifier => modifier.RuleType.Equals("in_mode", StringComparison.OrdinalIgnoreCase))
+            .Select(modifier => modifier.RuleString)
+            .Where(mode => !string.IsNullOrWhiteSpace(mode))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        if (declaredModes.Count == 0)
+        {
+            return new string?[] { null };
+        }
+
+        var otherMode = "__save_editor_other_mode__";
+        while (declaredModes.Contains(otherMode, StringComparer.OrdinalIgnoreCase))
+        {
+            otherMode += "_";
+        }
+
+        return new string?[] { null }
+            .Concat(declaredModes)
+            .Append(otherMode)
+            .ToArray();
+    }
+
+    private static IReadOnlyList<double?> BuildReachableLightLevels(
+        IEnumerable<HeroMaxHpModifier> modifiers)
+    {
+        var thresholds = modifiers
+            .Where(modifier => modifier.RuleType.Equals("lightabove", StringComparison.OrdinalIgnoreCase))
+            .Select(modifier => modifier.RuleFloat)
+            .Where(value => value is not null)
+            .Select(value => value!.Value)
+            .Distinct()
+            .ToArray();
+        if (thresholds.Length == 0)
+        {
+            return new double?[] { null };
+        }
+
+        var levels = new HashSet<double> { 0.0 };
+        foreach (var threshold in thresholds)
+        {
+            levels.Add(threshold);
+            var below = Math.BitDecrement(threshold);
+            var above = Math.BitIncrement(threshold);
+            if (double.IsFinite(below))
+            {
+                levels.Add(below);
+            }
+            if (double.IsFinite(above))
+            {
+                levels.Add(above);
+            }
+        }
+
+        return new double?[] { null }
+            .Concat(levels.Order().Select(level => (double?)level))
+            .ToArray();
+    }
+
+    private static bool IsActiveAtGeneration(HeroMaxHpModifier modifier)
+    {
+        var rawCondition = modifier.RuleType.ToLowerInvariant() switch
+        {
+            "always" => true,
+            "no_trinkets" => true,
+            _ => false
+        };
+        return rawCondition && !modifier.IsFalseRule;
+    }
+
+    private static bool IsActiveAtRuntime(
+        HeroMaxHpModifier modifier,
+        bool hasTrinkets,
+        bool isAfflicted,
+        string? mode,
+        double? lightLevel)
+    {
+        bool? rawCondition = modifier.RuleType.ToLowerInvariant() switch
+        {
+            "always" => true,
+            "no_trinkets" => !hasTrinkets,
+            "afflicted" => isAfflicted,
+            "in_mode" when mode is not null => mode.Equals(
+                modifier.RuleString,
+                StringComparison.OrdinalIgnoreCase),
+            "lightabove" when lightLevel is not null && modifier.RuleFloat is { } threshold =>
+                lightLevel.Value > threshold,
+            _ => null
+        };
+        return rawCondition is { } condition && condition != modifier.IsFalseRule;
+    }
+
+    private static double ValidateMaxHpState(
+        string heroClassId,
+        double baseHp,
+        double flatTotal,
+        double percentageTotal,
+        IReadOnlyCollection<HeroMaxHpModifier> activeModifiers)
+    {
+        var additiveResult = baseHp + flatTotal;
+        var multiplier = 1.0 + percentageTotal;
+        var currentHp = additiveResult * multiplier;
+
+        if (!double.IsFinite(flatTotal) ||
+            !double.IsFinite(percentageTotal) ||
+            !double.IsFinite(additiveResult) ||
+            !double.IsFinite(multiplier) ||
+            !double.IsFinite(currentHp) ||
+            additiveResult <= HpSafetyTolerance ||
+            multiplier <= HpSafetyTolerance ||
+            currentHp <= HpSafetyTolerance)
+        {
+            var activeBuffs = activeModifiers.Count == 0
+                ? "无"
+                : string.Join(", ", activeModifiers.Select(modifier => modifier.BuffId));
+            throw new InvalidOperationException(
+                $"职业 '{heroClassId}' 的初始怪癖合计 HP 修正无效：存在可达条件会使生命不大于 0；" +
+                $"基础 {baseHp}，固定 {flatTotal:+0.###;-0.###;0}，" +
+                $"百分比 {percentageTotal:+0.###%;-0.###%;0%}，活动 Buff：{activeBuffs}。");
+        }
+
+        return currentHp;
     }
 
     private static int ResolveEvolutionDuration(int seed, HeroInitialQuirkDefinition quirk)

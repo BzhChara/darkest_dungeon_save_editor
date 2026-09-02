@@ -17,7 +17,7 @@
         WindowStartupLocation="CenterOwner">
     <Grid Background="{StaticResource AppTextureBrush}">
         <Border Margin="8"
-                Background="#E8050505"
+                Background="#90050505"
                 BorderBrush="{StaticResource GoldDarkBrush}"
                 BorderThickness="1">
             <Border Margin="3" BorderBrush="#4B5351" BorderThickness="1">
@@ -100,7 +100,7 @@
                                    Style="{StaticResource FieldLabelStyle}" Text="筛选" />
                         <TextBox x:Name="SearchTextBox" Grid.Column="1" Margin="0"
                                  TextChanged="SearchTextBox_TextChanged"
-                                 ToolTip="按怪癖 ID、中英文名、类别、来源、HP 规则、限制或不可用原因筛选" />
+                                 ToolTip="按怪癖 ID、中英文名、类别、来源或 HP 规则筛选" />
                         <TextBlock x:Name="SelectionSummaryTextBlock" Grid.Column="2"
                                    Margin="18,0,4,0" VerticalAlignment="Center"
                                    TextAlignment="Right" TextWrapping="Wrap"

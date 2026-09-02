@@ -127,11 +127,24 @@ Assert(
 System.Xml.Linq.XElement ReadNamedMainElement(string elementName, string name) => mainWindowXaml
     .Descendants(presentationNamespace + elementName)
     .Single(element => element.Attribute(xamlName)?.Value == name);
+    var itemGridElement = ReadNamedMainElement("DataGrid", "ItemGrid");
 var trinketGridElement = ReadNamedMainElement("DataGrid", "TrinketGrid");
 var heroGridElement = ReadNamedMainElement("DataGrid", "HeroGrid");
 var dataGridStyle = appXaml
     .Descendants(presentationNamespace + "Style")
     .Single(element => element.Attribute("TargetType")?.Value == "DataGrid");
+var xamlNamespace = System.Xml.Linq.XName.Get("Key", "http://schemas.microsoft.com/winfx/2006/xaml");
+var applicationResourceKeys = appXaml
+    .Descendants()
+    .Select(element => element.Attribute(xamlNamespace)?.Value)
+    .Where(value => value is not null)
+    .ToHashSet(StringComparer.Ordinal);
+    var itemColumnHeaders = itemGridElement
+        .Descendants()
+        .Where(element => element.Name == presentationNamespace + "DataGridTextColumn" ||
+                          element.Name == presentationNamespace + "DataGridCheckBoxColumn")
+        .Select(element => element.Attribute("Header")?.Value)
+        .ToArray();
 var trinketColumnHeaders = trinketGridElement
     .Descendants()
     .Where(element => element.Name == presentationNamespace + "DataGridTextColumn" ||
@@ -147,7 +160,16 @@ var heroColumnHeaders = heroGridElement
 var heroQuirkRangeColumn = heroGridElement
     .Descendants(presentationNamespace + "DataGridTextColumn")
     .Single(column => column.Attribute("Header")?.Value == "自然怪癖范围");
+var itemEnglishColumn = itemGridElement
+    .Descendants(presentationNamespace + "DataGridTextColumn")
+    .Single(column => column.Attribute("Header")?.Value == "English");
+var heroSourceColumn = heroGridElement
+    .Descendants(presentationNamespace + "DataGridTextColumn")
+    .Single(column => column.Attribute("Header")?.Value == "来源");
 Assert(
+        itemColumnHeaders.SequenceEqual(
+            new[] { "物品 ID", "中文名", "English", "位置 / 类型 / 堆叠", "当前数量", "来源" },
+            StringComparer.Ordinal) &&
     trinketColumnHeaders.SequenceEqual(
         new[] { "饰品 ID", "中文名", "English", "稀有度", "来源", "定义上限" },
         StringComparer.Ordinal) &&
@@ -156,19 +178,19 @@ Assert(
         StringComparer.Ordinal) &&
     heroQuirkRangeColumn.Attribute("Width")?.Value == "1.75*" &&
     heroQuirkRangeColumn.Attribute("MinWidth")?.Value == "170" &&
+    itemEnglishColumn.Attribute("CellStyle") is null &&
+    itemEnglishColumn.Attribute("HeaderStyle") is null &&
+    heroSourceColumn.Attribute("CellStyle") is null &&
+    heroSourceColumn.Attribute("HeaderStyle") is null &&
     ReadStyleSetter(dataGridStyle, "HorizontalContentAlignment") == "Stretch" &&
     ReadStyleSetter(dataGridStyle, "VerticalContentAlignment") == "Top" &&
+        itemGridElement.Descendants(presentationNamespace + "DataGridTextColumn")
+            .All(column => column.Attribute("ElementStyle")?.Value == "{StaticResource DataGridTextElementStyle}") &&
     trinketGridElement.Descendants(presentationNamespace + "DataGridTextColumn")
         .All(column => column.Attribute("ElementStyle")?.Value == "{StaticResource DataGridTextElementStyle}") &&
     heroGridElement.Descendants(presentationNamespace + "DataGridTextColumn")
         .All(column => column.Attribute("ElementStyle")?.Value == "{StaticResource DataGridTextElementStyle}"),
-    "The main catalogs must keep only user-relevant columns and apply vertically centered, ellipsized text elements.");
-var xamlNamespace = System.Xml.Linq.XName.Get("Key", "http://schemas.microsoft.com/winfx/2006/xaml");
-var applicationResourceKeys = appXaml
-    .Descendants()
-    .Select(element => element.Attribute(xamlNamespace)?.Value)
-    .Where(value => value is not null)
-    .ToHashSet(StringComparer.Ordinal);
+        "The item, trinket, and hero catalogs must keep only user-relevant columns, avoid special-case separators at the two specified boundaries, and use vertically centered ellipsized text.");
 Assert(
     applicationResourceKeys.Contains("CardStyle") &&
     applicationResourceKeys.Contains("PrimaryButtonStyle") &&
@@ -181,6 +203,9 @@ Assert(
     "The game-panel application shell and effective storage-capacity summary must remain wired into the main window.");
 var mainWindowRoot = mainWindowXaml.Root
     ?? throw new InvalidDataException("MainWindow.xaml has no root element.");
+    var appTextureBrush = appXaml
+        .Descendants(presentationNamespace + "ImageBrush")
+        .Single(element => element.Attribute(xamlNamespace)?.Value == "AppTextureBrush");
 System.Xml.Linq.XElement ReadAppStyle(string key) => appXaml
     .Descendants(presentationNamespace + "Style")
     .Single(element => element.Attribute(xamlNamespace)?.Value == key);
@@ -222,6 +247,12 @@ Assert(
     mainWindowRoot.Attribute("FontFamily")?.Value == "SimHei, Microsoft YaHei UI" &&
     mainWindowRoot.Attribute("FontSize")?.Value == "14" &&
     applicationResourceKeys.Contains("AppTextureBrush") &&
+        appTextureBrush.Attribute("Stretch")?.Value == "UniformToFill" &&
+        appTextureBrush.Attribute("TileMode") is null &&
+        ReadAppColor("SurfaceColor") == "#D80A0A09" &&
+        mainWindowRoot.Element(presentationNamespace + "Grid")?
+            .Element(presentationNamespace + "Border")?
+            .Attribute("Background")?.Value == "#90050505" &&
     appProjectText.Contains("<Resource Include=\"Assets\\charcoal-cloth.png\"", StringComparison.Ordinal) &&
     File.Exists(Path.Combine(
         repositoryRoot,
@@ -435,6 +466,10 @@ var dataGridHeaderStyle = appXaml
         element.Attribute(xamlNamespace) is null);
 Assert(
     ReadStyleSetter(dataGridCellStyle, "VerticalContentAlignment") == "Center" &&
+    ReadStyleSetter(dataGridStyle, "GridLinesVisibility") == "Horizontal" &&
+    ReadStyleSetter(dataGridCellStyle, "BorderBrush") ==
+        ReadStyleSetter(dataGridStyle, "VerticalGridLinesBrush") &&
+    ReadStyleSetter(dataGridCellStyle, "BorderThickness") == "0,0,1,0" &&
     dataGridCellStyle.Descendants(presentationNamespace + "ContentPresenter")
         .Any(element => element.Attribute("VerticalAlignment")?.Value == "Center") &&
     ReadStyleSetter(dataGridHeaderStyle, "VerticalContentAlignment") == "Center" &&
@@ -442,7 +477,7 @@ Assert(
     applicationResourceKeys.Contains("DataGridTextElementStyle") &&
     !dataGridCellStyle.Descendants(presentationNamespace + "Trigger")
         .Any(trigger => trigger.Attribute("Property")?.Value == "IsKeyboardFocusWithin"),
-    "Catalog row text and headers must remain vertically centered, and clicking a row must not draw a separate gold focus box around one cell.");
+    "Catalog rows must render each ordinary vertical separator exactly once through the shared one-pixel cell border, keep text and headers centered, and avoid a separate gold focus box.");
 var tabItemStyle = appXaml
     .Descendants(presentationNamespace + "Style")
     .Single(element =>
@@ -464,14 +499,53 @@ Assert(
     tabHeaderPresenter.Attribute("HorizontalAlignment")?.Value == "Center" &&
     tabHeaderPresenter.Attribute("VerticalAlignment")?.Value == "Center" &&
     catalogTabHeaderPanel.Attribute("Rows")?.Value == "1" &&
-    catalogTabHeaderPanel.Attribute("Columns")?.Value == "2" &&
+        catalogTabHeaderPanel.Attribute("Columns")?.Value == "3" &&
     catalogTabHeaderPanel.Attribute("Margin")?.Value == "0,0,0,5" &&
     !tabItemStyle.Descendants(presentationNamespace + "Trigger")
         .Any(trigger => trigger.Attribute("Property")?.Value == "IsKeyboardFocused") &&
     mainWindowXaml.Descendants(presentationNamespace + "TabItem")
         .All(tabItem => tabItem.Elements(presentationNamespace + "DataGrid").Count() == 1 &&
                         !tabItem.Elements(presentationNamespace + "Border").Any()),
-    "The two catalog tabs must share the full width equally, keep only their headers centered, stretch result content from the top edge, and avoid a nested border around their grids.");
+        "The three catalog tabs must share the full width equally, keep only their headers centered, stretch result content from the top edge, and avoid a nested border around their grids.");
+    var catalogTabHeaders = mainWindowXaml
+        .Descendants(presentationNamespace + "TabItem")
+        .Select(tab => tab.Attribute("Header")?.Value)
+        .ToArray();
+    var showUnusedItemsCheckBox = ReadNamedMainElement("CheckBox", "ShowUnusedItemsCheckBox");
+    Assert(
+        catalogTabHeaders.SequenceEqual(
+            new[] { "物品  /  ITEMS", "饰品  /  TRINKETS", "人物  /  HEROES" },
+            StringComparer.Ordinal) &&
+        mainWindowCode.Contains("QuantityItemCatalog.LoadAsync(activeContent, codec)", StringComparison.Ordinal) &&
+        showUnusedItemsCheckBox.Attribute("Checked")?.Value == "ShowUnusedItemsCheckBox_Changed" &&
+        showUnusedItemsCheckBox.Attribute("Unchecked")?.Value == "ShowUnusedItemsCheckBox_Changed" &&
+        mainWindowCode.Contains("definition.IsHiddenByDefault", StringComparison.Ordinal) &&
+        mainWindowCode.Contains("显示未使用定义", StringComparison.Ordinal) &&
+        mainWindowCode.Contains("IsPresentInSave = resultingEntryCount > 0", StringComparison.Ordinal) &&
+        mainWindowCode.Contains("SavedEntryCount = resultingEntryCount", StringComparison.Ordinal) &&
+        mainWindowCode.Contains("PrepareQuantityItemEditAsync(", StringComparison.Ordinal) &&
+        mainWindowCode.Contains("CopiesLabel.Text = isItemTab ? \"目标数量\" : \"添加数量\"", StringComparison.Ordinal) &&
+        ReadNamedMainElement("TextBox", "CopiesTextBox").Attribute("TextChanged")?.Value ==
+        "CopiesTextBox_TextChanged" &&
+        ReadNamedMainElement("TextBox", "CopiesTextBox").Attribute("PreviewMouseLeftButtonDown")?.Value ==
+        "SelectAllTextOnFirstClick" &&
+        ReadNamedMainElement("TextBox", "CopiesTextBox").Attribute("GotKeyboardFocus")?.Value ==
+        "SelectAllTextOnKeyboardFocus" &&
+        mainWindowCode.Contains("textBox.IsKeyboardFocusWithin", StringComparison.Ordinal) &&
+        mainWindowCode.Contains("textBox.SelectAll();", StringComparison.Ordinal) &&
+        mainWindowCode.Contains("ResetQuantityInputForCurrentTab();", StringComparison.Ordinal) &&
+        mainWindowCode.Contains("1 => \"1\"", StringComparison.Ordinal) &&
+        mainWindowCode.Contains("该物品不可从庄园携入远征。", StringComparison.Ordinal) &&
+        mainWindowCode.Contains("该物品能否从庄园携入远征尚未确认。", StringComparison.Ordinal) &&
+        mainWindowCode.Contains("string.IsNullOrWhiteSpace(itemWarning)", StringComparison.Ordinal) &&
+        mainWindowCode.Contains("程序会先完整备份当前档案。", StringComparison.Ordinal) &&
+        !mainWindowCode.Contains("此功能只修改 persist.estate.json", StringComparison.Ordinal) &&
+        !mainWindowCode.Contains("persist.raid.json 不会变化", StringComparison.Ordinal) &&
+        !mainWindowCode.Contains("estate 类型能表示庄园计数", StringComparison.Ordinal) &&
+        mainWindowCode.Contains("requireCurrentQuantitySnapshot: CatalogTabs.SelectedIndex == 0", StringComparison.Ordinal) &&
+        mainWindowCode.Contains("expectedInRaid ? profile.RaidSavePath : profile.EstateSavePath", StringComparison.Ordinal) &&
+        mainWindowCode.Contains("副本背包  /  RAID ITEMS", StringComparison.Ordinal),
+        "The quantity editor must appear immediately left of trinkets, use an absolute target amount, switch between town storage and the current raid inventory, keep only concise user-facing risks, retain persisted unused definitions, invalidate stale previews when input changes, and reject stale displayed quantities or a changed town/raid state.");
 var rightSelectionPanel = mainWindowXaml
     .Descendants(presentationNamespace + "ContentControl")
     .Single(control => control.Attribute("Content")?.Value == "选择要生成的内容")
@@ -588,8 +662,13 @@ Assert(
     nativeWindowThemeCode.Contains("DwmwaUseImmersiveDarkMode = 20", StringComparison.Ordinal) &&
     nativeWindowThemeCode.Contains("DwmwaCaptionColor = 35", StringComparison.Ordinal) &&
     nativeWindowThemeCode.Contains("DwmwaTextColor = 36", StringComparison.Ordinal) &&
-    nativeWindowThemeCode.Contains("DwmwaBorderColor = 34", StringComparison.Ordinal),
-    "Both editor windows must request a dark native caption, light caption text, and themed system border.");
+        nativeWindowThemeCode.Contains("DwmwaBorderColor = 34", StringComparison.Ordinal) &&
+        nativeWindowThemeCode.Contains("red: 0x3B, green: 0x15, blue: 0x16", StringComparison.Ordinal) &&
+        !nativeWindowThemeCode.Contains("red: 0x8B, green: 0x68, blue: 0x36", StringComparison.Ordinal) &&
+        initialQuirkDialogXaml.Root?.Element(presentationNamespace + "Grid")?
+            .Element(presentationNamespace + "Border")?
+            .Attribute("Background")?.Value == "#90050505",
+        "Both editor windows must request a dark native caption, muted light text, a dark-red system border, and visible full-window texture instead of a bright yellow native frame.");
 var initialQuirkBindings = initialQuirkDialogXaml
     .Descendants(presentationNamespace + "DataGridTextColumn")
     .Select(column => column.Attribute("Binding")?.Value)
@@ -598,7 +677,7 @@ var unknownHpDisplayIndex = initialQuirkDialogCode.IndexOf(
     "WriteStatusReason.Contains(\"max_hp\"",
     StringComparison.Ordinal);
 var knownHpDisplayIndex = initialQuirkDialogCode.IndexOf(
-    "Definition.MaxHpModifier is { } modifier",
+        "Definition.MaxHpModifiers.Count == 0",
     StringComparison.Ordinal);
 Assert(
     initialQuirkBindings.Contains("{Binding Kind}", StringComparer.Ordinal) &&
@@ -634,7 +713,16 @@ Assert(
     unknownHpDisplayIndex >= 0 &&
     knownHpDisplayIndex > unknownHpDisplayIndex &&
     initialQuirkDialogCode.Contains("? \"待验证\"", StringComparison.Ordinal) &&
-    initialQuirkDialogCode.Contains(": \"无\"", StringComparison.Ordinal),
+        initialQuirkDialogCode.Contains("? \"无\"", StringComparison.Ordinal) &&
+        initialQuirkDialogCode.Contains("FormatMaxHpModifier", StringComparison.Ordinal) &&
+        initialQuirkDialogCode.Contains("火光 ≤", StringComparison.Ordinal) &&
+        initialQuirkDialogCode.Contains("_resolveLevel", StringComparison.Ordinal) &&
+        initialQuirkDialogCode.Contains(
+            "row.SetAvailability(row.IsSelected, row.BaseUnavailableReason)",
+            StringComparison.Ordinal) &&
+        initialQuirkDialogCode.Contains("if (requestedValue)", StringComparison.Ordinal) &&
+        !initialQuirkDialogCode.Contains("row.IsSelected = !requestedValue", StringComparison.Ordinal) &&
+        mainWindowCode.Contains("GetSelectedHeroLevel(),", StringComparison.Ordinal),
     "The initial quirk dialog must fully show fixed/special kind text, distinguish absent from unverified HP modifiers, keep context-limit explanations visible, keep quota feedback in the summary/click validation, and reserve row-level dynamic reasons for actual incompatibilities.");
 var initialQuirkGrid = initialQuirkDialogXaml
     .Descendants(presentationNamespace + "DataGrid")
@@ -650,6 +738,19 @@ Assert(
     mainWindowCode.Contains("if (dialog?.IsVisible == true)", StringComparison.Ordinal) &&
     mainWindowCode.Contains("dialog.Close();", StringComparison.Ordinal),
     "The quirk selector must not open DataGrid edit transactions and must close an orphaned dialog if ShowDialog unwinds unexpectedly.");
+    var initialQuirkSearchBox = initialQuirkDialogXaml
+        .Descendants(presentationNamespace + "TextBox")
+        .Single(textBox => textBox.Attribute(xamlName)?.Value == "SearchTextBox");
+    Assert(
+        initialQuirkSearchBox.Attribute("ToolTip")?.Value ==
+            "按怪癖 ID、中英文名、类别、来源或 HP 规则筛选" &&
+        initialQuirkDialogCode.Contains(
+            "row.Source.Contains(keyword, StringComparison.OrdinalIgnoreCase)",
+            StringComparison.Ordinal) &&
+        !initialQuirkDialogCode.Contains(
+            "row.UnavailableReason.Contains(keyword, StringComparison.OrdinalIgnoreCase)",
+            StringComparison.Ordinal),
+        "Quirk filtering must use stable catalog fields only; selecting an incompatible quirk must not make its counterpart appear merely because the dynamic unavailable reason names the query quirk.");
 
 var jarPath = Path.Combine(repositoryRoot, "tools", "DDSaveEditor", "DDSaveEditor.jar");
 var runRoot = Path.Combine(
@@ -701,9 +802,13 @@ var activeWorkshopUpgradeRoot = Path.Combine(activeWorkshopRoot, "upgrades");
 var activeWorkshopBuildingUpgradeRoot = Path.Combine(activeWorkshopUpgradeRoot, "building");
 var activeWorkshopBuffRoot = Path.Combine(activeWorkshopRoot, "shared", "buffs");
 var activeWorkshopLocalizationRoot = Path.Combine(activeWorkshopRoot, "localization");
+var activeWorkshopDistrictRoot = Path.Combine(activeWorkshopRoot, "campaign", "town", "districts");
 var baseInventoryRoot = Path.Combine(gameRoot, "inventory");
 var activeWorkshopInventoryRoot = Path.Combine(activeWorkshopRoot, "inventory");
 var disabledWorkshopInventoryRoot = Path.Combine(disabledWorkshopRoot, "inventory");
+    var localInventoryRoot = Path.Combine(localModRoot, "inventory");
+var localLootRoot = Path.Combine(localModRoot, "loot");
+var localRulesRoot = Path.Combine(localModRoot, "rules");
 var activeWorkshopDlcRoot = Path.Combine(activeWorkshopRoot, "dlc", "100_feature_pack");
 var activeWorkshopDlcTrinketRoot = Path.Combine(activeWorkshopDlcRoot, "trinkets");
 var activeWorkshopOfficialOverrideHeroRoot = Path.Combine(
@@ -729,6 +834,7 @@ var ignoredDisabledFeatureTrinketRoot = Path.Combine(
     "trinkets");
 var disabledHeroRoot = Path.Combine(disabledWorkshopRoot, "heroes", "disabled_hero");
 var localHeroRoot = Path.Combine(localModRoot, "heroes", "local_hero");
+var compatibleUpgradeHeroRoot = Path.Combine(localModRoot, "heroes", "compatible_upgrade_hero");
 var localPriorityHeroRoot = Path.Combine(localModRoot, "heroes", "priority_hero");
 var localHeroUpgradeRoot = Path.Combine(localModRoot, "upgrades");
 var localNestedHeroUpgradeRoot = Path.Combine(localHeroUpgradeRoot, "heroes");
@@ -775,9 +881,13 @@ Directory.CreateDirectory(activeWorkshopUpgradeRoot);
 Directory.CreateDirectory(activeWorkshopBuildingUpgradeRoot);
 Directory.CreateDirectory(activeWorkshopBuffRoot);
 Directory.CreateDirectory(activeWorkshopLocalizationRoot);
+Directory.CreateDirectory(activeWorkshopDistrictRoot);
 Directory.CreateDirectory(baseInventoryRoot);
 Directory.CreateDirectory(activeWorkshopInventoryRoot);
 Directory.CreateDirectory(disabledWorkshopInventoryRoot);
+    Directory.CreateDirectory(localInventoryRoot);
+Directory.CreateDirectory(localLootRoot);
+Directory.CreateDirectory(localRulesRoot);
 Directory.CreateDirectory(activeWorkshopDlcTrinketRoot);
 Directory.CreateDirectory(activeWorkshopOfficialOverrideHeroRoot);
 Directory.CreateDirectory(Path.Combine(activeWorkshopDlcRoot, "heroes", "dlc_shared_hero"));
@@ -795,6 +905,8 @@ Directory.CreateDirectory(ignoredDisabledFeatureHeroRoot);
 Directory.CreateDirectory(ignoredDisabledFeatureTrinketRoot);
 Directory.CreateDirectory(disabledHeroRoot);
 Directory.CreateDirectory(localHeroRoot);
+Directory.CreateDirectory(compatibleUpgradeHeroRoot);
+Directory.CreateDirectory(Path.Combine(compatibleUpgradeHeroRoot, "compatible_upgrade_hero_A"));
 Directory.CreateDirectory(localPriorityHeroRoot);
 Directory.CreateDirectory(localHeroUpgradeRoot);
 Directory.CreateDirectory(localNestedHeroUpgradeRoot);
@@ -839,6 +951,19 @@ File.WriteAllText(
         { "id": "MAXHP-100", "stat_type": "combat_stat_multiply", "stat_sub_type": "max_hp", "amount": -1.0, "rule_type": "always", "is_false_rule": false },
         { "id": "MAXHP_CONDITIONAL", "stat_type": "combat_stat_multiply", "stat_sub_type": "max_hp", "amount": 0.5, "rule_type": "in_rank", "is_false_rule": false },
         { "id": "MAXHP_FLAT", "stat_type": "combat_stat_add", "stat_sub_type": "max_hp", "amount": 4, "rule_type": "always", "is_false_rule": false },
+        { "id": "MAXHP_FLAT_NEG24", "stat_type": "combat_stat_add", "stat_sub_type": "max_hp", "amount": -24, "rule_type": "always", "is_false_rule": false },
+        { "id": "MAXHP4_PERCENT", "stat_type": "combat_stat_multiply", "stat_sub_type": "max_hp", "amount": 0.04, "rule_type": "always", "is_false_rule": false },
+        { "id": "MAXHP-50", "stat_type": "combat_stat_multiply", "stat_sub_type": "max_hp", "amount": -0.5, "rule_type": "always", "is_false_rule": false },
+        { "id": "MAXHP_AFFLICTED", "stat_type": "combat_stat_multiply", "stat_sub_type": "max_hp", "amount": 0.05, "rule_type": "afflicted", "is_false_rule": false },
+        { "id": "MAXHP_AFFLICTED_NEG", "stat_type": "combat_stat_multiply", "stat_sub_type": "max_hp", "amount": -0.5, "rule_type": "afflicted", "is_false_rule": false },
+        { "id": "MAXHP_OTHER_MODE", "stat_type": "combat_stat_add", "stat_sub_type": "max_hp", "amount": 20, "rule_type": "in_mode", "is_false_rule": true, "rule_data": { "float": 0, "string": "ContractModeA" } },
+        { "id": "MAXHP_OTHER_MODE_NEG", "stat_type": "combat_stat_multiply", "stat_sub_type": "max_hp", "amount": -0.5, "rule_type": "in_mode", "is_false_rule": true, "rule_data": { "float": 0, "string": "ContractModeA" } },
+        { "id": "MAXHP_MODE_A_NEG60", "stat_type": "combat_stat_multiply", "stat_sub_type": "max_hp", "amount": -0.6, "rule_type": "in_mode", "is_false_rule": false, "rule_data": { "float": 0, "string": "ContractModeA" } },
+        { "id": "MAXHP_MODE_B_NEG60", "stat_type": "combat_stat_multiply", "stat_sub_type": "max_hp", "amount": -0.6, "rule_type": "in_mode", "is_false_rule": false, "rule_data": { "float": 0, "string": "ContractModeB" } },
+        { "id": "MAXHP_LIGHT_ABOVE", "stat_type": "combat_stat_multiply", "stat_sub_type": "max_hp", "amount": -0.5, "rule_type": "lightabove", "is_false_rule": false, "rule_data": { "float": 1, "string": "" } },
+        { "id": "MAXHP_ROUNDING_NEG20_A", "stat_type": "combat_stat_multiply", "stat_sub_type": "max_hp", "amount": -0.2, "rule_type": "always", "is_false_rule": false },
+        { "id": "MAXHP_ROUNDING_NEG20_B", "stat_type": "combat_stat_multiply", "stat_sub_type": "max_hp", "amount": -0.2, "rule_type": "always", "is_false_rule": false },
+        { "id": "MAXHP_ROUNDING_NEG10", "stat_type": "combat_stat_multiply", "stat_sub_type": "max_hp", "amount": -0.1, "rule_type": "always", "is_false_rule": false },
         { "id": "ACC5", "stat_type": "combat_stat_add", "stat_sub_type": "accuracy", "amount": 5, "rule_type": "always", "is_false_rule": false }
       ]
     }
@@ -876,6 +1001,19 @@ File.WriteAllText(
         { "id": "evolving_unknown_hp", "random_chance": 100, "is_positive": true, "is_disease": false, "buffs": ["MAXHP_CONDITIONAL"], "evolution_duration_min": 30, "evolution_duration_max": 60, "evolution_class_id": "evolved_unknown_hp" },
         { "id": "flat_hp_quirk", "random_chance": 1, "is_positive": true, "is_disease": false, "buffs": ["MAXHP_FLAT"] },
         { "id": "multiple_hp_quirk", "random_chance": 1, "is_positive": true, "is_disease": false, "buffs": ["MAXHP10", "MAXHP-5"] },
+        { "id": "mixed_hp_quirk", "random_chance": 1, "is_positive": true, "is_disease": false, "buffs": ["MAXHP_FLAT", "MAXHP4_PERCENT"] },
+        { "id": "afflicted_hp_quirk", "random_chance": 1, "is_positive": true, "is_disease": false, "buffs": ["MAXHP_AFFLICTED"] },
+        { "id": "afflicted_half_weakness", "random_chance": 0, "is_positive": false, "is_disease": false, "buffs": ["MAXHP_AFFLICTED_NEG"] },
+        { "id": "other_mode_hp_quirk", "random_chance": 0, "is_positive": true, "is_disease": false, "buffs": ["MAXHP_OTHER_MODE"] },
+        { "id": "other_mode_half_weakness", "random_chance": 0, "is_positive": false, "is_disease": false, "buffs": ["MAXHP_OTHER_MODE_NEG"] },
+        { "id": "mode_a_weakness", "random_chance": 0, "is_positive": false, "is_disease": false, "buffs": ["MAXHP_MODE_A_NEG60"] },
+        { "id": "mode_b_weakness", "random_chance": 0, "is_positive": false, "is_disease": false, "buffs": ["MAXHP_MODE_B_NEG60"] },
+        { "id": "light_hp_quirk", "random_chance": 0, "is_positive": false, "is_disease": false, "buffs": ["MAXHP_LIGHT_ABOVE"] },
+        { "id": "rounding_weakness_a", "random_chance": 0, "is_positive": false, "is_disease": false, "buffs": ["MAXHP_ROUNDING_NEG20_A"] },
+        { "id": "rounding_weakness_b", "random_chance": 0, "is_positive": false, "is_disease": false, "buffs": ["MAXHP_ROUNDING_NEG20_B"] },
+        { "id": "rounding_weakness_c", "random_chance": 0, "is_positive": false, "is_disease": false, "buffs": ["MAXHP_ROUNDING_NEG10"] },
+        { "id": "half_weakness", "random_chance": 1, "is_positive": false, "is_disease": false, "buffs": ["MAXHP-50"] },
+        { "id": "flat_level_boundary", "random_chance": 0, "is_positive": false, "is_disease": false, "buffs": ["MAXHP_FLAT_NEG24"] },
         { "id": "fragile", "random_chance": 1, "is_positive": false, "is_disease": false, "incompatible_quirks": ["tough"], "buffs": ["MAXHP-10"] },
         { "id": "soft", "random_chance": 1, "is_positive": false, "is_disease": false, "incompatible_quirks": ["hard_skinned"], "buffs": ["MAXHP-5"] },
         { "id": "fatal_weakness", "random_chance": 1, "is_positive": false, "is_disease": false, "buffs": ["MAXHP-100"] },
@@ -926,12 +1064,26 @@ File.WriteAllText(
     <root>
       <language id="english">
         <entry id="str_inventory_title_trinketfocus_ring"><![CDATA[Contract Focus Ring]]></entry>
+        <entry id="str_inventory_title_gold"><![CDATA[Gold]]></entry>
+        <entry id="str_inventory_title_heirloomblueprint"><![CDATA[Blueprint]]></entry>
+        <entry id="str_inventory_title_supplytorch"><![CDATA[Torch]]></entry>
+        <entry id="str_inventory_title_supplybandage"><![CDATA[Bandage]]></entry>
+        <entry id="str_inventory_title_gemraid_only_gem"><![CDATA[Raid Gem]]></entry>
+        <entry id="str_inventory_title_estatethe_blood"><![CDATA[The Blood]]></entry>
+        <entry id="str_inventory_title_estatesave_only_relic"><![CDATA[Save Relic]]></entry>
         <entry id="str_quirk_name_natural"><![CDATA[Contract Natural Constitution]]></entry>
       </language>
       <language id="schinese">
         <entry id="hero_name_0"><![CDATA[Contract One]]></entry>
         <entry id="hero_name_1"><![CDATA[Contract Two]]></entry>
         <entry id="str_inventory_title_trinketfocus_ring"><![CDATA[契约专注戒指]]></entry>
+        <entry id="str_inventory_title_gold"><![CDATA[金币]]></entry>
+        <entry id="str_inventory_title_heirloomblueprint"><![CDATA[建筑图纸]]></entry>
+        <entry id="str_inventory_title_supplytorch"><![CDATA[火把]]></entry>
+        <entry id="str_inventory_title_supplybandage"><![CDATA[绷带]]></entry>
+        <entry id="str_inventory_title_gemraid_only_gem"><![CDATA[副本宝石]]></entry>
+        <entry id="str_inventory_title_estatethe_blood"><![CDATA[血酿]]></entry>
+        <entry id="str_inventory_title_estatesave_only_relic"><![CDATA[存档遗物]]></entry>
         <entry id="str_quirk_name_natural"><![CDATA[契约自然体质]]></entry>
       </language>
     </root>
@@ -975,6 +1127,33 @@ File.WriteAllText(
     inventory_system_config: .type "trinket_storage" .max_slots 9999 .use_stack_limits true
     inventory_system_config: .type "hero_equipped_trinkets" .max_slots 2 .use_stack_limits true
     """,
+        new UTF8Encoding(false));
+    File.WriteAllText(
+        Path.Combine(baseInventoryRoot, "raid.inventory.system_configs.darkest"),
+        """
+    inventory_system_config: .type "raid" .max_slots 4 .use_stack_limits true
+    """,
+        new UTF8Encoding(false));
+    File.WriteAllText(
+        Path.Combine(baseInventoryRoot, "base.currency.inventory.items.darkest"),
+        """
+    inventory_item: .type "gold" .id "" .base_stack_limit 1750 .purchase_gold_value 0 .sell_gold_value 0
+    inventory_item: .type "heirloom" .id "blueprint" .base_stack_limit 1 .purchase_gold_value 0 .sell_gold_value 0
+    inventory_item: .type "gem" .id "raid_only_gem" .base_stack_limit 5 .purchase_gold_value 0 .sell_gold_value 500
+    """,
+        new UTF8Encoding(false));
+    File.WriteAllText(
+        Path.Combine(baseInventoryRoot, "base.supply.inventory.items.darkest"),
+        """
+    inventory_item: .type "supply" .id "torch" .base_stack_limit 8 .purchase_gold_value 75 .sell_gold_value 5
+    inventory_item: .type "supply" .id "bandage" .base_stack_limit 6 .purchase_gold_value 150 .sell_gold_value 15
+    """,
+        new UTF8Encoding(false));
+    File.WriteAllText(
+        Path.Combine(baseInventoryRoot, "base.estate.inventory.items.darkest"),
+        """
+    inventory_item: .type "estate" .id "the_blood" .base_stack_limit 6 .purchase_gold_value 0 .sell_gold_value 0 .estate_can_be_provision true
+    """,
     new UTF8Encoding(false));
 File.WriteAllText(
     Path.Combine(activeWorkshopInventoryRoot, "base.inventory.system_configs.darkest"),
@@ -983,11 +1162,78 @@ File.WriteAllText(
     inventory_system_config: .type "trinket_storage" // .max_slots 9999 must stay ignored
         .max_slots 3 .use_stack_limits true
     """,
+        new UTF8Encoding(false));
+    File.WriteAllText(
+        Path.Combine(activeWorkshopInventoryRoot, "active.currency.inventory.items.darkest"),
+        """
+    inventory_item: .type "gold" .id "" .base_stack_limit 2500 .purchase_gold_value 0 .sell_gold_value 0
+    """,
     new UTF8Encoding(false));
 File.WriteAllText(
     Path.Combine(disabledWorkshopInventoryRoot, "base.inventory.system_configs.darkest"),
     """
     inventory_system_config: .type "trinket_storage" .max_slots 1 .use_stack_limits true
+    """,
+        new UTF8Encoding(false));
+    File.WriteAllText(
+        Path.Combine(disabledWorkshopInventoryRoot, "disabled.estate.inventory.items.darkest"),
+        """
+    inventory_item: .type "estate" .id "disabled_mod_item" .base_stack_limit 99
+    """,
+        new UTF8Encoding(false));
+    File.WriteAllText(
+        Path.Combine(localInventoryRoot, "local.estate.inventory.items.darkest"),
+        """
+    inventory_item: .type "estate" .id "local_mod_essence" .base_stack_limit 12 .purchase_gold_value 0 .sell_gold_value 10 .estate_can_be_provision false
+    inventory_item: .type "estate" .id "orphan_mod_essence" .base_stack_limit 1 .purchase_gold_value 0 .sell_gold_value 0 .estate_can_be_provision false
+    inventory_item: .type "estate" .id "stored_orphan_essence" .base_stack_limit 1 .purchase_gold_value 0 .sell_gold_value 0 .estate_can_be_provision false
+    """,
+    new UTF8Encoding(false));
+File.WriteAllText(
+    Path.Combine(localLootRoot, "local.loot.json"),
+    """
+    {
+      "loot_tables": [
+        {
+          "id": "LOCAL_ACTIVE_LOOT",
+          "entries": [
+            { "type": "table", "chances": 1, "data": { "table": "LOCAL_NESTED_LOOT" } }
+          ]
+        },
+        {
+          "id": "LOCAL_NESTED_LOOT",
+          "entries": [
+            { "type": "item", "chances": 1, "data": { "type": "estate", "id": "local_mod_essence", "amount": 1 } }
+          ]
+        },
+        {
+          "id": "LOCAL_ORPHAN_LOOT",
+          "entries": [
+            { "type": "item", "chances": 1, "data": { "type": "estate", "id": "orphan_mod_essence", "amount": 1 } },
+            { "type": "item", "chances": 1, "data": { "type": "estate", "id": "stored_orphan_essence", "amount": 1 } }
+          ]
+        }
+      ]
+    }
+    """,
+    new UTF8Encoding(false));
+File.WriteAllText(
+    Path.Combine(localRulesRoot, "comment_only_reference.darkest"),
+    "// reward: .type \"estate\" .id \"orphan_mod_essence\"",
+    new UTF8Encoding(false));
+File.WriteAllText(
+    Path.Combine(activeWorkshopDistrictRoot, "quantity_reference.districts.json"),
+    """
+    {
+      "buildings": [
+        {
+          "name": "cross_mod_item_building",
+          "buff_list": [
+            { "type": "DistrictSupplyBuffData", "loot_table_code": "LOCAL_ACTIVE_LOOT" }
+          ]
+        }
+      ]
+    }
     """,
     new UTF8Encoding(false));
 
@@ -1009,6 +1255,8 @@ File.WriteAllText(
     trinkets/local.entries.trinkets.json 100
     trinkets/origin_probe.entries.trinkets.json 100
     inventory/base.inventory.system_configs.darkest 100
+    inventory/active.currency.inventory.items.darkest 100
+    campaign/town/districts/quantity_reference.districts.json 100
     dlc/100_feature_pack/trinkets/shared.entries.trinkets.json 100
     dlc/100_feature_pack/heroes/dlc_shared_hero/dlc_shared_hero.info.darkest 100
     dlc/100_feature_pack/heroes/official_override_hero/official_override_hero.override.darkest 100
@@ -1679,7 +1927,9 @@ File.WriteAllText(
     armour: .name "local_hero_armour_3" .def 15% .prot 0 .hp 32 .spd 0 .upgradeRequirementCode 2
     armour: .name "local_hero_armour_4" .def 20% .prot 0 .hp 36 .spd 0 .upgradeRequirementCode 3
     combat_skill: .id "local_skill" .level 0 .effect "Priority Effect" .generation_guaranteed
+    combat_skill: .id "local_skill" .level 1
     combat_skill: .id "local_skill_two" .level 0
+    combat_skill: .id "local_skill_two" .level 1
     skill_selection: .can_select_combat_skills true
     skill_selection: .number_of_selected_combat_skills_max 1
     generation: .is_generation_enabled true .number_of_positive_quirks_min 1
@@ -1756,6 +2006,82 @@ File.WriteAllText(
     """,
     new UTF8Encoding(false));
 File.WriteAllText(
+    Path.Combine(compatibleUpgradeHeroRoot, "compatible_upgrade_hero.info.darkest"),
+    """
+    weapon: .name "compatible_upgrade_hero_weapon_0" .dmg 4 8
+    weapon: .name "compatible_upgrade_hero_weapon_1" .dmg 5 9 .upgradeRequirementCode 0
+    armour: .name "compatible_upgrade_hero_armour_0" .def 0% .prot 0 .hp 19 .spd 0
+    armour: .name "compatible_upgrade_hero_armour_1" .def 5% .prot 0 .hp 23 .spd 0 .upgradeRequirementCode 0
+    combat_skill: .id "scaling_strike" .level 0
+    combat_skill: .id "scaling_strike" .level 1
+    combat_skill: .id "fixed_command" .level 0
+    skill_selection: .can_select_combat_skills false .number_of_selected_combat_skills_max 2
+    generation: .is_generation_enabled true .number_of_positive_quirks_min 0 .number_of_positive_quirks_max 0 .number_of_negative_quirks_min 0 .number_of_negative_quirks_max 0 .number_of_random_combat_skills 2
+    """,
+    new UTF8Encoding(false));
+File.WriteAllText(
+    Path.Combine(localHeroUpgradeRoot, "compatible_upgrade_hero.upgrades.json"),
+    """
+    {
+      "trees": [
+        {
+          "id": "compatible_upgrade_hero.weapon",
+          "tags": ["weapon", "first_level_not_upgrade"],
+          "requirements": [
+            { "code": "0", "prerequisite_resolve_level": 1 }
+          ]
+        },
+        {
+          "id": "compatible_upgrade_hero.armour",
+          "tags": ["armour", "first_level_not_upgrade"],
+          "requirements": [
+            { "code": "0", "prerequisite_resolve_level": 1 }
+          ]
+        },
+        {
+          "id": "compatible_upgrade_hero.scaling_strike",
+          "tags": ["combat_skill"],
+          "requirements": [
+            { "code": "0", "prerequisite_resolve_level": 0 },
+            { "code": "1", "prerequisite_resolve_level": 1 }
+          ]
+        }
+      ]
+    }
+    """,
+    new UTF8Encoding(false));
+File.WriteAllText(
+    Path.Combine(localNestedHeroUpgradeRoot, "compatible_upgrade_hero.upgrades.json"),
+    """
+    {
+      "trees": [
+        {
+          "id": "compatible_upgrade_hero.weapon",
+          "tags": ["weapon", "first_level_not_upgrade"],
+          "requirements": [
+            { "code": "0", "prerequisite_resolve_level": 1 }
+          ]
+        },
+        {
+          "id": "compatible_upgrade_hero.armour",
+          "tags": ["armour", "first_level_not_upgrade"],
+          "requirements": [
+            { "code": "0", "prerequisite_resolve_level": 1 }
+          ]
+        },
+        {
+          "id": "compatible_upgrade_hero.legacy_strike_name",
+          "tags": ["combat_skill"],
+          "requirements": [
+            { "code": "0", "prerequisite_resolve_level": 0 },
+            { "code": "1", "prerequisite_resolve_level": 1 }
+          ]
+        }
+      ]
+    }
+    """,
+    new UTF8Encoding(false));
+File.WriteAllText(
     Path.Combine(localHeroUpgradeRoot, "case_probe_hero.upgrades.json"),
     """
     {
@@ -1794,10 +2120,12 @@ File.WriteAllText(
     <root>
       <language id="english">
         <entry id="hero_class_name_local_hero"><![CDATA[Local Contract Hero]]></entry>
+        <entry id="str_inventory_title_estatelocal_mod_essence"><![CDATA[Local Essence]]></entry>
         <entry id="str_quirk_name_priority_top_quirk"><![CDATA[Priority Legacy]]></entry>
       </language>
       <language id="schinese">
         <entry id="hero_class_name_local_hero"><![CDATA[{colour_start|G2}本地契约英雄{colour_end}]]></entry>
+        <entry id="str_inventory_title_estatelocal_mod_essence"><![CDATA[本地精华]]></entry>
         <entry id="str_quirk_name_priority_top_quirk"><![CDATA[优先传承]]></entry>
       </language>
     </root>
@@ -2060,14 +2388,35 @@ File.WriteAllText(
     {
       "base_root": {
         "version": 34,
-        "wallet": {},
+        "wallet": {
+          "0": { "amount": 1250, "type": "gold" },
+          "1": { "amount": 2, "type": "blueprint" }
+        },
         "trinkets": {
           "items": {
             "0": { "id": "bleed_charm", "type": "trinket", "amount": 1 }
           }
         },
         "darkest_dungeon_trinket_unlocks": {},
-        "estate_items": { "items": {} }
+        "estate_items": {
+          "items": {
+            "0": {
+              "id": "the_blood", "type": "estate", "amount": 3,
+              "added_buffs": 0, "hero_name": "", "previous_trinket_id": "",
+              "did_transform": false, "trinkets_gained_count": 0
+            },
+            "1": {
+              "id": "save_only_relic", "type": "estate", "amount": 7,
+              "added_buffs": 0, "hero_name": "", "previous_trinket_id": "",
+              "did_transform": false, "trinkets_gained_count": 0
+            },
+            "2": {
+              "id": "stored_orphan_essence", "type": "estate", "amount": 0,
+              "added_buffs": 0, "hero_name": "", "previous_trinket_id": "",
+              "did_transform": false, "trinkets_gained_count": 0
+            }
+          }
+        }
       }
     }
     """,
@@ -2236,6 +2585,489 @@ Assert(
     activeContent.Sources.Single(source => source.Id == "dlc-feature:enabled_feature").VirtualPathPrefix == "dlc/100_feature_pack/features/enabled_feature",
     "A DLC feature source must preserve its game-root virtual path prefix.");
 
+    var quantityEstateRoot = JsonNode.Parse(File.ReadAllText(decodedSeedPath)) as JsonObject
+        ?? throw new InvalidDataException("Quantity-item estate seed is invalid.");
+    var quantityCatalog = QuantityItemCatalog.Load(activeContent, quantityEstateRoot, "contract-estate-sha");
+    Assert(
+        quantityCatalog.SourceEstateSha256 == "contract-estate-sha" &&
+        quantityCatalog.Items.Count == 7 &&
+        quantityCatalog.Items.All(item => item.DisplayId != "raid_only_gem") &&
+        quantityCatalog.Items.All(item => item.DisplayId != "disabled_mod_item"),
+        "The quantity-item catalog must include only wallet/estate persisted definitions and ignore raid-only or disabled content.");
+    var catalogGold = quantityCatalog.Items.Single(item => item.DisplayId == "gold");
+    var catalogBlueprint = quantityCatalog.Items.Single(item => item.DisplayId == "blueprint");
+    var catalogBlood = quantityCatalog.Items.Single(item => item.DisplayId == "the_blood");
+    var catalogModEssence = quantityCatalog.Items.Single(item => item.DisplayId == "local_mod_essence");
+    var catalogOrphanModEssence = quantityCatalog.Items.Single(item => item.DisplayId == "orphan_mod_essence");
+    var catalogStoredOrphanEssence = quantityCatalog.Items.Single(item => item.DisplayId == "stored_orphan_essence");
+    var catalogSaveOnly = quantityCatalog.Items.Single(item => item.DisplayId == "save_only_relic");
+    Assert(
+        catalogGold.StorageKind == QuantityItemStorageKind.Wallet &&
+        catalogGold.CurrentAmount == 1250 &&
+        catalogGold.Source == "workshop:111" &&
+        catalogGold.SourceLabel.Contains("原版（当前由 创意工坊 Mod", StringComparison.Ordinal) &&
+        catalogGold.LocalizedName == new BilingualContentName("金币", "Gold") &&
+        catalogBlueprint is { StorageKind: QuantityItemStorageKind.Wallet, CurrentAmount: 2 } &&
+        catalogBlueprint.LocalizedName == new BilingualContentName("建筑图纸", "Blueprint") &&
+        catalogBlood is
+        {
+            StorageKind: QuantityItemStorageKind.EstateItems,
+            EstateCanBeProvision: true,
+            CurrentAmount: 3
+        } &&
+        catalogBlood.LocalizedName == new BilingualContentName("血酿", "The Blood"),
+        "Wallet and estate items must merge live amounts, bilingual names, and original/current-provider provenance.");
+    Assert(
+        catalogModEssence is
+        {
+            StorageKind: QuantityItemStorageKind.EstateItems,
+            EstateCanBeProvision: false,
+            CurrentAmount: 0
+        } &&
+        catalogModEssence.Source == "local:Local Test Mod" &&
+        catalogModEssence.LocalizedName == new BilingualContentName("本地精华", "Local Essence") &&
+        catalogModEssence.ReferenceStatus == QuantityItemReferenceStatus.ConfirmedActive &&
+        catalogModEssence.ReferenceEvidence.Any(evidence =>
+            evidence.Contains("LOCAL_ACTIVE_LOOT", StringComparison.Ordinal) &&
+            evidence.Contains("LOCAL_NESTED_LOOT", StringComparison.Ordinal)) &&
+        !catalogModEssence.IsHiddenByDefault &&
+        catalogOrphanModEssence.ReferenceStatus == QuantityItemReferenceStatus.SuspectedUnused &&
+        catalogOrphanModEssence.IsHiddenByDefault &&
+        catalogStoredOrphanEssence.ReferenceStatus == QuantityItemReferenceStatus.SuspectedUnused &&
+        catalogStoredOrphanEssence is { IsPresentInSave: true, CurrentAmount: 0, IsHiddenByDefault: false } &&
+        catalogSaveOnly.IsSaveOnly &&
+        catalogSaveOnly.ReferenceStatus == QuantityItemReferenceStatus.SaveOnly &&
+        catalogSaveOnly.IsPresentInSave &&
+        catalogSaveOnly.CurrentAmount == 7 &&
+        catalogSaveOnly.LocalizedName == new BilingualContentName("存档遗物", "Save Relic"),
+        "Reachable Mod items, hidden orphan definitions, definition-backed save residues, and save-only entries must remain distinguishable and editable.");
+
+    var malformedReferencePath = Path.Combine(localRulesRoot, "malformed_reference.json");
+    QuantityItemCatalogResult malformedReferenceCatalog;
+    File.WriteAllText(malformedReferencePath, "{ invalid", new UTF8Encoding(false));
+    try
+    {
+        malformedReferenceCatalog = QuantityItemCatalog.Load(
+            activeContent,
+            quantityEstateRoot,
+            "contract-estate-sha");
+    }
+    finally
+    {
+        File.Delete(malformedReferencePath);
+    }
+
+    Assert(
+        malformedReferenceCatalog.Items.Single(item => item.DisplayId == "orphan_mod_essence") is
+        {
+            ReferenceStatus: QuantityItemReferenceStatus.AnalysisIncomplete,
+            IsHiddenByDefault: false
+        } &&
+        malformedReferenceCatalog.Issues.Any(issue =>
+            issue.Contains("could not parse active JSON file", StringComparison.OrdinalIgnoreCase) &&
+            issue.Contains("malformed_reference.json", StringComparison.OrdinalIgnoreCase)),
+        "An unreadable active reference file must fail open: unresolved Mod items stay visible as analysis-incomplete.");
+
+    var malformedLootPath = Path.Combine(localLootRoot, "malformed_reference.loot.json");
+    QuantityItemCatalogResult malformedLootCatalog;
+    File.WriteAllText(malformedLootPath, "{ \"loot_tables\": [", new UTF8Encoding(false));
+    try
+    {
+        malformedLootCatalog = QuantityItemCatalog.Load(
+            activeContent,
+            quantityEstateRoot,
+            "contract-estate-sha");
+    }
+    finally
+    {
+        File.Delete(malformedLootPath);
+    }
+
+    Assert(
+        malformedLootCatalog.Items.Single(item => item.DisplayId == "orphan_mod_essence") is
+        {
+            ReferenceStatus: QuantityItemReferenceStatus.AnalysisIncomplete,
+            IsHiddenByDefault: false
+        } &&
+        malformedLootCatalog.Issues.Any(issue =>
+            issue.Contains("could not parse active loot file", StringComparison.OrdinalIgnoreCase) &&
+            issue.Contains("malformed_reference.loot.json", StringComparison.OrdinalIgnoreCase)),
+        "An unreadable active loot graph must fail open instead of hiding items behind a lost nested-table edge.");
+
+    var quantityReferenceManifestPath = Path.Combine(activeWorkshopRoot, "modfiles.txt");
+    var quantityReferenceManifestBytes = File.ReadAllBytes(quantityReferenceManifestPath);
+    QuantityItemCatalogResult missingReferenceCatalog;
+    File.AppendAllText(
+        quantityReferenceManifestPath,
+        Environment.NewLine + "campaign/town_events/missing_quantity_reference.json 100",
+        new UTF8Encoding(false));
+    try
+    {
+        missingReferenceCatalog = QuantityItemCatalog.Load(
+            activeContent,
+            quantityEstateRoot,
+            "contract-estate-sha");
+    }
+    finally
+    {
+        File.WriteAllBytes(quantityReferenceManifestPath, quantityReferenceManifestBytes);
+    }
+
+    Assert(
+        missingReferenceCatalog.Items.Single(item => item.DisplayId == "orphan_mod_essence") is
+        {
+            ReferenceStatus: QuantityItemReferenceStatus.AnalysisIncomplete,
+            IsHiddenByDefault: false
+        } &&
+        missingReferenceCatalog.Issues.Any(issue =>
+            issue.Contains("reference file listed by active Mod is missing", StringComparison.OrdinalIgnoreCase) &&
+            issue.Contains("missing_quantity_reference.json", StringComparison.OrdinalIgnoreCase)),
+        "A missing active manifest reference file must keep unresolved Mod items visible instead of claiming they are unused.");
+
+    var (goldAdjustedRoot, goldPreview) = QuantityItemSaveEditor.SetAmount(quantityEstateRoot, catalogGold, 5000);
+    Assert(
+        goldPreview is { ExistingAmount: 1250, TargetAmount: 5000, CreatedEntry: false } &&
+        QuantityItemSaveEditor.CountAmount(goldAdjustedRoot, catalogGold) == 5000 &&
+        QuantityItemSaveEditor.CountAmount(quantityEstateRoot, catalogGold) == 1250,
+        "Wallet amount edits must be absolute, clone the input, and preserve the source document.");
+    var (essenceAddedRoot, essencePreview) = QuantityItemSaveEditor.SetAmount(
+        quantityEstateRoot,
+        catalogModEssence,
+        11);
+    var createdEssence = ((JsonObject)((JsonObject)((JsonObject)essenceAddedRoot["base_root"]!)["estate_items"]!)["items"]!)
+        .Select(pair => pair.Value as JsonObject)
+        .Single(item => item is not null && item["id"]?.GetValue<string>() == "local_mod_essence")!;
+    Assert(
+        essencePreview is { ExistingAmount: 0, TargetAmount: 11, CreatedEntry: true } &&
+        QuantityItemSaveEditor.CountAmount(essenceAddedRoot, catalogModEssence) == 11 &&
+        createdEssence["added_buffs"]?.GetValue<int>() == 0 &&
+        createdEssence["hero_name"]?.GetValue<string>() == string.Empty &&
+        createdEssence["did_transform"]?.GetValue<bool>() == false &&
+        createdEssence["trinkets_gained_count"]?.GetValue<int>() == 0,
+        "Adding an absent Mod estate item must use the complete game-compatible default saved-item shape.");
+    var (bloodZeroRoot, bloodPreview) = QuantityItemSaveEditor.SetAmount(quantityEstateRoot, catalogBlood, 0);
+    Assert(
+        bloodPreview is { ExistingAmount: 3, TargetAmount: 0, CreatedEntry: false } &&
+        QuantityItemSaveEditor.CountAmount(bloodZeroRoot, catalogBlood) == 0,
+        "Existing estate items must support an absolute target quantity of zero without deleting unrelated fields.");
+
+    var duplicateQuantityRoot = quantityEstateRoot.DeepClone() as JsonObject
+        ?? throw new InvalidDataException("Failed to clone the duplicate quantity-item fixture.");
+    var duplicateBaseRoot = (JsonObject)duplicateQuantityRoot["base_root"]!;
+    var duplicateWallet = (JsonObject)duplicateBaseRoot["wallet"]!;
+    duplicateWallet["99"] = new JsonObject
+    {
+        ["amount"] = 250,
+        ["type"] = "gold",
+        ["contract_sentinel"] = "wallet-preserved"
+    };
+    var duplicateEstateItems = (JsonObject)((JsonObject)duplicateBaseRoot["estate_items"]!)["items"]!;
+    duplicateEstateItems["99"] = new JsonObject
+    {
+        ["id"] = "the_blood",
+        ["type"] = "estate",
+        ["amount"] = 4,
+        ["added_buffs"] = 17,
+        ["hero_name"] = "estate-preserved",
+        ["previous_trinket_id"] = "contract_previous",
+        ["did_transform"] = true,
+        ["trinkets_gained_count"] = 23
+    };
+    var (duplicateLoweredRoot, duplicateLoweredPreview) = QuantityItemSaveEditor.SetAmount(
+        duplicateQuantityRoot,
+        catalogGold,
+        1000);
+    var loweredDuplicateWallet = (JsonObject)((JsonObject)duplicateLoweredRoot["base_root"]!)["wallet"]!;
+    Assert(
+        duplicateLoweredPreview is { ExistingAmount: 1500, TargetAmount: 1000, MatchingEntries: 2 } &&
+        QuantityItemSaveEditor.CountAmount(duplicateLoweredRoot, catalogGold) == 1000 &&
+        ((JsonObject)loweredDuplicateWallet["99"]!)["contract_sentinel"]?.GetValue<string>() ==
+        "wallet-preserved" &&
+        ((JsonObject)duplicateWallet["99"]!)["amount"]?.GetValue<int>() == 250,
+        "Lowering a duplicated wallet quantity must distribute the absolute target without mutating the source or unrelated fields.");
+    var (duplicateRaisedRoot, duplicateRaisedPreview) = QuantityItemSaveEditor.SetAmount(
+        duplicateQuantityRoot,
+        catalogBlood,
+        12);
+    var raisedDuplicateEstateItems = (JsonObject)((JsonObject)((JsonObject)duplicateRaisedRoot["base_root"]!)["estate_items"]!)["items"]!;
+    var raisedDuplicateBlood = (JsonObject)raisedDuplicateEstateItems["99"]!;
+    Assert(
+        duplicateRaisedPreview is { ExistingAmount: 7, TargetAmount: 12, MatchingEntries: 2 } &&
+        QuantityItemSaveEditor.CountAmount(duplicateRaisedRoot, catalogBlood) == 12 &&
+        raisedDuplicateBlood["amount"]?.GetValue<int>() == 4 &&
+        raisedDuplicateBlood["added_buffs"]?.GetValue<int>() == 17 &&
+        raisedDuplicateBlood["hero_name"]?.GetValue<string>() == "estate-preserved" &&
+        raisedDuplicateBlood["previous_trinket_id"]?.GetValue<string>() == "contract_previous" &&
+        raisedDuplicateBlood["did_transform"]?.GetValue<bool>() == true &&
+        raisedDuplicateBlood["trinkets_gained_count"]?.GetValue<int>() == 23,
+        "Raising duplicated estate-item quantities must preserve every non-amount field on all existing entries.");
+    var (maxQuantityRoot, maxQuantityPreview) = QuantityItemSaveEditor.SetAmount(
+        quantityEstateRoot,
+        catalogGold,
+        int.MaxValue);
+    Assert(
+        maxQuantityPreview.TargetAmount == int.MaxValue &&
+        QuantityItemSaveEditor.CountAmount(maxQuantityRoot, catalogGold) == int.MaxValue,
+        "An existing positive quantity must support Int32.MaxValue without intermediate arithmetic overflow.");
+
+    var quantityRaidRoot = JsonNode.Parse(
+        """
+        {
+          "base_root": {
+            "party": {
+              "inventory": {
+                "items": {
+                  "0": { "id": "torch", "type": "supply", "amount": 6 },
+                  "2": { "id": "", "type": "gold", "amount": 2500 },
+                  "3": { "id": "raid_only_gem", "type": "gem", "amount": 5 }
+                }
+              }
+            }
+          }
+        }
+        """) as JsonObject
+        ?? throw new InvalidDataException("Quantity-item raid seed is invalid.");
+    var conflictingRaidItemModRootA = Path.Combine(runRoot, "conflicting_raid_item_mod_a");
+    var conflictingRaidItemModRootB = Path.Combine(runRoot, "conflicting_raid_item_mod_b");
+    var conflictingRaidItemLowerModRoot = Path.Combine(runRoot, "conflicting_raid_item_lower_mod");
+    var conflictingRaidItemInventoryRootA = Path.Combine(conflictingRaidItemModRootA, "inventory");
+    var conflictingRaidItemInventoryRootB = Path.Combine(conflictingRaidItemModRootB, "inventory");
+    var conflictingRaidItemLowerInventoryRoot = Path.Combine(conflictingRaidItemLowerModRoot, "inventory");
+    Directory.CreateDirectory(conflictingRaidItemInventoryRootA);
+    Directory.CreateDirectory(conflictingRaidItemInventoryRootB);
+    Directory.CreateDirectory(conflictingRaidItemLowerInventoryRoot);
+    File.WriteAllText(
+        Path.Combine(conflictingRaidItemInventoryRootA, "shared.inventory.items.darkest"),
+        """inventory_item: .type "supply" .id "conflicting_raid_item" .base_stack_limit 4""",
+        new UTF8Encoding(false));
+    File.WriteAllText(
+        Path.Combine(conflictingRaidItemInventoryRootB, "shared.inventory.items.darkest"),
+        """inventory_item: .type "supply" .id "conflicting_raid_item" .base_stack_limit 8""",
+        new UTF8Encoding(false));
+    File.WriteAllText(
+        Path.Combine(conflictingRaidItemLowerInventoryRoot, "lower.inventory.items.darkest"),
+        """inventory_item: .type "supply" .id "conflicting_raid_item" .base_stack_limit 99""",
+        new UTF8Encoding(false));
+    var conflictingRaidItemContent = activeContent with
+    {
+        Sources = activeContent.Sources
+            .Concat([
+                new ActiveContentSource(
+                    "local:raid-item-conflict-a",
+                    "Raid Item Conflict A",
+                    "local",
+                    conflictingRaidItemModRootA,
+                    -3000),
+                new ActiveContentSource(
+                    "local:raid-item-conflict-b",
+                    "Raid Item Conflict B",
+                    "local",
+                    conflictingRaidItemModRootB,
+                    -3000),
+                new ActiveContentSource(
+                    "local:raid-item-conflict-lower",
+                    "Raid Item Conflict Lower",
+                    "local",
+                    conflictingRaidItemLowerModRoot,
+                    -2000)
+            ])
+            .ToArray()
+    };
+    var conflictingRaidItemCatalog = QuantityItemCatalog.LoadRaid(
+        conflictingRaidItemContent,
+        quantityRaidRoot,
+        "contract-raid-conflict-sha");
+    var conflictingRaidItem = conflictingRaidItemCatalog.Items.Single(item =>
+        item.InventoryType == "supply" && item.ItemId == "conflicting_raid_item");
+    var conflictingRaidItemBlocked = false;
+    try
+    {
+        var conflictProbeService = new SaveEditService(
+            codec,
+            new SaveEditorLocations(
+                Path.Combine(runRoot, "raid-item-conflict-appdata"),
+                Path.Combine(runRoot, "raid-item-conflict-appdata", "workspaces"),
+                Path.Combine(runRoot, "raid-item-conflict-appdata", "backups")));
+        _ = await conflictProbeService.PrepareQuantityItemEditAsync(
+            activeContent.Profile,
+            conflictingRaidItem,
+            1,
+            conflictingRaidItemContent);
+    }
+    catch (InvalidOperationException error) when (error.Message.Contains(
+        "unresolved definitions",
+        StringComparison.OrdinalIgnoreCase))
+    {
+        conflictingRaidItemBlocked = true;
+    }
+
+    Assert(
+        conflictingRaidItem.HasProviderConflict &&
+        !conflictingRaidItem.IsSaveOnly &&
+        conflictingRaidItem.BaseStackLimit != 99 &&
+        conflictingRaidItemBlocked,
+        "A raid item from different same-virtual-path, same-priority providers must remain visible but read-only; it must not disappear into a writable save-only fallback or use a lower/arbitrary stack limit.");
+    var raidStorageCatalog = RaidInventoryStorageCatalog.Load(activeContent);
+    var raidQuantityCatalog = QuantityItemCatalog.LoadRaid(
+        activeContent,
+        quantityRaidRoot,
+        "contract-raid-sha");
+    var raidWithCarriedTrinketRoot = quantityRaidRoot.DeepClone() as JsonObject
+        ?? throw new InvalidDataException("Failed to clone the raid quantity fixture.");
+    var raidWithCarriedTrinketItems = (JsonObject)((JsonObject)((JsonObject)((JsonObject)
+        raidWithCarriedTrinketRoot["base_root"]!)["party"]!)["inventory"]!)["items"]!;
+    raidWithCarriedTrinketItems["1"] = new JsonObject
+    {
+        ["id"] = "Livia_6",
+        ["type"] = "trinket",
+        ["amount"] = 1
+    };
+    var raidWithCarriedTrinketCatalog = QuantityItemCatalog.LoadRaid(
+        activeContent,
+        raidWithCarriedTrinketRoot,
+        "contract-raid-trinket-sha");
+    var raidTorch = raidQuantityCatalog.Items.Single(item =>
+        item.InventoryType == "supply" && item.ItemId == "torch");
+    var raidBandage = raidQuantityCatalog.Items.Single(item =>
+        item.InventoryType == "supply" && item.ItemId == "bandage");
+    var raidGold = raidQuantityCatalog.Items.Single(item =>
+        item.InventoryType == "gold" && item.ItemId == string.Empty);
+    var raidGem = raidQuantityCatalog.Items.Single(item => item.DisplayId == "raid_only_gem");
+    var raidBlood = raidQuantityCatalog.Items.Single(item =>
+        item.InventoryType == "estate" && item.ItemId == "the_blood");
+    var raidModEssence = raidQuantityCatalog.Items.Single(item =>
+        item.InventoryType == "estate" && item.ItemId == "local_mod_essence");
+    Assert(
+        raidQuantityCatalog is
+        {
+            SaveContext: QuantityItemSaveContext.Raid,
+            SourceSaveSha256: "contract-raid-sha"
+        } &&
+        raidQuantityCatalog.RaidStorage?.MaxSlots == 4 &&
+        raidStorageCatalog.Storage?.MaxSlots == 4 &&
+        raidQuantityCatalog.Items.All(item => item.StorageKind == QuantityItemStorageKind.RaidInventory) &&
+        raidWithCarriedTrinketCatalog.Items.All(item =>
+            !item.InventoryType.Equals("trinket", StringComparison.OrdinalIgnoreCase)) &&
+        raidTorch is
+        {
+            StorageKind: QuantityItemStorageKind.RaidInventory,
+            BaseStackLimit: 8,
+            CurrentAmount: 6,
+            SavedEntryCount: 1
+        } &&
+        raidTorch.LocalizedName == new BilingualContentName("火把", "Torch") &&
+        raidGold is { CurrentAmount: 2500, BaseStackLimit: 2500 } &&
+        catalogGold.CurrentAmount == 1250 &&
+        raidGem is { CurrentAmount: 5, BaseStackLimit: 5 } &&
+        catalogBlood is { StorageKind: QuantityItemStorageKind.EstateItems, CurrentAmount: 3 } &&
+        raidBlood is { StorageKind: QuantityItemStorageKind.RaidInventory, CurrentAmount: 0 } &&
+        raidModEssence is
+        {
+            StorageKind: QuantityItemStorageKind.RaidInventory,
+            ReferenceStatus: QuantityItemReferenceStatus.ConfirmedActive,
+            IsHiddenByDefault: false
+        },
+        "An active expedition must expose only ordinary raid-target rows and independent bag totals without merging town amounts. Gold, estate items, and reachable Mod estate loot must remain valid overlapping definitions in both contexts instead of being excluded by their town storage type, while carried trinket instances remain outside the quantity workflow.");
+
+    var raidWithZeroSaveOnlyStackRoot = quantityRaidRoot.DeepClone() as JsonObject
+        ?? throw new InvalidDataException("Failed to clone the zero-stack raid fixture.");
+    var raidWithZeroSaveOnlyStackItems = (JsonObject)((JsonObject)((JsonObject)((JsonObject)
+        raidWithZeroSaveOnlyStackRoot["base_root"]!)["party"]!)["inventory"]!)["items"]!;
+    raidWithZeroSaveOnlyStackItems["1"] = new JsonObject
+    {
+        ["id"] = "orphan_zero_stack",
+        ["type"] = "supply",
+        ["amount"] = 0
+    };
+    var zeroSaveOnlyCatalog = QuantityItemCatalog.LoadRaid(
+        activeContent,
+        raidWithZeroSaveOnlyStackRoot,
+        "contract-raid-zero-sha");
+    var zeroSaveOnlyItem = zeroSaveOnlyCatalog.Items.Single(item =>
+        item.InventoryType == "supply" && item.ItemId == "orphan_zero_stack");
+    var (zeroStackRemovedRoot, zeroStackRemovalPreview) = RaidInventorySaveEditor.SetAmount(
+        raidWithZeroSaveOnlyStackRoot,
+        zeroSaveOnlyItem,
+        0,
+        raidStorageCatalog.Storage!.MaxSlots);
+    var zeroStackRemovedItems = (JsonObject)((JsonObject)((JsonObject)((JsonObject)
+        zeroStackRemovedRoot["base_root"]!)["party"]!)["inventory"]!)["items"]!;
+    Assert(
+        zeroSaveOnlyItem is
+        {
+            IsSaveOnly: true,
+            IsPresentInSave: true,
+            CurrentAmount: 0,
+            SavedEntryCount: 1
+        } &&
+        zeroStackRemovalPreview is
+        {
+            ExistingAmount: 0,
+            TargetAmount: 0,
+            ExistingInventoryEntries: 4,
+            ResultingInventoryEntries: 3,
+            RemovedEntries: 1,
+            ResultingMatchingEntries: 0
+        } &&
+        !zeroStackRemovedItems.ContainsKey("1"),
+        "A target of zero must remove a physically present zero-amount save-only stack and release its raid slot.");
+
+    var (torchAdjustedRoot, torchPreview) = RaidInventorySaveEditor.SetAmount(
+        quantityRaidRoot,
+        raidTorch,
+        10,
+        raidStorageCatalog.Storage!.MaxSlots);
+    var adjustedRaidItems = (JsonObject)((JsonObject)((JsonObject)((JsonObject)
+        torchAdjustedRoot["base_root"]!)["party"]!)["inventory"]!)["items"]!;
+    Assert(
+        torchPreview is
+        {
+            ExistingAmount: 6,
+            TargetAmount: 10,
+            MatchingEntries: 1,
+            ResultingMatchingEntries: 2,
+            ExistingInventoryEntries: 3,
+            ResultingInventoryEntries: 4,
+            CreatedEntries: 1,
+            InventoryCapacity: 4
+        } &&
+        ((JsonObject)adjustedRaidItems["0"]!)["amount"]?.GetValue<int>() == 8 &&
+        ((JsonObject)adjustedRaidItems["1"]!)["amount"]?.GetValue<int>() == 2 &&
+        RaidInventorySaveEditor.CountAmount(torchAdjustedRoot, raidTorch) == 10 &&
+        RaidInventorySaveEditor.CountAmount(quantityRaidRoot, raidTorch) == 6,
+        "Increasing a raid item must fill its existing stack, occupy the first empty slot, respect stack limits, and leave the source document unchanged.");
+
+    var fullBagRejected = false;
+    try
+    {
+        _ = RaidInventorySaveEditor.SetAmount(
+            torchAdjustedRoot,
+            raidBandage,
+            1,
+            raidStorageCatalog.Storage.MaxSlots);
+    }
+    catch (InvalidOperationException error)
+    {
+        fullBagRejected = error.Message.Contains("不会被覆盖", StringComparison.Ordinal);
+    }
+
+    Assert(fullBagRejected, "A full expedition inventory must reject a new item instead of replacing an occupied slot.");
+    var (torchRemovedRoot, torchRemovedPreview) = RaidInventorySaveEditor.SetAmount(
+        torchAdjustedRoot,
+        raidTorch,
+        0,
+        raidStorageCatalog.Storage.MaxSlots);
+    Assert(
+        torchRemovedPreview is
+        {
+            TargetAmount: 0,
+            RemovedEntries: 2,
+            ResultingMatchingEntries: 0,
+            ResultingInventoryEntries: 2
+        } &&
+        RaidInventorySaveEditor.CountAmount(torchRemovedRoot, raidTorch) == 0,
+        "Setting a raid item to zero must remove only its matching stacks and free their slots.");
+
 var defaultLocalContent = await ActiveContentResolver.ResolveAsync(
     profile,
     gameRoot,
@@ -2387,11 +3219,17 @@ Directory.CreateDirectory(conflictingCapacityInventoryRootA);
 Directory.CreateDirectory(conflictingCapacityInventoryRootB);
 File.WriteAllText(
     Path.Combine(conflictingCapacityInventoryRootA, "shared.inventory.system_configs.darkest"),
-    """inventory_system_config: .type "trinket_storage" .max_slots 4""",
+    """
+    inventory_system_config: .type "trinket_storage" .max_slots 4
+    inventory_system_config: .type "raid" .max_slots 20
+    """,
     new UTF8Encoding(false));
 File.WriteAllText(
     Path.Combine(conflictingCapacityInventoryRootB, "shared.inventory.system_configs.darkest"),
-    """inventory_system_config: .type "trinket_storage" .max_slots 5""",
+    """
+    inventory_system_config: .type "trinket_storage" .max_slots 5
+    inventory_system_config: .type "raid" .max_slots 24
+    """,
     new UTF8Encoding(false));
 var conflictingCapacityContent = activeContent with
 {
@@ -2413,11 +3251,15 @@ var conflictingCapacityContent = activeContent with
         .ToArray()
 };
 var conflictingCapacityCatalog = TrinketStorageCatalog.Load(conflictingCapacityContent);
+var conflictingRaidCapacityCatalog = RaidInventoryStorageCatalog.Load(conflictingCapacityContent);
 Assert(
     conflictingCapacityCatalog.Storage is null &&
+    conflictingRaidCapacityCatalog.Storage is null &&
     conflictingCapacityCatalog.Issues.Any(issue =>
+        issue.Contains("multiple providers", StringComparison.Ordinal)) &&
+    conflictingRaidCapacityCatalog.Issues.Any(issue =>
         issue.Contains("multiple providers", StringComparison.Ordinal)),
-    "Same-priority storage providers for one virtual path must fail closed.");
+    "Same-priority town-storage or raid-capacity providers for one virtual path must fail closed instead of falling back to a lower-priority value.");
 var ordinary = activeCatalog.Trinkets.Single(item => item.Id == "focus_ring");
 var unlimited = activeCatalog.Trinkets.Single(item => item.Id == "unlimited_probe");
 var stateful = activeCatalog.Trinkets.Single(item => item.Id == "fire_probe");
@@ -2498,7 +3340,7 @@ Assert(activeContent.GameMode == "base" && heroCatalog.GameMode == "base", "The 
 Assert(
     heroCatalog.ResolveLevelThresholds.SequenceEqual([0, 2, 8, 14, 24, 36, 48]),
     "Base resolve XP thresholds were not loaded from the effective roster variables.");
-Assert(heroCatalog.HeroClasses.Count == 7, "Hero catalog should contain base replacement/patch, enabled DLC package/feature, active Workshop, and local classes.");
+Assert(heroCatalog.HeroClasses.Count == 8, "Hero catalog should contain base replacement/patch, enabled DLC package/feature, active Workshop, and local classes.");
 Assert(heroCatalog.RecruitEvents.Count == 4, "Resolved Workshop, DLC-overlay, local, and identical duplicate bonus_recruit events should be active.");
 Assert(heroCatalog.HeroClasses.All(item => item.Id != "disabled_hero"), "Persistent history must not enable a disabled hero class.");
 Assert(heroCatalog.HeroClasses.Any(item => item.Id == "dlc_shared_hero"), "Enabled DLC package root hero is missing.");
@@ -2614,6 +3456,30 @@ Assert(
         issue.Contains("Hero upgrade 'case_probe_hero'", StringComparison.Ordinal) &&
         issue.Contains("conflicting definitions", StringComparison.Ordinal)),
     "Same-priority hero upgrade templates that differ only by requirement-code case must remain an explicit conflict.");
+var compatibleUpgradeHero = heroCatalog.HeroClasses.Single(item => item.Id == "compatible_upgrade_hero");
+Assert(
+    string.IsNullOrWhiteSpace(compatibleUpgradeHero.ProgressionUnsupportedReason) &&
+    compatibleUpgradeHero.UpgradeTrees.Any(tree =>
+        tree.Id == "compatible_upgrade_hero.scaling_strike") &&
+    compatibleUpgradeHero.UpgradeTrees.All(tree =>
+        tree.Id != "compatible_upgrade_hero.legacy_strike_name") &&
+    compatibleUpgradeHero.SingleLevelCombatSkillIds.SequenceEqual(["fixed_command"]) &&
+    heroCatalog.Issues.All(issue =>
+        !issue.Contains("Hero upgrade 'compatible_upgrade_hero'", StringComparison.Ordinal)),
+    "A unique same-priority upgrade template compatible with the active hero skill ids should win, while a truly level-zero-only skill remains explicit.");
+var compatibleLevelZeroCandidate = StagecoachHeroCandidateFactory.Generate(
+    heroCatalog,
+    compatibleUpgradeHero,
+    seed: 1729,
+    resolveLevel: 0,
+    selectedInitialQuirkIds: []);
+Assert(
+    compatibleLevelZeroCandidate.UpgradePurchases.Count == 2 &&
+    compatibleLevelZeroCandidate.UpgradePurchases.Contains(
+        new HeroUpgradePurchase("compatible_upgrade_hero.scaling_strike", "0")) &&
+    compatibleLevelZeroCandidate.UpgradePurchases.Contains(
+        new HeroUpgradePurchase("compatible_upgrade_hero.fixed_command", "0")),
+    "A level-zero-only combat skill omitted from the upgrade JSON should receive the proven code-0 purchase without weakening multilevel missing-tree validation.");
 Assert(localHero.ColourVariationCount == 2, "Only the continuous A/B skin directories should be available for random colour selection.");
 Assert(localHero.ClassCampingSkillIds.Count == 2 && localHero.SharedCampingSkillIds.Count == 2, "Class and shared camping skills were not separated by the camping configuration.");
 Assert(localHero.IncompatibleInitialQuirkIds.Contains("excluded_quirk"), "Class-level incompatible initial quirks were not parsed.");
@@ -2698,7 +3564,15 @@ Assert(
         IsNaturalRandomEligible: true,
         WriteStatus: HeroInitialQuirkWriteStatus.Direct
     } &&
-    naturalQuirk.MaxHpModifier is { Amount: 0.2, RuleType: "no_trinkets" },
+        naturalQuirk.MaxHpModifiers is
+        [
+        {
+            Kind: HeroMaxHpModifierKind.Percentage,
+            Amount: 0.2,
+            RuleType: "no_trinkets",
+            IsFalseRule: false
+        }
+        ],
     "The original no_trinkets max-HP quirk shape should be supported for an empty-trinket candidate.");
 var specialQuirk = heroCatalog.InitialQuirks.Single(item => item.Id == "priority_top_quirk");
 Assert(
@@ -2726,6 +3600,11 @@ Assert(
     maxHpConflictQuirk.WriteStatus == HeroInitialQuirkWriteStatus.Unverified &&
     maxHpConflictQuirk.WriteStatusReason.Contains("max_hp", StringComparison.OrdinalIgnoreCase),
     "An unresolved max-HP Buff must still block explicit quirk selection because current_hp cannot be derived safely.");
+Assert(
+    heroCatalog.Issues.All(issue =>
+        !issue.Contains("Buff 'CONFLICT_ACC'", StringComparison.Ordinal) &&
+        !issue.Contains("Buff 'CONFLICT_MAXHP'", StringComparison.Ordinal)),
+    "Raw Buff conflicts should not pollute the catalog log: only a referenced max-HP conflict belongs to the affected quirk's write status.");
 var contextualQuirk = heroCatalog.InitialQuirks.Single(item => item.Id == "context_special");
 Assert(
     contextualQuirk is
@@ -2855,14 +3734,48 @@ Assert(
         WriteStatus: HeroInitialQuirkWriteStatus.Unverified
     },
     "Allowing evolution metadata must not bypass an unknown conditional max-HP rule.");
+    var flatHpQuirk = heroCatalog.InitialQuirks.Single(item => item.Id == "flat_hp_quirk");
 Assert(
-    heroCatalog.InitialQuirks.Single(item => item.Id == "flat_hp_quirk").WriteStatus ==
-    HeroInitialQuirkWriteStatus.Unverified,
-    "A flat max-HP modifier should remain blocked until the absolute current_hp formula is verified.");
+        flatHpQuirk.WriteStatus == HeroInitialQuirkWriteStatus.Direct &&
+        flatHpQuirk.MaxHpModifiers is
+        [
+            { Kind: HeroMaxHpModifierKind.Flat, Amount: 4, RuleType: "always" }
+        ],
+        "A known flat max-HP modifier should enter the additive term of the verified formula.");
+    var multipleHpQuirk = heroCatalog.InitialQuirks.Single(item => item.Id == "multiple_hp_quirk");
+    Assert(
+        multipleHpQuirk.WriteStatus == HeroInitialQuirkWriteStatus.Direct &&
+        multipleHpQuirk.MaxHpModifiers.Count == 2 &&
+        multipleHpQuirk.MaxHpModifiers.All(modifier =>
+            modifier.Kind == HeroMaxHpModifierKind.Percentage),
+        "Multiple known max-HP Buffs on one quirk should remain individually modeled.");
+    var otherModeHpQuirk = heroCatalog.InitialQuirks.Single(item => item.Id == "other_mode_hp_quirk");
+    Assert(
+        otherModeHpQuirk.WriteStatus == HeroInitialQuirkWriteStatus.Direct &&
+        otherModeHpQuirk.MaxHpModifiers is
+        [
+            {
+                Kind: HeroMaxHpModifierKind.Flat,
+                Amount: 20,
+                RuleType: "in_mode",
+                IsFalseRule: true,
+                RuleString: "ContractModeA"
+            }
+        ],
+        "A recognized inverted in_mode max-HP Buff should preserve its rule_data string.");
+    var lightHpQuirk = heroCatalog.InitialQuirks.Single(item => item.Id == "light_hp_quirk");
 Assert(
-    heroCatalog.InitialQuirks.Single(item => item.Id == "multiple_hp_quirk").WriteStatus ==
-    HeroInitialQuirkWriteStatus.Unverified,
-    "Multiple max-HP Buffs on one quirk should remain blocked until their stacking formula is verified.");
+        lightHpQuirk.WriteStatus == HeroInitialQuirkWriteStatus.Direct &&
+        lightHpQuirk.MaxHpModifiers is
+        [
+            {
+                Kind: HeroMaxHpModifierKind.Percentage,
+                Amount: -0.5,
+                RuleType: "lightabove",
+                RuleFloat: 1
+            }
+        ],
+        "A recognized lightabove max-HP Buff should preserve its rule_data threshold.");
 StagecoachHeroCandidateFactory.ValidateInitialQuirkSelection(heroCatalog, localHero, []);
 StagecoachHeroCandidateFactory.ValidateInitialQuirkSelection(
     heroCatalog,
@@ -2896,6 +3809,23 @@ StagecoachHeroCandidateFactory.ValidateInitialQuirkSelection(
     heroCatalog,
     localHero,
     ["context_special", "context_roster_limited"]);
+    StagecoachHeroCandidateFactory.ValidateInitialQuirkSelection(
+        heroCatalog,
+        localHero,
+        ["flat_hp_quirk", "multiple_hp_quirk"]);
+    StagecoachHeroCandidateFactory.ValidateInitialQuirkSelection(
+        heroCatalog,
+        localHero,
+        ["afflicted_hp_quirk", "other_mode_hp_quirk", "light_hp_quirk"]);
+    StagecoachHeroCandidateFactory.ValidateInitialQuirkSelection(
+        heroCatalog,
+        localHero,
+        ["mode_a_weakness", "mode_b_weakness"]);
+    StagecoachHeroCandidateFactory.ValidateInitialQuirkSelection(
+        heroCatalog,
+        localHero,
+        resolveLevel: 4,
+        selectedInitialQuirkIds: ["flat_level_boundary"]);
 AssertInitialQuirkSelectionRejected(heroCatalog, localHero, ["tough", "fragile"], "互斥");
 AssertInitialQuirkSelectionRejected(heroCatalog, localHero, ["evolution_missing_max"], "当前不能显式写入");
 AssertInitialQuirkSelectionRejected(heroCatalog, localHero, ["evolution_inverted"], "当前不能显式写入");
@@ -2903,8 +3833,27 @@ AssertInitialQuirkSelectionRejected(heroCatalog, localHero, ["evolution_fraction
 AssertInitialQuirkSelectionRejected(heroCatalog, localHero, ["evolution_missing_outcome"], "当前不能显式写入");
 AssertInitialQuirkSelectionRejected(heroCatalog, localHero, ["unknown_hp_rule"], "当前不能显式写入");
 AssertInitialQuirkSelectionRejected(heroCatalog, localHero, ["evolving_unknown_hp"], "当前不能显式写入");
-AssertInitialQuirkSelectionRejected(heroCatalog, localHero, ["flat_hp_quirk"], "当前不能显式写入");
-AssertInitialQuirkSelectionRejected(heroCatalog, localHero, ["multiple_hp_quirk"], "当前不能显式写入");
+    AssertInitialQuirkSelectionRejected(heroCatalog, localHero, ["flat_level_boundary"], "可达条件");
+    AssertInitialQuirkSelectionRejected(
+        heroCatalog,
+        localHero,
+        ["half_weakness", "light_hp_quirk"],
+        "可达条件");
+    AssertInitialQuirkSelectionRejected(
+        heroCatalog,
+        localHero,
+        ["half_weakness", "afflicted_half_weakness"],
+        "可达条件");
+    AssertInitialQuirkSelectionRejected(
+        heroCatalog,
+        localHero,
+        ["half_weakness", "other_mode_half_weakness"],
+        "可达条件");
+    AssertInitialQuirkSelectionRejected(
+        heroCatalog,
+        localHero,
+        ["light_hp_quirk", "rounding_weakness_a", "rounding_weakness_b", "rounding_weakness_c"],
+        "可达条件");
 AssertInitialQuirkSelectionRejected(heroCatalog, localHero, ["ambiguous_quirk"], "多个未解析定义");
 AssertInitialQuirkSelectionRejected(heroCatalog, localHero, ["evolution_conflict_quirk"], "多个未解析定义");
 AssertInitialQuirkSelectionRejected(heroCatalog, localHero, ["max_hp_conflict_quirk"], "当前不能显式写入");
@@ -3173,6 +4122,62 @@ Assert(
     ((JsonObject)mixedRuleStackedHpCandidate.Candidate["actor"]!["buff_group"]!).Count == 0,
     "Stacked max-HP quirks must not be duplicated into actor.buff_group.");
 
+    var flatHpCandidate = StagecoachHeroCandidateFactory.Generate(
+        heroCatalog,
+        localHero,
+        seed: 1729,
+        selectedInitialQuirkIds: ["flat_hp_quirk"]);
+    Assert(
+        Math.Abs(flatHpCandidate.Preview.CurrentHp - 24.0) < 0.000001,
+        "A constant flat max-HP modifier should be added to the selected armour base HP.");
+
+    var multipleHpCandidate = StagecoachHeroCandidateFactory.Generate(
+        heroCatalog,
+        localHero,
+        seed: 1729,
+        selectedInitialQuirkIds: ["multiple_hp_quirk"]);
+    Assert(
+        Math.Abs(multipleHpCandidate.Preview.CurrentHp - 21.0) < 0.000001,
+        "Multiple percentage modifiers declared by one quirk should be summed before multiplication.");
+
+    var mixedFlatPercentageCandidate = StagecoachHeroCandidateFactory.Generate(
+        heroCatalog,
+        localHero,
+        seed: 1729,
+        selectedInitialQuirkIds: ["mixed_hp_quirk"]);
+    Assert(
+        Math.Abs(mixedFlatPercentageCandidate.Preview.CurrentHp - 24.96) < 0.000001,
+        "Mixed HP modifiers should use (base + flat) * (1 + percentage), not flat-after-percentage ordering.");
+
+    var runtimeConditionalHpCandidate = StagecoachHeroCandidateFactory.Generate(
+        heroCatalog,
+        localHero,
+        seed: 1729,
+        selectedInitialQuirkIds: ["afflicted_hp_quirk", "other_mode_hp_quirk", "light_hp_quirk"]);
+    Assert(
+        Math.Abs(runtimeConditionalHpCandidate.Preview.CurrentHp - 20.0) < 0.000001 &&
+        ((JsonObject)runtimeConditionalHpCandidate.Candidate["actor"]!["buff_group"]!).Count == 0,
+        "Runtime-only affliction, mode, and light modifiers should not be pre-applied to a stagecoach candidate.");
+
+    var mutuallyExclusiveModeCandidate = StagecoachHeroCandidateFactory.Generate(
+        heroCatalog,
+        localHero,
+        seed: 1729,
+        selectedInitialQuirkIds: ["mode_a_weakness", "mode_b_weakness"]);
+    Assert(
+        Math.Abs(mutuallyExclusiveModeCandidate.Preview.CurrentHp - 20.0) < 0.000001,
+        "Different in_mode conditions should be evaluated as mutually exclusive runtime states, not arbitrary independent Buff subsets.");
+
+    var levelFourFlatBoundaryCandidate = StagecoachHeroCandidateFactory.Generate(
+        heroCatalog,
+        localHero,
+        seed: 1729,
+        resolveLevel: 4,
+        selectedInitialQuirkIds: ["flat_level_boundary"]);
+    Assert(
+        Math.Abs(levelFourFlatBoundaryCandidate.Preview.CurrentHp - 8.0) < 0.000001,
+        "HP safety and current_hp calculation should use the selected level's armour HP, not level zero.");
+
 var levelFourCandidate = StagecoachHeroCandidateFactory.Generate(
     heroCatalog,
     localHero,
@@ -3261,6 +4266,16 @@ AssertHeroGenerationRejected(
 AssertHeroGenerationRejected(heroCatalog, localHero, ["tough", "fragile"], "互斥");
 AssertHeroGenerationRejected(heroCatalog, localHero, ["unknown_hp_rule"], "当前不能显式写入");
 AssertHeroGenerationRejected(heroCatalog, localHero, ["unknown_hp_disease"], "当前不能显式写入");
+    AssertHeroGenerationRejected(
+        heroCatalog,
+        localHero,
+        ["half_weakness", "light_hp_quirk"],
+        "可达条件");
+    AssertHeroGenerationRejected(
+        heroCatalog,
+        localHero,
+        ["light_hp_quirk", "rounding_weakness_a", "rounding_weakness_b", "rounding_weakness_c"],
+        "可达条件");
 AssertHeroGenerationRejected(
     heroCatalog,
     localHero,
@@ -4140,6 +5155,202 @@ var committedRoot = JsonNode.Parse(File.ReadAllText(committedDecoded)) as JsonOb
     ?? throw new InvalidDataException("Committed estate did not decode to an object.");
 Assert(TrinketSaveEditor.CountCopies(committedRoot, "focus_ring") == 2, "Committed save has the wrong focus ring count.");
 
+    var quantityProfileRoot = Path.Combine(runRoot, "profile_quantity_items");
+    Directory.CreateDirectory(quantityProfileRoot);
+    foreach (var sourcePath in Directory.EnumerateFiles(profileRoot, "persist*.json", SearchOption.TopDirectoryOnly))
+    {
+        File.Copy(sourcePath, Path.Combine(quantityProfileRoot, Path.GetFileName(sourcePath)), overwrite: false);
+    }
+
+    var quantityEstatePath = Path.Combine(quantityProfileRoot, "persist.estate.json");
+    var quantityGamePath = Path.Combine(quantityProfileRoot, "persist.game.json");
+    var quantityRaidPath = Path.Combine(quantityProfileRoot, "persist.raid.json");
+    var quantityProfile = new SaveProfile(
+        "profile_quantity_items",
+        quantityProfileRoot,
+        quantityEstatePath,
+        "contract-user",
+        File.GetLastWriteTimeUtc(quantityEstatePath));
+    var quantityActiveContent = activeContent with
+    {
+        Profile = quantityProfile,
+        SourceGameSha256 = ComputeSha256(quantityGamePath)
+    };
+    var quantityLocations = new SaveEditorLocations(
+        Path.Combine(runRoot, "quantity-appdata"),
+        Path.Combine(runRoot, "quantity-appdata", "workspaces"),
+        Path.Combine(runRoot, "quantity-appdata", "backups"));
+    var quantityService = new SaveEditService(codec, quantityLocations);
+    var preparedQuantity = await quantityService.PrepareQuantityItemEditAsync(
+        quantityProfile,
+        catalogModEssence,
+        11,
+        quantityActiveContent);
+    Assert(
+        preparedQuantity.Preview is
+        {
+            ExistingAmount: 0,
+            TargetAmount: 11,
+            CreatedEntry: true,
+            StorageKind: QuantityItemStorageKind.EstateItems
+        } &&
+        ReadRevision(preparedQuantity.SourceCopyPath).SequenceEqual(ReadRevision(preparedQuantity.EncodedPath)),
+        "The service preview must roundtrip a zero-held Mod estate item and preserve DSON revision bytes.");
+
+    var quantityDefinitionBytes = File.ReadAllBytes(catalogModEssence.SourcePath);
+    File.AppendAllText(catalogModEssence.SourcePath, Environment.NewLine + "// stale quantity definition", new UTF8Encoding(false));
+    var staleQuantityDefinitionBlocked = false;
+    try
+    {
+        _ = await quantityService.CommitAsync(preparedQuantity);
+    }
+    catch (InvalidOperationException ex) when (ex.Message.Contains(
+        "quantity-item definition changed after preview",
+        StringComparison.OrdinalIgnoreCase))
+    {
+        staleQuantityDefinitionBlocked = true;
+    }
+    finally
+    {
+        File.WriteAllBytes(catalogModEssence.SourcePath, quantityDefinitionBytes);
+    }
+
+    Assert(
+        staleQuantityDefinitionBlocked && !Directory.Exists(quantityLocations.BackupDirectory),
+        "Quantity-item commit must reject a changed selected Mod definition before creating a backup.");
+    preparedQuantity = await quantityService.PrepareQuantityItemEditAsync(
+        quantityProfile,
+        catalogModEssence,
+        11,
+        quantityActiveContent);
+    var quantityCommit = await quantityService.CommitAsync(preparedQuantity);
+    Assert(
+        File.Exists(Path.Combine(quantityCommit.BackupDirectory, "persist.estate.json")) &&
+        !File.Exists(Path.Combine(quantityCommit.BackupDirectory, "persist.raid.json")) &&
+        File.Exists(Path.Combine(quantityCommit.BackupDirectory, "backup-manifest.json")) &&
+        File.Exists(Path.Combine(quantityCommit.BackupDirectory, "commit-result.json")),
+        "A town quantity-item commit must preserve the same complete profile backup and result evidence as trinket writes without inventing persist.raid.json.");
+    var quantityCommittedDecodedPath = Path.Combine(runRoot, "quantity.committed.persist.estate.json");
+    await codec.DecodeAsync(quantityEstatePath, quantityCommittedDecodedPath);
+    var quantityCommittedRoot = JsonNode.Parse(File.ReadAllText(quantityCommittedDecodedPath)) as JsonObject
+        ?? throw new InvalidDataException("Committed quantity-item save did not decode to an object.");
+    Assert(
+        QuantityItemSaveEditor.CountAmount(quantityCommittedRoot, catalogModEssence) == 11 &&
+        TrinketSaveEditor.CountCopies(quantityCommittedRoot, "focus_ring") == 2,
+        "Quantity-item commit must write the requested Mod amount without changing the existing trinket inventory.");
+
+    var quantityDecodedRaidSeedPath = Path.Combine(runRoot, "quantity.seed.persist.raid.json");
+    File.WriteAllText(quantityDecodedRaidSeedPath, quantityRaidRoot.ToJsonString(), new UTF8Encoding(false));
+    await codec.EncodeAsync(quantityDecodedRaidSeedPath, quantityRaidPath, originalBinaryPath: null);
+    SetRevision(quantityRaidPath, [0x00, 0x00, 0x4A, 0x70]);
+    var quantityEstateBytesBeforeRaidEdit = File.ReadAllBytes(quantityEstatePath);
+    var autoRaidCatalog = await QuantityItemCatalog.LoadAsync(
+        quantityActiveContent with
+        {
+            WorkspaceDirectory = Path.Combine(runRoot, "quantity-raid-catalog-workspace")
+        },
+        codec);
+    var serviceRaidTorch = autoRaidCatalog.Items.Single(item =>
+        item.InventoryType == "supply" && item.ItemId == "torch");
+    Assert(
+        autoRaidCatalog.SaveContext == QuantityItemSaveContext.Raid &&
+        autoRaidCatalog.RaidStorage?.MaxSlots == 4 &&
+        serviceRaidTorch.CurrentAmount == 6,
+        "The asynchronous quantity catalog must switch to persist.raid.json whenever the selected profile is in an expedition.");
+
+    var townItemBlockedDuringRaid = false;
+    try
+    {
+        _ = await quantityService.PrepareQuantityItemEditAsync(
+            quantityProfile,
+            catalogModEssence,
+            12,
+            quantityActiveContent);
+    }
+    catch (InvalidOperationException error) when (error.Message.Contains("已经进入副本", StringComparison.Ordinal))
+    {
+        townItemBlockedDuringRaid = true;
+    }
+
+    Assert(
+        townItemBlockedDuringRaid,
+        "Once persist.raid.json appears, a stale town item row must be rejected and the user must reload into raid mode.");
+    var preparedRaidQuantity = await quantityService.PrepareQuantityItemEditAsync(
+        quantityProfile,
+        serviceRaidTorch,
+        10,
+        quantityActiveContent);
+    Assert(
+        preparedRaidQuantity.ContentGuard.SaveContext == QuantityItemSaveContext.Raid &&
+        preparedRaidQuantity.Preview is
+        {
+            ExistingAmount: 6,
+            TargetAmount: 10,
+            ExistingInventoryEntries: 3,
+            ResultingInventoryEntries: 4,
+            InventoryCapacity: 4
+        } &&
+        ReadRevision(preparedRaidQuantity.SourceCopyPath)
+            .SequenceEqual(ReadRevision(preparedRaidQuantity.EncodedPath)),
+        "A raid quantity preview must roundtrip persist.raid.json, preserve its revision, and expose its slot impact.");
+
+    var raidStoragePath = autoRaidCatalog.RaidStorage!.SourcePath;
+    var raidStorageBytes = File.ReadAllBytes(raidStoragePath);
+    File.AppendAllText(raidStoragePath, Environment.NewLine + "// stale raid capacity", new UTF8Encoding(false));
+    var staleRaidCapacityBlocked = false;
+    try
+    {
+        _ = await quantityService.CommitAsync(preparedRaidQuantity);
+    }
+    catch (InvalidOperationException error) when (error.Message.Contains(
+        "inventory capacity changed after preview",
+        StringComparison.OrdinalIgnoreCase))
+    {
+        staleRaidCapacityBlocked = true;
+    }
+    finally
+    {
+        File.WriteAllBytes(raidStoragePath, raidStorageBytes);
+    }
+
+    Assert(
+        staleRaidCapacityBlocked,
+        "A raid capacity configuration change after preview must block commit before touching the live inventory.");
+    var parkedRaidPath = Path.Combine(quantityProfileRoot, "persist.raid.contract-parked");
+    File.Move(quantityRaidPath, parkedRaidPath);
+    var endedRaidBlocked = false;
+    try
+    {
+        _ = await quantityService.CommitAsync(preparedRaidQuantity);
+    }
+    catch (InvalidOperationException error) when (error.Message.Contains("已不在副本", StringComparison.Ordinal))
+    {
+        endedRaidBlocked = true;
+    }
+    finally
+    {
+        File.Move(parkedRaidPath, quantityRaidPath);
+    }
+
+    Assert(
+        endedRaidBlocked,
+        "If the expedition ends after preview, the prepared raid edit must be rejected instead of being redirected to town storage.");
+    var raidQuantityCommit = await quantityService.CommitAsync(preparedRaidQuantity);
+    Assert(
+        Path.GetFileName(raidQuantityCommit.TargetPath) == "persist.raid.json" &&
+        File.Exists(Path.Combine(raidQuantityCommit.BackupDirectory, "persist.raid.json")) &&
+        File.Exists(Path.Combine(raidQuantityCommit.BackupDirectory, "persist.estate.json")) &&
+        File.ReadAllBytes(quantityEstatePath).SequenceEqual(quantityEstateBytesBeforeRaidEdit),
+        "A raid quantity commit must replace only persist.raid.json while backing up the complete current profile.");
+    var quantityCommittedRaidDecodedPath = Path.Combine(runRoot, "quantity.committed.persist.raid.json");
+    await codec.DecodeAsync(quantityRaidPath, quantityCommittedRaidDecodedPath);
+    var quantityCommittedRaidRoot = JsonNode.Parse(File.ReadAllText(quantityCommittedRaidDecodedPath)) as JsonObject
+        ?? throw new InvalidDataException("Committed raid quantity save did not decode to an object.");
+    Assert(
+        RaidInventorySaveEditor.CountAmount(quantityCommittedRaidRoot, serviceRaidTorch) == 10 &&
+        ReadRevision(quantityRaidPath).SequenceEqual(new byte[] { 0x00, 0x00, 0x4A, 0x70 }),
+        "A raid quantity commit must write the requested stacks and preserve the DSON revision.");
+
 var loc2ProbeModRoot = Environment.GetEnvironmentVariable("DDSE_LOC2_PROBE_MOD_ROOT");
 if (!string.IsNullOrWhiteSpace(loc2ProbeModRoot))
 {
@@ -4224,7 +5435,7 @@ if (!string.IsNullOrWhiteSpace(rurutiaProbeModRoot))
         "The real Rurutia LOC2 files should not be rejected for cross-string colour controls.");
 }
 
-Console.WriteLine("PASS: active game-mode/Mod catalogs, bilingual names, level 0-max progression, blank/default and explicit natural/special quirks, HP/skill/camping rules, stagecoach GUID/upgrade append, full-roster preservation, town/roster/upgrades stale guards, DSON roundtrips, verified backups, three-file rollback, and trinket commit contracts.");
+    Console.WriteLine("PASS: active game-mode/Mod catalogs, bilingual names, town/raid quantity edits with stack and slot guards, level 0-max progression, blank/default and explicit natural/special quirks, HP/skill/camping rules, stagecoach GUID/upgrade append, full-roster preservation, stale guards, DSON roundtrips, verified backups, three-file rollback, and trinket/quantity commit contracts.");
 Console.WriteLine($"Artifacts: {runRoot}");
 
 static TrinketStorageCatalogResult LoadStorageCapacityProbe(

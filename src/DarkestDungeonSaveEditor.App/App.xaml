@@ -9,7 +9,7 @@
             that mapping while keeping all panel artwork original to this project.
         -->
         <Color x:Key="AppBackgroundColor">#070707</Color>
-        <Color x:Key="SurfaceColor">#F20A0A09</Color>
+        <Color x:Key="SurfaceColor">#D80A0A09</Color>
         <Color x:Key="SurfaceRaisedColor">#1E1D19</Color>
         <Color x:Key="SurfaceHoverColor">#2C2922</Color>
         <Color x:Key="SurfaceInsetColor">#050505</Color>
@@ -49,7 +49,7 @@
         <SolidColorBrush x:Key="SuccessBrush" Color="{StaticResource SuccessColor}" />
         <SolidColorBrush x:Key="WarningBrush" Color="{StaticResource WarningColor}" />
         <SolidColorBrush x:Key="DangerBrush" Color="{StaticResource DangerColor}" />
-        <SolidColorBrush x:Key="HeaderBrush" Color="#F0060606" />
+        <SolidColorBrush x:Key="HeaderBrush" Color="#D0060606" />
 
         <LinearGradientBrush x:Key="PrimaryButtonBrush" StartPoint="0,0" EndPoint="0,1">
             <GradientStop Color="#8A201E" Offset="0" />
@@ -91,10 +91,9 @@
         </LinearGradientBrush>
         <ImageBrush x:Key="AppTextureBrush"
                     ImageSource="Assets/charcoal-cloth.png"
-                    TileMode="Tile"
-                    Viewport="0,0,768,768"
-                    ViewportUnits="Absolute"
-                    Stretch="Fill" />
+                    AlignmentX="Center"
+                    AlignmentY="Center"
+                    Stretch="UniformToFill" />
         <ImageBrush x:Key="BandTextureBrush"
                     ImageSource="Assets/charcoal-cloth.png"
                     TileMode="Tile"
@@ -613,7 +612,7 @@
             <Setter Property="AlternatingRowBackground" Value="#11110F" />
             <Setter Property="HorizontalGridLinesBrush" Value="#343936" />
             <Setter Property="VerticalGridLinesBrush" Value="#252A28" />
-            <Setter Property="GridLinesVisibility" Value="All" />
+            <Setter Property="GridLinesVisibility" Value="Horizontal" />
             <Setter Property="RowHeaderWidth" Value="0" />
             <Setter Property="HeadersVisibility" Value="Column" />
             <Setter Property="CanUserResizeRows" Value="False" />
@@ -649,7 +648,8 @@
 
         <Style TargetType="DataGridCell">
             <Setter Property="Background" Value="Transparent" />
-            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="BorderBrush" Value="#252A28" />
+            <Setter Property="BorderThickness" Value="0,0,1,0" />
             <Setter Property="Padding" Value="9,0" />
             <Setter Property="FocusVisualStyle" Value="{x:Null}" />
             <Setter Property="HorizontalContentAlignment" Value="Stretch" />
@@ -704,7 +704,7 @@
                             <UniformGrid x:Name="HeaderPanel"
                                          Grid.Row="0"
                                          Rows="1"
-                                         Columns="2"
+                                         Columns="3"
                                          Margin="0,0,0,5"
                                          IsItemsHost="True"
                                          Panel.ZIndex="1"

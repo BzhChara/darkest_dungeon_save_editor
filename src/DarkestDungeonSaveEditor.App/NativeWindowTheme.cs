@@ -43,9 +43,9 @@ internal static class NativeWindowTheme
                     sizeof(int));
             }
 
-            var captionColor = ToColorRef(red: 0x10, green: 0x0C, blue: 0x0A);
-            var textColor = ToColorRef(red: 0xF5, green: 0xEB, blue: 0xD6);
-            var borderColor = ToColorRef(red: 0x8B, green: 0x68, blue: 0x36);
+            var captionColor = ToColorRef(red: 0x0B, green: 0x08, blue: 0x08);
+            var textColor = ToColorRef(red: 0xD8, green: 0xD4, blue: 0xC7);
+            var borderColor = ToColorRef(red: 0x3B, green: 0x15, blue: 0x16);
             _ = DwmSetWindowAttribute(handle, DwmwaCaptionColor, ref captionColor, sizeof(int));
             _ = DwmSetWindowAttribute(handle, DwmwaTextColor, ref textColor, sizeof(int));
             _ = DwmSetWindowAttribute(handle, DwmwaBorderColor, ref borderColor, sizeof(int));
