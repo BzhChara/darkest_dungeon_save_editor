@@ -50,6 +50,26 @@ var nativeWindowThemeCode = File.ReadAllText(Path.Combine(
     "src",
     "DarkestDungeonSaveEditor.App",
     "NativeWindowTheme.cs"));
+var themedDialogXamlPath = Path.Combine(
+    repositoryRoot,
+    "src",
+    "DarkestDungeonSaveEditor.App",
+    "ThemedDialog.xaml");
+var themedDialogXaml = System.Xml.Linq.XDocument.Load(themedDialogXamlPath);
+var themedDialogCode = File.ReadAllText(Path.Combine(
+    repositoryRoot,
+    "src",
+    "DarkestDungeonSaveEditor.App",
+    "ThemedDialog.xaml.cs"));
+var dialogParchmentPath = Path.Combine(
+    repositoryRoot,
+    "src",
+    "DarkestDungeonSaveEditor.App",
+    "Assets",
+    "dialog-parchment.png");
+var presentationNamespace = mainWindowXaml.Root?.Name.Namespace ??
+    throw new InvalidDataException("MainWindow.xaml has no root namespace.");
+var xamlName = System.Xml.Linq.XName.Get("Name", "http://schemas.microsoft.com/winfx/2006/xaml");
 Assert(
     !mainWindowCode.Contains("Loaded += (_, _) => Discover();", StringComparison.Ordinal) &&
     mainWindowCode.Contains("Discover_Click(object sender, RoutedEventArgs e) => Discover();", StringComparison.Ordinal) &&
@@ -64,11 +84,27 @@ Assert(
 Assert(
     mainWindowCode.Contains("内容目录档案：ID={activeContent.Profile.ProfileId}", StringComparison.Ordinal) &&
     mainWindowCode.Contains("档案目录={activeContent.Profile.ProfileDirectory}", StringComparison.Ordinal) &&
-    mainWindowCode.Contains("persist.game.json SHA-256={activeContent.SourceGameSha256}", StringComparison.Ordinal),
-    "Catalog loading must log the selected profile id, full profile directory, and source persist.game.json SHA-256.");
-var presentationNamespace = mainWindowXaml.Root?.Name.Namespace ??
-    throw new InvalidDataException("MainWindow.xaml has no root namespace.");
-var xamlName = System.Xml.Linq.XName.Get("Name", "http://schemas.microsoft.com/winfx/2006/xaml");
+    mainWindowCode.Contains("persist.game.json SHA-256={activeContent.SourceGameSha256}", StringComparison.Ordinal) &&
+    mainWindowCode.Contains("内容目录数量快照：场景={FormatQuantitySaveContext(_quantitySaveContext)}", StringComparison.Ordinal) &&
+    mainWindowCode.Contains("数量来源文件={Path.GetFullPath(quantitySourcePath)}", StringComparison.Ordinal) &&
+    mainWindowCode.Contains("SHA-256={quantityItems.SourceSaveSha256}", StringComparison.Ordinal) &&
+    mainWindowCode.Contains("persist.estate.json SHA-256={estateSaveSha256}", StringComparison.Ordinal),
+    "Catalog loading must persist the selected profile path, game hash, active town/raid quantity-save path and hash, plus the estate hash needed alongside a raid catalog.");
+Assert(
+    !mainWindowXaml.Descendants()
+        .Any(element => element.Attribute(xamlName)?.Value == "CatalogSummaryTextBlock") &&
+    !mainWindowCode.Contains("CatalogSummaryTextBlock", StringComparison.Ordinal) &&
+    !mainWindowCode.Contains("UpdateCatalogSummary", StringComparison.Ordinal) &&
+    mainWindowCode.Contains("目录加载完成：档案 {profile.ProfileId}；模式 {catalogs.Heroes.GameMode}", StringComparison.Ordinal) &&
+    mainWindowCode.Contains("目录统计：{FormatQuantitySaveContext(_quantitySaveContext)}物品", StringComparison.Ordinal) &&
+    mainWindowCode.Contains("当前场景隐藏项 {hiddenItemCount} 个", StringComparison.Ordinal) &&
+    mainWindowCode.Contains("副本格位 {quantityItems.RaidOccupiedSlots}/", StringComparison.Ordinal) &&
+    !mainWindowCode.Contains("Sum(item => item.SavedEntryCount)", StringComparison.Ordinal) &&
+    mainWindowCode.Contains("怪癖定义 {catalogs.Heroes.InitialQuirks.Count} 个", StringComparison.Ordinal) &&
+    mainWindowCode.Contains("姓名 {catalogs.Heroes.HeroNames.Count} 个", StringComparison.Ordinal) &&
+    mainWindowCode.Contains("有招募事件的人物", StringComparison.Ordinal) &&
+    mainWindowCode.Contains("有后续玩法怪癖线索的人物", StringComparison.Ordinal),
+    "The crowded top catalog summary must be removed; the runtime log must retain current scene, visible/hidden item, raid-slot, trinket, hero, quirk, name, level, and runtime-signal diagnostics.");
 var generationModeColumn = mainWindowXaml
     .Descendants(presentationNamespace + "DataGridTextColumn")
     .Single(column => column.Attribute("Header")?.Value == "生成方式");
@@ -182,6 +218,8 @@ Assert(
     itemEnglishColumn.Attribute("HeaderStyle") is null &&
     heroSourceColumn.Attribute("CellStyle") is null &&
     heroSourceColumn.Attribute("HeaderStyle") is null &&
+    new[] { itemGridElement, trinketGridElement, heroGridElement }
+        .All(grid => grid.Attribute("CellStyle") is null && grid.Attribute("RowStyle") is null) &&
     ReadStyleSetter(dataGridStyle, "HorizontalContentAlignment") == "Stretch" &&
     ReadStyleSetter(dataGridStyle, "VerticalContentAlignment") == "Top" &&
         itemGridElement.Descendants(presentationNamespace + "DataGridTextColumn")
@@ -199,8 +237,10 @@ Assert(
     applicationResourceKeys.Contains("RedPanelHeaderStyle") &&
     applicationResourceKeys.Contains("OlivePanelHeaderStyle") &&
     applicationResourceKeys.Contains("LogTextBoxStyle") &&
-    mainWindowCode.Split("FormatStorageCapacity(_trinketStorage)", StringSplitOptions.None).Length >= 3,
-    "The game-panel application shell and effective storage-capacity summary must remain wired into the main window.");
+    mainWindowCode.Contains(
+        "仓库槽位 {FormatStorageCapacity(_trinketStorage)}",
+        StringComparison.Ordinal),
+    "The game-panel application shell and effective storage-capacity diagnostic must remain wired into the runtime log.");
 var mainWindowRoot = mainWindowXaml.Root
     ?? throw new InvalidDataException("MainWindow.xaml has no root element.");
     var appTextureBrush = appXaml
@@ -380,7 +420,7 @@ Assert(
     applicationResourceKeys.Contains("RedBandBrush") &&
     applicationResourceKeys.Contains("BandVignetteBrush") &&
     !appXaml.Descendants(presentationNamespace + "DropShadowEffect").Any() &&
-    HasOnlySquareCorners(appXaml, mainWindowXaml),
+    HasOnlySquareCorners(appXaml, mainWindowXaml, themedDialogXaml),
     "The UI must use the game's SimSun/SimHei Simplified Chinese mapping, weathered band resources, and square shadow-free panel geometry.");
 Assert(
     mainWindowRoot.Attribute("MinWidth")?.Value == "1120" &&
@@ -459,25 +499,94 @@ var dataGridCellStyle = appXaml
     .Single(element =>
         element.Attribute("TargetType")?.Value == "DataGridCell" &&
         element.Attribute(xamlNamespace) is null);
+var dataGridRowStyle = appXaml
+    .Descendants(presentationNamespace + "Style")
+    .Single(element =>
+        element.Attribute("TargetType")?.Value == "DataGridRow" &&
+        element.Attribute(xamlNamespace) is null);
+var dataGridCellChrome = dataGridCellStyle
+    .Descendants(presentationNamespace + "Border")
+    .Single(element => element.Attribute(xamlName)?.Value == "CellChrome");
 var dataGridHeaderStyle = appXaml
     .Descendants(presentationNamespace + "Style")
     .Single(element =>
         element.Attribute("TargetType")?.Value == "DataGridColumnHeader" &&
         element.Attribute(xamlNamespace) is null);
+var dataGridHeaderTemplate = dataGridHeaderStyle
+    .Descendants(presentationNamespace + "ControlTemplate")
+    .Single(element => element.Attribute("TargetType")?.Value == "DataGridColumnHeader");
+var dataGridHeaderLeadingSeparator = dataGridHeaderTemplate
+    .Descendants(presentationNamespace + "Rectangle")
+    .Single(element => element.Attribute(xamlName)?.Value == "HeaderLeadingSeparator");
+var dataGridHeaderBottomSeparator = dataGridHeaderTemplate
+    .Descendants(presentationNamespace + "Rectangle")
+    .Single(element => element.Attribute(xamlName)?.Value == "HeaderBottomSeparator");
+var dataGridHeaderSortArrow = dataGridHeaderTemplate
+    .Descendants(presentationNamespace + "Path")
+    .Single(element => element.Attribute(xamlName)?.Value == "SortArrow");
+var dataGridHeaderGrippers = dataGridHeaderTemplate
+    .Descendants(presentationNamespace + "Thumb")
+    .Where(element => element.Attribute(xamlName)?.Value is
+        "PART_LeftHeaderGripper" or "PART_RightHeaderGripper")
+    .ToArray();
 Assert(
     ReadStyleSetter(dataGridCellStyle, "VerticalContentAlignment") == "Center" &&
-    ReadStyleSetter(dataGridStyle, "GridLinesVisibility") == "Horizontal" &&
-    ReadStyleSetter(dataGridCellStyle, "BorderBrush") ==
-        ReadStyleSetter(dataGridStyle, "VerticalGridLinesBrush") &&
-    ReadStyleSetter(dataGridCellStyle, "BorderThickness") == "0,0,1,0" &&
+    ReadStyleSetter(dataGridStyle, "GridLinesVisibility") == "All" &&
+    ReadStyleSetter(dataGridStyle, "UseLayoutRounding") == "True" &&
+    ReadStyleSetter(dataGridStyle, "FocusVisualStyle") == "{x:Null}" &&
+    !string.IsNullOrWhiteSpace(ReadStyleSetter(dataGridStyle, "VerticalGridLinesBrush")) &&
+    ReadStyleSetter(dataGridCellStyle, "Foreground") == "{StaticResource TextPrimaryBrush}" &&
+    ReadStyleSetter(dataGridCellStyle, "BorderBrush") == "Transparent" &&
+    ReadStyleSetter(dataGridCellStyle, "BorderThickness") == "0" &&
+    ReadStyleSetter(dataGridCellStyle, "FocusVisualStyle") == "{x:Null}" &&
+    ReadStyleSetter(dataGridRowStyle, "BorderThickness") == "0" &&
+    ReadStyleSetter(dataGridRowStyle, "FocusVisualStyle") == "{x:Null}" &&
+    dataGridCellChrome.Attribute("BorderBrush") is null &&
+    dataGridCellChrome.Attribute("BorderThickness") is null &&
     dataGridCellStyle.Descendants(presentationNamespace + "ContentPresenter")
         .Any(element => element.Attribute("VerticalAlignment")?.Value == "Center") &&
     ReadStyleSetter(dataGridHeaderStyle, "VerticalContentAlignment") == "Center" &&
     ReadStyleSetter(dataGridHeaderStyle, "HorizontalContentAlignment") == "Center" &&
+    ReadStyleSetter(dataGridHeaderStyle, "SnapsToDevicePixels") == "True" &&
+    ReadStyleSetter(dataGridHeaderStyle, "UseLayoutRounding") == "True" &&
+    dataGridHeaderLeadingSeparator.Attribute("Width")?.Value == "1" &&
+    dataGridHeaderLeadingSeparator.Attribute("HorizontalAlignment")?.Value == "Left" &&
+    dataGridHeaderLeadingSeparator.Attribute("Fill")?.Value == "{TemplateBinding BorderBrush}" &&
+    dataGridHeaderBottomSeparator.Attribute("Height")?.Value == "1" &&
+    dataGridHeaderBottomSeparator.Attribute("VerticalAlignment")?.Value == "Bottom" &&
+    dataGridHeaderSortArrow.Attribute("HorizontalAlignment")?.Value == "Right" &&
+    dataGridHeaderSortArrow.Attribute("VerticalAlignment")?.Value == "Top" &&
+    dataGridHeaderSortArrow.Attribute("Margin")?.Value == "0,3,3,0" &&
+    dataGridHeaderGrippers.Length == 2 &&
+    dataGridHeaderGrippers.All(element =>
+        element.Attribute("Style")?.Value ==
+        "{StaticResource DataGridColumnHeaderGripperStyle}") &&
+    dataGridHeaderTemplate.Descendants(presentationNamespace + "Trigger")
+        .Count(trigger => trigger.Attribute("Property")?.Value == "SortDirection") == 2 &&
     applicationResourceKeys.Contains("DataGridTextElementStyle") &&
+    dataGridCellStyle.Descendants(presentationNamespace + "Trigger")
+        .Any(trigger =>
+            trigger.Attribute("Property")?.Value == "IsSelected" &&
+            trigger.Attribute("Value")?.Value == "True" &&
+            trigger.Descendants(presentationNamespace + "Setter")
+                .Any(setter =>
+                    setter.Attribute("Property")?.Value == "Foreground" &&
+                    setter.Attribute("Value")?.Value == "#FFF8EC")) &&
+    dataGridRowStyle.Descendants(presentationNamespace + "Trigger")
+        .Any(trigger =>
+            trigger.Attribute("Property")?.Value == "IsSelected" &&
+            trigger.Attribute("Value")?.Value == "True" &&
+            trigger.Descendants(presentationNamespace + "Setter")
+                .Any(setter =>
+                    setter.Attribute("Property")?.Value == "Background" &&
+                    setter.Attribute("Value")?.Value == "#5D1718")) &&
+    !dataGridRowStyle.Descendants(presentationNamespace + "Trigger")
+        .Where(trigger => trigger.Attribute("Property")?.Value == "IsSelected")
+        .SelectMany(trigger => trigger.Descendants(presentationNamespace + "Setter"))
+        .Any(setter => setter.Attribute("Property")?.Value is "BorderBrush" or "BorderThickness") &&
     !dataGridCellStyle.Descendants(presentationNamespace + "Trigger")
         .Any(trigger => trigger.Attribute("Property")?.Value == "IsKeyboardFocusWithin"),
-    "Catalog rows must render each ordinary vertical separator exactly once through the shared one-pixel cell border, keep text and headers centered, and avoid a separate gold focus box.");
+    "Catalog body rows must use automatic DataGrid gridlines without rendering the control's default gray cell border; selection uses only the shared red row fill. Every header draws the same leading separator, text stays centered, and resize/sort behavior remains available.");
 var tabItemStyle = appXaml
     .Descendants(presentationNamespace + "Style")
     .Single(element =>
@@ -512,6 +621,21 @@ Assert(
         .Select(tab => tab.Attribute("Header")?.Value)
         .ToArray();
     var showUnusedItemsCheckBox = ReadNamedMainElement("CheckBox", "ShowUnusedItemsCheckBox");
+    var loadCatalogRowsStage = mainWindowCode.IndexOf(
+        "CrashDiagnostics.SetStage(\"LoadCatalog: populating visible rows\");",
+        StringComparison.Ordinal);
+    var loadCatalogModeRefresh = loadCatalogRowsStage < 0
+        ? -1
+        : mainWindowCode.IndexOf(
+            "UpdateCatalogMode();",
+            loadCatalogRowsStage,
+            StringComparison.Ordinal);
+    var loadCatalogFilterRefresh = loadCatalogRowsStage < 0
+        ? -1
+        : mainWindowCode.IndexOf(
+            "ApplyFilter();",
+            loadCatalogRowsStage,
+            StringComparison.Ordinal);
     Assert(
         catalogTabHeaders.SequenceEqual(
             new[] { "物品  /  ITEMS", "饰品  /  TRINKETS", "人物  /  HEROES" },
@@ -520,7 +644,17 @@ Assert(
         showUnusedItemsCheckBox.Attribute("Checked")?.Value == "ShowUnusedItemsCheckBox_Changed" &&
         showUnusedItemsCheckBox.Attribute("Unchecked")?.Value == "ShowUnusedItemsCheckBox_Changed" &&
         mainWindowCode.Contains("definition.IsHiddenByDefault", StringComparison.Ordinal) &&
-        mainWindowCode.Contains("显示未使用定义", StringComparison.Ordinal) &&
+        showUnusedItemsCheckBox.Attribute("Content")?.Value == "显示当前场景隐藏项（0）" &&
+        showUnusedItemsCheckBox.Attribute("ToolTip")?.Value ==
+            "切换为只显示当前场景默认隐藏的物品定义" &&
+        mainWindowCode.Contains(
+            "definition.IsHiddenByDefault == showHiddenItemsOnly",
+            StringComparison.Ordinal) &&
+        mainWindowCode.Contains("显示当前场景隐藏项（", StringComparison.Ordinal) &&
+        !mainWindowCode.Contains("显示未使用定义", StringComparison.Ordinal) &&
+        loadCatalogRowsStage >= 0 &&
+        loadCatalogModeRefresh > loadCatalogRowsStage &&
+        loadCatalogModeRefresh < loadCatalogFilterRefresh &&
         mainWindowCode.Contains("IsPresentInSave = resultingEntryCount > 0", StringComparison.Ordinal) &&
         mainWindowCode.Contains("SavedEntryCount = resultingEntryCount", StringComparison.Ordinal) &&
         mainWindowCode.Contains("PrepareQuantityItemEditAsync(", StringComparison.Ordinal) &&
@@ -535,8 +669,13 @@ Assert(
         mainWindowCode.Contains("textBox.SelectAll();", StringComparison.Ordinal) &&
         mainWindowCode.Contains("ResetQuantityInputForCurrentTab();", StringComparison.Ordinal) &&
         mainWindowCode.Contains("1 => \"1\"", StringComparison.Ordinal) &&
-        mainWindowCode.Contains("该物品不可从庄园携入远征。", StringComparison.Ordinal) &&
-        mainWindowCode.Contains("该物品能否从庄园携入远征尚未确认。", StringComparison.Ordinal) &&
+        mainWindowCode.Contains("庄园库存 / 可手动配给", StringComparison.Ordinal) &&
+        mainWindowCode.Contains("庄园库存 / 不可手动配给", StringComparison.Ordinal) &&
+        mainWindowCode.Contains("庄园库存 / 手动配给未声明", StringComparison.Ordinal) &&
+        mainWindowCode.Contains("人物自带或副本中生成的数量不受本次修改影响。", StringComparison.Ordinal) &&
+        mainWindowCode.Contains("是否可手动配给未声明，且不会直接修改副本背包。", StringComparison.Ordinal) &&
+        !mainWindowCode.Contains("不可配给进副本", StringComparison.Ordinal) &&
+        !mainWindowCode.Contains("该物品不可从庄园携入远征。", StringComparison.Ordinal) &&
         mainWindowCode.Contains("string.IsNullOrWhiteSpace(itemWarning)", StringComparison.Ordinal) &&
         mainWindowCode.Contains("程序会先完整备份当前档案。", StringComparison.Ordinal) &&
         !mainWindowCode.Contains("此功能只修改 persist.estate.json", StringComparison.Ordinal) &&
@@ -641,7 +780,7 @@ Assert(
     initialQuirkDialogXaml.Root?.Attribute("MinWidth")?.Value == "900" &&
     initialQuirkDialogXaml.Root?.Attribute("MinHeight")?.Value == "560" &&
     HasGamePanelWindowFrame(initialQuirkDialogXaml) &&
-    HasOnlySquareCorners(appXaml, mainWindowXaml, initialQuirkDialogXaml) &&
+    HasOnlySquareCorners(appXaml, mainWindowXaml, initialQuirkDialogXaml, themedDialogXaml) &&
     mainWindowXaml.Descendants(presentationNamespace + "ContentControl")
         .Count(element => element.Attribute("Style")?.Value.Contains("PanelHeaderStyle", StringComparison.Ordinal) == true) >= 3 &&
     initialQuirkDialogXaml.Descendants(presentationNamespace + "ContentControl")
@@ -669,6 +808,53 @@ Assert(
             .Element(presentationNamespace + "Border")?
             .Attribute("Background")?.Value == "#90050505",
         "Both editor windows must request a dark native caption, muted light text, a dark-red system border, and visible full-window texture instead of a bright yellow native frame.");
+var themedDialogCancelButton = themedDialogXaml
+    .Descendants(presentationNamespace + "Button")
+    .Single(element => element.Attribute(xamlName)?.Value == "CancelButton");
+var themedDialogConfirmButton = themedDialogXaml
+    .Descendants(presentationNamespace + "Button")
+    .Single(element => element.Attribute(xamlName)?.Value == "ConfirmButton");
+var themedDialogParchmentBrush = themedDialogXaml
+    .Descendants(presentationNamespace + "ImageBrush")
+    .Single(element => element.Attribute(xamlNamespace)?.Value == "DialogParchmentBrush");
+var themedDialogParchmentSurface = themedDialogXaml
+    .Descendants(presentationNamespace + "Border")
+    .Single(element => element.Attribute(xamlName)?.Value == "ParchmentSurfaceBorder");
+Assert(
+    themedDialogXaml.Root?.Attribute("Icon")?.Value == "Assets/save-editor.ico" &&
+    themedDialogXaml.Root?.Attribute("ResizeMode")?.Value == "NoResize" &&
+    themedDialogXaml.Root?.Attribute("ShowInTaskbar")?.Value == "False" &&
+    themedDialogXaml.Root?.Attribute("WindowStartupLocation")?.Value == "CenterOwner" &&
+    themedDialogXaml.Root?.Attribute("SizeToContent")?.Value == "Height" &&
+    HasGamePanelWindowFrame(themedDialogXaml) &&
+    themedDialogParchmentBrush.Attribute("ImageSource")?.Value == "Assets/dialog-parchment.png" &&
+    themedDialogXaml.Descendants(presentationNamespace + "ScrollViewer")
+        .Any(element => element.Attribute("MaxHeight")?.Value == "390" &&
+                        element.Attribute("VerticalScrollBarVisibility")?.Value == "Auto") &&
+    themedDialogCancelButton.Attribute("Style")?.Value == "{StaticResource GhostButtonStyle}" &&
+    themedDialogConfirmButton.Attribute("Style")?.Value == "{StaticResource PrimaryButtonStyle}" &&
+    themedDialogParchmentSurface.Attribute("BorderThickness")?.Value == "0" &&
+    !themedDialogXaml.Descendants()
+        .Any(element => element.Attribute(xamlName)?.Value is
+            "KeyboardHintTextBlock" or "KindMarkerBorder") &&
+    !themedDialogXaml.Descendants(presentationNamespace + "Border")
+        .Any(element => element.Attribute("Grid.Row")?.Value == "2") &&
+    File.Exists(dialogParchmentPath) &&
+    new FileInfo(dialogParchmentPath).Length > 100_000 &&
+    appProjectText.Contains("<Resource Include=\"Assets\\dialog-parchment.png\" />", StringComparison.Ordinal),
+    "Application messages must use an unboxed parchment surface, no lower-left helper or framed marker/footer, the dark outer frame, bounded scrolling, and existing themed action buttons.");
+Assert(
+    !mainWindowCode.Contains("MessageBox.Show", StringComparison.Ordinal) &&
+    mainWindowCode.Contains("ThemedDialog.Confirm(", StringComparison.Ordinal) &&
+    mainWindowCode.Contains("ThemedDialogKind.Information", StringComparison.Ordinal) &&
+    mainWindowCode.Contains("ThemedDialogKind.Error", StringComparison.Ordinal) &&
+    themedDialogCode.Contains("NativeWindowTheme.ApplyDarkTitleBar(this);", StringComparison.Ordinal) &&
+    themedDialogCode.Contains("CancelButton.IsDefault = true;", StringComparison.Ordinal) &&
+    themedDialogCode.Contains("CancelButton.IsCancel = true;", StringComparison.Ordinal) &&
+    themedDialogCode.Contains("ConfirmButton.IsDefault = true;", StringComparison.Ordinal) &&
+    themedDialogCode.Contains("ConfirmButton.IsCancel = true;", StringComparison.Ordinal) &&
+    themedDialogCode.Contains(".ShowDialog() == true", StringComparison.Ordinal),
+    "Save confirmation, success, and failure messages must use the themed modal while preserving safe default-cancel, Enter/Escape, owner, and dark-caption behavior.");
 var initialQuirkBindings = initialQuirkDialogXaml
     .Descendants(presentationNamespace + "DataGridTextColumn")
     .Select(column => column.Attribute("Binding")?.Value)
@@ -732,6 +918,9 @@ var initialQuirkCheckBox = initialQuirkGrid
     .Single(checkBox => checkBox.Attribute("Click")?.Value == "QuirkCheckBox_Click");
 Assert(
     initialQuirkGrid.Attribute("IsReadOnly")?.Value == "True" &&
+    initialQuirkGrid.Attribute("SelectionUnit")?.Value == "FullRow" &&
+    initialQuirkGrid.Attribute("CellStyle") is null &&
+    initialQuirkGrid.Attribute("RowStyle") is null &&
     initialQuirkCheckBox.Attribute("IsChecked")?.Value == "{Binding IsSelected, Mode=OneWay}" &&
     initialQuirkDialogCode.Contains("_view is IEditableCollectionView editableView", StringComparison.Ordinal) &&
     initialQuirkDialogCode.Contains("editableView.CommitEdit();", StringComparison.Ordinal) &&
@@ -806,9 +995,13 @@ var activeWorkshopDistrictRoot = Path.Combine(activeWorkshopRoot, "campaign", "t
 var baseInventoryRoot = Path.Combine(gameRoot, "inventory");
 var activeWorkshopInventoryRoot = Path.Combine(activeWorkshopRoot, "inventory");
 var disabledWorkshopInventoryRoot = Path.Combine(disabledWorkshopRoot, "inventory");
-    var localInventoryRoot = Path.Combine(localModRoot, "inventory");
+var localInventoryRoot = Path.Combine(localModRoot, "inventory");
 var localLootRoot = Path.Combine(localModRoot, "loot");
 var localRulesRoot = Path.Combine(localModRoot, "rules");
+var localProvisionRoot = Path.Combine(localModRoot, "campaign", "provision");
+var localTownEventsRoot = Path.Combine(localModRoot, "campaign", "town_events");
+var localMonsterRoot = Path.Combine(localModRoot, "monsters", "quantity_reference_probe");
+var localRaidCampingRoot = Path.Combine(localModRoot, "raid", "camping");
 var activeWorkshopDlcRoot = Path.Combine(activeWorkshopRoot, "dlc", "100_feature_pack");
 var activeWorkshopDlcTrinketRoot = Path.Combine(activeWorkshopDlcRoot, "trinkets");
 var activeWorkshopOfficialOverrideHeroRoot = Path.Combine(
@@ -885,9 +1078,13 @@ Directory.CreateDirectory(activeWorkshopDistrictRoot);
 Directory.CreateDirectory(baseInventoryRoot);
 Directory.CreateDirectory(activeWorkshopInventoryRoot);
 Directory.CreateDirectory(disabledWorkshopInventoryRoot);
-    Directory.CreateDirectory(localInventoryRoot);
+Directory.CreateDirectory(localInventoryRoot);
 Directory.CreateDirectory(localLootRoot);
 Directory.CreateDirectory(localRulesRoot);
+Directory.CreateDirectory(localProvisionRoot);
+Directory.CreateDirectory(localTownEventsRoot);
+Directory.CreateDirectory(localMonsterRoot);
+Directory.CreateDirectory(localRaidCampingRoot);
 Directory.CreateDirectory(activeWorkshopDlcTrinketRoot);
 Directory.CreateDirectory(activeWorkshopOfficialOverrideHeroRoot);
 Directory.CreateDirectory(Path.Combine(activeWorkshopDlcRoot, "heroes", "dlc_shared_hero"));
@@ -1185,8 +1382,28 @@ File.WriteAllText(
         Path.Combine(localInventoryRoot, "local.estate.inventory.items.darkest"),
         """
     inventory_item: .type "estate" .id "local_mod_essence" .base_stack_limit 12 .purchase_gold_value 0 .sell_gold_value 10 .estate_can_be_provision false
+    inventory_item: .type "estate" .id "provisionable_mod_essence" .base_stack_limit 4 .purchase_gold_value 0 .sell_gold_value 0 .estate_can_be_provision true
     inventory_item: .type "estate" .id "orphan_mod_essence" .base_stack_limit 1 .purchase_gold_value 0 .sell_gold_value 0 .estate_can_be_provision false
     inventory_item: .type "estate" .id "stored_orphan_essence" .base_stack_limit 1 .purchase_gold_value 0 .sell_gold_value 0 .estate_can_be_provision false
+    inventory_item: .type "estate" .id "hero_starter_essence" .base_stack_limit 6 .purchase_gold_value 0 .sell_gold_value 0 .estate_can_be_provision false
+    inventory_item: .type "heirloom" .id "town_only_heirloom" .base_stack_limit 1 .purchase_gold_value 0 .sell_gold_value 0
+    inventory_item: .type "heirloom" .id "event_cost_only_heirloom" .base_stack_limit 1 .purchase_gold_value 0 .sell_gold_value 0
+    inventory_item: .type "gem" .id "local_raid_gem" .base_stack_limit 5 .purchase_gold_value 0 .sell_gold_value 500
+    """,
+    new UTF8Encoding(false));
+File.WriteAllText(
+    Path.Combine(localProvisionRoot, "hero_starter.provision.json"),
+    """
+    {
+      "raid_starting_hero_class_item_lists": [
+        {
+          "hero_class": "quantity_reference_probe",
+          "item_lists": [
+            { "type": "estate", "id": "hero_starter_essence", "amount": 3 }
+          ]
+        }
+      ]
+    }
     """,
     new UTF8Encoding(false));
 File.WriteAllText(
@@ -1207,6 +1424,12 @@ File.WriteAllText(
           ]
         },
         {
+          "id": "LOCAL_RAID_LOOT",
+          "entries": [
+            { "type": "item", "chances": 1, "data": { "type": "gem", "id": "local_raid_gem", "amount": 1 } }
+          ]
+        },
+        {
           "id": "LOCAL_ORPHAN_LOOT",
           "entries": [
             { "type": "item", "chances": 1, "data": { "type": "estate", "id": "orphan_mod_essence", "amount": 1 } },
@@ -1215,6 +1438,29 @@ File.WriteAllText(
         }
       ]
     }
+    """,
+    new UTF8Encoding(false));
+File.WriteAllText(
+    Path.Combine(localTownEventsRoot, "quantity_reference.events.json"),
+    """
+    {
+      "events": [
+        {
+          "id": "town_currency_probe",
+          "data": [
+            { "type": "bonus_currency", "string_data": "town_only_heirloom", "number_data": 1 },
+            { "type": "event_cost", "string_data": "event_cost_only_heirloom", "number_data": 1 }
+          ]
+        }
+      ]
+    }
+    """,
+    new UTF8Encoding(false));
+File.WriteAllText(
+    Path.Combine(localMonsterRoot, "quantity_reference_probe.info.darkest"),
+    """
+    monster: .id "quantity_reference_probe"
+    loot: .code "LOCAL_RAID_LOOT" .count 1
     """,
     new UTF8Encoding(false));
 File.WriteAllText(
@@ -1229,7 +1475,7 @@ File.WriteAllText(
         {
           "name": "cross_mod_item_building",
           "buff_list": [
-            { "type": "DistrictSupplyBuffData", "loot_table_code": "LOCAL_ACTIVE_LOOT" }
+            { "type": "DistrictSupplyBuffData", "target_inventory": "estate", "loot_table_code": "LOCAL_ACTIVE_LOOT" }
           ]
         }
       ]
@@ -2590,16 +2836,25 @@ Assert(
     var quantityCatalog = QuantityItemCatalog.Load(activeContent, quantityEstateRoot, "contract-estate-sha");
     Assert(
         quantityCatalog.SourceEstateSha256 == "contract-estate-sha" &&
-        quantityCatalog.Items.Count == 7 &&
+        quantityCatalog.Items.Count == 11 &&
         quantityCatalog.Items.All(item => item.DisplayId != "raid_only_gem") &&
+        quantityCatalog.Items.All(item => item.DisplayId != "local_raid_gem") &&
         quantityCatalog.Items.All(item => item.DisplayId != "disabled_mod_item"),
         "The quantity-item catalog must include only wallet/estate persisted definitions and ignore raid-only or disabled content.");
     var catalogGold = quantityCatalog.Items.Single(item => item.DisplayId == "gold");
     var catalogBlueprint = quantityCatalog.Items.Single(item => item.DisplayId == "blueprint");
     var catalogBlood = quantityCatalog.Items.Single(item => item.DisplayId == "the_blood");
     var catalogModEssence = quantityCatalog.Items.Single(item => item.DisplayId == "local_mod_essence");
+    var catalogProvisionableModEssence = quantityCatalog.Items.Single(item =>
+        item.DisplayId == "provisionable_mod_essence");
+    var catalogTownOnlyHeirloom = quantityCatalog.Items.Single(item =>
+        item.DisplayId == "town_only_heirloom");
+    var catalogEventCostOnlyHeirloom = quantityCatalog.Items.Single(item =>
+        item.DisplayId == "event_cost_only_heirloom");
     var catalogOrphanModEssence = quantityCatalog.Items.Single(item => item.DisplayId == "orphan_mod_essence");
     var catalogStoredOrphanEssence = quantityCatalog.Items.Single(item => item.DisplayId == "stored_orphan_essence");
+    var catalogHeroStarterEssence = quantityCatalog.Items.Single(item =>
+        item.DisplayId == "hero_starter_essence");
     var catalogSaveOnly = quantityCatalog.Items.Single(item => item.DisplayId == "save_only_relic");
     Assert(
         catalogGold.StorageKind == QuantityItemStorageKind.Wallet &&
@@ -2631,18 +2886,74 @@ Assert(
             evidence.Contains("LOCAL_ACTIVE_LOOT", StringComparison.Ordinal) &&
             evidence.Contains("LOCAL_NESTED_LOOT", StringComparison.Ordinal)) &&
         !catalogModEssence.IsHiddenByDefault &&
+        catalogProvisionableModEssence is
+        {
+            ReferenceStatus: QuantityItemReferenceStatus.ConfirmedActive,
+            IsHiddenByDefault: false
+        } &&
+        catalogProvisionableModEssence.ReferenceEvidence.Any(evidence =>
+            evidence.Contains("允许从庄园库存手动配给", StringComparison.Ordinal)) &&
+        catalogTownOnlyHeirloom is
+        {
+            StorageKind: QuantityItemStorageKind.Wallet,
+            ReferenceStatus: QuantityItemReferenceStatus.ConfirmedActive,
+            IsHiddenByDefault: false
+        } &&
+        catalogEventCostOnlyHeirloom is
+        {
+            StorageKind: QuantityItemStorageKind.Wallet,
+            ReferenceStatus: QuantityItemReferenceStatus.ConfirmedActive,
+            IsHiddenByDefault: false
+        } &&
+        catalogEventCostOnlyHeirloom.ReferenceEvidence.Any(evidence =>
+            evidence.Contains("quantity_reference.events.json", StringComparison.OrdinalIgnoreCase)) &&
         catalogOrphanModEssence.ReferenceStatus == QuantityItemReferenceStatus.SuspectedUnused &&
         catalogOrphanModEssence.IsHiddenByDefault &&
         catalogStoredOrphanEssence.ReferenceStatus == QuantityItemReferenceStatus.SuspectedUnused &&
         catalogStoredOrphanEssence is { IsPresentInSave: true, CurrentAmount: 0, IsHiddenByDefault: false } &&
+        catalogHeroStarterEssence is
+        {
+            EstateCanBeProvision: false,
+            ReferenceStatus: QuantityItemReferenceStatus.SuspectedUnused,
+            IsHiddenByDefault: true
+        } &&
         catalogSaveOnly.IsSaveOnly &&
         catalogSaveOnly.ReferenceStatus == QuantityItemReferenceStatus.SaveOnly &&
         catalogSaveOnly.IsPresentInSave &&
         catalogSaveOnly.CurrentAmount == 7 &&
         catalogSaveOnly.LocalizedName == new BilingualContentName("存档遗物", "Save Relic"),
-        "Reachable Mod items, hidden orphan definitions, definition-backed save residues, and save-only entries must remain distinguishable and editable.");
+        "Town-reachable Mod items, hidden orphan definitions, definition-backed save residues, and save-only entries must remain distinguishable and editable.");
 
-    var malformedReferencePath = Path.Combine(localRulesRoot, "malformed_reference.json");
+    var malformedRaidJsonTownOverridePath = Path.Combine(
+        localRaidCampingRoot,
+        "malformed_town_override.json");
+    QuantityItemCatalogResult malformedRaidJsonTownOverrideCatalog;
+    File.WriteAllText(malformedRaidJsonTownOverridePath, "{ invalid", new UTF8Encoding(false));
+    try
+    {
+        malformedRaidJsonTownOverrideCatalog = QuantityItemCatalog.Load(
+            activeContent,
+            quantityEstateRoot,
+            "contract-estate-sha");
+    }
+    finally
+    {
+        File.Delete(malformedRaidJsonTownOverridePath);
+    }
+
+    Assert(
+        malformedRaidJsonTownOverrideCatalog.Items.Single(item =>
+            item.DisplayId == "orphan_mod_essence") is
+        {
+            ReferenceStatus: QuantityItemReferenceStatus.AnalysisIncomplete,
+            IsHiddenByDefault: false
+        } &&
+        malformedRaidJsonTownOverrideCatalog.Issues.Any(issue =>
+            issue.Contains("could not parse active JSON file", StringComparison.OrdinalIgnoreCase) &&
+            issue.Contains("malformed_town_override.json", StringComparison.OrdinalIgnoreCase)),
+        "A malformed JSON under a raid-default path must fail open for the town catalog because its nodes could target estate or wallet storage.");
+
+    var malformedReferencePath = Path.Combine(localTownEventsRoot, "malformed_reference.json");
     QuantityItemCatalogResult malformedReferenceCatalog;
     File.WriteAllText(malformedReferencePath, "{ invalid", new UTF8Encoding(false));
     try
@@ -2723,6 +3034,36 @@ Assert(
             issue.Contains("reference file listed by active Mod is missing", StringComparison.OrdinalIgnoreCase) &&
             issue.Contains("missing_quantity_reference.json", StringComparison.OrdinalIgnoreCase)),
         "A missing active manifest reference file must keep unresolved Mod items visible instead of claiming they are unused.");
+
+    var nonTownReferenceManifestBytes = File.ReadAllBytes(quantityReferenceManifestPath);
+    QuantityItemCatalogResult missingRaidJsonTownOverrideCatalog;
+    File.AppendAllText(
+        quantityReferenceManifestPath,
+        Environment.NewLine + "raid/camping/missing_town_override.json 100",
+        new UTF8Encoding(false));
+    try
+    {
+        missingRaidJsonTownOverrideCatalog = QuantityItemCatalog.Load(
+            activeContent,
+            quantityEstateRoot,
+            "contract-estate-sha");
+    }
+    finally
+    {
+        File.WriteAllBytes(quantityReferenceManifestPath, nonTownReferenceManifestBytes);
+    }
+
+    Assert(
+        missingRaidJsonTownOverrideCatalog.Items.Single(item =>
+            item.DisplayId == "orphan_mod_essence") is
+        {
+            ReferenceStatus: QuantityItemReferenceStatus.AnalysisIncomplete,
+            IsHiddenByDefault: false
+        } &&
+        missingRaidJsonTownOverrideCatalog.Issues.Any(issue =>
+            issue.Contains("reference file listed by active Mod is missing", StringComparison.OrdinalIgnoreCase) &&
+            issue.Contains("missing_town_override.json", StringComparison.OrdinalIgnoreCase)),
+        "A missing manifest-listed JSON under a raid-default path must fail open for the town catalog because it could have contained a town inventory override.");
 
     var (goldAdjustedRoot, goldPreview) = QuantityItemSaveEditor.SetAmount(quantityEstateRoot, catalogGold, 5000);
     Assert(
@@ -2926,6 +3267,15 @@ Assert(
         activeContent,
         raidWithCarriedTrinketRoot,
         "contract-raid-trinket-sha");
+    var raidWithoutTorchRoot = quantityRaidRoot.DeepClone() as JsonObject
+        ?? throw new InvalidDataException("Failed to clone the no-torch raid fixture.");
+    var raidWithoutTorchItems = (JsonObject)((JsonObject)((JsonObject)((JsonObject)
+        raidWithoutTorchRoot["base_root"]!)["party"]!)["inventory"]!)["items"]!;
+    _ = raidWithoutTorchItems.Remove("0");
+    var raidWithoutTorchCatalog = QuantityItemCatalog.LoadRaid(
+        activeContent,
+        raidWithoutTorchRoot,
+        "contract-raid-no-torch-sha");
     var raidTorch = raidQuantityCatalog.Items.Single(item =>
         item.InventoryType == "supply" && item.ItemId == "torch");
     var raidBandage = raidQuantityCatalog.Items.Single(item =>
@@ -2937,12 +3287,25 @@ Assert(
         item.InventoryType == "estate" && item.ItemId == "the_blood");
     var raidModEssence = raidQuantityCatalog.Items.Single(item =>
         item.InventoryType == "estate" && item.ItemId == "local_mod_essence");
+    var raidProvisionableModEssence = raidQuantityCatalog.Items.Single(item =>
+        item.InventoryType == "estate" && item.ItemId == "provisionable_mod_essence");
+    var raidTownOnlyHeirloom = raidQuantityCatalog.Items.Single(item =>
+        item.InventoryType == "heirloom" && item.ItemId == "town_only_heirloom");
+    var raidLocalGem = raidQuantityCatalog.Items.Single(item =>
+        item.InventoryType == "gem" && item.ItemId == "local_raid_gem");
+    var raidHeroStarterEssence = raidQuantityCatalog.Items.Single(item =>
+        item.InventoryType == "estate" && item.ItemId == "hero_starter_essence");
+    var absentRaidTorch = raidWithoutTorchCatalog.Items.Single(item =>
+        item.InventoryType == "supply" && item.ItemId == "torch");
     Assert(
         raidQuantityCatalog is
         {
             SaveContext: QuantityItemSaveContext.Raid,
-            SourceSaveSha256: "contract-raid-sha"
+            SourceSaveSha256: "contract-raid-sha",
+            RaidOccupiedSlots: 3
         } &&
+        raidWithCarriedTrinketCatalog.RaidOccupiedSlots == 4 &&
+        raidWithoutTorchCatalog.RaidOccupiedSlots == 2 &&
         raidQuantityCatalog.RaidStorage?.MaxSlots == 4 &&
         raidStorageCatalog.Storage?.MaxSlots == 4 &&
         raidQuantityCatalog.Items.All(item => item.StorageKind == QuantityItemStorageKind.RaidInventory) &&
@@ -2956,6 +3319,13 @@ Assert(
             SavedEntryCount: 1
         } &&
         raidTorch.LocalizedName == new BilingualContentName("火把", "Torch") &&
+        absentRaidTorch is
+        {
+            CurrentAmount: 0,
+            IsPresentInSave: false,
+            ReferenceStatus: QuantityItemReferenceStatus.OfficialContent,
+            IsHiddenByDefault: false
+        } &&
         raidGold is { CurrentAmount: 2500, BaseStackLimit: 2500 } &&
         catalogGold.CurrentAmount == 1250 &&
         raidGem is { CurrentAmount: 5, BaseStackLimit: 5 } &&
@@ -2964,10 +3334,131 @@ Assert(
         raidModEssence is
         {
             StorageKind: QuantityItemStorageKind.RaidInventory,
+            ReferenceStatus: QuantityItemReferenceStatus.SuspectedUnused,
+            IsHiddenByDefault: true
+        } &&
+        raidProvisionableModEssence is
+        {
+            StorageKind: QuantityItemStorageKind.RaidInventory,
             ReferenceStatus: QuantityItemReferenceStatus.ConfirmedActive,
             IsHiddenByDefault: false
-        },
-        "An active expedition must expose only ordinary raid-target rows and independent bag totals without merging town amounts. Gold, estate items, and reachable Mod estate loot must remain valid overlapping definitions in both contexts instead of being excluded by their town storage type, while carried trinket instances remain outside the quantity workflow.");
+        } &&
+        raidProvisionableModEssence.ReferenceEvidence.Any(evidence =>
+            evidence.Contains("允许从庄园配给", StringComparison.Ordinal)) &&
+        raidTownOnlyHeirloom is
+        {
+            ReferenceStatus: QuantityItemReferenceStatus.SuspectedUnused,
+            IsHiddenByDefault: true
+        } &&
+        raidLocalGem is
+        {
+            ReferenceStatus: QuantityItemReferenceStatus.ConfirmedActive,
+            IsHiddenByDefault: false
+        } &&
+        raidLocalGem.ReferenceEvidence.Any(evidence =>
+            evidence.Contains("quantity_reference_probe", StringComparison.OrdinalIgnoreCase) &&
+            evidence.Contains("LOCAL_RAID_LOOT", StringComparison.OrdinalIgnoreCase)),
+        "An active expedition must resolve rooted raid loot independently from town-only references.");
+    Assert(
+        raidHeroStarterEssence is
+        {
+            ReferenceStatus: QuantityItemReferenceStatus.ConfirmedActive,
+            IsHiddenByDefault: false
+        } &&
+        raidHeroStarterEssence.ReferenceEvidence.Any(evidence =>
+            evidence.Contains("hero_starter.provision.json", StringComparison.OrdinalIgnoreCase)),
+        "An estate item with estate_can_be_provision=false must remain raid-visible when a hero-starting-item list injects it independently of town stock.");
+    Assert(
+        raidQuantityCatalog.Items.All(item => item.StorageKind == QuantityItemStorageKind.RaidInventory),
+        "An active expedition must use raid reachability rather than town-only evidence: explicit provisioning and rooted raid loot remain visible, while town-only currency and estate rewards hide by default. Carried trinkets remain outside the quantity workflow.");
+
+    var malformedTownOnlyReferencePath = Path.Combine(
+        localTownEventsRoot,
+        "malformed_town_only_reference.json");
+    QuantityItemCatalogResult raidWithMalformedTownOnlyReference;
+    File.WriteAllText(malformedTownOnlyReferencePath, "{ invalid", new UTF8Encoding(false));
+    try
+    {
+        raidWithMalformedTownOnlyReference = QuantityItemCatalog.LoadRaid(
+            activeContent,
+            quantityRaidRoot,
+            "contract-raid-malformed-town-sha");
+    }
+    finally
+    {
+        File.Delete(malformedTownOnlyReferencePath);
+    }
+
+    Assert(
+        raidWithMalformedTownOnlyReference.Items.Single(item =>
+            item.InventoryType == "heirloom" && item.ItemId == "town_only_heirloom") is
+        {
+            ReferenceStatus: QuantityItemReferenceStatus.SuspectedUnused,
+            IsHiddenByDefault: true
+        } &&
+        raidWithMalformedTownOnlyReference.Issues.All(issue =>
+            !issue.Contains("malformed_town_only_reference.json", StringComparison.OrdinalIgnoreCase)),
+        "A malformed town-only reference file must not make unrelated raid reachability incomplete or keep town-only definitions visible in the raid catalog.");
+
+    var mixedDistrictReferencePath = Path.Combine(
+        activeWorkshopDistrictRoot,
+        "quantity_reference.districts.json");
+    var mixedDistrictReferenceBytes = File.ReadAllBytes(mixedDistrictReferencePath);
+    QuantityItemCatalogResult raidWithMalformedMixedDistrictReference;
+    File.WriteAllText(mixedDistrictReferencePath, "{ invalid", new UTF8Encoding(false));
+    try
+    {
+        raidWithMalformedMixedDistrictReference = QuantityItemCatalog.LoadRaid(
+            activeContent,
+            quantityRaidRoot,
+            "contract-raid-malformed-district-sha");
+    }
+    finally
+    {
+        File.WriteAllBytes(mixedDistrictReferencePath, mixedDistrictReferenceBytes);
+    }
+
+    Assert(
+        raidWithMalformedMixedDistrictReference.Items.Single(item =>
+            item.InventoryType == "heirloom" && item.ItemId == "town_only_heirloom") is
+        {
+            ReferenceStatus: QuantityItemReferenceStatus.AnalysisIncomplete,
+            IsHiddenByDefault: false
+        } &&
+        raidWithMalformedMixedDistrictReference.Issues.Any(issue =>
+            issue.Contains("could not parse active JSON file", StringComparison.OrdinalIgnoreCase) &&
+            issue.Contains("quantity_reference.districts.json", StringComparison.OrdinalIgnoreCase)),
+        "An unreadable district JSON must fail open in raid mode because a town district can contain provision-target or inventory-replacement nodes.");
+
+    var raidReferenceManifestBytes = File.ReadAllBytes(quantityReferenceManifestPath);
+    QuantityItemCatalogResult raidWithMissingMixedDistrictReference;
+    File.AppendAllText(
+        quantityReferenceManifestPath,
+        Environment.NewLine + "campaign/town/districts/missing_raid_supply_reference.json 100",
+        new UTF8Encoding(false));
+    try
+    {
+        raidWithMissingMixedDistrictReference = QuantityItemCatalog.LoadRaid(
+            activeContent,
+            quantityRaidRoot,
+            "contract-raid-missing-district-sha");
+    }
+    finally
+    {
+        File.WriteAllBytes(quantityReferenceManifestPath, raidReferenceManifestBytes);
+    }
+
+    Assert(
+        raidWithMissingMixedDistrictReference.Items.Single(item =>
+            item.InventoryType == "heirloom" && item.ItemId == "town_only_heirloom") is
+        {
+            ReferenceStatus: QuantityItemReferenceStatus.AnalysisIncomplete,
+            IsHiddenByDefault: false
+        } &&
+        raidWithMissingMixedDistrictReference.Issues.Any(issue =>
+            issue.Contains("reference file listed by active Mod is missing", StringComparison.OrdinalIgnoreCase) &&
+            issue.Contains("missing_raid_supply_reference.json", StringComparison.OrdinalIgnoreCase)),
+        "A missing manifest-listed district JSON must fail open in raid mode because its content could have supplied the expedition inventory.");
 
     var raidWithZeroSaveOnlyStackRoot = quantityRaidRoot.DeepClone() as JsonObject
         ?? throw new InvalidDataException("Failed to clone the zero-stack raid fixture.");
@@ -3011,6 +3502,31 @@ Assert(
         } &&
         !zeroStackRemovedItems.ContainsKey("1"),
         "A target of zero must remove a physically present zero-amount save-only stack and release its raid slot.");
+
+    var raidWithTownOnlyResidueRoot = quantityRaidRoot.DeepClone() as JsonObject
+        ?? throw new InvalidDataException("Failed to clone the town-only residue raid fixture.");
+    var raidWithTownOnlyResidueItems = (JsonObject)((JsonObject)((JsonObject)((JsonObject)
+        raidWithTownOnlyResidueRoot["base_root"]!)["party"]!)["inventory"]!)["items"]!;
+    raidWithTownOnlyResidueItems["1"] = new JsonObject
+    {
+        ["id"] = "town_only_heirloom",
+        ["type"] = "heirloom",
+        ["amount"] = 0
+    };
+    var raidWithTownOnlyResidueCatalog = QuantityItemCatalog.LoadRaid(
+        activeContent,
+        raidWithTownOnlyResidueRoot,
+        "contract-raid-town-residue-sha");
+    Assert(
+        raidWithTownOnlyResidueCatalog.Items.Single(item =>
+            item.InventoryType == "heirloom" && item.ItemId == "town_only_heirloom") is
+        {
+            ReferenceStatus: QuantityItemReferenceStatus.SuspectedUnused,
+            IsPresentInSave: true,
+            CurrentAmount: 0,
+            IsHiddenByDefault: false
+        },
+        "A town-only definition that is already present in the raid save must remain visible even at amount zero so the residue can be inspected or removed.");
 
     var (torchAdjustedRoot, torchPreview) = RaidInventorySaveEditor.SetAmount(
         quantityRaidRoot,

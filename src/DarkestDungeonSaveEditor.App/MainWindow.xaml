@@ -201,17 +201,11 @@
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
                         <ContentControl Grid.Row="0"
                                         Style="{StaticResource RedPanelHeaderStyle}"
                                         Content="选择要生成的内容" />
-                        <TextBlock x:Name="CatalogSummaryTextBlock" Grid.Row="1"
-                                   Margin="15,8,15,5"
-                                   TextAlignment="Right" TextWrapping="Wrap"
-                                   Style="{StaticResource MutedTextStyle}" />
-
-                        <Grid Grid.Row="2" Margin="14,3,14,12">
+                        <Grid Grid.Row="1" Margin="14,12,14,12">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="3*" MinWidth="140" />
@@ -245,13 +239,13 @@
                                     Click="SelectInitialQuirks_Click" />
                             <CheckBox x:Name="ShowUnusedItemsCheckBox" Grid.Column="4" Margin="12,0,0,0"
                                       VerticalAlignment="Center"
-                                      Content="显示未使用定义 (0)"
-                                      ToolTip="显示当前活动玩法入口不可达、且存档中不存在的 Mod 物品定义"
+                                      Content="显示当前场景隐藏项（0）"
+                                      ToolTip="切换为只显示当前场景默认隐藏的物品定义"
                                       Checked="ShowUnusedItemsCheckBox_Changed"
                                       Unchecked="ShowUnusedItemsCheckBox_Changed" />
                         </Grid>
 
-                        <TextBlock x:Name="InitialQuirkSelectionSummaryTextBlock" Grid.Row="3"
+                        <TextBlock x:Name="InitialQuirkSelectionSummaryTextBlock" Grid.Row="2"
                                    Margin="16,0,16,10" Foreground="{StaticResource GoldBrush}"
                                    FontWeight="SemiBold" TextWrapping="Wrap" Visibility="Collapsed" />
                     </Grid>

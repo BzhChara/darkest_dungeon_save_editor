@@ -288,6 +288,7 @@ public sealed record QuantityItemCatalogResult(
 {
     public QuantityItemSaveContext SaveContext { get; init; } = QuantityItemSaveContext.Town;
     public RaidInventoryStorageDefinition? RaidStorage { get; init; }
+    public int RaidOccupiedSlots { get; init; }
 
     // Compatibility alias for callers compiled against the original town-only catalog.
     public string SourceEstateSha256 => SourceSaveSha256;

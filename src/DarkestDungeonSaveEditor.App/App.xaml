@@ -612,24 +612,38 @@
             <Setter Property="AlternatingRowBackground" Value="#11110F" />
             <Setter Property="HorizontalGridLinesBrush" Value="#343936" />
             <Setter Property="VerticalGridLinesBrush" Value="#252A28" />
-            <Setter Property="GridLinesVisibility" Value="Horizontal" />
+            <Setter Property="GridLinesVisibility" Value="All" />
             <Setter Property="RowHeaderWidth" Value="0" />
             <Setter Property="HeadersVisibility" Value="Column" />
             <Setter Property="CanUserResizeRows" Value="False" />
             <Setter Property="AlternationCount" Value="2" />
             <Setter Property="SelectionMode" Value="Single" />
             <Setter Property="SelectionUnit" Value="FullRow" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
             <Setter Property="RowHeight" Value="38" />
             <Setter Property="ColumnHeaderHeight" Value="40" />
             <Setter Property="FontSize" Value="13.5" />
             <Setter Property="SnapsToDevicePixels" Value="True" />
+            <Setter Property="UseLayoutRounding" Value="True" />
+        </Style>
+
+        <Style x:Key="DataGridColumnHeaderGripperStyle" TargetType="Thumb">
+            <Setter Property="Width" Value="8" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Cursor" Value="SizeWE" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Thumb">
+                        <Border Background="{TemplateBinding Background}" />
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
 
         <Style TargetType="DataGridColumnHeader">
             <Setter Property="Background" Value="{StaticResource StoneBandBrush}" />
             <Setter Property="Foreground" Value="{StaticResource GoldBrush}" />
             <Setter Property="BorderBrush" Value="#565E5B" />
-            <Setter Property="BorderThickness" Value="0,0,1,1" />
             <Setter Property="Padding" Value="8,4" />
             <Setter Property="MinHeight" Value="40" />
             <Setter Property="FontFamily" Value="SimSun, Microsoft YaHei UI" />
@@ -637,6 +651,61 @@
             <Setter Property="FontWeight" Value="Bold" />
             <Setter Property="HorizontalContentAlignment" Value="Center" />
             <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="SnapsToDevicePixels" Value="True" />
+            <Setter Property="UseLayoutRounding" Value="True" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="DataGridColumnHeader">
+                        <Grid Background="{TemplateBinding Background}"
+                              SnapsToDevicePixels="True"
+                              UseLayoutRounding="True">
+                            <Grid Margin="{TemplateBinding Padding}">
+                                <ContentPresenter x:Name="HeaderContent"
+                                                  ContentSource="Content"
+                                                  HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                                  VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                                  RecognizesAccessKey="True"
+                                                  SnapsToDevicePixels="True" />
+                                <Path x:Name="SortArrow"
+                                      Width="8" Height="5" Margin="0,3,3,0"
+                                      HorizontalAlignment="Right" VerticalAlignment="Top"
+                                      Fill="{TemplateBinding Foreground}"
+                                      Data="M 0,5 L 4,0 L 8,5 Z"
+                                      Stretch="Fill" Visibility="Collapsed"
+                                      IsHitTestVisible="False" />
+                            </Grid>
+                            <!-- Draw the divider inside the following header. A trailing-edge
+                                 line can be clipped when star columns are remeasured after load. -->
+                            <Rectangle x:Name="HeaderLeadingSeparator"
+                                       Width="1" HorizontalAlignment="Left"
+                                       Fill="{TemplateBinding BorderBrush}"
+                                       SnapsToDevicePixels="True"
+                                       IsHitTestVisible="False" />
+                            <Rectangle x:Name="HeaderBottomSeparator"
+                                       Height="1" VerticalAlignment="Bottom"
+                                       Fill="{TemplateBinding BorderBrush}"
+                                       SnapsToDevicePixels="True"
+                                       IsHitTestVisible="False" />
+                            <Thumb x:Name="PART_LeftHeaderGripper"
+                                   HorizontalAlignment="Left"
+                                   Style="{StaticResource DataGridColumnHeaderGripperStyle}" />
+                            <Thumb x:Name="PART_RightHeaderGripper"
+                                   HorizontalAlignment="Right"
+                                   Style="{StaticResource DataGridColumnHeaderGripperStyle}" />
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="SortDirection" Value="Ascending">
+                                <Setter TargetName="SortArrow" Property="Visibility" Value="Visible" />
+                                <Setter TargetName="SortArrow" Property="Data" Value="M 0,5 L 4,0 L 8,5 Z" />
+                            </Trigger>
+                            <Trigger Property="SortDirection" Value="Descending">
+                                <Setter TargetName="SortArrow" Property="Visibility" Value="Visible" />
+                                <Setter TargetName="SortArrow" Property="Data" Value="M 0,0 L 4,5 L 8,0 Z" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
 
         <Style x:Key="DataGridTextElementStyle" TargetType="TextBlock">
@@ -648,8 +717,9 @@
 
         <Style TargetType="DataGridCell">
             <Setter Property="Background" Value="Transparent" />
-            <Setter Property="BorderBrush" Value="#252A28" />
-            <Setter Property="BorderThickness" Value="0,0,1,0" />
+            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
             <Setter Property="Padding" Value="9,0" />
             <Setter Property="FocusVisualStyle" Value="{x:Null}" />
             <Setter Property="HorizontalContentAlignment" Value="Stretch" />
@@ -659,8 +729,6 @@
                     <ControlTemplate TargetType="DataGridCell">
                         <Border x:Name="CellChrome"
                                 Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}"
                                 Padding="{TemplateBinding Padding}"
                                 SnapsToDevicePixels="True">
                             <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
@@ -670,6 +738,11 @@
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Foreground" Value="#FFF8EC" />
+                </Trigger>
+            </Style.Triggers>
         </Style>
 
         <Style TargetType="DataGridRow">
@@ -677,6 +750,7 @@
             <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
                     <Setter Property="Background" Value="{StaticResource SurfaceHoverBrush}" />

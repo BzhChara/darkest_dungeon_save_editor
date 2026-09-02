@@ -33,6 +33,7 @@ internal static partial class QuantityItemReferenceAnalyzer
     public static IReadOnlyDictionary<string, QuantityItemReferenceAnalysis> Analyze(
         ActiveContentSnapshot activeContent,
         IReadOnlyList<QuantityItemDefinition> definitions,
+        QuantityItemSaveContext saveContext,
         List<string> issues)
     {
         ArgumentNullException.ThrowIfNull(activeContent);
@@ -45,7 +46,17 @@ internal static partial class QuantityItemReferenceAnalyzer
         var lootTables = new Dictionary<string, LootTableNode>(StringComparer.OrdinalIgnoreCase);
         var rootLootEvidence = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
         var scanComplete = true;
-        var files = LoadEffectiveFiles(activeContent, issues, ref scanComplete);
+        var files = LoadEffectiveFiles(activeContent, saveContext, issues, ref scanComplete);
+
+        foreach (var definition in definitions.Where(definition => definition.EstateCanBeProvision == true))
+        {
+            AddEvidence(
+                activeEvidence,
+                definition.CatalogKey,
+                saveContext == QuantityItemSaveContext.Town
+                    ? "物品定义明确允许从庄园库存手动配给"
+                    : "物品定义明确允许从庄园配给进副本");
+        }
 
         foreach (var file in files.Where(file => file.IsLootFile))
         {
@@ -58,6 +69,7 @@ internal static partial class QuantityItemReferenceAnalyzer
                 file,
                 index,
                 lootTables.Keys,
+                saveContext,
                 activeEvidence,
                 rootLootEvidence,
                 incompleteEvidence,
@@ -102,7 +114,9 @@ internal static partial class QuantityItemReferenceAnalyzer
 
             result[definition.CatalogKey] = new QuantityItemReferenceAnalysis(
                 QuantityItemReferenceStatus.SuspectedUnused,
-                ["未发现从活动技能、英雄、怪物、任务、事件、建筑、配给或掉落入口可达的引用"]);
+                [saveContext == QuantityItemSaveContext.Raid
+                    ? "未发现从活动配给、技能、英雄、怪物、任务、场景或掉落入口进入副本的引用"
+                    : "未发现从活动事件、建筑、配给、任务、掉落或其他小镇持久化入口可达的引用"]);
         }
 
         return result;
@@ -110,6 +124,7 @@ internal static partial class QuantityItemReferenceAnalyzer
 
     private static IReadOnlyList<ScannedContentFile> LoadEffectiveFiles(
         ActiveContentSnapshot activeContent,
+        QuantityItemSaveContext saveContext,
         List<string> issues,
         ref bool scanComplete)
     {
@@ -119,7 +134,12 @@ internal static partial class QuantityItemReferenceAnalyzer
         {
             try
             {
-                AuditManifestReferenceFiles(source, enabledDlcPrefixes, issues, ref scanComplete);
+                AuditManifestReferenceFiles(
+                    source,
+                    enabledDlcPrefixes,
+                    saveContext,
+                    issues,
+                    ref scanComplete);
                 foreach (var path in EnumerateCandidateFiles(source, enabledDlcPrefixes))
                 {
                     candidates.Add(new ContentFileCandidate(source, path));
@@ -149,8 +169,11 @@ internal static partial class QuantityItemReferenceAnalyzer
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or DecoderFallbackException)
             {
-                scanComplete = false;
-                issues.Add($"Failed to read quantity-item reference file '{file.Path}': {ex.Message}");
+                if (ReferencePathCanAffectContext(file.RelativePath, saveContext))
+                {
+                    scanComplete = false;
+                    issues.Add($"Failed to read quantity-item reference file '{file.Path}': {ex.Message}");
+                }
             }
         }
 
@@ -160,6 +183,7 @@ internal static partial class QuantityItemReferenceAnalyzer
     private static void AuditManifestReferenceFiles(
         ActiveContentSource source,
         IReadOnlyList<string> enabledDlcPrefixes,
+        QuantityItemSaveContext saveContext,
         List<string> issues,
         ref bool scanComplete)
     {
@@ -189,6 +213,7 @@ internal static partial class QuantityItemReferenceAnalyzer
                 !ContentDirectories.Any(directory =>
                     ContentFileOverlay.IsRootOrEnabledDlcPath(normalized, directory, enabledDlcPrefixes)) ||
                 IsDefinitionOnlyPath(normalized) ||
+                !ReferencePathCanAffectContext(normalized, saveContext) ||
                 File.Exists(path) ||
                 !reported.Add(path))
             {
@@ -295,6 +320,113 @@ internal static partial class QuantityItemReferenceAnalyzer
         var normalized = $"/{relativePath.Replace('\\', '/').Trim('/')}";
         return normalized.Contains("/loot/", StringComparison.OrdinalIgnoreCase) ||
                normalized.EndsWith(".loot.json", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool ReferencePathCanAffectContext(
+        string relativePath,
+        QuantityItemSaveContext saveContext)
+    {
+        return IsLootPath(relativePath) ||
+               IsReachableInContext(GetDefaultReachability(relativePath), saveContext) ||
+               saveContext == QuantityItemSaveContext.Town &&
+               MayContainTownReachabilityOverride(relativePath) ||
+               saveContext == QuantityItemSaveContext.Raid &&
+               MayContainRaidReachabilityOverride(relativePath);
+    }
+
+    private static bool MayContainTownReachabilityOverride(string relativePath)
+    {
+        // JSON roots outside the town directories can still contain currency_cost,
+        // event_cost, currencies, or explicit estate/wallet inventory targets. If such
+        // a file cannot be inspected, fail open instead of hiding town-side definitions.
+        return Path.GetExtension(relativePath).Equals(".json", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool MayContainRaidReachabilityOverride(string relativePath)
+    {
+        var normalized = $"/{relativePath.Replace('\\', '/').Trim('/')}";
+        return normalized.Contains("/campaign/town/district", StringComparison.OrdinalIgnoreCase) &&
+               normalized.EndsWith(".json", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static ReferenceReachability GetDefaultReachability(string relativePath)
+    {
+        var normalized = $"/{relativePath.Replace('\\', '/').Trim('/')}";
+        if (normalized.Contains("/campaign/provision/", StringComparison.OrdinalIgnoreCase) ||
+            normalized.Contains("/campaign/town/provision/", StringComparison.OrdinalIgnoreCase))
+        {
+            return ReferenceReachability.RaidCapable;
+        }
+
+        return normalized.Contains("/campaign/town_events/", StringComparison.OrdinalIgnoreCase) ||
+               normalized.Contains("/campaign/estate/", StringComparison.OrdinalIgnoreCase) ||
+               normalized.Contains("/campaign/town/", StringComparison.OrdinalIgnoreCase) ||
+               normalized.Contains("/upgrades/", StringComparison.OrdinalIgnoreCase)
+            ? ReferenceReachability.TownOnly
+            : ReferenceReachability.RaidCapable;
+    }
+
+    private static ReferenceReachability GetJsonReachability(
+        JsonElement node,
+        string parentProperty,
+        ReferenceReachability inherited)
+    {
+        if (parentProperty.Equals("currency_cost", StringComparison.OrdinalIgnoreCase) ||
+            parentProperty.Equals("currencies", StringComparison.OrdinalIgnoreCase) ||
+            parentProperty.Equals("quest_fail_keep_rates", StringComparison.OrdinalIgnoreCase))
+        {
+            return ReferenceReachability.TownOnly;
+        }
+
+        var type = ReadString(node, "type");
+        if (type.Equals("bonus_currency", StringComparison.OrdinalIgnoreCase) ||
+            type.Equals("event_cost", StringComparison.OrdinalIgnoreCase))
+        {
+            return ReferenceReachability.TownOnly;
+        }
+
+        var targetInventory = ReadString(node, "target_inventory");
+        if (targetInventory.Equals("provision", StringComparison.OrdinalIgnoreCase) ||
+            targetInventory.Equals("raid", StringComparison.OrdinalIgnoreCase))
+        {
+            return ReferenceReachability.RaidCapable;
+        }
+
+        if (targetInventory.Equals("estate", StringComparison.OrdinalIgnoreCase) ||
+            targetInventory.Equals("wallet", StringComparison.OrdinalIgnoreCase))
+        {
+            return ReferenceReachability.TownOnly;
+        }
+
+        if (type.Equals("DistrictReplacementInventoryEffectBuffData", StringComparison.OrdinalIgnoreCase))
+        {
+            return ReferenceReachability.RaidCapable;
+        }
+
+        if (type.Equals("DistrictSupplyBuffData", StringComparison.OrdinalIgnoreCase))
+        {
+            var itemType = ReadString(node, "item_type");
+            if (itemType.Equals("supply", StringComparison.OrdinalIgnoreCase) ||
+                itemType.Equals("provision", StringComparison.OrdinalIgnoreCase) ||
+                itemType.Equals("quest_item", StringComparison.OrdinalIgnoreCase))
+            {
+                return ReferenceReachability.RaidCapable;
+            }
+        }
+
+        return inherited;
+    }
+
+    private static bool IsReachableInContext(
+        ReferenceReachability reachability,
+        QuantityItemSaveContext saveContext)
+    {
+        return saveContext switch
+        {
+            QuantityItemSaveContext.Town => reachability == ReferenceReachability.TownOnly,
+            QuantityItemSaveContext.Raid => reachability == ReferenceReachability.RaidCapable,
+            _ => false
+        };
     }
 
     private static bool ParseLootFile(
@@ -406,11 +538,13 @@ internal static partial class QuantityItemReferenceAnalyzer
         ScannedContentFile file,
         QuantityItemIndex index,
         IEnumerable<string> knownLootTables,
+        QuantityItemSaveContext saveContext,
         Dictionary<string, List<string>> activeEvidence,
         Dictionary<string, List<string>> rootLootEvidence,
         Dictionary<string, List<string>> incompleteEvidence,
         List<string> issues)
     {
+        var defaultReachability = GetDefaultReachability(file.File.RelativePath);
         var extension = Path.GetExtension(file.File.Path);
         if (extension.Equals(".json", StringComparison.OrdinalIgnoreCase))
         {
@@ -423,10 +557,17 @@ internal static partial class QuantityItemReferenceAnalyzer
                         string.Empty,
                         file.File.RelativePath,
                         index,
+                        saveContext,
+                        defaultReachability,
                         activeEvidence,
                         rootLootEvidence);
                 }
 
+                return true;
+            }
+
+            if (!ReferencePathCanAffectContext(file.File.RelativePath, saveContext))
+            {
                 return true;
             }
 
@@ -446,13 +587,20 @@ internal static partial class QuantityItemReferenceAnalyzer
 
         if (extension.Equals(".darkest", StringComparison.OrdinalIgnoreCase))
         {
-            ParseDarkestRoot(file, index, activeEvidence, rootLootEvidence);
+            if (IsReachableInContext(defaultReachability, saveContext))
+            {
+                ParseDarkestRoot(file, index, activeEvidence, rootLootEvidence);
+            }
+
             return true;
         }
 
         if (extension.Equals(".csv", StringComparison.OrdinalIgnoreCase))
         {
-            ParseCsvRoot(file, index, knownLootTables, activeEvidence, rootLootEvidence);
+            if (IsReachableInContext(defaultReachability, saveContext))
+            {
+                ParseCsvRoot(file, index, knownLootTables, activeEvidence, rootLootEvidence);
+            }
         }
 
         return true;
@@ -463,6 +611,8 @@ internal static partial class QuantityItemReferenceAnalyzer
         string parentProperty,
         string relativePath,
         QuantityItemIndex index,
+        QuantityItemSaveContext saveContext,
+        ReferenceReachability inheritedReachability,
         Dictionary<string, List<string>> activeEvidence,
         Dictionary<string, List<string>> rootLootEvidence)
     {
@@ -470,7 +620,15 @@ internal static partial class QuantityItemReferenceAnalyzer
         {
             foreach (var child in node.EnumerateArray())
             {
-                VisitRootJson(child, parentProperty, relativePath, index, activeEvidence, rootLootEvidence);
+                VisitRootJson(
+                    child,
+                    parentProperty,
+                    relativePath,
+                    index,
+                    saveContext,
+                    inheritedReachability,
+                    activeEvidence,
+                    rootLootEvidence);
             }
 
             return;
@@ -481,37 +639,45 @@ internal static partial class QuantityItemReferenceAnalyzer
             return;
         }
 
-        var type = ReadString(node, "type");
-        var id = ReadString(node, "id");
-        MarkResolved(index.Resolve(type, id), activeEvidence, relativePath);
-
-        var itemType = ReadString(node, "item_type");
-        var itemName = ReadString(node, "item_name");
-        MarkResolved(index.Resolve(itemType, itemName), activeEvidence, relativePath);
-
-        if (type.Equals("bonus_currency", StringComparison.OrdinalIgnoreCase))
+        var reachability = GetJsonReachability(node, parentProperty, inheritedReachability);
+        if (IsReachableInContext(reachability, saveContext))
         {
-            MarkResolved(index.ResolveIdentity(ReadString(node, "string_data")), activeEvidence, relativePath);
-        }
+            var type = ReadString(node, "type");
+            var id = ReadString(node, "id");
+            MarkResolved(index.Resolve(type, id), activeEvidence, relativePath);
 
-        if (type.Equals("loot", StringComparison.OrdinalIgnoreCase))
-        {
-            AddEvidence(rootLootEvidence, ReadString(node, "sub_type"), relativePath);
-        }
+            var itemType = ReadString(node, "item_type");
+            var itemName = ReadString(node, "item_name");
+            MarkResolved(index.Resolve(itemType, itemName), activeEvidence, relativePath);
 
-        foreach (var field in new[] { "loot_table_code", "loot_table", "loot_code" })
-        {
-            AddEvidence(rootLootEvidence, ReadString(node, field), relativePath);
-        }
+            if (type.Equals("bonus_currency", StringComparison.OrdinalIgnoreCase) ||
+                type.Equals("event_cost", StringComparison.OrdinalIgnoreCase))
+            {
+                MarkResolved(
+                    index.ResolveIdentity(ReadString(node, "string_data")),
+                    activeEvidence,
+                    relativePath);
+            }
 
-        foreach (var field in new[] { "item_id", "currency_id" })
-        {
-            MarkResolved(index.ResolveIdentity(ReadString(node, field)), activeEvidence, relativePath);
-        }
+            if (type.Equals("loot", StringComparison.OrdinalIgnoreCase))
+            {
+                AddEvidence(rootLootEvidence, ReadString(node, "sub_type"), relativePath);
+            }
 
-        if (parentProperty.Equals("currencies", StringComparison.OrdinalIgnoreCase))
-        {
-            MarkResolved(index.ResolveIdentity(id), activeEvidence, relativePath);
+            foreach (var field in new[] { "loot_table_code", "loot_table", "loot_code" })
+            {
+                AddEvidence(rootLootEvidence, ReadString(node, field), relativePath);
+            }
+
+            foreach (var field in new[] { "item_id", "currency_id" })
+            {
+                MarkResolved(index.ResolveIdentity(ReadString(node, field)), activeEvidence, relativePath);
+            }
+
+            if (parentProperty.Equals("currencies", StringComparison.OrdinalIgnoreCase))
+            {
+                MarkResolved(index.ResolveIdentity(id), activeEvidence, relativePath);
+            }
         }
 
         foreach (var property in node.EnumerateObject())
@@ -521,6 +687,8 @@ internal static partial class QuantityItemReferenceAnalyzer
                 property.Name,
                 relativePath,
                 index,
+                saveContext,
+                reachability,
                 activeEvidence,
                 rootLootEvidence);
         }
@@ -820,6 +988,12 @@ internal static partial class QuantityItemReferenceAnalyzer
         EffectiveContentFile File,
         string Text,
         bool IsLootFile);
+
+    private enum ReferenceReachability
+    {
+        TownOnly,
+        RaidCapable
+    }
 
     private sealed class LootTableNode
     {
