@@ -110,7 +110,11 @@ public static partial class QuantityItemCatalog
                 group => SumAmounts(group.Select(entry => entry.Amount), group.Key),
                 StringComparer.OrdinalIgnoreCase);
 
-        var referenceAnalysis = QuantityItemReferenceAnalyzer.Analyze(activeContent, definitions, issues);
+        var referenceAnalysis = QuantityItemReferenceAnalyzer.Analyze(
+            activeContent,
+            definitions,
+            QuantityItemSaveContext.Town,
+            issues);
         var merged = new List<QuantityItemDefinition>(definitions.Count + savedEntries.Count);
         foreach (var definition in definitions)
         {
@@ -186,6 +190,12 @@ public static partial class QuantityItemCatalog
         ArgumentNullException.ThrowIfNull(activeContent);
         ArgumentNullException.ThrowIfNull(raidRoot);
         var issues = new List<string>();
+        var occupiedSlots = JsonSupport.RequireObject(
+            raidRoot,
+            "base_root",
+            "party",
+            "inventory",
+            "items").Count;
         var definitions = LoadDefinitions(activeContent, QuantityItemSaveContext.Raid, issues);
         var savedEntries = ReadSavedRaidEntries(raidRoot, issues);
         var savedEntryCounts = savedEntries
@@ -197,7 +207,11 @@ public static partial class QuantityItemCatalog
                 group => group.Key,
                 group => SumAmounts(group.Select(entry => entry.Amount), group.Key),
                 StringComparer.OrdinalIgnoreCase);
-        var referenceAnalysis = QuantityItemReferenceAnalyzer.Analyze(activeContent, definitions, issues);
+        var referenceAnalysis = QuantityItemReferenceAnalyzer.Analyze(
+            activeContent,
+            definitions,
+            QuantityItemSaveContext.Raid,
+            issues);
         var merged = new List<QuantityItemDefinition>(definitions.Count + savedEntries.Count);
         foreach (var definition in definitions)
         {
@@ -263,7 +277,8 @@ public static partial class QuantityItemCatalog
             sourceRaidSha256)
         {
             SaveContext = QuantityItemSaveContext.Raid,
-            RaidStorage = raidStorage.Storage
+            RaidStorage = raidStorage.Storage,
+            RaidOccupiedSlots = occupiedSlots
         };
     }
 

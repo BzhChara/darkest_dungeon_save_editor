@@ -239,34 +239,53 @@ public partial class MainWindow : Window
             PopulateHeroLevels(catalogs.Heroes);
             _catalogProfileDirectory = profile.ProfileDirectory;
             _catalogGameSaveSha256 = activeContent.SourceGameSha256;
-            _catalogEstateSaveSha256 = ComputeSha256(profile.EstateSavePath);
+            var estateSaveSha256 = ComputeSha256(profile.EstateSavePath);
+            _catalogEstateSaveSha256 = estateSaveSha256;
             _catalogQuantitySaveSha256 = quantityItems.SourceSaveSha256;
             _quantitySaveContext = quantityItems.SaveContext;
             ItemTab.Header = _quantitySaveContext == QuantityItemSaveContext.Raid
                 ? "副本背包  /  RAID ITEMS"
                 : "小镇物品  /  ESTATE ITEMS";
             CrashDiagnostics.SetStage("LoadCatalog: populating visible rows");
+            UpdateCatalogMode();
             ApplyFilter();
-            CrashDiagnostics.SetStage("LoadCatalog: updating summary");
-            var hiddenUnusedItemCount = _allItems.Count(item => item.IsHiddenByDefault);
-            var defaultVisibleItemCount = _allItems.Count - hiddenUnusedItemCount;
-            UpdateCatalogSummary();
+            CrashDiagnostics.SetStage("LoadCatalog: recording catalog diagnostics");
+            var hiddenItemCount = _allItems.Count(item => item.IsHiddenByDefault);
+            var defaultVisibleItemCount = _allItems.Count - hiddenItemCount;
             var issues = activeContent.Issues
                 .Concat(quantityItems.Issues)
                 .Concat(catalogs.Trinkets.Issues)
                 .Concat(catalogs.Heroes.Issues)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToArray();
+            var quantitySourcePath = _quantitySaveContext == QuantityItemSaveContext.Raid
+                ? Path.Combine(profile.ProfileDirectory, "persist.raid.json")
+                : profile.EstateSavePath;
+            CrashDiagnostics.RecordStatus(
+                $"内容目录数量快照：场景={FormatQuantitySaveContext(_quantitySaveContext)}；" +
+                $"数量来源文件={Path.GetFullPath(quantitySourcePath)}；" +
+                $"SHA-256={quantityItems.SourceSaveSha256}" +
+                (_quantitySaveContext == QuantityItemSaveContext.Raid
+                    ? $"；persist.estate.json SHA-256={estateSaveSha256}"
+                    : string.Empty));
             AppendStatus(
-                $"内容目录完成：档案记录启用 Mod {activeContent.AppliedModCount} 个，" +
-                $"成功解析来源 {activeContent.Sources.Count} 个、" +
-                $"{FormatQuantitySaveContext(_quantitySaveContext)}可计数物品 {defaultVisibleItemCount} 个" +
-                (hiddenUnusedItemCount == 0 ? "、" : $"（未使用定义 {hiddenUnusedItemCount} 个默认隐藏）、") +
-                $"饰品 {_allTrinkets.Count} 个、" +
-                $"仓库槽位 {FormatStorageCapacity(_trinketStorage)}、" +
-                $"人物 {_allHeroes.Count} 个（其中 {_allHeroes.Count(item => item.RecruitEvents.Count > 0)} 个有招募事件，" +
-                $"{_allHeroes.Count(item => item.RuntimeQuirkSignals.Count > 0)} 个有后续玩法怪癖线索；这些线索不是初始怪癖）。" +
-                (issues.Length == 0 ? string.Empty : $" 读取提示 {issues.Length} 条。"));
+                $"目录加载完成：档案 {profile.ProfileId}；模式 {catalogs.Heroes.GameMode}；" +
+                $"档案启用 Mod {activeContent.AppliedModCount} 个；活动来源 {activeContent.Sources.Count} 个；" +
+                $"读取提示 {issues.Length} 条。");
+            AppendStatus(
+                $"目录统计：{FormatQuantitySaveContext(_quantitySaveContext)}物品 {defaultVisibleItemCount} 个" +
+                $"（当前场景隐藏项 {hiddenItemCount} 个）" +
+                (_quantitySaveContext == QuantityItemSaveContext.Raid
+                    ? $"；副本格位 {quantityItems.RaidOccupiedSlots}/" +
+                      $"{FormatRaidInventoryCapacity(_raidInventoryStorage)}"
+                    : string.Empty) +
+                $"；饰品 {_allTrinkets.Count} 个；仓库槽位 {FormatStorageCapacity(_trinketStorage)}；" +
+                $"人物 {_allHeroes.Count} 个；怪癖定义 {catalogs.Heroes.InitialQuirks.Count} 个；" +
+                $"姓名 {catalogs.Heroes.HeroNames.Count} 个；" +
+                $"等级 0-{Math.Max(0, catalogs.Heroes.ResolveLevelThresholds.Count - 1)}。" +
+                $" 人物线索：有招募事件的人物 {_allHeroes.Count(item => item.RecruitEvents.Count > 0)} 个；" +
+                $"有后续玩法怪癖线索的人物 {_allHeroes.Count(item => item.RuntimeQuirkSignals.Count > 0)} 个" +
+                "（不作为初始怪癖）。");
             var issueMessages = issues
                 .Select(issue => $"目录提示：{issue}")
                 .ToArray();
@@ -336,8 +355,9 @@ public partial class MainWindow : Window
     private void ApplyFilter()
     {
         var keyword = SearchTextBox.Text.Trim();
+        var showHiddenItemsOnly = ShowUnusedItemsCheckBox.IsChecked == true;
         var filteredItems = _allItems.Where(definition =>
-            (!definition.IsHiddenByDefault || ShowUnusedItemsCheckBox.IsChecked == true) &&
+            definition.IsHiddenByDefault == showHiddenItemsOnly &&
             (string.IsNullOrWhiteSpace(keyword) ||
              definition.DisplayId.Contains(keyword, StringComparison.OrdinalIgnoreCase) ||
              definition.InventoryType.Contains(keyword, StringComparison.OrdinalIgnoreCase) ||
@@ -380,32 +400,6 @@ public partial class MainWindow : Window
         {
             _visibleHeroes.Add(new HeroRow(definition));
         }
-    }
-
-    private void UpdateCatalogSummary()
-    {
-        if (_activeContentSnapshot is null || _heroCatalog is null)
-        {
-            CatalogSummaryTextBlock.Text = string.Empty;
-            return;
-        }
-
-        var hiddenUnusedItemCount = _allItems.Count(item => item.IsHiddenByDefault);
-        var defaultVisibleItemCount = _allItems.Count - hiddenUnusedItemCount;
-        CatalogSummaryTextBlock.Text =
-            $"模式 {_heroCatalog.GameMode}；活动来源 {_activeContentSnapshot.Sources.Count} 个；" +
-            $"物品场景 {FormatQuantitySaveContext(_quantitySaveContext)}；" +
-            $"可计数物品 {defaultVisibleItemCount} 个" +
-            (hiddenUnusedItemCount == 0 ? "；" : $"（另有未使用定义 {hiddenUnusedItemCount} 个默认隐藏）；") +
-            (_quantitySaveContext == QuantityItemSaveContext.Raid
-                ? $"副本背包 {_allItems.Where(item => item.IsPresentInSave).Sum(item => item.SavedEntryCount)}/" +
-                  $"{FormatRaidInventoryCapacity(_raidInventoryStorage)} 格；"
-                : string.Empty) +
-            $"饰品 {_allTrinkets.Count} 个；" +
-            $"仓库槽位 {FormatStorageCapacity(_trinketStorage)}；" +
-            $"人物 {_allHeroes.Count} 个，怪癖定义 {_heroCatalog.InitialQuirks.Count} 个，" +
-            $"姓名 {_heroCatalog.HeroNames.Count} 个；" +
-            $"等级 0-{Math.Max(0, _heroCatalog.ResolveLevelThresholds.Count - 1)}";
     }
 
     private async void Preview_Click(object sender, RoutedEventArgs e)
@@ -665,15 +659,13 @@ public partial class MainWindow : Window
         var definitionLimitWarning = string.IsNullOrWhiteSpace(definitionLimitWarningText)
             ? string.Empty
             : $"\n\n注意：\n{definitionLimitWarningText}";
-        var confirmation = MessageBox.Show(
+        var confirmation = ThemedDialog.Confirm(
+            this,
             $"将对以下档案执行：{changeSummary}\n\n" +
             $"{profileDirectory}" + definitionLimitWarning + "\n\n" +
             "程序会先完整备份当前档案。确认游戏已经关闭并继续吗？",
-            "确认应用存档修改",
-            MessageBoxButton.YesNo,
-            MessageBoxImage.Warning,
-            MessageBoxResult.No);
-        if (confirmation != MessageBoxResult.Yes)
+            "确认应用存档修改");
+        if (!confirmation)
         {
             AppendStatus("已取消应用，真实存档未修改。");
             return;
@@ -729,21 +721,20 @@ public partial class MainWindow : Window
                     .ToArray();
                 ApplyFilter();
                 UpdateCatalogMode();
-                UpdateCatalogSummary();
             }
 
             AppendStatus($"应用成功。备份：{backupDirectory}");
-            MessageBox.Show(
+            ThemedDialog.ShowMessage(
+                this,
                 $"存档修改成功。\n\n备份目录：\n{backupDirectory}",
                 "完成",
-                MessageBoxButton.OK,
-                MessageBoxImage.Information);
+                ThemedDialogKind.Information);
             InvalidatePreparedEdit();
         }
         catch (Exception ex)
         {
             AppendStatus($"应用失败：{ex.Message}");
-            MessageBox.Show(ex.Message, "应用失败", MessageBoxButton.OK, MessageBoxImage.Error);
+            ThemedDialog.ShowMessage(this, ex.Message, "应用失败", ThemedDialogKind.Error);
         }
         finally
         {
@@ -915,14 +906,10 @@ public partial class MainWindow : Window
         {
             HeroGrid.SelectedItem = null;
         }
-        if (CatalogSummaryTextBlock is not null)
-        {
-            CatalogSummaryTextBlock.Text = string.Empty;
-        }
         if (ShowUnusedItemsCheckBox is not null)
         {
             ShowUnusedItemsCheckBox.IsChecked = false;
-            ShowUnusedItemsCheckBox.Content = "显示未使用定义 (0)";
+            ShowUnusedItemsCheckBox.Content = "显示当前场景隐藏项（0）";
         }
         if (PreviewButton is not null)
         {
@@ -1073,7 +1060,7 @@ public partial class MainWindow : Window
         ShowUnusedItemsCheckBox.Visibility = isItemTab ? Visibility.Visible : Visibility.Collapsed;
         ShowUnusedItemsCheckBox.IsEnabled = isItemTab && _allItems.Count > 0 && CatalogTabs.IsEnabled;
         ShowUnusedItemsCheckBox.Content =
-            $"显示未使用定义 ({_allItems.Count(item => item.IsHiddenByDefault)})";
+            $"显示当前场景隐藏项（{_allItems.Count(item => item.IsHiddenByDefault)}）";
         InitialQuirkSelectionSummaryTextBlock.Visibility = isHeroTab ? Visibility.Visible : Visibility.Collapsed;
         InitialQuirksButton.IsEnabled = isHeroTab &&
             _heroCatalog is not null &&
@@ -1202,9 +1189,9 @@ public partial class MainWindow : Window
 
         return definition.EstateCanBeProvision switch
         {
-            true => "庄园物品 / 可配给进副本",
-            false => "庄园物品 / 不可配给进副本",
-            null => "庄园物品 / 配给规则未声明"
+            true => "庄园库存 / 可手动配给",
+            false => "庄园库存 / 不可手动配给",
+            null => "庄园库存 / 手动配给未声明"
         };
     }
 
@@ -1224,8 +1211,8 @@ public partial class MainWindow : Window
 
         return definition.EstateCanBeProvision switch
         {
-            false => "该物品不可从庄园携入远征。",
-            null => "该物品能否从庄园携入远征尚未确认。",
+            false => "该庄园库存不可手动配给；人物自带或副本中生成的数量不受本次修改影响。",
+            null => "这里只修改小镇庄园库存；是否可手动配给未声明，且不会直接修改副本背包。",
             true => string.Empty
         };
     }

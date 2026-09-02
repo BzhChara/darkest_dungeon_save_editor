@@ -2,7 +2,7 @@
 
 This document records the Darkest Dungeon Save Editor's accepted visual direction, historical failures, technical fixes, and regression checks. Chat screenshots and temporary render workspaces remain historical analysis material; durable conclusions must be reproducible from tracked assets, code, or tests.
 
-- Last updated: 2026-09-01
+- Last updated: 2026-09-02
 - Target window: 1440 × 900
 - Minimum window: 1120 × 720
 - Current status: the user confirmed the title animation, readability, and stable wordmark as normal; the new native-frame and full-window texture changes still require the user's visual acceptance
@@ -70,7 +70,9 @@ The relevant assertions live in [ContractTests/Program.cs](../tests/DarkestDunge
 - The first tab is `小镇物品 / ESTATE ITEMS` or `副本背包 / RAID ITEMS` after catalog load (and the neutral `物品 / ITEMS` before load); it remains left of `饰品 / TRINKETS` and `人物 / HEROES`. All three headers are centered, equally sized, and fully visible.
 - Catalog content is top-left aligned. A filter yielding fewer results must not recenter the result grid.
 - Row text is vertically centered. ID, bilingual names, source, and operation-relevant state take priority.
-- The `English` / `位置 / 类型 / 堆叠` boundary in the item catalog and the `来源` / `生成方式` boundary in the hero catalog use the same one-pixel column separator as every other catalog boundary; they are not emphasized as section dividers.
+- Selecting an item, trinket, hero, or quirk uses only the full-row red fill. Cell, row, and keyboard-focus outlines must not add a white or gold frame; automatic gridlines remain visible.
+- The `English` / `位置 / 类型 / 堆叠` boundary in the item catalog and the `来源` / `生成方式` boundary in the hero catalog use the same one-pixel separator as every other catalog boundary. Body cells use the automatic DataGrid gridline; every column header draws the shared fixed separator on its leading inside edge so star-column remeasurement, loading rows, hovering, sorting, and resizing cannot clip a header-only gap. These boundaries are not emphasized as section dividers.
+- Catalog totals do not occupy a summary line above the controls. After loading, the runtime log records a concise load summary and a separate content-count summary; raid occupied-slot counts include every saved inventory entry, including carried trinkets that the quantity catalog intentionally does not expose. The persistent log additionally records the selected profile path and hashes for the game and active town/raid quantity saves.
 - Low-frequency diagnostics such as state shape and definition conflict should not crowd out primary fields; use tooltips or the risk panel.
 - Preview/write buttons stay near the relevant catalog action area rather than inside an otherwise empty titled panel.
 - The runtime-log header stays concise and does not repeat the log-directory explanation.
@@ -92,6 +94,16 @@ The relevant assertions live in [ContractTests/Program.cs](../tests/DarkestDunge
 - The two quirk information panels suppress redundant outer separators; their title bands provide hierarchy.
 - `自然怪癖范围` is rendered as `正面 n–m / 负面 n–m`, not the ambiguous `+1-2 -1-2` shorthand.
 - Hero generation status uses `游戏自然 / 编辑器手动`, `仅编辑器手动`, or `自然状态未知 / 编辑器手动`; an absent flag is not treated as proof of natural generation.
+
+### 3.4 Application dialogs
+
+- Confirmation, success, and failure messages use the application's square dark double frame instead of the default Windows `MessageBox` surface.
+- The message body uses an original, subdued parchment texture with dark text and no additional nested frame; the header marker is also unboxed.
+- The footer contains only the required actions. Do not add a lower-left Enter/Escape helper or another framed footer region.
+- Destructive save confirmation defaults to `返回`: pressing Enter without moving focus must not approve a write. Escape also returns without writing.
+- Informational dialogs expose one `知道了` action and support both Enter and Escape.
+- Long messages scroll inside the parchment surface instead of growing beyond the display.
+- The native folder picker remains an operating-system dialog because it provides filesystem navigation rather than an in-application message.
 
 ## 4. Historical evidence and reproducibility
 
