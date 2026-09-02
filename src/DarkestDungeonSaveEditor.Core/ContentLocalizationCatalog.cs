@@ -10,6 +10,7 @@ internal sealed class ContentLocalizationCatalog
 {
     private const string HeroClassPrefix = "hero_class_name_";
     private const string QuirkPrefix = "str_quirk_name_";
+    private const string InventoryTitlePrefix = "str_inventory_title_";
     private const string TrinketPrefix = "str_inventory_title_trinket";
     private readonly IReadOnlyDictionary<string, BilingualContentName> _entries;
 
@@ -36,12 +37,35 @@ internal sealed class ContentLocalizationCatalog
             string.IsNullOrWhiteSpace(canonical.English) ? alternate.English : canonical.English);
     }
 
+    public BilingualContentName GetInventoryItemName(string type, string id)
+    {
+        var keys = GetInventoryItemKeys(type, id);
+        var result = BilingualContentName.Empty;
+        foreach (var key in keys)
+        {
+            var candidate = Get(key);
+            result = new BilingualContentName(
+                string.IsNullOrWhiteSpace(result.Chinese) ? candidate.Chinese : result.Chinese,
+                string.IsNullOrWhiteSpace(result.English) ? candidate.English : result.English);
+        }
+
+        return result;
+    }
+
     internal static string GetHeroClassKey(string id) => HeroClassPrefix + id;
 
     internal static string GetQuirkKey(string id) => QuirkPrefix + id;
 
     internal static IReadOnlyList<string> GetTrinketKeys(string id) =>
         [TrinketPrefix + id, TrinketPrefix + "_" + id];
+
+    internal static IReadOnlyList<string> GetInventoryItemKeys(string type, string id)
+    {
+        var canonical = InventoryTitlePrefix + type + id;
+        return string.IsNullOrWhiteSpace(id)
+            ? [canonical]
+            : [canonical, InventoryTitlePrefix + type + "_" + id];
+    }
 
     public static ContentLocalizationCatalog Load(
         ActiveContentSnapshot activeContent,
@@ -268,7 +292,7 @@ internal sealed class ContentLocalizationCatalog
     private static bool IsSupportedKey(string key) =>
         key.StartsWith(HeroClassPrefix, StringComparison.OrdinalIgnoreCase) ||
         key.StartsWith(QuirkPrefix, StringComparison.OrdinalIgnoreCase) ||
-        key.StartsWith(TrinketPrefix, StringComparison.OrdinalIgnoreCase);
+        key.StartsWith(InventoryTitlePrefix, StringComparison.OrdinalIgnoreCase);
 
     private static IReadOnlyList<string> EnumerateLocalizationFiles(
         ActiveContentSource source,

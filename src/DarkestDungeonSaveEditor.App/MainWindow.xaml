@@ -16,7 +16,7 @@
         WindowStartupLocation="CenterScreen">
     <Grid Background="{StaticResource AppTextureBrush}">
         <Border Margin="8"
-                Background="#E8050505"
+                Background="#90050505"
                 BorderBrush="{StaticResource GoldDarkBrush}"
                 BorderThickness="1">
             <Border Margin="3"
@@ -223,11 +223,14 @@
                                        Style="{StaticResource FieldLabelStyle}" Text="筛选" />
                             <TextBox x:Name="SearchTextBox" Grid.Column="1" Margin="0,0,8,0"
                                      TextChanged="SearchTextBox_TextChanged"
-                                     ToolTip="按 ID、中文名、英文名、稀有度或来源筛选" />
+                                     ToolTip="按 ID、中文名、英文名、类型、稀有度或来源筛选" />
                             <TextBlock x:Name="CopiesLabel" Grid.Column="2" Margin="8,0,6,0"
                                        Style="{StaticResource FieldLabelStyle}" Text="添加数量" />
                             <TextBox x:Name="CopiesTextBox" Grid.Column="3" Width="116"
-                                     HorizontalAlignment="Left" Margin="0" Text="1" />
+                                     HorizontalAlignment="Left" Margin="0" Text="1"
+                                     TextChanged="CopiesTextBox_TextChanged"
+                                     PreviewMouseLeftButtonDown="SelectAllTextOnFirstClick"
+                                     GotKeyboardFocus="SelectAllTextOnKeyboardFocus" />
                             <TextBlock x:Name="HeroLevelLabel" Grid.Column="2" Margin="8,0,6,0"
                                        Style="{StaticResource FieldLabelStyle}" Text="人物等级"
                                        Visibility="Collapsed" />
@@ -240,6 +243,12 @@
                                     Content="选择初始怪癖… (0)"
                                     Visibility="Collapsed" IsEnabled="False"
                                     Click="SelectInitialQuirks_Click" />
+                            <CheckBox x:Name="ShowUnusedItemsCheckBox" Grid.Column="4" Margin="12,0,0,0"
+                                      VerticalAlignment="Center"
+                                      Content="显示未使用定义 (0)"
+                                      ToolTip="显示当前活动玩法入口不可达、且存档中不存在的 Mod 物品定义"
+                                      Checked="ShowUnusedItemsCheckBox_Changed"
+                                      Unchecked="ShowUnusedItemsCheckBox_Changed" />
                         </Grid>
 
                         <TextBlock x:Name="InitialQuirkSelectionSummaryTextBlock" Grid.Row="3"
@@ -256,6 +265,30 @@
 
                     <TabControl x:Name="CatalogTabs" Grid.Row="0" Margin="0,0,0,8"
                                 SelectionChanged="CatalogTabs_SelectionChanged">
+                        <TabItem x:Name="ItemTab" Header="物品  /  ITEMS">
+                            <DataGrid x:Name="ItemGrid"
+                                      AutoGenerateColumns="False"
+                                      IsReadOnly="True"
+                                      SelectionMode="Single"
+                                      SelectionChanged="ItemGrid_SelectionChanged"
+                                      CanUserAddRows="False"
+                                      HeadersVisibility="Column">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="物品 ID" Binding="{Binding Id}" Width="1.25*" MinWidth="105"
+                                                        ElementStyle="{StaticResource DataGridTextElementStyle}" />
+                                    <DataGridTextColumn Header="中文名" Binding="{Binding ChineseName}" Width="1.05*" MinWidth="86"
+                                                        ElementStyle="{StaticResource DataGridTextElementStyle}" />
+                                    <DataGridTextColumn Header="English" Binding="{Binding EnglishName}" Width="1.05*" MinWidth="86"
+                                                        ElementStyle="{StaticResource DataGridTextElementStyle}" />
+                                    <DataGridTextColumn Header="位置 / 类型 / 堆叠" Binding="{Binding Storage}" Width="180"
+                                                        ElementStyle="{StaticResource DataGridTextElementStyle}" />
+                                    <DataGridTextColumn Header="当前数量" Binding="{Binding CurrentAmount}" Width="88"
+                                                        ElementStyle="{StaticResource DataGridTextElementStyle}" />
+                                    <DataGridTextColumn Header="来源" Binding="{Binding Source}" Width="1.75*" MinWidth="135"
+                                                        ElementStyle="{StaticResource DataGridTextElementStyle}" />
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </TabItem>
                         <TabItem Header="饰品  /  TRINKETS">
                             <DataGrid x:Name="TrinketGrid"
                                       AutoGenerateColumns="False"

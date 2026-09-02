@@ -4,6 +4,7 @@ using System.IO;
 using System.Security.Cryptography;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using DarkestDungeonSaveEditor.Core;
@@ -18,21 +19,28 @@ public partial class MainWindow : Window
     private const int TitleLogoFrameColumns = 10;
     private const int TitleLogoFrameCount = 120;
     private static readonly TimeSpan TitleLogoFrameInterval = TimeSpan.FromMilliseconds(100);
+    private readonly ObservableCollection<ItemRow> _visibleItems = [];
     private readonly ObservableCollection<TrinketRow> _visibleTrinkets = [];
     private readonly ObservableCollection<HeroRow> _visibleHeroes = [];
     private readonly ObservableCollection<HeroLevelChoice> _heroLevelChoices = [];
+    private IReadOnlyList<QuantityItemDefinition> _allItems = [];
     private IReadOnlyList<TrinketDefinition> _allTrinkets = [];
     private IReadOnlyList<HeroClassDefinition> _allHeroes = [];
     private IReadOnlyList<string> _selectedInitialQuirkIds = [];
     private HeroClassCatalogResult? _heroCatalog;
     private TrinketStorageDefinition? _trinketStorage;
+    private RaidInventoryStorageDefinition? _raidInventoryStorage;
     private ActiveContentSnapshot? _activeContentSnapshot;
+    private PreparedQuantityItemEdit? _preparedQuantityItemEdit;
     private PreparedTrinketEdit? _preparedTrinketEdit;
     private PreparedStagecoachHeroEdit? _preparedHeroEdit;
     private StagecoachHeroCandidatePreview? _preparedHeroCandidatePreview;
     private SaveEditService? _editService;
     private string? _catalogProfileDirectory;
     private string? _catalogGameSaveSha256;
+    private string? _catalogEstateSaveSha256;
+    private string? _catalogQuantitySaveSha256;
+    private QuantityItemSaveContext _quantitySaveContext = QuantityItemSaveContext.Town;
     private int _editRevision;
     private DispatcherTimer? _titleLogoTimer;
     private CroppedBitmap[]? _titleLogoFrames;
@@ -41,9 +49,11 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        ItemGrid.ItemsSource = _visibleItems;
         TrinketGrid.ItemsSource = _visibleTrinkets;
         HeroGrid.ItemsSource = _visibleHeroes;
         HeroLevelComboBox.ItemsSource = _heroLevelChoices;
+        UpdateCatalogMode();
     }
 
     protected override void OnSourceInitialized(EventArgs e)
@@ -193,7 +203,7 @@ public partial class MainWindow : Window
             var jarPath = Path.Combine(AppContext.BaseDirectory, "tools", "DDSaveEditor", "DDSaveEditor.jar");
             var codec = new DsonSaveCodec(jarPath);
             AppendStatus(
-                "正在读取当前档案启用的 DLC、Workshop 与本地 Mod，再扫描饰品和人物定义……" +
+                "正在读取当前档案启用的 DLC、Workshop 与本地 Mod，再扫描可计数物品、饰品和人物定义……" +
                 (additionalLocalModDirectory is null
                     ? string.Empty
                     : $" 本地 Mod 目录：{additionalLocalModDirectory}"));
@@ -209,36 +219,50 @@ public partial class MainWindow : Window
                 $"档案目录={activeContent.Profile.ProfileDirectory}；" +
                 $"persist.game.json SHA-256={activeContent.SourceGameSha256}");
             CrashDiagnostics.SetStage("LoadCatalog: building content catalogs");
-            var catalogs = await Task.Run(() => new
+            var staticCatalogTask = Task.Run(() => new
             {
                 Trinkets = TrinketCatalog.Load(activeContent),
                 Heroes = HeroClassCatalog.Load(activeContent)
             });
+            var quantityItemCatalogTask = QuantityItemCatalog.LoadAsync(activeContent, codec);
+            await Task.WhenAll(staticCatalogTask, quantityItemCatalogTask);
+            var catalogs = await staticCatalogTask;
+            var quantityItems = await quantityItemCatalogTask;
             CrashDiagnostics.SetStage("LoadCatalog: assigning catalog results");
+            _allItems = quantityItems.Items;
             _allTrinkets = catalogs.Trinkets.Trinkets;
             _allHeroes = catalogs.Heroes.HeroClasses;
             _heroCatalog = catalogs.Heroes;
             _trinketStorage = catalogs.Trinkets.Storage;
+            _raidInventoryStorage = quantityItems.RaidStorage;
             _activeContentSnapshot = activeContent;
             PopulateHeroLevels(catalogs.Heroes);
             _catalogProfileDirectory = profile.ProfileDirectory;
             _catalogGameSaveSha256 = activeContent.SourceGameSha256;
+            _catalogEstateSaveSha256 = ComputeSha256(profile.EstateSavePath);
+            _catalogQuantitySaveSha256 = quantityItems.SourceSaveSha256;
+            _quantitySaveContext = quantityItems.SaveContext;
+            ItemTab.Header = _quantitySaveContext == QuantityItemSaveContext.Raid
+                ? "副本背包  /  RAID ITEMS"
+                : "小镇物品  /  ESTATE ITEMS";
             CrashDiagnostics.SetStage("LoadCatalog: populating visible rows");
             ApplyFilter();
             CrashDiagnostics.SetStage("LoadCatalog: updating summary");
-            CatalogSummaryTextBlock.Text =
-                $"模式 {catalogs.Heroes.GameMode}；活动来源 {activeContent.Sources.Count} 个；饰品 {_allTrinkets.Count} 个；" +
-                $"仓库槽位 {FormatStorageCapacity(_trinketStorage)}；" +
-                $"人物 {_allHeroes.Count} 个，怪癖定义 {catalogs.Heroes.InitialQuirks.Count} 个，" +
-                $"姓名 {catalogs.Heroes.HeroNames.Count} 个；等级 0-{Math.Max(0, catalogs.Heroes.ResolveLevelThresholds.Count - 1)}";
+            var hiddenUnusedItemCount = _allItems.Count(item => item.IsHiddenByDefault);
+            var defaultVisibleItemCount = _allItems.Count - hiddenUnusedItemCount;
+            UpdateCatalogSummary();
             var issues = activeContent.Issues
+                .Concat(quantityItems.Issues)
                 .Concat(catalogs.Trinkets.Issues)
                 .Concat(catalogs.Heroes.Issues)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToArray();
             AppendStatus(
                 $"内容目录完成：档案记录启用 Mod {activeContent.AppliedModCount} 个，" +
-                $"成功解析来源 {activeContent.Sources.Count} 个、饰品 {_allTrinkets.Count} 个、" +
+                $"成功解析来源 {activeContent.Sources.Count} 个、" +
+                $"{FormatQuantitySaveContext(_quantitySaveContext)}可计数物品 {defaultVisibleItemCount} 个" +
+                (hiddenUnusedItemCount == 0 ? "、" : $"（未使用定义 {hiddenUnusedItemCount} 个默认隐藏）、") +
+                $"饰品 {_allTrinkets.Count} 个、" +
                 $"仓库槽位 {FormatStorageCapacity(_trinketStorage)}、" +
                 $"人物 {_allHeroes.Count} 个（其中 {_allHeroes.Count(item => item.RecruitEvents.Count > 0)} 个有招募事件，" +
                 $"{_allHeroes.Count(item => item.RuntimeQuirkSignals.Count > 0)} 个有后续玩法怪癖线索；这些线索不是初始怪癖）。" +
@@ -303,9 +327,31 @@ public partial class MainWindow : Window
 
     private void SearchTextBox_TextChanged(object sender, TextChangedEventArgs e) => ApplyFilter();
 
+    private void ShowUnusedItemsCheckBox_Changed(object sender, RoutedEventArgs e)
+    {
+        InvalidatePreparedEdit();
+        ApplyFilter();
+    }
+
     private void ApplyFilter()
     {
         var keyword = SearchTextBox.Text.Trim();
+        var filteredItems = _allItems.Where(definition =>
+            (!definition.IsHiddenByDefault || ShowUnusedItemsCheckBox.IsChecked == true) &&
+            (string.IsNullOrWhiteSpace(keyword) ||
+             definition.DisplayId.Contains(keyword, StringComparison.OrdinalIgnoreCase) ||
+             definition.InventoryType.Contains(keyword, StringComparison.OrdinalIgnoreCase) ||
+             definition.LocalizedName.Chinese.Contains(keyword, StringComparison.OrdinalIgnoreCase) ||
+             definition.LocalizedName.English.Contains(keyword, StringComparison.OrdinalIgnoreCase) ||
+             definition.Source.Contains(keyword, StringComparison.OrdinalIgnoreCase) ||
+             definition.SourceLabel.Contains(keyword, StringComparison.OrdinalIgnoreCase)));
+
+        _visibleItems.Clear();
+        foreach (var definition in filteredItems)
+        {
+            _visibleItems.Add(new ItemRow(definition));
+        }
+
         var filteredTrinkets = _allTrinkets.Where(definition =>
             string.IsNullOrWhiteSpace(keyword) ||
             definition.Id.Contains(keyword, StringComparison.OrdinalIgnoreCase) ||
@@ -336,6 +382,32 @@ public partial class MainWindow : Window
         }
     }
 
+    private void UpdateCatalogSummary()
+    {
+        if (_activeContentSnapshot is null || _heroCatalog is null)
+        {
+            CatalogSummaryTextBlock.Text = string.Empty;
+            return;
+        }
+
+        var hiddenUnusedItemCount = _allItems.Count(item => item.IsHiddenByDefault);
+        var defaultVisibleItemCount = _allItems.Count - hiddenUnusedItemCount;
+        CatalogSummaryTextBlock.Text =
+            $"模式 {_heroCatalog.GameMode}；活动来源 {_activeContentSnapshot.Sources.Count} 个；" +
+            $"物品场景 {FormatQuantitySaveContext(_quantitySaveContext)}；" +
+            $"可计数物品 {defaultVisibleItemCount} 个" +
+            (hiddenUnusedItemCount == 0 ? "；" : $"（另有未使用定义 {hiddenUnusedItemCount} 个默认隐藏）；") +
+            (_quantitySaveContext == QuantityItemSaveContext.Raid
+                ? $"副本背包 {_allItems.Where(item => item.IsPresentInSave).Sum(item => item.SavedEntryCount)}/" +
+                  $"{FormatRaidInventoryCapacity(_raidInventoryStorage)} 格；"
+                : string.Empty) +
+            $"饰品 {_allTrinkets.Count} 个；" +
+            $"仓库槽位 {FormatStorageCapacity(_trinketStorage)}；" +
+            $"人物 {_allHeroes.Count} 个，怪癖定义 {_heroCatalog.InitialQuirks.Count} 个，" +
+            $"姓名 {_heroCatalog.HeroNames.Count} 个；" +
+            $"等级 0-{Math.Max(0, _heroCatalog.ResolveLevelThresholds.Count - 1)}";
+    }
+
     private async void Preview_Click(object sender, RoutedEventArgs e)
     {
         InvalidatePreparedEdit();
@@ -344,12 +416,72 @@ public partial class MainWindow : Window
         {
             SetBusy(true);
             var profile = SteamDiscovery.OpenProfile(ProfileDirectoryTextBox.Text.Trim());
-            EnsureCatalogMatches(profile);
+            EnsureCatalogMatches(
+                profile,
+                requireCurrentQuantitySnapshot: CatalogTabs.SelectedIndex == 0,
+                requireCurrentEstateSnapshot: CatalogTabs.SelectedIndex == 1);
             var jarPath = Path.Combine(AppContext.BaseDirectory, "tools", "DDSaveEditor", "DDSaveEditor.jar");
             var editService = new SaveEditService(new DsonSaveCodec(jarPath));
             AppendStatus($"正在为 {profile.ProfileId} 创建只读副本并执行编码回环……");
 
             if (CatalogTabs.SelectedIndex == 0)
+            {
+                if (ItemGrid.SelectedItem is not ItemRow selectedItem)
+                {
+                    throw new InvalidOperationException("请先选择一个可计数物品。");
+                }
+
+                if (!int.TryParse(
+                        CopiesTextBox.Text,
+                        NumberStyles.Integer,
+                        CultureInfo.InvariantCulture,
+                        out var targetAmount) ||
+                    targetAmount < 0)
+                {
+                    throw new InvalidOperationException("目标数量必须是 0 到 2147483647 的整数。");
+                }
+
+                if (_activeContentSnapshot is null)
+                {
+                    throw new InvalidOperationException("活动内容快照不可用，请重新加载内容目录。");
+                }
+
+                var preparedItemEdit = await editService.PrepareQuantityItemEditAsync(
+                    profile,
+                    selectedItem.Definition,
+                    targetAmount,
+                    _activeContentSnapshot);
+                if (previewRevision != _editRevision || CatalogTabs.SelectedIndex != 0)
+                {
+                    AppendStatus("预览期间目录状态发生变化，已丢弃本次结果。");
+                    return;
+                }
+
+                _editService = editService;
+                _preparedQuantityItemEdit = preparedItemEdit;
+                var preview = preparedItemEdit.Preview;
+                PreviewSummaryTextBlock.Text =
+                    $"{selectedItem.DisplayName} / {preview.ItemId} · {FormatItemStorage(selectedItem.Definition)} · " +
+                    $"数量 {preview.ExistingAmount} → {preview.TargetAmount}" +
+                    (preview.StorageKind == QuantityItemStorageKind.RaidInventory
+                        ? $" · 背包格 {preview.ExistingInventoryEntries} → {preview.ResultingInventoryEntries}/" +
+                          $"{FormatStorageCapacity(preview.InventoryCapacity)}"
+                        : preview.CreatedEntry
+                            ? "（将创建新的存档条目）"
+                            : string.Empty);
+                var itemWarning = FormatQuantityItemBoundaryWarning(selectedItem.Definition);
+                PreviewWarningTextBlock.Text = itemWarning;
+                PreviewWarningTextBlock.Visibility = string.IsNullOrWhiteSpace(itemWarning)
+                    ? Visibility.Collapsed
+                    : Visibility.Visible;
+                ApplyButton.IsEnabled = true;
+                AppendStatus(
+                    $"物品数量预览通过：{preview.ItemId}，{preview.ExistingAmount} → {preview.TargetAmount}；" +
+                    $"保存位置 {FormatItemStorage(preview.StorageKind)}；工作区：{preparedItemEdit.WorkspaceDirectory}");
+                return;
+            }
+
+            if (CatalogTabs.SelectedIndex == 1)
             {
                 if (TrinketGrid.SelectedItem is not TrinketRow selected)
                 {
@@ -382,7 +514,7 @@ public partial class MainWindow : Window
                     copies,
                     _trinketStorage,
                     _activeContentSnapshot);
-                if (previewRevision != _editRevision || CatalogTabs.SelectedIndex != 0)
+                if (previewRevision != _editRevision || CatalogTabs.SelectedIndex != 1)
                 {
                     AppendStatus("预览期间目录状态发生变化，已丢弃本次结果。");
                     return;
@@ -429,7 +561,7 @@ public partial class MainWindow : Window
                 generated,
                 _heroCatalog,
                 _activeContentSnapshot);
-            if (previewRevision != _editRevision || CatalogTabs.SelectedIndex != 1)
+            if (previewRevision != _editRevision || CatalogTabs.SelectedIndex != 2)
             {
                 AppendStatus("预览期间目录状态发生变化，已丢弃本次结果。");
                 return;
@@ -487,36 +619,56 @@ public partial class MainWindow : Window
 
     private async void Apply_Click(object sender, RoutedEventArgs e)
     {
-        if (_editService is null || (_preparedTrinketEdit is null && _preparedHeroEdit is null))
+        if (_editService is null ||
+            (_preparedQuantityItemEdit is null && _preparedTrinketEdit is null && _preparedHeroEdit is null))
         {
             return;
         }
 
+        var isItemEdit = _preparedQuantityItemEdit is not null;
         var isHeroEdit = _preparedHeroEdit is not null;
-        var profileDirectory = isHeroEdit
-            ? _preparedHeroEdit!.Profile.ProfileDirectory
-            : _preparedTrinketEdit!.Profile.ProfileDirectory;
-        var changeSummary = isHeroEdit
-            ? $"向普通马车加入 {_preparedHeroCandidatePreview?.Name} / {_preparedHeroCandidatePreview?.HeroClass} " +
-              $"（{_preparedHeroCandidatePreview?.ResolveLevel}级，XP {_preparedHeroCandidatePreview?.ResolveXp}，" +
-              $"武器/护甲 rank {_preparedHeroCandidatePreview?.WeaponRank}/{_preparedHeroCandidatePreview?.ArmourRank}；" +
-              $"个人升级记录 {_preparedHeroEdit!.Preview.UpgradePurchaseCount} 条；" +
-              $"GUID {_preparedHeroEdit!.Preview.CandidateGuid}；" +
-              $"初始怪癖 [{FormatSelectedQuirks(_preparedHeroCandidatePreview)}]）"
-            : $"加入 {_preparedTrinketEdit!.Preview.RequestedCopies} 个 {_preparedTrinketEdit.Trinket.Id}";
-        var definitionLimitWarningText = isHeroEdit
-            ? FormatHeroQuirkLimitWarnings(_preparedHeroEdit!.Preview)
-            : _preparedTrinketEdit!.Preview.ExceedsDefinitionLimit
+        string profileDirectory;
+        string changeSummary;
+        string definitionLimitWarningText;
+        if (isItemEdit)
+        {
+            profileDirectory = _preparedQuantityItemEdit!.Profile.ProfileDirectory;
+            changeSummary =
+                $"把 {_preparedQuantityItemEdit.Item.DisplayId} 的数量从 " +
+                $"{_preparedQuantityItemEdit.Preview.ExistingAmount} 修改为 " +
+                $"{_preparedQuantityItemEdit.Preview.TargetAmount}";
+            definitionLimitWarningText = FormatQuantityItemBoundaryWarning(_preparedQuantityItemEdit.Item);
+        }
+        else if (isHeroEdit)
+        {
+            profileDirectory = _preparedHeroEdit!.Profile.ProfileDirectory;
+            changeSummary =
+                $"向普通马车加入 {_preparedHeroCandidatePreview?.Name} / {_preparedHeroCandidatePreview?.HeroClass} " +
+                $"（{_preparedHeroCandidatePreview?.ResolveLevel}级，XP {_preparedHeroCandidatePreview?.ResolveXp}，" +
+                $"武器/护甲 rank {_preparedHeroCandidatePreview?.WeaponRank}/{_preparedHeroCandidatePreview?.ArmourRank}；" +
+                $"个人升级记录 {_preparedHeroEdit.Preview.UpgradePurchaseCount} 条；" +
+                $"GUID {_preparedHeroEdit.Preview.CandidateGuid}；" +
+                $"初始怪癖 [{FormatSelectedQuirks(_preparedHeroCandidatePreview)}]）";
+            definitionLimitWarningText = FormatHeroQuirkLimitWarnings(_preparedHeroEdit.Preview);
+        }
+        else
+        {
+            profileDirectory = _preparedTrinketEdit!.Profile.ProfileDirectory;
+            changeSummary =
+                $"加入 {_preparedTrinketEdit.Preview.RequestedCopies} 个 {_preparedTrinketEdit.Trinket.Id}";
+            definitionLimitWarningText = _preparedTrinketEdit.Preview.ExceedsDefinitionLimit
                 ? $"写入后仓库内该饰品将有 {_preparedTrinketEdit.Preview.ResultingCopies} 个，" +
                   $"超过定义上限 {_preparedTrinketEdit.Preview.DefinitionLimit}。"
                 : string.Empty;
+        }
+
         var definitionLimitWarning = string.IsNullOrWhiteSpace(definitionLimitWarningText)
             ? string.Empty
             : $"\n\n注意：\n{definitionLimitWarningText}";
         var confirmation = MessageBox.Show(
             $"将对以下档案执行：{changeSummary}\n\n" +
             $"{profileDirectory}" + definitionLimitWarning + "\n\n" +
-            "程序会先完整备份 profile 中所有 persist*.json。确认游戏已经关闭并继续吗？",
+            "程序会先完整备份当前档案。确认游戏已经关闭并继续吗？",
             "确认应用存档修改",
             MessageBoxButton.YesNo,
             MessageBoxImage.Warning,
@@ -530,9 +682,56 @@ public partial class MainWindow : Window
         try
         {
             SetBusy(true);
-            var backupDirectory = isHeroEdit
-                ? (await _editService.CommitAsync(_preparedHeroEdit!)).BackupDirectory
-                : (await _editService.CommitAsync(_preparedTrinketEdit!)).BackupDirectory;
+            string backupDirectory;
+            SaveCommitResult? estateCommit = null;
+            if (isItemEdit)
+            {
+                estateCommit = await _editService.CommitAsync(_preparedQuantityItemEdit!);
+                backupDirectory = estateCommit.BackupDirectory;
+            }
+            else if (isHeroEdit)
+            {
+                backupDirectory = (await _editService.CommitAsync(_preparedHeroEdit!)).BackupDirectory;
+            }
+            else
+            {
+                estateCommit = await _editService.CommitAsync(_preparedTrinketEdit!);
+                backupDirectory = estateCommit.BackupDirectory;
+            }
+
+            if (isItemEdit && estateCommit is not null)
+            {
+                _catalogQuantitySaveSha256 = estateCommit.FinalSha256;
+                if (_quantitySaveContext == QuantityItemSaveContext.Town)
+                {
+                    _catalogEstateSaveSha256 = estateCommit.FinalSha256;
+                }
+            }
+            else if (estateCommit is not null)
+            {
+                _catalogEstateSaveSha256 = estateCommit.FinalSha256;
+            }
+
+            if (isItemEdit)
+            {
+                var editedKey = _preparedQuantityItemEdit!.Item.CatalogKey;
+                var targetAmount = _preparedQuantityItemEdit.Preview.TargetAmount;
+                var resultingEntryCount = _preparedQuantityItemEdit.Preview.ResultingMatchingEntries;
+                _allItems = _allItems
+                    .Select(item => item.CatalogKey.Equals(editedKey, StringComparison.OrdinalIgnoreCase)
+                        ? item with
+                        {
+                            CurrentAmount = targetAmount,
+                            IsPresentInSave = resultingEntryCount > 0,
+                            SavedEntryCount = resultingEntryCount
+                        }
+                        : item)
+                    .ToArray();
+                ApplyFilter();
+                UpdateCatalogMode();
+                UpdateCatalogSummary();
+            }
+
             AppendStatus($"应用成功。备份：{backupDirectory}");
             MessageBox.Show(
                 $"存档修改成功。\n\n备份目录：\n{backupDirectory}",
@@ -552,7 +751,45 @@ public partial class MainWindow : Window
         }
     }
 
-    private void TrinketGrid_SelectionChanged(object sender, SelectionChangedEventArgs e) => InvalidatePreparedEdit();
+    private void ItemGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        InvalidatePreparedEdit();
+        if (CatalogTabs.SelectedIndex == 0 && ItemGrid.SelectedItem is ItemRow selected)
+        {
+            CopiesTextBox.Text = selected.CurrentAmount.ToString(CultureInfo.InvariantCulture);
+        }
+    }
+
+    private void TrinketGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        InvalidatePreparedEdit();
+        if (CatalogTabs.SelectedIndex == 1 && TrinketGrid.SelectedItem is TrinketRow)
+        {
+            CopiesTextBox.Text = "1";
+        }
+    }
+
+    private void CopiesTextBox_TextChanged(object sender, TextChangedEventArgs e) => InvalidatePreparedEdit();
+
+    private void SelectAllTextOnFirstClick(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is not TextBox textBox || textBox.IsKeyboardFocusWithin)
+        {
+            return;
+        }
+
+        e.Handled = true;
+        _ = textBox.Focus();
+        textBox.SelectAll();
+    }
+
+    private void SelectAllTextOnKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
+    {
+        if (sender is TextBox textBox)
+        {
+            textBox.SelectAll();
+        }
+    }
 
     private void HeroGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
@@ -579,6 +816,7 @@ public partial class MainWindow : Window
             dialog = new InitialQuirkSelectionDialog(
                 _heroCatalog,
                 selectedHero.Definition,
+                GetSelectedHeroLevel(),
                 _selectedInitialQuirkIds)
             {
                 Owner = this
@@ -619,6 +857,24 @@ public partial class MainWindow : Window
 
         InvalidatePreparedEdit();
         UpdateCatalogMode();
+        ResetQuantityInputForCurrentTab();
+    }
+
+    private void ResetQuantityInputForCurrentTab()
+    {
+        if (CopiesTextBox is null)
+        {
+            return;
+        }
+
+        CopiesTextBox.Text = CatalogTabs.SelectedIndex switch
+        {
+            0 when ItemGrid?.SelectedItem is ItemRow selected =>
+                selected.CurrentAmount.ToString(CultureInfo.InvariantCulture),
+            0 => "0",
+            1 => "1",
+            _ => CopiesTextBox.Text
+        };
     }
 
     private void InputPath_TextChanged(object sender, TextChangedEventArgs e) => InvalidateCatalog();
@@ -628,15 +884,29 @@ public partial class MainWindow : Window
         InvalidatePreparedEdit();
         _catalogProfileDirectory = null;
         _catalogGameSaveSha256 = null;
+        _catalogEstateSaveSha256 = null;
+        _catalogQuantitySaveSha256 = null;
+        _quantitySaveContext = QuantityItemSaveContext.Town;
+        if (ItemTab is not null)
+        {
+            ItemTab.Header = "物品  /  ITEMS";
+        }
+        _allItems = [];
         _allTrinkets = [];
         _allHeroes = [];
         _selectedInitialQuirkIds = [];
         _heroCatalog = null;
         _trinketStorage = null;
+        _raidInventoryStorage = null;
         _activeContentSnapshot = null;
         _heroLevelChoices.Clear();
+        _visibleItems.Clear();
         _visibleTrinkets.Clear();
         _visibleHeroes.Clear();
+        if (ItemGrid is not null)
+        {
+            ItemGrid.SelectedItem = null;
+        }
         if (TrinketGrid is not null)
         {
             TrinketGrid.SelectedItem = null;
@@ -648,6 +918,11 @@ public partial class MainWindow : Window
         if (CatalogSummaryTextBlock is not null)
         {
             CatalogSummaryTextBlock.Text = string.Empty;
+        }
+        if (ShowUnusedItemsCheckBox is not null)
+        {
+            ShowUnusedItemsCheckBox.IsChecked = false;
+            ShowUnusedItemsCheckBox.Content = "显示未使用定义 (0)";
         }
         if (PreviewButton is not null)
         {
@@ -662,6 +937,7 @@ public partial class MainWindow : Window
         {
             _editRevision++;
         }
+        _preparedQuantityItemEdit = null;
         _preparedTrinketEdit = null;
         _preparedHeroEdit = null;
         _preparedHeroCandidatePreview = null;
@@ -686,24 +962,31 @@ public partial class MainWindow : Window
         PathInputsBorder.IsEnabled = !busy;
         CatalogTabs.IsEnabled = !busy;
         SearchTextBox.IsEnabled = !busy;
-        CopiesTextBox.IsEnabled = !busy && CatalogTabs.SelectedIndex == 0;
+        ShowUnusedItemsCheckBox.IsEnabled = !busy &&
+            CatalogTabs.SelectedIndex == 0 && _allItems.Count > 0;
+        CopiesTextBox.IsEnabled = !busy && CatalogTabs.SelectedIndex is 0 or 1;
         HeroLevelComboBox.IsEnabled = !busy &&
-            CatalogTabs.SelectedIndex == 1 &&
+            CatalogTabs.SelectedIndex == 2 &&
             _heroCatalog is not null &&
             HeroGrid.SelectedItem is HeroRow;
         InitialQuirksButton.IsEnabled = !busy &&
-            CatalogTabs.SelectedIndex == 1 &&
+            CatalogTabs.SelectedIndex == 2 &&
             _heroCatalog is not null &&
             HeroGrid.SelectedItem is HeroRow;
         PreviewButton.IsEnabled = !busy && CanPreviewCurrentTab();
         ApplyButton.IsEnabled = !busy &&
-            (_preparedTrinketEdit is not null || _preparedHeroEdit is not null);
+            (_preparedQuantityItemEdit is not null ||
+             _preparedTrinketEdit is not null ||
+             _preparedHeroEdit is not null);
     }
 
-    private void EnsureCatalogMatches(SaveProfile profile)
+    private void EnsureCatalogMatches(
+        SaveProfile profile,
+        bool requireCurrentQuantitySnapshot,
+        bool requireCurrentEstateSnapshot)
     {
         if (_catalogProfileDirectory is null || _catalogGameSaveSha256 is null ||
-            (_allTrinkets.Count == 0 && _heroCatalog is null))
+            (_allItems.Count == 0 && _allTrinkets.Count == 0 && _heroCatalog is null))
         {
             throw new InvalidOperationException("请先为当前档案加载内容目录。");
         }
@@ -722,15 +1005,46 @@ public partial class MainWindow : Window
             InvalidateCatalog();
             throw new InvalidOperationException("当前档案的 Mod/DLC 配置已变化，请重新加载内容目录。");
         }
+
+        if (requireCurrentQuantitySnapshot)
+        {
+            var currentlyInRaid = File.Exists(profile.RaidSavePath);
+            var expectedInRaid = _quantitySaveContext == QuantityItemSaveContext.Raid;
+            var quantitySavePath = expectedInRaid ? profile.RaidSavePath : profile.EstateSavePath;
+            if (currentlyInRaid != expectedInRaid ||
+                _catalogQuantitySaveSha256 is null ||
+                !File.Exists(quantitySavePath) ||
+                !ComputeSha256(quantitySavePath).Equals(
+                    _catalogQuantitySaveSha256,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                InvalidateCatalog();
+                throw new InvalidOperationException(
+                    "当前档案的小镇/副本状态或物品数量已变化，请重新加载内容目录。");
+            }
+        }
+
+        if (requireCurrentEstateSnapshot &&
+            (_catalogEstateSaveSha256 is null ||
+             !File.Exists(profile.EstateSavePath) ||
+             !ComputeSha256(profile.EstateSavePath).Equals(
+                 _catalogEstateSaveSha256,
+                 StringComparison.OrdinalIgnoreCase)))
+        {
+            InvalidateCatalog();
+            throw new InvalidOperationException("当前档案的物品数量已变化，请重新加载内容目录后再修改。");
+        }
     }
 
     private bool CanPreviewCurrentTab()
     {
         return _catalogProfileDirectory is not null &&
                (CatalogTabs.SelectedIndex == 0
-                   ? _allTrinkets.Count > 0
-                   : CatalogTabs.SelectedIndex == 1 && _heroCatalog is not null &&
-                     _allHeroes.Count > 0 && HeroLevelComboBox.SelectedItem is HeroLevelChoice);
+                   ? _allItems.Count > 0
+                   : CatalogTabs.SelectedIndex == 1
+                       ? _allTrinkets.Count > 0
+                       : CatalogTabs.SelectedIndex == 2 && _heroCatalog is not null &&
+                         _allHeroes.Count > 0 && HeroLevelComboBox.SelectedItem is HeroLevelChoice);
     }
 
     private void UpdateCatalogMode()
@@ -740,8 +1054,14 @@ public partial class MainWindow : Window
             return;
         }
 
-        var isHeroTab = CatalogTabs.SelectedIndex == 1;
-        PreviewButton.Content = isHeroTab ? "生成候选人物安全预览" : "生成饰品安全预览";
+        var isItemTab = CatalogTabs.SelectedIndex == 0;
+        var isHeroTab = CatalogTabs.SelectedIndex == 2;
+        PreviewButton.Content = isHeroTab
+            ? "生成候选人物安全预览"
+            : isItemTab
+                ? "生成物品数量安全预览"
+                : "生成饰品安全预览";
+        CopiesLabel.Text = isItemTab ? "目标数量" : "添加数量";
         CopiesLabel.Visibility = isHeroTab ? Visibility.Collapsed : Visibility.Visible;
         CopiesTextBox.Visibility = isHeroTab ? Visibility.Collapsed : Visibility.Visible;
         HeroLevelLabel.Visibility = isHeroTab ? Visibility.Visible : Visibility.Collapsed;
@@ -750,6 +1070,10 @@ public partial class MainWindow : Window
             _heroCatalog is not null &&
             HeroGrid.SelectedItem is HeroRow;
         InitialQuirksButton.Visibility = isHeroTab ? Visibility.Visible : Visibility.Collapsed;
+        ShowUnusedItemsCheckBox.Visibility = isItemTab ? Visibility.Visible : Visibility.Collapsed;
+        ShowUnusedItemsCheckBox.IsEnabled = isItemTab && _allItems.Count > 0 && CatalogTabs.IsEnabled;
+        ShowUnusedItemsCheckBox.Content =
+            $"显示未使用定义 ({_allItems.Count(item => item.IsHiddenByDefault)})";
         InitialQuirkSelectionSummaryTextBlock.Visibility = isHeroTab ? Visibility.Visible : Visibility.Collapsed;
         InitialQuirksButton.IsEnabled = isHeroTab &&
             _heroCatalog is not null &&
@@ -794,7 +1118,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        InitialQuirksButton.IsEnabled = CatalogTabs is { IsEnabled: true, SelectedIndex: 1 } &&
+        InitialQuirksButton.IsEnabled = CatalogTabs is { IsEnabled: true, SelectedIndex: 2 } &&
             _heroCatalog is not null;
 
         var positiveCount = 0;
@@ -853,6 +1177,59 @@ public partial class MainWindow : Window
         };
     }
 
+    private static string FormatItemStorage(QuantityItemStorageKind storageKind) => storageKind switch
+    {
+        QuantityItemStorageKind.Wallet => "钱包",
+        QuantityItemStorageKind.EstateItems => "庄园物品",
+        QuantityItemStorageKind.RaidInventory => "当前副本背包",
+        _ => storageKind.ToString()
+    };
+
+    private static string FormatItemStorage(QuantityItemDefinition definition)
+    {
+        if (definition.StorageKind == QuantityItemStorageKind.RaidInventory)
+        {
+            return definition.BaseStackLimit is > 0
+                ? $"背包 / {definition.InventoryType} / 每格 " +
+                  definition.BaseStackLimit.Value.ToString(CultureInfo.InvariantCulture)
+                : $"背包 / {definition.InventoryType} / 堆叠未知";
+        }
+
+        if (definition.StorageKind != QuantityItemStorageKind.EstateItems)
+        {
+            return FormatItemStorage(definition.StorageKind);
+        }
+
+        return definition.EstateCanBeProvision switch
+        {
+            true => "庄园物品 / 可配给进副本",
+            false => "庄园物品 / 不可配给进副本",
+            null => "庄园物品 / 配给规则未声明"
+        };
+    }
+
+    private static string FormatQuantityItemBoundaryWarning(QuantityItemDefinition definition)
+    {
+        if (definition.StorageKind == QuantityItemStorageKind.RaidInventory)
+        {
+            return definition.InventoryType.Equals("quest_item", StringComparison.OrdinalIgnoreCase)
+                ? "任务物品可能影响当前任务目标，请确认所选 ID 与当前副本相符。"
+                : string.Empty;
+        }
+
+        if (definition.StorageKind != QuantityItemStorageKind.EstateItems)
+        {
+            return string.Empty;
+        }
+
+        return definition.EstateCanBeProvision switch
+        {
+            false => "该物品不可从庄园携入远征。",
+            null => "该物品能否从庄园携入远征尚未确认。",
+            true => string.Empty
+        };
+    }
+
     private static string FormatStorageCapacity(TrinketStorageDefinition? storage)
     {
         return storage is null
@@ -864,6 +1241,12 @@ public partial class MainWindow : Window
     {
         return capacity?.ToString(CultureInfo.InvariantCulture) ?? "未知";
     }
+
+    private static string FormatRaidInventoryCapacity(RaidInventoryStorageDefinition? storage) =>
+        storage?.MaxSlots.ToString(CultureInfo.InvariantCulture) ?? "未知";
+
+    private static string FormatQuantitySaveContext(QuantityItemSaveContext saveContext) =>
+        saveContext == QuantityItemSaveContext.Raid ? "副本背包" : "小镇庄园";
 
     private static string ComputeSha256(string path)
     {
@@ -902,6 +1285,33 @@ public partial class MainWindow : Window
         {
             CrashDiagnostics.RecordException(diagnosticSource, ex, message);
         }
+    }
+
+    private sealed record ItemRow(QuantityItemDefinition Definition)
+    {
+        public string Id => Definition.DisplayId;
+        public string ChineseName => FormatLocalizedName(Definition.LocalizedName.Chinese);
+        public string EnglishName => FormatLocalizedName(Definition.LocalizedName.English);
+        public string Storage => FormatItemStorage(Definition);
+        public int CurrentAmount => Definition.CurrentAmount;
+        public string Source
+        {
+            get
+            {
+                var source = string.IsNullOrWhiteSpace(Definition.SourceLabel)
+                    ? Definition.Source
+                    : Definition.SourceLabel;
+                return Definition.IsPresentInSave &&
+                       Definition.ReferenceStatus == QuantityItemReferenceStatus.SuspectedUnused
+                    ? $"{source}（存档残留）"
+                    : source;
+            }
+        }
+        public string DisplayName => !string.IsNullOrWhiteSpace(Definition.LocalizedName.Chinese)
+            ? Definition.LocalizedName.Chinese
+            : !string.IsNullOrWhiteSpace(Definition.LocalizedName.English)
+                ? Definition.LocalizedName.English
+                : Definition.DisplayId;
     }
 
     private sealed record TrinketRow(TrinketDefinition Definition)

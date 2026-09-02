@@ -238,14 +238,13 @@ public static class HeroClassCatalog
             definition => definition.SourcePath,
             GetBuffSignature,
             "Buff",
-            issues);
-        var effectiveUpgrades = ResolveUniqueDefinitions(
+            issues,
+            reportConflicts: false);
+        var effectiveUpgrades = ResolveHeroUpgradeDefinitions(
             upgradeCandidates,
+            candidates,
+            heroOverridesByClass,
             sourcesById,
-            definition => definition.Source,
-            definition => definition.SourcePath,
-            GetHeroUpgradeSignature,
-            "Hero upgrade",
             issues);
         var resolveLevelThresholds = ReadEffectiveResolveLevelThresholds(rosterVariableFiles, issues);
         var effectiveEvents = ResolveUniqueDefinitions(
@@ -365,7 +364,8 @@ public static class HeroClassCatalog
         Func<T, string> getSourcePath,
         Func<T, string> getSemanticSignature,
         string contentLabel,
-        List<string> issues)
+        List<string> issues,
+        bool reportConflicts = true)
     {
         var result = new Dictionary<string, T>(StringComparer.OrdinalIgnoreCase);
         foreach (var pair in candidates)
@@ -384,14 +384,144 @@ public static class HeroClassCatalog
                 continue;
             }
 
-            issues.Add(
-                $"{contentLabel} '{pair.Key}' has conflicting definitions at the same effective priority and was left unresolved: " +
-                string.Join(
-                    " | ",
-                    effective.Select(candidate => $"{getSource(candidate)}:{getSourcePath(candidate)}")));
+            if (reportConflicts)
+            {
+                issues.Add(
+                    $"{contentLabel} '{pair.Key}' has conflicting definitions at the same effective priority and was left unresolved: " +
+                    string.Join(
+                        " | ",
+                        effective.Select(candidate => $"{getSource(candidate)}:{getSourcePath(candidate)}")));
+            }
         }
 
         return result;
+    }
+
+    private static IReadOnlyDictionary<string, HeroUpgradeDefinition> ResolveHeroUpgradeDefinitions(
+        Dictionary<string, List<HeroUpgradeDefinition>> candidates,
+        IReadOnlyDictionary<string, List<HeroCandidate>> heroCandidates,
+        IReadOnlyDictionary<string, IReadOnlyList<EffectiveContentFile>> heroOverridesByClass,
+        IReadOnlyDictionary<string, ActiveContentSource> sourcesById,
+        List<string> issues)
+    {
+        var result = new Dictionary<string, HeroUpgradeDefinition>(StringComparer.OrdinalIgnoreCase);
+        foreach (var pair in candidates)
+        {
+            var effective = SelectEffectiveDefinitions(
+                pair.Value,
+                sourcesById,
+                definition => definition.Source,
+                definition => definition.SourcePath,
+                GetHeroUpgradeSignature);
+            pair.Value.Clear();
+            pair.Value.AddRange(effective);
+            if (effective.Count == 1)
+            {
+                result[pair.Key] = effective[0];
+                continue;
+            }
+
+            HeroCandidate? selectedHero = null;
+            if (heroCandidates.TryGetValue(pair.Key, out var classCandidates))
+            {
+                var effectiveHeroes = SelectEffectiveDefinitions(
+                    classCandidates,
+                    sourcesById,
+                    candidate => candidate.Source,
+                    candidate => candidate.SourcePath,
+                    GetHeroCandidateSignature);
+                if (effectiveHeroes.Count == 1)
+                {
+                    selectedHero = ApplyHeroOverrides(
+                        effectiveHeroes[0],
+                        heroOverridesByClass.TryGetValue(pair.Key, out var overrideFiles)
+                            ? overrideFiles
+                            : [],
+                        sourcesById);
+                }
+            }
+
+            var compatible = selectedHero is null
+                ? null
+                : SelectCompatibleHeroUpgrade(selectedHero, effective);
+            if (compatible is not null)
+            {
+                result[pair.Key] = compatible;
+                continue;
+            }
+
+            issues.Add(
+                $"Hero upgrade '{pair.Key}' has conflicting definitions at the same effective priority and was left unresolved: " +
+                string.Join(
+                    " | ",
+                    effective.Select(candidate => $"{candidate.Source}:{candidate.SourcePath}")));
+        }
+
+        return result;
+    }
+
+    private static HeroUpgradeDefinition? SelectCompatibleHeroUpgrade(
+        HeroCandidate hero,
+        IReadOnlyList<HeroUpgradeDefinition> candidates)
+    {
+        var expectedTreeIds = hero.CombatSkillIds
+            .ToDictionary(
+                skillId => $"{hero.Id}.{skillId}",
+                skillId => skillId,
+                StringComparer.Ordinal);
+        var singleLevelSkillIds = hero.CombatSkillLevels
+            .Where(pair => pair.Value.Count == 1 && pair.Value[0] == 0)
+            .Select(pair => pair.Key)
+            .ToHashSet(StringComparer.Ordinal);
+        var ranked = candidates
+            .Select(candidate =>
+            {
+                var combatTreeIds = candidate.Trees
+                    .Where(tree => tree.Kind == HeroUpgradeTreeKind.CombatSkill)
+                    .Select(tree => tree.Id)
+                    .ToHashSet(StringComparer.Ordinal);
+                var unsupportedMissing = expectedTreeIds
+                    .Where(pair => !combatTreeIds.Contains(pair.Key) &&
+                                   !singleLevelSkillIds.Contains(pair.Value))
+                    .Count();
+                var equipmentFailures =
+                    (string.IsNullOrWhiteSpace(BuildEquipmentProgression(
+                        "weapon",
+                        hero.WeaponRanks,
+                        candidate.WeaponRequirements,
+                        requireHp: false).UnsupportedReason) ? 0 : 1) +
+                    (string.IsNullOrWhiteSpace(BuildEquipmentProgression(
+                        "armour",
+                        hero.ArmourRanks,
+                        candidate.ArmourRequirements,
+                        requireHp: true).UnsupportedReason) ? 0 : 1);
+                return new HeroUpgradeCompatibility(
+                    candidate,
+                    equipmentFailures + unsupportedMissing,
+                    expectedTreeIds.Keys.Count(combatTreeIds.Contains),
+                    combatTreeIds.Count(treeId => !expectedTreeIds.ContainsKey(treeId)));
+            })
+            .OrderBy(item => item.HardFailureCount)
+            .ThenByDescending(item => item.MatchedCombatTreeCount)
+            .ThenBy(item => item.UnexpectedCombatTreeCount)
+            .ToArray();
+        if (ranked.Length == 0)
+        {
+            return null;
+        }
+
+        var best = ranked[0];
+        if (best.HardFailureCount != 0)
+        {
+            return null;
+        }
+
+        return ranked.Skip(1).Any(item =>
+            item.HardFailureCount == best.HardFailureCount &&
+            item.MatchedCombatTreeCount == best.MatchedCombatTreeCount &&
+            item.UnexpectedCombatTreeCount == best.UnexpectedCombatTreeCount)
+            ? null
+            : best.Definition;
     }
 
     private static IReadOnlyList<T> SelectEffectiveDefinitions<T>(
@@ -452,7 +582,9 @@ public static class HeroClassCatalog
         definition.StatSubType,
         definition.Amount,
         definition.RuleType,
-        definition.IsFalseRule
+        definition.IsFalseRule,
+        definition.RuleFloat,
+        definition.RuleString
     });
 
     private static string GetHeroUpgradeSignature(HeroUpgradeDefinition definition) => JsonSerializer.Serialize(new
@@ -487,6 +619,13 @@ public static class HeroClassCatalog
         candidate.ArmourRanks,
         candidate.ColourVariationCount,
         CombatSkillIds = SortSemanticValues(candidate.CombatSkillIds),
+        CombatSkillLevels = candidate.CombatSkillLevels
+            .OrderBy(pair => pair.Key, StringComparer.Ordinal)
+            .Select(pair => new
+            {
+                Id = pair.Key,
+                Levels = pair.Value.OrderBy(level => level).ToArray()
+            }),
         GuaranteedCombatSkillIds = SortSemanticValues(candidate.GuaranteedCombatSkillIds),
         IncompatibleInitialQuirkIds = SortSemanticValues(candidate.IncompatibleInitialQuirkIds),
         SkillEffects = candidate.SkillEffects
@@ -875,6 +1014,7 @@ public static class HeroClassCatalog
                 [],
                 [],
                 [],
+                [],
                 recruitEvents,
                 [],
                 true,
@@ -925,6 +1065,10 @@ public static class HeroClassCatalog
             progression.UnsupportedReason,
             selected.ColourVariationCount,
             selected.CombatSkillIds.ToArray(),
+            selected.CombatSkillIds
+                .Where(skillId => selected.CombatSkillLevels.TryGetValue(skillId, out var levels) &&
+                                  levels.Count == 1 && levels[0] == 0)
+                .ToArray(),
             selected.GuaranteedCombatSkillIds.ToArray(),
             availableCampingSkills
                 .Where(skill => !skill.IsShared)
@@ -1033,27 +1177,40 @@ public static class HeroClassCatalog
         var hpBuffs = referencedBuffs
             .Where(buff => buff.StatSubType.Equals("max_hp", StringComparison.OrdinalIgnoreCase))
             .ToArray();
-        HeroMaxHpModifier? maxHpModifier = null;
-        if (hpBuffs.Length > 1)
+        var maxHpModifiers = new List<HeroMaxHpModifier>(hpBuffs.Length);
+        foreach (var buff in hpBuffs)
         {
-            unverifiedReasons.Add("同一怪癖包含多个 max_hp Buff，叠加方式尚未验证");
-        }
-        else if (hpBuffs.Length == 1)
-        {
-            var buff = hpBuffs[0];
-            var hasSupportedRule =
-                buff.RuleType.Equals("always", StringComparison.OrdinalIgnoreCase) ||
-                buff.RuleType.Equals("no_trinkets", StringComparison.OrdinalIgnoreCase);
-            if (!buff.StatType.Equals("combat_stat_multiply", StringComparison.OrdinalIgnoreCase) ||
-                buff.Amount is null ||
-                buff.IsFalseRule != false ||
-                !hasSupportedRule)
+            var modifierKind = buff.StatType.ToLowerInvariant() switch
+            {
+                "combat_stat_add" => HeroMaxHpModifierKind.Flat,
+                "combat_stat_multiply" => HeroMaxHpModifierKind.Percentage,
+                _ => (HeroMaxHpModifierKind?)null
+            };
+            var hasValidRuleData = buff.RuleType.ToLowerInvariant() switch
+            {
+                "always" or "no_trinkets" or "afflicted" => true,
+                "in_mode" => !string.IsNullOrWhiteSpace(buff.RuleString),
+                "lightabove" => buff.RuleFloat is { } threshold && double.IsFinite(threshold),
+                _ => false
+            };
+            if (modifierKind is null ||
+                buff.Amount is not { } amount ||
+                !double.IsFinite(amount) ||
+                buff.IsFalseRule is null ||
+                !hasValidRuleData)
             {
                 unverifiedReasons.Add($"max_hp Buff '{buff.Id}' 使用了尚未验证的规则");
             }
             else
             {
-                maxHpModifier = new HeroMaxHpModifier(buff.Id, buff.Amount.Value, buff.RuleType);
+                maxHpModifiers.Add(new HeroMaxHpModifier(
+                    buff.Id,
+                    modifierKind.Value,
+                    amount,
+                    buff.RuleType,
+                    buff.IsFalseRule.Value,
+                    buff.RuleFloat,
+                    buff.RuleString));
             }
         }
 
@@ -1096,7 +1253,7 @@ public static class HeroClassCatalog
             quirk.IsDisease,
             evolution,
             quirk.IncompatibleQuirks,
-            maxHpModifier,
+            maxHpModifiers.ToArray(),
             kind,
             kind == HeroInitialQuirkKind.Natural && writeStatus == HeroInitialQuirkWriteStatus.Direct,
             writeStatus,
@@ -1179,18 +1336,18 @@ public static class HeroClassCatalog
             if (kind.Equals("combat_skill", StringComparison.OrdinalIgnoreCase))
             {
                 var level = ReadInt(attributes, "level");
-                if (level is not null and not 0)
-                {
-                    continue;
-                }
-
                 var skillId = ReadString(attributes, "id");
                 if (string.IsNullOrWhiteSpace(skillId))
                 {
                     continue;
                 }
 
-                builder.AddCombatSkill(skillId);
+                builder.AddCombatSkill(skillId, level ?? 0);
+                if (level is not null and not 0)
+                {
+                    continue;
+                }
+
                 if (ReadBooleanFlag(attributes, "generation_guaranteed") is { } generationGuaranteed)
                 {
                     builder.SetGuaranteedCombatSkill(skillId, generationGuaranteed);
@@ -1383,6 +1540,9 @@ public static class HeroClassCatalog
                 continue;
             }
 
+            var hasRuleData = item.TryGetProperty("rule_data", out var ruleData) &&
+                              ruleData.ValueKind == JsonValueKind.Object;
+
             yield return new BuffDefinition(
                 id,
                 ReadJsonString(item, "stat_type"),
@@ -1390,6 +1550,8 @@ public static class HeroClassCatalog
                 ReadJsonDouble(item, "amount"),
                 ReadJsonString(item, "rule_type"),
                 ReadJsonBoolean(item, "is_false_rule"),
+                hasRuleData ? ReadJsonDouble(ruleData, "float") : null,
+                hasRuleData ? ReadJsonString(ruleData, "string") : string.Empty,
                 source,
                 Path.GetFullPath(path));
         }
@@ -2089,6 +2251,8 @@ public static class HeroClassCatalog
         private string _townEventDependency = string.Empty;
         private readonly List<string> _combatSkillIds = [];
         private readonly HashSet<string> _combatSkillSet = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, HashSet<int>> _combatSkillLevels =
+            new(StringComparer.Ordinal);
         private readonly List<string> _guaranteedCombatSkillIds = [];
         private readonly HashSet<string> _guaranteedCombatSkillSet = new(StringComparer.Ordinal);
         private readonly Dictionary<int, HeroEquipmentRank> _weaponRanks = [];
@@ -2133,9 +2297,12 @@ public static class HeroClassCatalog
                 _townEventDependency = generation.TownEventDependency;
             }
 
-            foreach (var skillId in candidate.CombatSkillIds)
+            foreach (var skill in candidate.CombatSkillLevels)
             {
-                AddCombatSkill(skillId);
+                foreach (var level in skill.Value)
+                {
+                    AddCombatSkill(skill.Key, level);
+                }
             }
 
             foreach (var skillId in candidate.GuaranteedCombatSkillIds)
@@ -2170,9 +2337,16 @@ public static class HeroClassCatalog
         public int ColourVariationCount { get; set; }
         public HashSet<string> IncompatibleInitialQuirkIds { get; } = new(StringComparer.OrdinalIgnoreCase);
 
-        public void AddCombatSkill(string id)
+        public void AddCombatSkill(string id, int level)
         {
-            if (_combatSkillSet.Add(id))
+            if (!_combatSkillLevels.TryGetValue(id, out var levels))
+            {
+                levels = [];
+                _combatSkillLevels[id] = levels;
+            }
+
+            levels.Add(level);
+            if (level == 0 && _combatSkillSet.Add(id))
             {
                 _combatSkillIds.Add(id);
             }
@@ -2347,6 +2521,10 @@ public static class HeroClassCatalog
                 _armourRanks.Values.OrderBy(rank => rank.Rank).ToArray(),
                 ColourVariationCount,
                 _combatSkillIds.ToArray(),
+                _combatSkillLevels.ToDictionary(
+                    pair => pair.Key,
+                    pair => (IReadOnlyList<int>)pair.Value.OrderBy(level => level).ToArray(),
+                    StringComparer.Ordinal),
                 _guaranteedCombatSkillIds.ToArray(),
                 IncompatibleInitialQuirkIds.ToArray(),
                 skillEffects);
@@ -2366,6 +2544,7 @@ public static class HeroClassCatalog
         IReadOnlyList<HeroEquipmentRank> ArmourRanks,
         int ColourVariationCount,
         IReadOnlyList<string> CombatSkillIds,
+        IReadOnlyDictionary<string, IReadOnlyList<int>> CombatSkillLevels,
         IReadOnlyList<string> GuaranteedCombatSkillIds,
         IReadOnlyList<string> IncompatibleInitialQuirkIds,
         IReadOnlyList<SkillEffectReference> SkillEffects);
@@ -2407,6 +2586,8 @@ public static class HeroClassCatalog
         double? Amount,
         string RuleType,
         bool? IsFalseRule,
+        double? RuleFloat,
+        string RuleString,
         string Source,
         string SourcePath);
     private sealed record CampingSkillDefinition(
@@ -2460,6 +2641,12 @@ public static class HeroClassCatalog
         IReadOnlyList<HeroUpgradeTreeDefinition> Trees,
         string Source,
         string SourcePath);
+
+    private sealed record HeroUpgradeCompatibility(
+        HeroUpgradeDefinition Definition,
+        int HardFailureCount,
+        int MatchedCombatTreeCount,
+        int UnexpectedCombatTreeCount);
 
     private sealed record ResolvedEquipmentRank(
         int Rank,
