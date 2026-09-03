@@ -10,9 +10,14 @@ internal static partial class ContractSuite
             appSourceDirectory,
             "MainWindow.xaml");
         var mainWindowXaml = System.Xml.Linq.XDocument.Load(mainWindowXamlPath);
-        var mainWindowCode = File.ReadAllText(Path.Combine(
-            appSourceDirectory,
-            "MainWindow.xaml.cs"));
+        var mainWindowCode = string.Join(
+            Environment.NewLine,
+            Directory.EnumerateFiles(
+                    appSourceDirectory,
+                    "MainWindow*.cs",
+                    SearchOption.TopDirectoryOnly)
+                .OrderBy(path => path, StringComparer.Ordinal)
+                .Select(File.ReadAllText));
         var battleMapXamlPath = Path.Combine(
             appSourceDirectory,
             "BattleMapView.xaml");
