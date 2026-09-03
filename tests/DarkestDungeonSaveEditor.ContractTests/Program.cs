@@ -27,6 +27,41 @@ var mainWindowCode = File.ReadAllText(Path.Combine(
     "src",
     "DarkestDungeonSaveEditor.App",
     "MainWindow.xaml.cs"));
+var battleMapXamlPath = Path.Combine(
+    repositoryRoot,
+    "src",
+    "DarkestDungeonSaveEditor.App",
+    "BattleMapView.xaml");
+var battleMapXaml = System.Xml.Linq.XDocument.Load(battleMapXamlPath);
+var battleMapCode = File.ReadAllText(Path.Combine(
+    repositoryRoot,
+    "src",
+    "DarkestDungeonSaveEditor.App",
+    "BattleMapView.xaml.cs"));
+var battleMapReaderCode = File.ReadAllText(Path.Combine(
+    repositoryRoot,
+    "src",
+    "DarkestDungeonSaveEditor.Core",
+    "BattleMapSnapshotReader.cs"));
+var battleMapEditorCode = File.ReadAllText(Path.Combine(
+    repositoryRoot,
+    "src",
+    "DarkestDungeonSaveEditor.Core",
+    "BattleMapSaveEditor.cs"));
+var battleMapEditServiceCode = File.ReadAllText(Path.Combine(
+    repositoryRoot,
+    "src",
+    "DarkestDungeonSaveEditor.Core",
+    "BattleMapEditService.cs"));
+var profileSaveMonitorCode = File.ReadAllText(Path.Combine(
+    repositoryRoot,
+    "src",
+    "DarkestDungeonSaveEditor.Core",
+    "ProfileSaveMonitor.cs"));
+var battleMapDesign = File.ReadAllText(Path.Combine(
+    repositoryRoot,
+    "docs",
+    "battle-map-editor-design.md"));
 var appCode = File.ReadAllText(Path.Combine(
     repositoryRoot,
     "src",
@@ -608,14 +643,16 @@ Assert(
     tabHeaderPresenter.Attribute("HorizontalAlignment")?.Value == "Center" &&
     tabHeaderPresenter.Attribute("VerticalAlignment")?.Value == "Center" &&
     catalogTabHeaderPanel.Attribute("Rows")?.Value == "1" &&
-        catalogTabHeaderPanel.Attribute("Columns")?.Value == "3" &&
+        catalogTabHeaderPanel.Attribute("Columns")?.Value == "4" &&
     catalogTabHeaderPanel.Attribute("Margin")?.Value == "0,0,0,5" &&
     !tabItemStyle.Descendants(presentationNamespace + "Trigger")
         .Any(trigger => trigger.Attribute("Property")?.Value == "IsKeyboardFocused") &&
-    mainWindowXaml.Descendants(presentationNamespace + "TabItem")
+    mainWindowXaml.Descendants(presentationNamespace + "TabItem").Take(3)
         .All(tabItem => tabItem.Elements(presentationNamespace + "DataGrid").Count() == 1 &&
-                        !tabItem.Elements(presentationNamespace + "Border").Any()),
-        "The three catalog tabs must share the full width equally, keep only their headers centered, stretch result content from the top edge, and avoid a nested border around their grids.");
+                        !tabItem.Elements(presentationNamespace + "Border").Any()) &&
+    mainWindowXaml.Descendants(presentationNamespace + "TabItem").Skip(3).Single()
+        .Elements().Single().Name.LocalName == "BattleMapView",
+        "The three catalogs plus battle workspace must share the full width equally, keep their headers centered, and avoid wrapping the existing catalog grids in nested borders.");
     var catalogTabHeaders = mainWindowXaml
         .Descendants(presentationNamespace + "TabItem")
         .Select(tab => tab.Attribute("Header")?.Value)
@@ -638,7 +675,7 @@ Assert(
             StringComparison.Ordinal);
     Assert(
         catalogTabHeaders.SequenceEqual(
-            new[] { "物品  /  ITEMS", "饰品  /  TRINKETS", "人物  /  HEROES" },
+            new[] { "物品  /  ITEMS", "饰品  /  TRINKETS", "人物  /  HEROES", "战斗  /  BATTLE" },
             StringComparer.Ordinal) &&
         mainWindowCode.Contains("QuantityItemCatalog.LoadAsync(activeContent, codec)", StringComparison.Ordinal) &&
         showUnusedItemsCheckBox.Attribute("Checked")?.Value == "ShowUnusedItemsCheckBox_Changed" &&
@@ -685,6 +722,147 @@ Assert(
         mainWindowCode.Contains("expectedInRaid ? profile.RaidSavePath : profile.EstateSavePath", StringComparison.Ordinal) &&
         mainWindowCode.Contains("副本背包  /  RAID ITEMS", StringComparison.Ordinal),
         "The quantity editor must appear immediately left of trinkets, use an absolute target amount, switch between town storage and the current raid inventory, keep only concise user-facing risks, retain persisted unused definitions, invalidate stale previews when input changes, and reject stale displayed quantities or a changed town/raid state.");
+var battleMapRoot = battleMapXaml.Root ??
+    throw new InvalidDataException("BattleMapView.xaml has no root element.");
+var battleMapNamedElements = battleMapXaml
+    .Descendants()
+    .Select(element => element.Attribute(xamlName)?.Value)
+    .Where(value => value is not null)
+    .ToHashSet(StringComparer.Ordinal);
+Assert(
+    battleMapNamedElements.Contains("MapViewport") &&
+    battleMapNamedElements.Contains("MapCanvas") &&
+    battleMapNamedElements.Contains("EmptyStatePanel") &&
+    battleMapNamedElements.Contains("MapSelectionTextBlock") &&
+    battleMapNamedElements.Contains("PrototypeBadgeTextBlock") &&
+    !battleMapNamedElements.Contains("MapLegend") &&
+    battleMapRoot.Attribute("PreviewMouseWheel")?.Value == "BattleMapView_PreviewMouseWheel" &&
+    battleMapRoot.Attribute("PreviewMouseRightButtonDown")?.Value ==
+        "BattleMapView_PreviewMouseRightButtonDown" &&
+    battleMapRoot.Attribute("PreviewMouseRightButtonUp")?.Value ==
+        "BattleMapView_PreviewMouseRightButtonUp" &&
+    battleMapRoot.Attribute("PreviewMouseMove")?.Value == "BattleMapView_PreviewMouseMove" &&
+    battleMapRoot.Attribute("Unloaded") is null &&
+    battleMapCode.Contains("PanThreshold = 5", StringComparison.Ordinal) &&
+    battleMapCode.Contains("MinimumZoom = 0.45", StringComparison.Ordinal) &&
+    battleMapCode.Contains("MaximumZoom = 2.40", StringComparison.Ordinal) &&
+    battleMapCode.Contains("FitMapToViewport", StringComparison.Ordinal) &&
+    battleMapCode.Contains("hasPersistedContent ? \"替换\" : \"新建\"", StringComparison.Ordinal) &&
+    battleMapCode.Contains("移动队伍到此", StringComparison.Ordinal) &&
+    !battleMapCode.Contains("PrototypeCellKind.CorridorEndpoint", StringComparison.Ordinal) &&
+    !battleMapCode.Contains("PrototypeCellKind.DoorTransition", StringComparison.Ordinal) &&
+    !battleMapCode.Contains("EndpointInteractionTarget", StringComparison.Ordinal) &&
+    !battleMapCode.Contains("IsEndpointHovered", StringComparison.Ordinal) &&
+    battleMapCode.Contains("CloseActiveContextMenu", StringComparison.Ordinal) &&
+    battleMapCode.Contains("if (!_cells.Contains(cell))", StringComparison.Ordinal) &&
+    battleMapCode.Contains("cell.Kind == PrototypeCellKind.Room ? 20 : 0", StringComparison.Ordinal) &&
+    battleMapCode.Contains("area.Kind != BattleMapAreaKind.Corridor || tile.StaticType == 1", StringComparison.Ordinal) &&
+    battleMapCode.Contains("tile.MapY - minimumY", StringComparison.Ordinal) &&
+    !battleMapCode.Contains("maximumY - tile.MapY", StringComparison.Ordinal) &&
+    battleMapCode.Contains("_cells.Count} 个可操作格", StringComparison.Ordinal) &&
+    battleMapCode.Contains("_selectedCell = null;", StringComparison.Ordinal) &&
+    battleMapCode.Contains("BuildPrototypeMap();", StringComparison.Ordinal) &&
+    battleMapCode.Contains("首领遭遇", StringComparison.Ordinal) &&
+    battleMapCode.Contains("原版 / BASE", StringComparison.Ordinal) &&
+    battleMapCode.Contains("官方 DLC / DLC", StringComparison.Ordinal) &&
+    battleMapCode.Contains("Mod / MODS", StringComparison.Ordinal) &&
+    battleMapCode.Contains(@"panels\panel_map.png", StringComparison.Ordinal) &&
+    battleMapCode.Contains(@"panels\icons_map", StringComparison.Ordinal) &&
+    battleMapCode.Contains("room_boss.png", StringComparison.Ordinal) &&
+    !battleMapCode.Contains("TryLoadMapIcon(\"hall_door.png\")", StringComparison.Ordinal) &&
+    battleMapCode.Contains("marker_curio.png", StringComparison.Ordinal) &&
+    !battleMapCode.Contains("marker_hunger.png", StringComparison.Ordinal) &&
+    battleMapCode.Contains("IsHiddenSystemContent", StringComparison.Ordinal) &&
+    battleMapCode.Contains("cell.RawContent == (int)BattleMapTileContent.Hunger", StringComparison.Ordinal) &&
+    battleMapCode.Contains("if (!isHiddenSystemContent)", StringComparison.Ordinal) &&
+    battleMapCode.Contains("marker_secret.png", StringComparison.Ordinal) &&
+    battleMapCode.Contains("indicator.png", StringComparison.Ordinal) &&
+    battleMapCode.Contains("PrototypeBadgeTextBlock.Text = \"全局视野\"", StringComparison.Ordinal) &&
+    battleMapCode.Contains("PrototypeBadge.ToolTip = _usesOriginalMapAssets", StringComparison.Ordinal) &&
+    !battleMapCode.Contains("全局视野 · 预览模式 · 占位素材", StringComparison.Ordinal) &&
+    !battleMapCode.Contains("实时只读 · 全局视野 · 操作不写入", StringComparison.Ordinal) &&
+    !battleMapCode.Contains("只读监听 · 已同步", StringComparison.Ordinal) &&
+    !battleMapCode.Contains("真实地图：", StringComparison.Ordinal) &&
+    !battleMapCode.Contains("右击操作仍只作用于界面预览", StringComparison.Ordinal) &&
+    battleMapCode.Split("存档未发生变化。", StringSplitOptions.None).Length - 1 == 3 &&
+    battleMapCode.Contains("cell.Knowledge is PrototypeKnowledge.Unknown or PrototypeKnowledge.Scouted", StringComparison.Ordinal) &&
+    !battleMapCode.Contains("return TryLoadMapIcon(\"room_unknown.png\")", StringComparison.Ordinal) &&
+    !battleMapCode.Contains("return TryLoadMapIcon(\"hall_dark.png\")", StringComparison.Ordinal) &&
+    !battleMapCode.Contains("cell.Knowledge != PrototypeKnowledge.Unknown &&", StringComparison.Ordinal) &&
+    !battleMapCode.Contains("Knowledge = PrototypeKnowledge.Visited", StringComparison.Ordinal) &&
+    battleMapCode.Contains("missingPartyMarker", StringComparison.Ordinal) &&
+    battleMapCode.Contains("missingCompletionMarker", StringComparison.Ordinal) &&
+    battleMapCode.Contains("BitmapCacheOption.OnLoad", StringComparison.Ordinal) &&
+    battleMapCode.Contains("new CroppedBitmap(bitmap, new Int32Rect(12, 18, 648, 326))", StringComparison.Ordinal) &&
+    battleMapCode.Contains("ViewportUnits = BrushMappingMode.RelativeToBoundingBox", StringComparison.Ordinal) &&
+    battleMapCode.Contains("TileMode = TileMode.None", StringComparison.Ordinal) &&
+    battleMapCode.Contains("BattleMapSnapshotReader", StringComparison.Ordinal) &&
+    battleMapCode.Contains("ProfileSaveMonitor", StringComparison.Ordinal) &&
+    battleMapCode.Contains("persist.map.json", StringComparison.Ordinal) &&
+    battleMapCode.Contains("persist.raid.json", StringComparison.Ordinal) &&
+    battleMapCode.Contains("BuildSnapshotMap", StringComparison.Ordinal) &&
+    battleMapCode.Contains("stagedCells", StringComparison.Ordinal) &&
+    battleMapCode.Contains("MapGridTileSize = 24", StringComparison.Ordinal) &&
+    battleMapCode.Contains("LoadSnapshotWithRetryAsync", StringComparison.Ordinal) &&
+    battleMapCode.Contains("ScheduleRefreshRetry", StringComparison.Ordinal) &&
+    battleMapCode.Contains("RetryLiveSnapshotAfterDelayAsync", StringComparison.Ordinal) &&
+    battleMapCode.Contains("mapExists != raidExists", StringComparison.Ordinal) &&
+    battleMapCode.Contains("保留上一快照 · 等待另一份副本存档", StringComparison.Ordinal) &&
+    battleMapReaderCode.Contains("sourceHashBefore", StringComparison.Ordinal) &&
+    battleMapReaderCode.Contains("sourceHashAfter", StringComparison.Ordinal) &&
+    battleMapReaderCode.Contains("PairVerificationDelay", StringComparison.Ordinal) &&
+    battleMapReaderCode.Contains("structuralIssues", StringComparison.Ordinal) &&
+    battleMapReaderCode.Contains("does not belong to the captured map topology", StringComparison.Ordinal) &&
+    battleMapReaderCode.Contains("area.Tiles.Count - 1 - savedAreaTile.Value", StringComparison.Ordinal) &&
+    battleMapReaderCode.Contains("return area.Tiles[physicalOrdinal].TileIndex", StringComparison.Ordinal) &&
+    profileSaveMonitorCode.Contains("FileSystemWatcher", StringComparison.Ordinal) &&
+    profileSaveMonitorCode.Contains("PollNow", StringComparison.Ordinal) &&
+    profileSaveMonitorCode.Contains("DetectChangesAndSchedule", StringComparison.Ordinal) &&
+    battleMapCode.Contains("BattleMapEditService", StringComparison.Ordinal) &&
+    battleMapCode.Contains("PrepareDeleteContentAsync", StringComparison.Ordinal) &&
+    battleMapCode.Contains("PrepareMovePartyAsync", StringComparison.Ordinal) &&
+    battleMapCode.Contains("ThemedDialog.Confirm", StringComparison.Ordinal) &&
+    !battleMapCode.Contains("File.Write", StringComparison.Ordinal) &&
+    !battleMapCode.Contains("File.Copy", StringComparison.Ordinal) &&
+    !battleMapCode.Contains("File.Move", StringComparison.Ordinal) &&
+    !battleMapCode.Contains("File.Delete", StringComparison.Ordinal) &&
+    battleMapEditorCode.Contains("dynamicTile[\"content\"] = 0", StringComparison.Ordinal) &&
+    battleMapEditorCode.Contains("dynamicTile[\"mash_index\"] = -1", StringComparison.Ordinal) &&
+    battleMapEditorCode.Contains("area.Tiles.Count - 1 - physicalOrdinal", StringComparison.Ordinal) &&
+    battleMapEditorCode.Contains("ValidateStationaryRaidState", StringComparison.Ordinal) &&
+    battleMapEditorCode.Contains("当前正在战斗，不能修改地图", StringComparison.Ordinal) &&
+    battleMapEditorCode.Contains("饥饿节点不属于地图编辑范围", StringComparison.Ordinal) &&
+    battleMapEditServiceCode.Contains("EnsureGameIsNotRunning", StringComparison.Ordinal) &&
+    battleMapEditServiceCode.Contains("检测到《暗黑地牢》仍在运行", StringComparison.Ordinal) &&
+    battleMapEditServiceCode.Contains("ValidateLivePair", StringComparison.Ordinal) &&
+    battleMapEditServiceCode.Contains("CreateBackup", StringComparison.Ordinal) &&
+    battleMapEditServiceCode.Contains("RestoreTarget", StringComparison.Ordinal),
+    "The battle workspace must expose a pannable, zoomable real save map rendered from original sprites, keep native hidden hunger nodes visually and operationally out of content editing, limit interaction to rooms and visible corridor tiles in native map orientation, keep create/replace as previews, and route confirmed delete/move actions through guarded, backed-up save transactions with localized safety errors.");
+Assert(
+    mainWindowXaml.Descendants()
+        .Any(element => element.Name.LocalName == "BattleMapView" &&
+                        element.Attribute(xamlName)?.Value == "BattleMapPanel") &&
+    mainWindowCode.Contains("private const int BattleTabIndex = 3;", StringComparison.Ordinal) &&
+    mainWindowCode.Contains("CatalogToolsPanel.Visibility = isBattleTab ? Visibility.Collapsed", StringComparison.Ordinal) &&
+    mainWindowCode.Contains("CatalogActionPanel.Visibility = isBattleTab ? Visibility.Collapsed", StringComparison.Ordinal) &&
+    mainWindowCode.Contains("BattleMapPanel.LoadProfileAsync", StringComparison.Ordinal) &&
+    mainWindowCode.Contains("BattleMapPanel.ClearProfile();", StringComparison.Ordinal) &&
+    mainWindowCode.Contains("protected override void OnClosed", StringComparison.Ordinal) &&
+    mainWindowCode.Contains("BattleMapPanel.SnapshotRefreshed -=", StringComparison.Ordinal) &&
+    mainWindowCode.Contains("LoadCatalog: battle map snapshot", StringComparison.Ordinal) &&
+    battleMapDesign.Contains("transactional delete and party movement", StringComparison.OrdinalIgnoreCase) &&
+    battleMapDesign.Contains("loaded at runtime from the user's selected Darkest Dungeon installation", StringComparison.Ordinal) &&
+    battleMapDesign.Contains("Original game artwork is not copied into or redistributed", StringComparison.Ordinal) &&
+    battleMapDesign.Contains("boss picker is global", StringComparison.OrdinalIgnoreCase) &&
+    battleMapDesign.Contains("does not render, select, right-click, or offer movement", StringComparison.Ordinal) &&
+    battleMapDesign.Contains("must not apply a Cartesian Y-axis inversion", StringComparison.Ordinal) &&
+    battleMapDesign.Contains("display-only global-vision rule", StringComparison.Ordinal) &&
+    battleMapDesign.Contains("does not reveal the map inside the game or write scouting progress", StringComparison.Ordinal) &&
+    battleMapDesign.Contains("Content previews must preserve the cell's persisted knowledge state", StringComparison.Ordinal) &&
+    battleMapDesign.Contains("does not read game process memory", StringComparison.OrdinalIgnoreCase) &&
+    battleMapDesign.Contains("create and replace remain preview-only", StringComparison.OrdinalIgnoreCase) &&
+    battleMapDesign.Contains("full-profile backup", StringComparison.OrdinalIgnoreCase),
+    "The battle tab must hide catalog-only controls, show and refresh a real map only for a loaded raid, and retain the approved global-vision, arbitrary-boss, normal-tile-only, native-orientation, delete, and movement decisions in durable documentation.");
 var rightSelectionPanel = mainWindowXaml
     .Descendants(presentationNamespace + "ContentControl")
     .Single(control => control.Attribute("Content")?.Value == "选择要生成的内容")
@@ -2782,6 +2960,452 @@ File.WriteAllText(
     new UTF8Encoding(false));
 
 var codec = new DsonSaveCodec(jarPath);
+var battleMapProfileRoot = Path.Combine(runRoot, "battle-map-profile");
+Directory.CreateDirectory(battleMapProfileRoot);
+var battleMapFixturePath = Path.Combine(battleMapProfileRoot, "persist.map.json");
+var battleRaidFixturePath = Path.Combine(battleMapProfileRoot, "persist.raid.json");
+File.WriteAllText(
+    battleMapFixturePath,
+    """
+    {
+      "base_root": {
+        "map": {
+          "bounds": [-1.0, 5.0, 0.0, 0.0],
+          "entrance_id": 100,
+          "final_room_id": 200,
+          "static_dynamic": {
+            "static_save": {
+              "base_root": {
+                "areas": {
+                  "rooA": {
+                    "id": 100,
+                    "kind": 0,
+                    "tiles": {
+                      "tile0": { "type": 3, "obstacle": 0, "mappos": [-1.0, 0.0] }
+                    }
+                  },
+                  "coAB": {
+                    "id": 150,
+                    "kind": 1,
+                    "tiles": {
+                      "tile0": { "type": 2, "obstacle": 0, "mappos": [0.0, 0.0], "door_to": { "area_to": 100, "tile_to": 0, "implied": false, "type": 0 } },
+                      "tile1": { "type": 1, "obstacle": 0, "mappos": [1.0, 0.0] },
+                      "tile2": { "type": 1, "obstacle": 0, "mappos": [2.0, 0.0] },
+                      "tile3": { "type": 1, "obstacle": 0, "mappos": [3.0, 0.0] },
+                      "tile4": { "type": 2, "obstacle": 0, "mappos": [4.0, 0.0], "door_to": { "area_to": 200, "tile_to": 0, "implied": false, "type": 0 } }
+                    }
+                  },
+                  "rooB": {
+                    "id": 200,
+                    "kind": 0,
+                    "tiles": {
+                      "tile0": { "type": 3, "obstacle": 0, "mappos": [5.0, 0.0] }
+                    }
+                  }
+                }
+              }
+            },
+            "areas": {
+              "rooA": {
+                "knowledge": 3,
+                "reversed": false,
+                "tiles": {
+                  "tile0": { "content": 0, "knowledge": 3, "mash_index": -1, "mash_type": 7 }
+                }
+              },
+              "coAB": {
+                "knowledge": 2,
+                "reversed": true,
+                "tiles": {
+                  "tile0": { "content": 0, "knowledge": 2, "mash_index": -1, "mash_type": 7 },
+                  "tile1": { "content": 3, "knowledge": 2, "trap": 321, "mash_index": -1, "mash_type": 7 },
+                  "tile2": { "content": 10, "knowledge": 2, "curio_prop": 987, "mash_index": 12, "mash_type": 1 },
+                  "tile3": { "content": 8, "knowledge": 2, "mash_index": -1, "mash_type": 7 },
+                  "tile4": { "content": 0, "knowledge": 2, "mash_index": -1, "mash_type": 7 }
+                }
+              },
+              "rooB": {
+                "knowledge": 1,
+                "reversed": false,
+                "tiles": {
+                  "tile0": { "content": 1, "knowledge": 1, "mash_index": 12, "mash_type": 1 }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    """,
+    new UTF8Encoding(false));
+File.WriteAllText(
+    battleRaidFixturePath,
+    """
+    {
+      "base_root": {
+        "raid_instance": { "dungeon": "cove", "difficulty": 2, "length": 3 },
+        "in_area": 150,
+        "areatile": 1,
+        "last_room_id": 100,
+        "teleported": false,
+        "in_doorway": { "area_to": 1701736302, "tile_to": 0, "implied": true },
+        "camp": { "phase": 0 },
+        "inbattle": false,
+        "loot": {
+          "queue": {},
+          "queue_items": { "items": {} },
+          "owned_items": { "items": {} }
+        },
+        "party": {
+          "IsMovingLeft()": false,
+          "retreat_room": 150,
+          "heroes": []
+        }
+      }
+    }
+    """,
+    new UTF8Encoding(false));
+var battleSnapshot = await new BattleMapSnapshotReader(codec).LoadAsync(battleMapProfileRoot);
+var battleCorridor = battleSnapshot.Areas.Single(area => area.AreaId == "coAB");
+Assert(
+    battleSnapshot.DungeonId == "cove" &&
+    battleSnapshot.Difficulty == 2 &&
+    battleSnapshot.Length == 3 &&
+    battleSnapshot.RoomCount == 2 &&
+    battleSnapshot.CorridorCount == 1 &&
+    battleSnapshot.TileCount == 7 &&
+    battleSnapshot.EntranceAreaId == "rooA" &&
+    battleSnapshot.FinalRoomId == "rooB" &&
+    battleSnapshot.PartyAreaId == "coAB" &&
+    battleSnapshot.PartyTileIndex == 3 &&
+    battleSnapshot.LastRoomId == "rooA" &&
+    battleCorridor.Reversed &&
+    battleCorridor.Tiles[1].Content == BattleMapTileContent.Trap &&
+    battleCorridor.Tiles[1].TrapHash == 321 &&
+    battleCorridor.Tiles[2].Content == BattleMapTileContent.GuardedTreasure &&
+    battleCorridor.Tiles[3].Content == BattleMapTileContent.Hunger &&
+    battleSnapshot.Issues.Count == 0,
+    "The battle-map reader must join static topology to dynamic state, resolve hashed areas, and map direction-relative corridor areatile progress onto the physical static tile.");
+
+var battleEstateFixturePath = Path.Combine(battleMapProfileRoot, "persist.estate.json");
+File.WriteAllText(battleEstateFixturePath, "{}", new UTF8Encoding(false));
+var battleEditLocations = new SaveEditorLocations(
+    Path.Combine(runRoot, "battle-map-appdata"),
+    Path.Combine(runRoot, "battle-map-appdata", "workspaces"),
+    Path.Combine(runRoot, "battle-map-appdata", "backups"));
+var battleEditProfile = new SaveProfile(
+    "profile_battle",
+    battleMapProfileRoot,
+    battleEstateFixturePath,
+    "battle-user",
+    File.GetLastWriteTimeUtc(battleEstateFixturePath));
+var battleEditService = new BattleMapEditService(codec, battleEditLocations);
+var mapHashBeforeRejectedHungerDelete = ComputeSha256(battleMapFixturePath);
+var rejectedHungerDelete = false;
+try
+{
+    _ = await battleEditService.PrepareDeleteContentAsync(
+        battleEditProfile,
+        battleSnapshot,
+        "coAB",
+        "tile3");
+}
+catch (InvalidOperationException ex) when (ex.Message.Contains("不属于地图编辑范围", StringComparison.Ordinal))
+{
+    rejectedHungerDelete = true;
+}
+Assert(
+    rejectedHungerDelete &&
+    ComputeSha256(battleMapFixturePath).Equals(mapHashBeforeRejectedHungerDelete, StringComparison.OrdinalIgnoreCase),
+    "Persisted hunger nodes must remain outside the content-editing contract and byte-identical after a rejected delete.");
+var rejectedDoorTransitionTarget = false;
+try
+{
+    _ = await battleEditService.PrepareMovePartyAsync(
+        battleEditProfile,
+        battleSnapshot,
+        "coAB",
+        "tile0");
+}
+catch (InvalidOperationException)
+{
+    rejectedDoorTransitionTarget = true;
+}
+Assert(
+    rejectedDoorTransitionTarget,
+    "Internal type=2 door-transition nodes must never become writable party destinations.");
+var raidHashBeforeDelete = ComputeSha256(battleRaidFixturePath);
+var preparedBattleDelete = await battleEditService.PrepareDeleteContentAsync(
+    battleEditProfile,
+    battleSnapshot,
+    "coAB",
+    "tile1");
+Assert(
+    preparedBattleDelete.Preview.Kind == BattleMapEditKind.DeleteContent &&
+    preparedBattleDelete.Preview.PreviousRawContent == 3 &&
+    preparedBattleDelete.TargetFile.FileName == "persist.map.json",
+    "Battle-map deletion must bind the exact persisted area/tile and prepare only persist.map.json for replacement.");
+var battleDeleteCommit = await battleEditService.CommitAsync(preparedBattleDelete);
+var battleSnapshotAfterDelete = await new BattleMapSnapshotReader(codec).LoadAsync(battleMapProfileRoot);
+var deletedBattleTile = battleSnapshotAfterDelete.Areas
+    .Single(area => area.AreaId == "coAB")
+    .Tiles.Single(tile => tile.TileId == "tile1");
+var backedUpBattleMap = JsonNode.Parse(File.ReadAllText(
+    Path.Combine(battleDeleteCommit.BackupDirectory, "persist.map.json")))!.AsObject();
+var backedUpDeletedTile = backedUpBattleMap["base_root"]!["map"]!["static_dynamic"]!["areas"]!["coAB"]!["tiles"]!["tile1"]!.AsObject();
+Assert(
+    deletedBattleTile.RawContent == 0 &&
+    deletedBattleTile.Knowledge == BattleMapTileKnowledge.Scouted &&
+    deletedBattleTile.TrapHash == 321 &&
+    deletedBattleTile.MashIndex == -1 &&
+    deletedBattleTile.MashType == 7 &&
+    ComputeSha256(battleRaidFixturePath).Equals(raidHashBeforeDelete, StringComparison.OrdinalIgnoreCase) &&
+    backedUpDeletedTile["content"]!.GetValue<int>() == 3 &&
+    File.Exists(Path.Combine(battleDeleteCommit.BackupDirectory, "persist.raid.json")) &&
+    File.Exists(Path.Combine(battleDeleteCommit.BackupDirectory, "persist.estate.json")),
+    "Deleting map content must preserve knowledge and curio/trap identity, normalize stale mash fields, leave the raid save byte-identical, and back up the full profile first.");
+
+var mapHashBeforeMove = ComputeSha256(battleMapFixturePath);
+var preparedCorridorMove = await battleEditService.PrepareMovePartyAsync(
+    battleEditProfile,
+    battleSnapshotAfterDelete,
+    "coAB",
+    "tile1");
+Assert(
+    preparedCorridorMove.Preview.Kind == BattleMapEditKind.MoveParty &&
+    preparedCorridorMove.Preview.SavedAreaTile == 3 &&
+    preparedCorridorMove.Preview.PreviousRoomHash == 200 &&
+    preparedCorridorMove.TargetFile.FileName == "persist.raid.json",
+    "A reversed corridor move must convert the physical tile back into traversal progress and use its saved entry-side room.");
+_ = await battleEditService.CommitAsync(preparedCorridorMove);
+var corridorMoveRaid = JsonNode.Parse(File.ReadAllText(battleRaidFixturePath))!.AsObject()["base_root"]!.AsObject();
+var corridorMoveParty = corridorMoveRaid["party"]!.AsObject();
+var corridorMoveDoorway = corridorMoveRaid["in_doorway"]!.AsObject();
+var battleSnapshotAfterCorridorMove = await new BattleMapSnapshotReader(codec).LoadAsync(battleMapProfileRoot);
+Assert(
+    corridorMoveRaid["in_area"]!.GetValue<int>() == 150 &&
+    corridorMoveRaid["areatile"]!.GetValue<int>() == 3 &&
+    corridorMoveRaid["last_room_id"]!.GetValue<int>() == 200 &&
+    corridorMoveParty["retreat_room"]!.GetValue<int>() == 150 &&
+    !corridorMoveParty["IsMovingLeft()"]!.GetValue<bool>() &&
+    corridorMoveDoorway["area_to"]!.GetValue<int>() == 1701736302 &&
+    corridorMoveDoorway["tile_to"]!.GetValue<int>() == 0 &&
+    corridorMoveDoorway["implied"]!.GetValue<bool>() &&
+    battleSnapshotAfterCorridorMove.PartyAreaId == "coAB" &&
+    battleSnapshotAfterCorridorMove.PartyTileIndex == 1 &&
+    ComputeSha256(battleMapFixturePath).Equals(mapHashBeforeMove, StringComparison.OrdinalIgnoreCase),
+    "Moving within a reversed corridor must produce a stationary, canonical raid location that the reader resolves back to the selected visible tile without changing map exploration data.");
+
+var preparedRoomMove = await battleEditService.PrepareMovePartyAsync(
+    battleEditProfile,
+    battleSnapshotAfterCorridorMove,
+    "rooB",
+    "tile0");
+_ = await battleEditService.CommitAsync(preparedRoomMove);
+var roomMoveRaid = JsonNode.Parse(File.ReadAllText(battleRaidFixturePath))!.AsObject()["base_root"]!.AsObject();
+var roomMoveParty = roomMoveRaid["party"]!.AsObject();
+var battleSnapshotAfterRoomMove = await new BattleMapSnapshotReader(codec).LoadAsync(battleMapProfileRoot);
+Assert(
+    roomMoveRaid["in_area"]!.GetValue<int>() == 200 &&
+    roomMoveRaid["areatile"]!.GetValue<int>() == 1 &&
+    roomMoveRaid["last_room_id"]!.GetValue<int>() == 200 &&
+    roomMoveParty["retreat_room"]!.GetValue<int>() == 200 &&
+    battleSnapshotAfterRoomMove.PartyAreaId == "rooB" &&
+    battleSnapshotAfterRoomMove.PartyTileIndex == 0,
+    "Moving to a room must write the native stationary room convention and resolve back to that room.");
+
+var preparedGuardedTreasureDelete = await battleEditService.PrepareDeleteContentAsync(
+    battleEditProfile,
+    battleSnapshotAfterRoomMove,
+    "coAB",
+    "tile2");
+_ = await battleEditService.CommitAsync(preparedGuardedTreasureDelete);
+var snapshotAfterGuardedTreasureDelete = await new BattleMapSnapshotReader(codec).LoadAsync(battleMapProfileRoot);
+var deletedGuardedTreasure = snapshotAfterGuardedTreasureDelete.Areas
+    .Single(area => area.AreaId == "coAB")
+    .Tiles.Single(tile => tile.TileId == "tile2");
+Assert(
+    deletedGuardedTreasure.Content == BattleMapTileContent.Nothing &&
+    deletedGuardedTreasure.RawContent == 0 &&
+    deletedGuardedTreasure.CurioPropHash == 987 &&
+    deletedGuardedTreasure.MashIndex == -1 &&
+    deletedGuardedTreasure.MashType == 7,
+    "Deleting a guarded treasure must remove the complete composite event and its battle mash while retaining only the inert native curio identity residue.");
+
+var forwardMapDocument = JsonNode.Parse(File.ReadAllText(battleMapFixturePath))!.AsObject();
+forwardMapDocument["base_root"]!["map"]!["static_dynamic"]!["areas"]!["coAB"]!["reversed"] = false;
+File.WriteAllText(battleMapFixturePath, forwardMapDocument.ToJsonString(), new UTF8Encoding(false));
+var forwardCorridorSnapshot = await new BattleMapSnapshotReader(codec).LoadAsync(battleMapProfileRoot);
+var mapHashBeforeForwardHungerMove = ComputeSha256(battleMapFixturePath);
+var preparedForwardCorridorMove = await battleEditService.PrepareMovePartyAsync(
+    battleEditProfile,
+    forwardCorridorSnapshot,
+    "coAB",
+    "tile3");
+Assert(
+    preparedForwardCorridorMove.Preview.SavedAreaTile == 3 &&
+    preparedForwardCorridorMove.Preview.PreviousRoomHash == 100,
+    "A forward corridor move must use the physical tile ordinal and the tile0 endpoint room.");
+_ = await battleEditService.CommitAsync(preparedForwardCorridorMove);
+var snapshotAfterForwardCorridorMove = await new BattleMapSnapshotReader(codec).LoadAsync(battleMapProfileRoot);
+var hungerTileAfterMove = snapshotAfterForwardCorridorMove.Areas
+    .Single(area => area.AreaId == "coAB")
+    .Tiles.Single(tile => tile.TileId == "tile3");
+Assert(
+    snapshotAfterForwardCorridorMove.PartyAreaId == "coAB" &&
+    snapshotAfterForwardCorridorMove.PartyTileIndex == 3 &&
+    snapshotAfterForwardCorridorMove.LastRoomId == "rooA" &&
+    hungerTileAfterMove.Content == BattleMapTileContent.Hunger &&
+    ComputeSha256(battleMapFixturePath).Equals(mapHashBeforeForwardHungerMove, StringComparison.OrdinalIgnoreCase),
+    "Moving onto a hidden hunger node must resolve to the selected visible tile while leaving the map and its persisted hunger content byte-identical.");
+
+var unsafeBattleRaid = JsonNode.Parse(File.ReadAllText(battleRaidFixturePath))!.AsObject();
+unsafeBattleRaid["base_root"]!["inbattle"] = true;
+File.WriteAllText(battleRaidFixturePath, unsafeBattleRaid.ToJsonString(), new UTF8Encoding(false));
+var unsafeBattleSnapshot = await new BattleMapSnapshotReader(codec).LoadAsync(battleMapProfileRoot);
+var rejectedBattleStateMove = false;
+try
+{
+    _ = await battleEditService.PrepareMovePartyAsync(
+        battleEditProfile,
+        unsafeBattleSnapshot,
+        "coAB",
+        "tile2");
+}
+catch (InvalidOperationException)
+{
+    rejectedBattleStateMove = true;
+}
+Assert(
+    rejectedBattleStateMove,
+    "Party movement must be refused while combat state is active.");
+unsafeBattleRaid["base_root"]!["inbattle"] = false;
+File.WriteAllText(battleRaidFixturePath, unsafeBattleRaid.ToJsonString(), new UTF8Encoding(false));
+var snapshotBeforeStaleGuard = await new BattleMapSnapshotReader(codec).LoadAsync(battleMapProfileRoot);
+var preparedStaleBattleDelete = await battleEditService.PrepareDeleteContentAsync(
+    battleEditProfile,
+    snapshotBeforeStaleGuard,
+    "rooB",
+    "tile0");
+var mapHashBeforeRejectedCommit = ComputeSha256(battleMapFixturePath);
+var changedRaid = JsonNode.Parse(File.ReadAllText(battleRaidFixturePath))!.AsObject();
+changedRaid["base_root"]!["torchlight"] = 73.0;
+File.WriteAllText(battleRaidFixturePath, changedRaid.ToJsonString(), new UTF8Encoding(false));
+var rejectedStaleBattleCommit = false;
+try
+{
+    _ = await battleEditService.CommitAsync(preparedStaleBattleDelete);
+}
+catch (InvalidOperationException)
+{
+    rejectedStaleBattleCommit = true;
+}
+Assert(
+    rejectedStaleBattleCommit &&
+    ComputeSha256(battleMapFixturePath).Equals(mapHashBeforeRejectedCommit, StringComparison.OrdinalIgnoreCase),
+    "A prepared map edit must reject a changed paired raid save before writing the target map file.");
+
+var dsonBattleProfileRoot = Path.Combine(runRoot, "battle-map-dson-profile");
+Directory.CreateDirectory(dsonBattleProfileRoot);
+var dsonBattleMapPath = Path.Combine(dsonBattleProfileRoot, "persist.map.json");
+var dsonBattleRaidPath = Path.Combine(dsonBattleProfileRoot, "persist.raid.json");
+var dsonBattleEstatePath = Path.Combine(dsonBattleProfileRoot, "persist.estate.json");
+await codec.EncodeAsync(battleMapFixturePath, dsonBattleMapPath, originalBinaryPath: null);
+await codec.EncodeAsync(battleRaidFixturePath, dsonBattleRaidPath, originalBinaryPath: null);
+File.WriteAllText(dsonBattleEstatePath, "{}", new UTF8Encoding(false));
+SetRevision(dsonBattleMapPath, [0x00, 0x00, 0x61, 0x42]);
+SetRevision(dsonBattleRaidPath, [0x00, 0x00, 0x61, 0x43]);
+var dsonBattleProfile = new SaveProfile(
+    "profile_battle_dson",
+    dsonBattleProfileRoot,
+    dsonBattleEstatePath,
+    "battle-user",
+    File.GetLastWriteTimeUtc(dsonBattleEstatePath));
+var dsonBattleSnapshot = await new BattleMapSnapshotReader(codec).LoadAsync(dsonBattleProfileRoot);
+var dsonRaidHashBeforeDelete = ComputeSha256(dsonBattleRaidPath);
+var preparedDsonBattleDelete = await battleEditService.PrepareDeleteContentAsync(
+    dsonBattleProfile,
+    dsonBattleSnapshot,
+    "rooB",
+    "tile0");
+Assert(
+    preparedDsonBattleDelete.TargetFile.SourceWasDson &&
+    ReadRevision(preparedDsonBattleDelete.TargetFile.SourceCopyPath)
+        .SequenceEqual(ReadRevision(preparedDsonBattleDelete.TargetFile.EncodedPath)),
+    "A real DSON battle-map edit must preserve the source revision before commit.");
+_ = await battleEditService.CommitAsync(preparedDsonBattleDelete);
+var dsonBattleDecodedAfterPath = Path.Combine(runRoot, "battle-map-dson-after.json");
+await codec.DecodeAsync(dsonBattleMapPath, dsonBattleDecodedAfterPath);
+var dsonDeletedTile = JsonNode.Parse(File.ReadAllText(dsonBattleDecodedAfterPath))!
+    ["base_root"]!["map"]!["static_dynamic"]!["areas"]!["rooB"]!["tiles"]!["tile0"]!.AsObject();
+Assert(
+    dsonDeletedTile["content"]!.GetValue<int>() == 0 &&
+    ReadRevision(dsonBattleMapPath).SequenceEqual(new byte[] { 0x00, 0x00, 0x61, 0x42 }) &&
+    ComputeSha256(dsonBattleRaidPath).Equals(dsonRaidHashBeforeDelete, StringComparison.OrdinalIgnoreCase),
+    "A committed DSON battle-map deletion must survive decode, retain revision bytes, and leave the paired raid save byte-identical.");
+
+File.WriteAllText(
+    battleRaidFixturePath,
+    """
+    {
+      "base_root": {
+        "raid_instance": { "dungeon": "weald", "difficulty": 1, "length": 2 },
+        "in_area": 999999,
+        "areatile": 1,
+        "last_room_id": 100,
+        "inbattle": false
+      }
+    }
+    """,
+    new UTF8Encoding(false));
+var rejectedMismatchedBattlePair = false;
+try
+{
+    _ = await new BattleMapSnapshotReader(codec).LoadAsync(battleMapProfileRoot);
+}
+catch (InvalidDataException)
+{
+    rejectedMismatchedBattlePair = true;
+}
+Assert(
+    rejectedMismatchedBattlePair,
+    "A stable raid document whose party area does not belong to the map must be rejected rather than rendered without a party marker.");
+
+var monitorProfileRoot = Path.Combine(runRoot, "profile-monitor");
+Directory.CreateDirectory(monitorProfileRoot);
+var monitoredMapPath = Path.Combine(monitorProfileRoot, "persist.map.json");
+File.WriteAllText(monitoredMapPath, "{}", new UTF8Encoding(false));
+var monitorNotifications = new List<IReadOnlyList<string>>();
+var monitorNotificationCountAtStop = 0;
+using (var monitor = new ProfileSaveMonitor(
+           monitorProfileRoot,
+           ["persist.map.json", "persist.raid.json"],
+           TimeSpan.FromHours(1),
+           TimeSpan.FromHours(1)))
+{
+    monitor.Changed += (_, eventArgs) => monitorNotifications.Add(eventArgs.FileNames);
+    monitor.Start();
+    File.WriteAllText(monitoredMapPath, "{\"revision\":2}", new UTF8Encoding(false));
+    File.SetLastWriteTimeUtc(monitoredMapPath, DateTime.UtcNow.AddSeconds(1));
+    monitor.PollNow();
+    File.WriteAllText(
+        Path.Combine(monitorProfileRoot, "persist.raid.json"),
+        "{}",
+        new UTF8Encoding(false));
+    monitor.PollNow();
+    monitorNotificationCountAtStop = monitorNotifications.Count;
+    monitor.Stop();
+    monitor.PollNow();
+}
+var monitoredChanges = monitorNotifications
+    .SelectMany(notification => notification)
+    .ToHashSet(StringComparer.OrdinalIgnoreCase);
+Assert(
+    monitorNotificationCountAtStop >= 2 &&
+    monitorNotifications.Count == monitorNotificationCountAtStop &&
+    monitoredChanges.Contains("persist.map.json") &&
+    monitoredChanges.Contains("persist.raid.json"),
+    "The reusable profile monitor must deterministically detect changed and newly created watched saves, while becoming quiet after Stop.");
 await codec.EncodeAsync(decodedSeedPath, estatePath, originalBinaryPath: null);
 await codec.EncodeAsync(decodedGameSeedPath, gameSavePath, originalBinaryPath: null);
 await codec.EncodeAsync(decodedTownSeedPath, townSavePath, originalBinaryPath: null);
@@ -5951,7 +6575,7 @@ if (!string.IsNullOrWhiteSpace(rurutiaProbeModRoot))
         "The real Rurutia LOC2 files should not be rejected for cross-string colour controls.");
 }
 
-    Console.WriteLine("PASS: active game-mode/Mod catalogs, bilingual names, town/raid quantity edits with stack and slot guards, level 0-max progression, blank/default and explicit natural/special quirks, HP/skill/camping rules, stagecoach GUID/upgrade append, full-roster preservation, stale guards, DSON roundtrips, verified backups, three-file rollback, and trinket/quantity commit contracts.");
+    Console.WriteLine("PASS: active game-mode/Mod catalogs, bilingual names, town/raid quantity edits with stack and slot guards, level 0-max progression, blank/default and explicit natural/special quirks, HP/skill/camping rules, stagecoach GUID/upgrade append, real battle-map snapshot/live-monitor plus guarded delete/move contracts, full-roster preservation, stale guards, DSON roundtrips, verified backups, three-file rollback, and trinket/quantity commit contracts.");
 Console.WriteLine($"Artifacts: {runRoot}");
 
 static TrinketStorageCatalogResult LoadStorageCapacityProbe(

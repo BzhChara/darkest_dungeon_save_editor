@@ -778,7 +778,7 @@
                             <UniformGrid x:Name="HeaderPanel"
                                          Grid.Row="0"
                                          Rows="1"
-                                         Columns="3"
+                                         Columns="4"
                                          Margin="0,0,0,5"
                                          IsItemsHost="True"
                                          Panel.ZIndex="1"

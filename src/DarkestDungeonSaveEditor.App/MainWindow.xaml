@@ -1,6 +1,7 @@
 <Window x:Class="DarkestDungeonSaveEditor.App.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:DarkestDungeonSaveEditor.App"
         Title="Darkest Dungeon 存档修改器"
         Width="1440"
         Height="900"
@@ -194,7 +195,7 @@
                     <RowDefinition Height="165" />
                 </Grid.RowDefinitions>
 
-                <Border Grid.Row="0" Style="{StaticResource OpenPanelStyle}"
+                <Border x:Name="CatalogToolsPanel" Grid.Row="0" Style="{StaticResource OpenPanelStyle}"
                         BorderThickness="0" Padding="0" Margin="0,0,0,10">
                     <Grid>
                         <Grid.RowDefinitions>
@@ -333,9 +334,12 @@
                                     </DataGrid.Columns>
                             </DataGrid>
                         </TabItem>
+                        <TabItem Header="战斗  /  BATTLE">
+                            <local:BattleMapView x:Name="BattleMapPanel" />
+                        </TabItem>
                     </TabControl>
 
-                    <Grid Grid.Row="1">
+                    <Grid x:Name="CatalogActionPanel" Grid.Row="1">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />

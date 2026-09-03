@@ -1,0 +1,296 @@
+<UserControl x:Class="DarkestDungeonSaveEditor.App.BattleMapView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Name="Root"
+             MinWidth="600"
+             MinHeight="360"
+             Background="Transparent"
+             Focusable="True"
+             Loaded="BattleMapView_Loaded"
+             SizeChanged="BattleMapView_SizeChanged"
+             PreviewMouseWheel="BattleMapView_PreviewMouseWheel"
+             PreviewMouseRightButtonDown="BattleMapView_PreviewMouseRightButtonDown"
+             PreviewMouseRightButtonUp="BattleMapView_PreviewMouseRightButtonUp"
+             PreviewMouseMove="BattleMapView_PreviewMouseMove">
+    <UserControl.Resources>
+        <Style x:Key="MapToolbarButtonStyle"
+               TargetType="Button"
+               BasedOn="{StaticResource GhostButtonStyle}">
+            <Setter Property="MinWidth" Value="42" />
+            <Setter Property="MinHeight" Value="32" />
+            <Setter Property="Margin" Value="3,0" />
+            <Setter Property="Padding" Value="10,4" />
+            <Setter Property="FontSize" Value="13" />
+        </Style>
+
+        <Style x:Key="BattleMapContextMenuStyle" TargetType="ContextMenu">
+            <Setter Property="Background" Value="#F20A0A09" />
+            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource GoldDarkBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="3" />
+            <Setter Property="HasDropShadow" Value="False" />
+            <Setter Property="FontFamily" Value="SimHei, Microsoft YaHei UI" />
+            <Setter Property="FontSize" Value="13.5" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ContextMenu">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                Padding="{TemplateBinding Padding}"
+                                SnapsToDevicePixels="True">
+                            <StackPanel IsItemsHost="True"
+                                        KeyboardNavigation.DirectionalNavigation="Cycle" />
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="BattleMapMenuItemStyle" TargetType="MenuItem">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+            <Setter Property="Padding" Value="10,7" />
+            <Setter Property="MinWidth" Value="190" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="MenuItem">
+                        <Grid SnapsToDevicePixels="True">
+                            <Border x:Name="ItemChrome"
+                                    Background="{TemplateBinding Background}"
+                                    Padding="{TemplateBinding Padding}">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="22" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="18" />
+                                    </Grid.ColumnDefinitions>
+                                    <ContentPresenter Grid.Column="0"
+                                                      Margin="0,0,7,0"
+                                                      ContentSource="Icon"
+                                                      VerticalAlignment="Center" />
+                                    <ContentPresenter Grid.Column="1"
+                                                      ContentSource="Header"
+                                                      RecognizesAccessKey="True"
+                                                      VerticalAlignment="Center" />
+                                    <Path x:Name="SubmenuArrow"
+                                          Grid.Column="2"
+                                          Width="5" Height="8"
+                                          HorizontalAlignment="Right"
+                                          VerticalAlignment="Center"
+                                          Fill="{StaticResource GoldBrush}"
+                                          Data="M 0,0 L 5,4 L 0,8 Z"
+                                          Visibility="Collapsed" />
+                                </Grid>
+                            </Border>
+                            <Popup x:Name="PART_Popup"
+                                   Placement="Right"
+                                   PlacementTarget="{Binding ElementName=ItemChrome}"
+                                   HorizontalOffset="-3"
+                                   AllowsTransparency="True"
+                                   Focusable="False"
+                                   PopupAnimation="Fade"
+                                   IsOpen="{Binding IsSubmenuOpen,
+                                       RelativeSource={RelativeSource TemplatedParent}}">
+                                <Border Margin="0"
+                                        Padding="3"
+                                        Background="#F70A0A09"
+                                        BorderBrush="{StaticResource GoldDarkBrush}"
+                                        BorderThickness="1">
+                                    <ScrollViewer MaxHeight="480"
+                                                  CanContentScroll="True"
+                                                  VerticalScrollBarVisibility="Auto">
+                                        <StackPanel IsItemsHost="True"
+                                                    KeyboardNavigation.DirectionalNavigation="Cycle" />
+                                    </ScrollViewer>
+                                </Border>
+                            </Popup>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="Role" Value="SubmenuHeader">
+                                <Setter TargetName="SubmenuArrow" Property="Visibility" Value="Visible" />
+                            </Trigger>
+                            <Trigger Property="IsHighlighted" Value="True">
+                                <Setter TargetName="ItemChrome" Property="Background" Value="#6D1718" />
+                                <Setter Property="Foreground" Value="#FFF8EC" />
+                            </Trigger>
+                            <Trigger Property="IsSubmenuOpen" Value="True">
+                                <Setter TargetName="ItemChrome" Property="Background" Value="#541112" />
+                                <Setter Property="Foreground" Value="{StaticResource GoldBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Foreground" Value="{StaticResource TextDisabledBrush}" />
+                                <Setter TargetName="ItemChrome" Property="Opacity" Value="0.62" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="BattleMapSeparatorStyle" TargetType="Separator">
+            <Setter Property="Margin" Value="8,3" />
+            <Setter Property="Height" Value="1" />
+            <Setter Property="Background" Value="#5553433A" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Separator">
+                        <Border Height="1" Background="{TemplateBinding Background}" />
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+
+    <Grid Background="#B0050505">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="46" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="38" />
+        </Grid.RowDefinitions>
+
+        <Grid Grid.Row="0" Background="{StaticResource StoneBandBrush}">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel Grid.Column="0"
+                        Margin="16,0,12,0"
+                        Orientation="Horizontal"
+                        VerticalAlignment="Center">
+                <TextBlock x:Name="MapTitleTextBlock"
+                           FontFamily="SimSun, Microsoft YaHei UI"
+                           FontSize="18"
+                           FontWeight="Bold"
+                           Foreground="{StaticResource GoldBrush}"
+                           Text="当前副本地图" />
+                <TextBlock Margin="12,1,0,0"
+                           VerticalAlignment="Center"
+                           Foreground="{StaticResource TextSecondaryBrush}"
+                           FontSize="12.5"
+                           Text="右击操作 · 右键拖拽 · 滚轮缩放" />
+            </StackPanel>
+            <StackPanel Grid.Column="1"
+                        Margin="8,0,12,0"
+                        Orientation="Horizontal"
+                        VerticalAlignment="Center">
+                <Button x:Name="ZoomOutButton"
+                        Style="{StaticResource MapToolbarButtonStyle}"
+                        Content="－"
+                        ToolTip="缩小地图"
+                        Click="ZoomOutButton_Click" />
+                <TextBlock x:Name="ZoomTextBlock"
+                           Width="58"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center"
+                           TextAlignment="Center"
+                           Foreground="{StaticResource GoldBrush}"
+                           FontWeight="Bold"
+                           Text="100%" />
+                <Button x:Name="ZoomInButton"
+                        Style="{StaticResource MapToolbarButtonStyle}"
+                        Content="＋"
+                        ToolTip="放大地图"
+                        Click="ZoomInButton_Click" />
+                <Button x:Name="ResetZoomButton"
+                        Style="{StaticResource MapToolbarButtonStyle}"
+                        MinWidth="62"
+                        Content="100%"
+                        ToolTip="恢复 100% 并居中"
+                        Click="ResetZoomButton_Click" />
+                <Button x:Name="FitMapButton"
+                        Style="{StaticResource MapToolbarButtonStyle}"
+                        MinWidth="82"
+                        Content="适应窗口"
+                        ToolTip="显示完整地图"
+                        Click="FitMapButton_Click" />
+            </StackPanel>
+        </Grid>
+
+        <Border x:Name="MapViewport"
+                Grid.Row="1"
+                Background="#F0030303"
+                BorderBrush="#4A514F"
+                BorderThickness="0,1,0,1"
+                ClipToBounds="True"
+                Cursor="Arrow">
+            <Grid>
+                <Canvas x:Name="MapCanvas"
+                        Width="672"
+                        Height="416"
+                        HorizontalAlignment="Left"
+                        VerticalAlignment="Top"
+                        Background="Transparent"
+                        Visibility="Collapsed"
+                        SnapsToDevicePixels="True">
+                    <Canvas.RenderTransform>
+                        <TransformGroup>
+                            <ScaleTransform x:Name="MapScaleTransform" ScaleX="1" ScaleY="1" />
+                            <TranslateTransform x:Name="MapTranslateTransform" X="0" Y="0" />
+                        </TransformGroup>
+                    </Canvas.RenderTransform>
+                </Canvas>
+
+                <Grid x:Name="EmptyStatePanel" Background="#B8050505">
+                    <StackPanel Width="520"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center">
+                        <TextBlock HorizontalAlignment="Center"
+                                   FontFamily="SimSun, Microsoft YaHei UI"
+                                   FontSize="28"
+                                   FontWeight="Bold"
+                                   Foreground="{StaticResource GoldBrush}"
+                                   Text="当前没有可显示的副本地图" />
+                        <TextBlock x:Name="EmptyStateTextBlock"
+                                   Margin="0,13,0,0"
+                                   TextAlignment="Center"
+                                   TextWrapping="Wrap"
+                                   Foreground="{StaticResource TextSecondaryBrush}"
+                                   LineHeight="22"
+                                   Text="载入 Profile 后，这里会在副本期间读取真实地图；小镇状态不会显示地图。" />
+                    </StackPanel>
+                </Grid>
+
+                <Border x:Name="PrototypeBadge"
+                        Margin="12"
+                        Padding="10,6"
+                        HorizontalAlignment="Right"
+                        VerticalAlignment="Top"
+                        Background="#D4511112"
+                        BorderBrush="{StaticResource AccentStrongBrush}"
+                        BorderThickness="1"
+                        Visibility="Collapsed">
+                    <TextBlock x:Name="PrototypeBadgeTextBlock"
+                               Foreground="{StaticResource GoldBrush}"
+                               FontWeight="Bold"
+                               Text="全局视野" />
+                </Border>
+
+            </Grid>
+        </Border>
+
+        <Grid Grid.Row="2" Background="#D0090908">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBlock x:Name="MapSelectionTextBlock"
+                       Grid.Column="0"
+                       Margin="14,0"
+                       VerticalAlignment="Center"
+                       Foreground="{StaticResource TextPrimaryBrush}"
+                       Text="请选择一个地图格。" />
+            <TextBlock x:Name="LiveStatusTextBlock"
+                       Grid.Column="1"
+                       Margin="12,0,14,0"
+                       VerticalAlignment="Center"
+                       Foreground="{StaticResource TextSecondaryBrush}"
+                       FontSize="12"
+                       Text="尚未绑定存档" />
+        </Grid>
+    </Grid>
+</UserControl>

@@ -14,6 +14,7 @@ namespace DarkestDungeonSaveEditor.App;
 
 public partial class MainWindow : Window
 {
+    private const int BattleTabIndex = 3;
     private const int TitleLogoFrameWidth = 320;
     private const int TitleLogoFrameHeight = 100;
     private const int TitleLogoFrameColumns = 10;
@@ -53,6 +54,9 @@ public partial class MainWindow : Window
         TrinketGrid.ItemsSource = _visibleTrinkets;
         HeroGrid.ItemsSource = _visibleHeroes;
         HeroLevelComboBox.ItemsSource = _heroLevelChoices;
+        BattleMapPanel.SnapshotRefreshed += BattleMapPanel_SnapshotRefreshed;
+        BattleMapPanel.SaveEditApplied += BattleMapPanel_SaveEditApplied;
+        BattleMapPanel.SaveEditBusyChanged += BattleMapPanel_SaveEditBusyChanged;
         UpdateCatalogMode();
     }
 
@@ -60,6 +64,16 @@ public partial class MainWindow : Window
     {
         base.OnSourceInitialized(e);
         NativeWindowTheme.ApplyDarkTitleBar(this);
+    }
+
+    protected override void OnClosed(EventArgs e)
+    {
+        _titleLogoTimer?.Stop();
+        BattleMapPanel.SnapshotRefreshed -= BattleMapPanel_SnapshotRefreshed;
+        BattleMapPanel.SaveEditApplied -= BattleMapPanel_SaveEditApplied;
+        BattleMapPanel.SaveEditBusyChanged -= BattleMapPanel_SaveEditBusyChanged;
+        BattleMapPanel.ClearProfile();
+        base.OnClosed(e);
     }
 
     private void TitleLogoImage_Loaded(object sender, RoutedEventArgs e)
@@ -246,6 +260,22 @@ public partial class MainWindow : Window
             ItemTab.Header = _quantitySaveContext == QuantityItemSaveContext.Raid
                 ? "副本背包  /  RAID ITEMS"
                 : "小镇物品  /  ESTATE ITEMS";
+            try
+            {
+                _ = await BattleMapPanel.LoadProfileAsync(
+                    profile,
+                    codec,
+                    gameDirectory);
+            }
+            catch (Exception mapException)
+            {
+                CrashDiagnostics.RecordException(
+                    "LoadCatalog: battle map snapshot",
+                    mapException,
+                    $"档案={profile.ProfileId}；目录={profile.ProfileDirectory}");
+                AppendStatus(
+                    $"战斗地图暂时无法读取，其他目录仍已正常加载：{mapException.Message}");
+            }
             CrashDiagnostics.SetStage("LoadCatalog: populating visible rows");
             UpdateCatalogMode();
             ApplyFilter();
@@ -404,6 +434,11 @@ public partial class MainWindow : Window
 
     private async void Preview_Click(object sender, RoutedEventArgs e)
     {
+        if (CatalogTabs.SelectedIndex == BattleTabIndex)
+        {
+            return;
+        }
+
         InvalidatePreparedEdit();
         var previewRevision = _editRevision;
         try
@@ -911,6 +946,10 @@ public partial class MainWindow : Window
             ShowUnusedItemsCheckBox.IsChecked = false;
             ShowUnusedItemsCheckBox.Content = "显示当前场景隐藏项（0）";
         }
+        if (BattleMapPanel is not null)
+        {
+            BattleMapPanel.ClearProfile();
+        }
         if (PreviewButton is not null)
         {
             PreviewButton.IsEnabled = false;
@@ -946,9 +985,11 @@ public partial class MainWindow : Window
 
     private void SetBusy(bool busy)
     {
+        var isBattleTab = CatalogTabs.SelectedIndex == BattleTabIndex;
         PathInputsBorder.IsEnabled = !busy;
         CatalogTabs.IsEnabled = !busy;
-        SearchTextBox.IsEnabled = !busy;
+        SearchTextBox.IsEnabled = !busy && !isBattleTab;
+        BattleMapPanel.IsEnabled = !busy;
         ShowUnusedItemsCheckBox.IsEnabled = !busy &&
             CatalogTabs.SelectedIndex == 0 && _allItems.Count > 0;
         CopiesTextBox.IsEnabled = !busy && CatalogTabs.SelectedIndex is 0 or 1;
@@ -1025,32 +1066,43 @@ public partial class MainWindow : Window
 
     private bool CanPreviewCurrentTab()
     {
-        return _catalogProfileDirectory is not null &&
-               (CatalogTabs.SelectedIndex == 0
-                   ? _allItems.Count > 0
-                   : CatalogTabs.SelectedIndex == 1
-                       ? _allTrinkets.Count > 0
-                       : CatalogTabs.SelectedIndex == 2 && _heroCatalog is not null &&
-                         _allHeroes.Count > 0 && HeroLevelComboBox.SelectedItem is HeroLevelChoice);
+        if (_catalogProfileDirectory is null)
+        {
+            return false;
+        }
+
+        return CatalogTabs.SelectedIndex switch
+        {
+            0 => _allItems.Count > 0,
+            1 => _allTrinkets.Count > 0,
+            2 => _heroCatalog is not null &&
+                 _allHeroes.Count > 0 &&
+                 HeroLevelComboBox.SelectedItem is HeroLevelChoice,
+            _ => false
+        };
     }
 
     private void UpdateCatalogMode()
     {
-        if (PreviewButton is null || CopiesTextBox is null || CopiesLabel is null)
+        if (PreviewButton is null || CopiesTextBox is null || CopiesLabel is null ||
+            CatalogToolsPanel is null || CatalogActionPanel is null)
         {
             return;
         }
 
         var isItemTab = CatalogTabs.SelectedIndex == 0;
         var isHeroTab = CatalogTabs.SelectedIndex == 2;
+        var isBattleTab = CatalogTabs.SelectedIndex == BattleTabIndex;
+        CatalogToolsPanel.Visibility = isBattleTab ? Visibility.Collapsed : Visibility.Visible;
+        CatalogActionPanel.Visibility = isBattleTab ? Visibility.Collapsed : Visibility.Visible;
         PreviewButton.Content = isHeroTab
             ? "生成候选人物安全预览"
             : isItemTab
                 ? "生成物品数量安全预览"
                 : "生成饰品安全预览";
         CopiesLabel.Text = isItemTab ? "目标数量" : "添加数量";
-        CopiesLabel.Visibility = isHeroTab ? Visibility.Collapsed : Visibility.Visible;
-        CopiesTextBox.Visibility = isHeroTab ? Visibility.Collapsed : Visibility.Visible;
+        CopiesLabel.Visibility = isHeroTab || isBattleTab ? Visibility.Collapsed : Visibility.Visible;
+        CopiesTextBox.Visibility = isHeroTab || isBattleTab ? Visibility.Collapsed : Visibility.Visible;
         HeroLevelLabel.Visibility = isHeroTab ? Visibility.Visible : Visibility.Collapsed;
         HeroLevelComboBox.Visibility = isHeroTab ? Visibility.Visible : Visibility.Collapsed;
         HeroLevelComboBox.IsEnabled = isHeroTab &&
@@ -1066,7 +1118,7 @@ public partial class MainWindow : Window
             _heroCatalog is not null &&
             HeroGrid.SelectedItem is HeroRow;
         UpdateInitialQuirkSelectionSummary();
-        PreviewButton.IsEnabled = CanPreviewCurrentTab();
+        PreviewButton.IsEnabled = !isBattleTab && CanPreviewCurrentTab();
     }
 
     private void PopulateHeroLevels(HeroClassCatalogResult catalog)
@@ -1250,6 +1302,26 @@ public partial class MainWindow : Window
 
         return Path.GetFullPath(value.Trim());
     }
+
+    private static void BattleMapPanel_SnapshotRefreshed(BattleMapSnapshot snapshot)
+    {
+        CrashDiagnostics.RecordStatus(
+            $"战斗地图快照：档案目录={snapshot.ProfileDirectory}；" +
+            $"地区={snapshot.DungeonId}；难度={snapshot.Difficulty}；长度={snapshot.Length}；" +
+            $"房间={snapshot.RoomCount}；走廊={snapshot.CorridorCount}；格子={snapshot.TileCount}；" +
+            $"队伍位置={snapshot.PartyAreaId ?? "未解析"}/tile{snapshot.PartyTileIndex?.ToString(CultureInfo.InvariantCulture) ?? "?"}；" +
+            $"persist.map.json SHA-256={snapshot.MapSha256}；" +
+            $"persist.raid.json SHA-256={snapshot.RaidSha256}；提示={snapshot.Issues.Count}");
+        foreach (var issue in snapshot.Issues)
+        {
+            CrashDiagnostics.RecordStatus($"战斗地图解析提示：{issue}");
+        }
+    }
+
+    private void BattleMapPanel_SaveEditApplied(string message) =>
+        AppendStatusSafely(message, "BattleMap: applied save edit");
+
+    private void BattleMapPanel_SaveEditBusyChanged(bool isBusy) => SetBusy(isBusy);
 
     private void AppendStatus(string message, bool persist = true)
     {
