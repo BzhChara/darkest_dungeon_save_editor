@@ -215,6 +215,9 @@ public sealed record TrinketDefinition(
 {
     public BilingualContentName LocalizedName { get; init; } = BilingualContentName.Empty;
     public string SourceLabel { get; init; } = string.Empty;
+    public int? QuestUses { get; init; }
+    public int? TriggerLimit { get; init; }
+    public IReadOnlyList<string> UnsupportedStateFields { get; init; } = [];
 }
 
 public sealed record TrinketCatalogResult(
