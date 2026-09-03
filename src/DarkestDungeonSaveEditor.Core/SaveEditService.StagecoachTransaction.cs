@@ -1,0 +1,501 @@
+using System.Diagnostics;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
+using System.Text.Json.Nodes;
+
+namespace DarkestDungeonSaveEditor.Core;
+
+public sealed partial class SaveEditService
+{
+    public async Task<MultiFileSaveCommitResult> CommitAsync(
+        PreparedStagecoachHeroEdit prepared,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(prepared);
+        cancellationToken.ThrowIfCancellationRequested();
+        EnsureGameIsNotRunning();
+        ValidateProfile(prepared.Profile);
+        ValidateStagecoachContentGuard(prepared.Profile, prepared.ContentGuard);
+        ValidatePreparedStagecoachFile(prepared.Profile, prepared.TownFile, "persist.town.json");
+        ValidatePreparedStagecoachFile(prepared.Profile, prepared.RosterFile, "persist.roster.json");
+        ValidatePreparedStagecoachFile(prepared.Profile, prepared.UpgradesFile, "persist.upgrades.json");
+        EnsureNoUnfinishedStagecoachTransaction(prepared.Profile);
+
+        // Make the candidate visible in town only after its upgrade ownership and GUID advance
+        // have both been written. Any failure still rolls every replaced file back from backup.
+        var files = new[] { prepared.UpgradesFile, prepared.RosterFile, prepared.TownFile };
+        foreach (var file in files)
+        {
+            var currentHash = ComputeSha256(file.TargetPath);
+            if (!currentHash.Equals(file.OriginalSha256, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException(
+                    $"The live {file.FileName} save changed after preview. Prepare a new preview instead of overwriting newer game data.");
+            }
+
+            var encodedHash = ComputeSha256(file.EncodedPath);
+            if (!encodedHash.Equals(file.EncodedSha256, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException(
+                    $"The prepared encoded {file.FileName} save changed after validation.");
+            }
+        }
+
+        var backupDirectory = CreateBackup(prepared.Profile, prepared);
+        var replacedFiles = new List<PreparedSaveFile>();
+        WriteStagecoachTransactionState(
+            backupDirectory,
+            prepared,
+            "backup_complete",
+            replacedFiles,
+            error: null);
+
+        try
+        {
+            foreach (var file in files)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var hashAfterBackup = ComputeSha256(file.TargetPath);
+                if (!hashAfterBackup.Equals(file.OriginalSha256, StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new InvalidOperationException(
+                        $"The live {file.FileName} save changed while the profile backup was being created. " +
+                        $"A backup was kept at '{backupDirectory}', but no replacement of this file was attempted.");
+                }
+            }
+
+            foreach (var file in files)
+            {
+                ValidateStagecoachContentGuard(prepared.Profile, prepared.ContentGuard);
+                WriteStagecoachTransactionState(
+                    backupDirectory,
+                    prepared,
+                    $"replacing_{Path.GetFileNameWithoutExtension(file.FileName).Replace("persist.", string.Empty, StringComparison.Ordinal)}",
+                    replacedFiles,
+                    error: null);
+                ReplacePreparedFile(file, () => replacedFiles.Add(file));
+                WriteStagecoachTransactionState(
+                    backupDirectory,
+                    prepared,
+                    $"replaced_{Path.GetFileNameWithoutExtension(file.FileName).Replace("persist.", string.Empty, StringComparison.Ordinal)}",
+                    replacedFiles,
+                    error: null);
+            }
+
+            ValidateStagecoachContentGuard(prepared.Profile, prepared.ContentGuard);
+
+            var results = new List<SaveFileCommitResult>();
+            foreach (var file in new[]
+                     {
+                         prepared.TownFile,
+                         prepared.RosterFile,
+                         prepared.UpgradesFile
+                     })
+            {
+                var finalHash = ComputeSha256(file.TargetPath);
+                if (!finalHash.Equals(file.EncodedSha256, StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new IOException(
+                        $"The final paired-save check found that {file.FileName} changed after replacement.");
+                }
+
+                results.Add(new SaveFileCommitResult(
+                    file.FileName,
+                    file.TargetPath,
+                    file.OriginalSha256,
+                    finalHash));
+            }
+
+            var result = new MultiFileSaveCommitResult(
+                prepared.Profile.ProfileDirectory,
+                backupDirectory,
+                results,
+                DateTime.UtcNow);
+            WriteJson(Path.Combine(backupDirectory, "commit-result.json"), result);
+            WriteStagecoachTransactionState(
+                backupDirectory,
+                prepared,
+                "committed",
+                replacedFiles,
+                error: null);
+            await Task.CompletedTask.ConfigureAwait(false);
+            return result;
+        }
+        catch (Exception commitError)
+        {
+            TryDeleteFile(Path.Combine(backupDirectory, "commit-result.json"));
+            TryWriteStagecoachTransactionState(
+                backupDirectory,
+                prepared,
+                "commit_failed_restoring",
+                replacedFiles,
+                commitError.Message);
+            try
+            {
+                RestoreReplacedStagecoachFiles(files, replacedFiles, backupDirectory);
+                TryWriteStagecoachTransactionState(
+                    backupDirectory,
+                    prepared,
+                    "restored",
+                    replacedFiles,
+                    commitError.Message);
+                throw new InvalidOperationException(
+                    $"Stagecoach save commit failed and every replaced file was restored from '{backupDirectory}'.",
+                    commitError);
+            }
+            catch (InvalidOperationException ex) when (ReferenceEquals(ex.InnerException, commitError))
+            {
+                throw;
+            }
+            catch (Exception restoreError)
+            {
+                TryWriteStagecoachTransactionState(
+                    backupDirectory,
+                    prepared,
+                    "restore_failed",
+                    replacedFiles,
+                    restoreError.Message);
+                throw new AggregateException(
+                    $"Stagecoach save commit failed and automatic restore also failed. Backup: {backupDirectory}",
+                    commitError,
+                    restoreError);
+            }
+        }
+    }
+
+    private string CreateBackup(SaveProfile profile, PreparedStagecoachHeroEdit prepared)
+    {
+        var backupDirectory = Path.Combine(
+            _locations.BackupDirectory,
+            SanitizePathSegment(profile.SteamUserId),
+            SanitizePathSegment(profile.ProfileId),
+            $"{DateTime.UtcNow:yyyyMMdd_HHmmss_fff}_{Guid.NewGuid():N}");
+        Directory.CreateDirectory(backupDirectory);
+
+        var files = Directory.EnumerateFiles(profile.ProfileDirectory, "persist*.json", SearchOption.TopDirectoryOnly)
+            .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+            .Select(path =>
+            {
+                var destination = Path.Combine(backupDirectory, Path.GetFileName(path));
+                var sourceHashBeforeCopy = ComputeSha256(path);
+                File.Copy(path, destination, overwrite: false);
+                var backupHash = ComputeSha256(destination);
+                var sourceHashAfterCopy = ComputeSha256(path);
+                if (!sourceHashBeforeCopy.Equals(backupHash, StringComparison.OrdinalIgnoreCase) ||
+                    !sourceHashAfterCopy.Equals(backupHash, StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new IOException($"Save file changed during backup: {path}");
+                }
+
+                return new
+                {
+                    fileName = Path.GetFileName(path),
+                    sha256 = backupHash,
+                    length = new FileInfo(destination).Length,
+                    lastWriteTimeUtc = File.GetLastWriteTimeUtc(destination)
+                };
+            })
+            .ToArray();
+
+        WriteJson(Path.Combine(backupDirectory, "backup-manifest.json"), new
+        {
+            version = 1,
+            operation = "add-stagecoach-hero",
+            createdAtUtc = DateTime.UtcNow,
+            profile.ProfileId,
+            profile.SteamUserId,
+            profile.ProfileDirectory,
+            prepared.SessionId,
+            prepared.Preview.CandidateGuid,
+            prepared.Preview.HeroClass,
+            resolveXp = prepared.Preview.ResolveXp,
+            weaponRank = prepared.Preview.WeaponRank,
+            armourRank = prepared.Preview.ArmourRank,
+            upgradePurchaseCount = prepared.Preview.UpgradePurchaseCount,
+            files
+        });
+        return backupDirectory;
+    }
+
+    private void EnsureNoUnfinishedStagecoachTransaction(SaveProfile profile)
+    {
+        var profileBackupRoot = Path.Combine(
+            _locations.BackupDirectory,
+            SanitizePathSegment(profile.SteamUserId),
+            SanitizePathSegment(profile.ProfileId));
+        if (!Directory.Exists(profileBackupRoot))
+        {
+            return;
+        }
+
+        foreach (var backupDirectory in Directory.EnumerateDirectories(profileBackupRoot)
+                     .OrderByDescending(path => path, StringComparer.OrdinalIgnoreCase))
+        {
+            var statePath = Path.Combine(backupDirectory, "transaction-state.json");
+            if (!File.Exists(statePath))
+            {
+                continue;
+            }
+
+            string status;
+            try
+            {
+                status = JsonSupport.ReadString(JsonSupport.ReadObject(statePath), "status");
+            }
+            catch (Exception error)
+            {
+                throw new InvalidOperationException(
+                    $"A stagecoach transaction state could not be read at '{statePath}'. " +
+                    "Inspect its backup before preparing another edit.",
+                    error);
+            }
+
+            if (!status.Equals("committed", StringComparison.OrdinalIgnoreCase) &&
+                !status.Equals("restored", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException(
+                    $"An unfinished stagecoach save transaction ('{status}') exists at '{backupDirectory}'. " +
+                    "Inspect or restore that backup before preparing another edit.");
+            }
+        }
+    }
+
+    private static void ValidateUnchangedDuringCopy(
+        string livePath,
+        string sourceCopyPath,
+        string originalHash,
+        string saveLabel)
+    {
+        var copyHash = ComputeSha256(sourceCopyPath);
+        var currentHash = ComputeSha256(livePath);
+        if (!copyHash.Equals(originalHash, StringComparison.OrdinalIgnoreCase) ||
+            !currentHash.Equals(originalHash, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                $"The {saveLabel} save changed while the edit workspace was being prepared.");
+        }
+    }
+
+    private static string GetProfileSavePath(SaveProfile profile, string fileName)
+    {
+        return Path.GetFullPath(Path.Combine(profile.ProfileDirectory, fileName));
+    }
+
+    private static void ValidateRequiredSaveFile(string path, string fileName)
+    {
+        if (!File.Exists(path))
+        {
+            throw new FileNotFoundException($"{fileName} was not found in the selected profile.", path);
+        }
+    }
+
+    private static void ValidatePreparedStagecoachFile(
+        SaveProfile profile,
+        PreparedSaveFile preparedFile,
+        string expectedFileName)
+    {
+        var expectedPath = GetProfileSavePath(profile, expectedFileName);
+        if (!preparedFile.FileName.Equals(expectedFileName, StringComparison.OrdinalIgnoreCase) ||
+            !Path.GetFullPath(preparedFile.TargetPath).Equals(expectedPath, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                $"Prepared {expectedFileName} target is outside the selected profile directory.");
+        }
+
+        ValidateRequiredSaveFile(expectedPath, expectedFileName);
+        if (!File.Exists(preparedFile.EncodedPath))
+        {
+            throw new FileNotFoundException(
+                $"Prepared encoded {expectedFileName} was not found.",
+                preparedFile.EncodedPath);
+        }
+    }
+
+    private static void ReplacePreparedFile(PreparedSaveFile file, Action replacementOccurred)
+    {
+        var targetDirectory = Path.GetDirectoryName(file.TargetPath)
+            ?? throw new InvalidOperationException($"Save target has no directory: {file.TargetPath}");
+        var temporaryTarget = Path.Combine(
+            targetDirectory,
+            $".{Path.GetFileName(file.TargetPath)}.ddse-{Guid.NewGuid():N}.tmp");
+        try
+        {
+            File.Copy(file.EncodedPath, temporaryTarget, overwrite: false);
+            var hashBeforeReplace = ComputeSha256(file.TargetPath);
+            if (!hashBeforeReplace.Equals(file.OriginalSha256, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException(
+                    $"The live {file.FileName} save changed immediately before replacement.");
+            }
+
+            File.Replace(
+                temporaryTarget,
+                file.TargetPath,
+                destinationBackupFileName: null,
+                ignoreMetadataErrors: true);
+            replacementOccurred();
+            var finalHash = ComputeSha256(file.TargetPath);
+            if (!finalHash.Equals(file.EncodedSha256, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new IOException(
+                    $"The committed {file.FileName} hash does not match the validated encoded save.");
+            }
+        }
+        finally
+        {
+            TryDeleteFile(temporaryTarget);
+        }
+    }
+
+    private static void RestoreReplacedStagecoachFiles(
+        IReadOnlyList<PreparedSaveFile> allFiles,
+        IReadOnlyList<PreparedSaveFile> replacedFiles,
+        string backupDirectory)
+    {
+        var restoreErrors = new List<Exception>();
+        foreach (var file in replacedFiles.Reverse())
+        {
+            var backupPath = Path.Combine(backupDirectory, file.FileName);
+            var targetDirectory = Path.GetDirectoryName(file.TargetPath)
+                ?? throw new InvalidOperationException($"Save target has no directory: {file.TargetPath}");
+            var temporaryTarget = Path.Combine(
+                targetDirectory,
+                $".{Path.GetFileName(file.TargetPath)}.ddse-restore-{Guid.NewGuid():N}.tmp");
+            try
+            {
+                if (!File.Exists(backupPath) ||
+                    !ComputeSha256(backupPath).Equals(file.OriginalSha256, StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new InvalidDataException(
+                        $"Backup for {file.FileName} is missing or does not match the original hash.");
+                }
+
+                File.Copy(backupPath, temporaryTarget, overwrite: false);
+                File.Replace(
+                    temporaryTarget,
+                    file.TargetPath,
+                    destinationBackupFileName: null,
+                    ignoreMetadataErrors: true);
+                if (!ComputeSha256(file.TargetPath).Equals(file.OriginalSha256, StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new IOException($"Restored {file.FileName} does not match its original hash.");
+                }
+            }
+            catch (Exception error)
+            {
+                restoreErrors.Add(error);
+            }
+            finally
+            {
+                TryDeleteFile(temporaryTarget);
+            }
+        }
+
+        foreach (var file in allFiles)
+        {
+            try
+            {
+                if (!ComputeSha256(file.TargetPath).Equals(file.OriginalSha256, StringComparison.OrdinalIgnoreCase))
+                {
+                    restoreErrors.Add(new IOException(
+                        $"After rollback, {file.FileName} does not match the file used for preview."));
+                }
+            }
+            catch (Exception error)
+            {
+                restoreErrors.Add(error);
+            }
+        }
+
+        if (restoreErrors.Count > 0)
+        {
+            throw new AggregateException("One or more stagecoach save files could not be restored.", restoreErrors);
+        }
+    }
+
+    private static void WriteStagecoachTransactionState(
+        string backupDirectory,
+        PreparedStagecoachHeroEdit prepared,
+        string status,
+        IReadOnlyList<PreparedSaveFile> replacedFiles,
+        string? error)
+    {
+        WriteJsonAtomic(Path.Combine(backupDirectory, "transaction-state.json"), new
+        {
+            version = 1,
+            updatedAtUtc = DateTime.UtcNow,
+            prepared.SessionId,
+            prepared.Preview.CandidateGuid,
+            status,
+            replacedFiles = replacedFiles.Select(file => file.FileName).ToArray(),
+            error
+        });
+    }
+
+    private static void TryWriteStagecoachTransactionState(
+        string backupDirectory,
+        PreparedStagecoachHeroEdit prepared,
+        string status,
+        IReadOnlyList<PreparedSaveFile> replacedFiles,
+        string? error)
+    {
+        try
+        {
+            WriteStagecoachTransactionState(backupDirectory, prepared, status, replacedFiles, error);
+        }
+        catch
+        {
+            // A logging failure must not prevent rollback of already replaced save files.
+        }
+    }
+
+    private static void WriteJsonAtomic<T>(string path, T value)
+    {
+        var directory = Path.GetDirectoryName(path)
+            ?? throw new InvalidOperationException($"Output path has no directory: {path}");
+        Directory.CreateDirectory(directory);
+        var temporaryPath = Path.Combine(
+            directory,
+            $".{Path.GetFileName(path)}.ddse-{Guid.NewGuid():N}.tmp");
+        try
+        {
+            File.WriteAllText(
+                temporaryPath,
+                JsonSerializer.Serialize(value, JsonSupport.SerializerOptions),
+                Utf8NoBom);
+            if (File.Exists(path))
+            {
+                File.Replace(
+                    temporaryPath,
+                    path,
+                    destinationBackupFileName: null,
+                    ignoreMetadataErrors: true);
+            }
+            else
+            {
+                File.Move(temporaryPath, path);
+            }
+        }
+        finally
+        {
+            TryDeleteFile(temporaryPath);
+        }
+    }
+
+    private static void TryDeleteFile(string path)
+    {
+        try
+        {
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+        }
+        catch
+        {
+            // Temporary files are harmless; preserve the primary commit or restore result.
+        }
+    }
+
+}
