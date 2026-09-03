@@ -194,17 +194,20 @@ public partial class MainWindow : Window
                 AppendStatus($"人物怪癖上限提示：{heroLimitWarning.Replace(Environment.NewLine, "；", StringComparison.Ordinal)}");
             }
             var heroPreview = generated.Preview;
+            var targetStagecoach = preparedHeroEdit.Preview.TargetPool == StagecoachRecruitPool.Shard
+                ? "碎片马车"
+                : "普通马车";
             PreviewSummaryTextBlock.Text =
                 $"{heroPreview.Name} / {heroPreview.HeroClass}：{heroPreview.ResolveLevel}级，XP {heroPreview.ResolveXp}，" +
                 $"武器/护甲 {heroPreview.WeaponRank}/{heroPreview.ArmourRank}，HP {heroPreview.CurrentHp.ToString("0.##", CultureInfo.InvariantCulture)}，" +
                 $"怪癖 [{FormatSelectedQuirks(heroPreview)}]，" +
                 $"技能 {heroPreview.CombatSkills.Count}+{heroPreview.CampingSkills.Count}，" +
                 $"个人升级记录 {preparedHeroEdit.Preview.UpgradePurchaseCount}；" +
-                $"马车 {preparedHeroEdit.Preview.ExistingCandidates} → {preparedHeroEdit.Preview.ResultingCandidates}，" +
+                $"{targetStagecoach} {preparedHeroEdit.Preview.ExistingCandidates} → {preparedHeroEdit.Preview.ResultingCandidates}，" +
                 $"GUID {preparedHeroEdit.Preview.CandidateGuid}。";
             ApplyButton.IsEnabled = true;
             AppendStatus(
-                $"人物预览通过：{heroPreview.Name} / {heroPreview.HeroClass} / {heroPreview.ResolveLevel}级；" +
+                $"人物预览通过（{targetStagecoach}）：{heroPreview.Name} / {heroPreview.HeroClass} / {heroPreview.ResolveLevel}级；" +
                 $"XP {heroPreview.ResolveXp}；武器/护甲 rank {heroPreview.WeaponRank}/{heroPreview.ArmourRank}；" +
                 $"正面怪癖 [{string.Join(", ", heroPreview.PositiveQuirks)}]；" +
                 $"负面怪癖 [{string.Join(", ", heroPreview.NegativeQuirks)}]；" +
@@ -253,8 +256,11 @@ public partial class MainWindow : Window
         else if (isHeroEdit)
         {
             profileDirectory = _preparedHeroEdit!.Profile.ProfileDirectory;
+            var targetStagecoach = _preparedHeroEdit.Preview.TargetPool == StagecoachRecruitPool.Shard
+                ? "碎片马车"
+                : "普通马车";
             changeSummary =
-                $"向普通马车加入 {_preparedHeroCandidatePreview?.Name} / {_preparedHeroCandidatePreview?.HeroClass} " +
+                $"向{targetStagecoach}加入 {_preparedHeroCandidatePreview?.Name} / {_preparedHeroCandidatePreview?.HeroClass} " +
                 $"（{_preparedHeroCandidatePreview?.ResolveLevel}级，XP {_preparedHeroCandidatePreview?.ResolveXp}，" +
                 $"武器/护甲 rank {_preparedHeroCandidatePreview?.WeaponRank}/{_preparedHeroCandidatePreview?.ArmourRank}；" +
                 $"个人升级记录 {_preparedHeroEdit.Preview.UpgradePurchaseCount} 条；" +

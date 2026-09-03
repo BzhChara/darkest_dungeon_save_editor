@@ -36,5 +36,6 @@ internal static partial class ContractSuite
 
     private sealed record HeroCandidateContractContext(
         GeneratedStagecoachHeroCandidate LevelFourCandidate,
-        GeneratedStagecoachHeroCandidate ContextLimitedCandidate);
+        GeneratedStagecoachHeroCandidate ContextLimitedCandidate,
+        GeneratedStagecoachHeroCandidate ShardCandidate);
 }

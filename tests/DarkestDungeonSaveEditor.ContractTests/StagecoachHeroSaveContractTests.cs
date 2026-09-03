@@ -15,6 +15,7 @@ internal static partial class ContractSuite
     {
         var levelFourCandidate = candidates.LevelFourCandidate;
         var contextLimitedCandidate = candidates.ContextLimitedCandidate;
+        var shardCandidate = candidates.ShardCandidate;
         var stagecoachCandidate = levelFourCandidate.Candidate;
         var existingCandidateTown = JsonNode.Parse(
             """
@@ -120,11 +121,22 @@ internal static partial class ContractSuite
         var mutatedPurchases = mutatedUpgrades["base_root"]?["purchases"] as JsonObject;
         Assert(mutationPreview.CandidateGuid == 364, "Stagecoach candidate should use roster nextGuid without filling holes.");
         Assert(
-            mutationPreview is { ResolveXp: 24, WeaponRank: 3, ArmourRank: 3, UpgradePurchaseCount: 18 },
+            mutationPreview is
+            {
+                TargetPool: StagecoachRecruitPool.Ordinary,
+                ResolveXp: 24,
+                WeaponRank: 3,
+                ArmourRank: 3,
+                UpgradePurchaseCount: 18
+            },
             "Stagecoach mutation preview should preserve the candidate progression metadata.");
         Assert(mutationPreview.ExistingCandidates == 1 && mutationPreview.ResultingCandidates == 2, "Existing normal recruits must be preserved while appending.");
         Assert(mutatedGenerated?.ContainsKey("100") == true && mutatedGenerated.ContainsKey("364"), "Normal recruit append removed an existing candidate or missed the new GUID.");
-        Assert(mutatedTown["base_root"]?["buildings"]?["stage_coach"]?["store"]?["shard_hero_recruit"]?["generated"]?["200"] is JsonObject, "The shard recruit pool must remain unchanged.");
+        Assert(
+            JsonNode.DeepEquals(
+                mutatedTown["base_root"]?["buildings"]?["stage_coach"]?["store"]?["shard_hero_recruit"],
+                existingCandidateTown["base_root"]?["buildings"]?["stage_coach"]?["store"]?["shard_hero_recruit"]),
+            "Ordinary routing must leave the entire shard recruit pool unchanged.");
         Assert(mutatedRoster["base_root"]?["nextGuid"]?.GetValue<int>() == 365, "Roster nextGuid should advance exactly once.");
         Assert((mutatedRoster["base_root"]?["heroes"] as JsonObject)?.Count == 1, "Stagecoach append must not modify the owned roster.");
         Assert(
@@ -167,6 +179,63 @@ internal static partial class ContractSuite
         Assert(
             (existingCandidateUpgrades["base_root"]?["purchases"] as JsonObject)?.Count == 1,
             "Pure mutation changed the input upgrades document.");
+
+        var (mutatedShardTown, mutatedShardRoster, mutatedShardUpgrades, shardMutationPreview) =
+            StagecoachHeroSaveEditor.AddCandidate(
+                existingCandidateTown,
+                existingCandidateRoster,
+                existingCandidateUpgrades,
+                shardCandidate.Candidate,
+                shardCandidate.UpgradePurchases);
+        var mutatedShardGenerated = mutatedShardTown["base_root"]?["buildings"]?["stage_coach"]?["store"]?
+            ["shard_hero_recruit"]?["generated"] as JsonObject;
+        Assert(
+            shardMutationPreview is
+            {
+                TargetPool: StagecoachRecruitPool.Shard,
+                ExistingCandidates: 1,
+                ResultingCandidates: 2,
+                CandidateGuid: 364
+            },
+            "A candidate carrying shard_hungry should target the shard stagecoach and report that pool's counts.");
+        Assert(
+            mutatedShardGenerated?.ContainsKey("200") == true &&
+            mutatedShardGenerated.ContainsKey("364"),
+            "Shard routing should preserve the existing shard candidate and append the generated candidate.");
+        Assert(
+            JsonNode.DeepEquals(
+                mutatedShardTown["base_root"]?["buildings"]?["stage_coach"]?["store"]?["hero_recruit"],
+                existingCandidateTown["base_root"]?["buildings"]?["stage_coach"]?["store"]?["hero_recruit"]),
+            "Shard routing must not modify the ordinary recruit pool.");
+        Assert(
+            mutatedShardRoster["base_root"]?["nextGuid"]?.GetValue<int>() == 365 &&
+            (mutatedShardUpgrades["base_root"]?["purchases"] as JsonObject)?.Count ==
+            1 + shardCandidate.UpgradePurchases.Count,
+            "Shard routing should retain the shared roster GUID and upgrade-purchase transaction behavior.");
+
+        var missingShardPoolTown = existingCandidateTown.DeepClone() as JsonObject
+            ?? throw new InvalidDataException("Missing-shard-pool fixture could not be cloned.");
+        var missingShardPoolStore = (JsonObject)missingShardPoolTown["base_root"]!["buildings"]!["stage_coach"]!["store"]!;
+        missingShardPoolStore.Remove("shard_hero_recruit");
+        var missingShardPoolSnapshot = missingShardPoolTown.DeepClone();
+        var missingShardPoolBlocked = false;
+        try
+        {
+            _ = StagecoachHeroSaveEditor.AddCandidate(
+                missingShardPoolTown,
+                existingCandidateRoster,
+                existingCandidateUpgrades,
+                shardCandidate.Candidate,
+                shardCandidate.UpgradePurchases);
+        }
+        catch (InvalidDataException)
+        {
+            missingShardPoolBlocked = true;
+        }
+
+        Assert(
+            missingShardPoolBlocked && JsonNode.DeepEquals(missingShardPoolTown, missingShardPoolSnapshot),
+            "A missing shard recruit pool must fail closed without synthesizing or mutating the input town save.");
 
         var nonRoundTrippableRequirementBlocked = false;
         try
@@ -241,6 +310,26 @@ internal static partial class ContractSuite
             Path.Combine(runRoot, "stagecoach-appdata", "workspaces"),
             Path.Combine(runRoot, "stagecoach-appdata", "backups"));
         var stagecoachService = new SaveEditService(codec, stagecoachLocations);
+        var preparedShardStagecoach = await stagecoachService.PrepareStagecoachHeroEditAsync(
+            profile,
+            shardCandidate,
+            heroCatalog,
+            activeContent);
+        var preparedShardTown = JsonNode.Parse(File.ReadAllText(preparedShardStagecoach.TownFile.ProposedDecodedPath))
+            as JsonObject ?? throw new InvalidDataException("Prepared shard-stagecoach town file is invalid.");
+        Assert(
+            preparedShardStagecoach.Preview is
+            {
+                TargetPool: StagecoachRecruitPool.Shard,
+                ExistingCandidates: 1,
+                ResultingCandidates: 2,
+                CandidateGuid: 364
+            } &&
+            preparedShardTown["base_root"]?["buildings"]?["stage_coach"]?["store"]?
+                ["shard_hero_recruit"]?["generated"]?["364"] is JsonObject &&
+            (preparedShardTown["base_root"]?["buildings"]?["stage_coach"]?["store"]?
+                ["hero_recruit"]?["generated"] as JsonObject)?.Count == 0,
+            "A prepared shard candidate should survive encode/decode validation in the shard pool without entering the ordinary pool.");
         var preparedContextLimitedStagecoach = await stagecoachService.PrepareStagecoachHeroEditAsync(
             profile,
             contextLimitedCandidate,
@@ -368,7 +457,8 @@ internal static partial class ContractSuite
         var stagecoachBackupManifest = JsonNode.Parse(
             File.ReadAllText(Path.Combine(stagecoachCommit.BackupDirectory, "backup-manifest.json"))) as JsonObject;
         Assert(
-            stagecoachBackupManifest?["resolveXp"]?.GetValue<int>() == 24 &&
+            stagecoachBackupManifest?["targetPool"]?.GetValue<string>() == "Ordinary" &&
+            stagecoachBackupManifest["resolveXp"]?.GetValue<int>() == 24 &&
             stagecoachBackupManifest["weaponRank"]?.GetValue<int>() == 3 &&
             stagecoachBackupManifest["armourRank"]?.GetValue<int>() == 3 &&
             stagecoachBackupManifest["upgradePurchaseCount"]?.GetValue<int>() == 18,

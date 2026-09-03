@@ -278,6 +278,7 @@ internal static partial class ContractSuite
         { "id": "context_special", "random_chance": 0, "is_positive": true, "is_disease": false, "tags": ["singleton"], "buffs": [] },
         { "id": "context_unverified_singleton", "random_chance": 0, "is_positive": true, "is_disease": false, "tags": ["singleton"], "buffs": ["MAXHP_CONDITIONAL"] },
         { "id": "context_roster_limited", "random_chance": 0, "is_positive": false, "is_disease": false, "roster_limit": 2, "buffs": [] },
+        { "id": "shard_hungry", "random_chance": 0, "is_positive": false, "is_disease": false, "roster_limit": 6, "buffs": [] },
         { "id": "excluded_quirk", "random_chance": 100, "is_positive": true, "is_disease": false, "buffs": [] },
         { "id": "semantic_priority_quirk", "random_chance": 1, "is_positive": false, "is_disease": false, "buffs": [] },
         { "id": "unknown_hp_rule", "random_chance": 100, "is_positive": true, "is_disease": false, "buffs": ["MAXHP_CONDITIONAL"] },

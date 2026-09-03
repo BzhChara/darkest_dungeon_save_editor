@@ -353,6 +353,12 @@ public sealed record SaveProfileSummary(
     int TrinketCopies,
     int UniqueTrinketIds);
 
+public enum StagecoachRecruitPool
+{
+    Ordinary,
+    Shard
+}
+
 public sealed record StagecoachHeroMutationPreview(
     int CandidateGuid,
     string HeroClass,
@@ -366,6 +372,7 @@ public sealed record StagecoachHeroMutationPreview(
     int ResultingNextGuid,
     int RosterHeroCount)
 {
+    public StagecoachRecruitPool TargetPool { get; init; } = StagecoachRecruitPool.Ordinary;
     public IReadOnlyList<HeroQuirkLimitPreview> QuirkLimits { get; init; } = [];
 }
 
