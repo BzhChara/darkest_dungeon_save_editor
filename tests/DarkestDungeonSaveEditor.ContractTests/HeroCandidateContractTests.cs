@@ -132,6 +132,15 @@ internal static partial class ContractSuite
             contextLimitedCandidate.Preview.PositiveQuirks.SequenceEqual(["context_special"]) &&
             contextLimitedCandidate.Preview.NegativeQuirks.SequenceEqual(["context_roster_limited"]),
             "A singleton or roster-limited quirk should generate normally before its save-context limit is previewed.");
+        var shardCandidate = StagecoachHeroCandidateFactory.Generate(
+            heroCatalog,
+            localHero,
+            seed: 1729,
+            selectedInitialQuirkIds: ["shard_hungry"]);
+        Assert(
+            shardCandidate.Preview.NegativeQuirks.SequenceEqual(["shard_hungry"]) &&
+            shardCandidate.Candidate["quirks"]?["shard_hungry"] is JsonObject,
+            "The shard mercenary quirk should be serialized normally before the save editor selects its target pool.");
 
         var classExcludedCandidate = StagecoachHeroCandidateFactory.Generate(
             heroCatalog,
@@ -529,6 +538,6 @@ internal static partial class ContractSuite
                 .SequenceEqual((referenceStagecoachCandidate["actor"] as JsonObject)!.Select(pair => pair.Key).Order(StringComparer.Ordinal)),
             "Generated actor envelope differs from a complete natural stagecoach candidate.");
 
-        return new HeroCandidateContractContext(levelFourCandidate, contextLimitedCandidate);
+        return new HeroCandidateContractContext(levelFourCandidate, contextLimitedCandidate, shardCandidate);
     }
 }

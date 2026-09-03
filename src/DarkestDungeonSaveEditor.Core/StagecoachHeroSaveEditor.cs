@@ -5,6 +5,8 @@ namespace DarkestDungeonSaveEditor.Core;
 
 public static class StagecoachHeroSaveEditor
 {
+    private const string ShardRecruitQuirkId = "shard_hungry";
+
     public static (
         JsonObject UpdatedTown,
         JsonObject UpdatedRoster,
@@ -54,8 +56,14 @@ public static class StagecoachHeroSaveEditor
             "buildings",
             "stage_coach",
             "store");
-        var normalRecruit = JsonSupport.RequireObject(store, "hero_recruit");
-        var generated = JsonSupport.RequireObject(normalRecruit, "generated");
+        var targetPool = IsShardRecruitCandidate(candidate)
+            ? StagecoachRecruitPool.Shard
+            : StagecoachRecruitPool.Ordinary;
+        var targetRecruitKey = targetPool == StagecoachRecruitPool.Shard
+            ? "shard_hero_recruit"
+            : "hero_recruit";
+        var targetRecruit = JsonSupport.RequireObject(store, targetRecruitKey);
+        var generated = JsonSupport.RequireObject(targetRecruit, "generated");
         ValidateNextGuidInvariant(nextGuid, heroes, store);
 
         var candidateKey = nextGuid.ToString(CultureInfo.InvariantCulture);
@@ -85,7 +93,10 @@ public static class StagecoachHeroSaveEditor
                 generated.Count,
                 nextGuid,
                 nextGuid + 1,
-                heroes.Count));
+                heroes.Count)
+            {
+                TargetPool = targetPool
+            });
     }
 
     public static IReadOnlyList<HeroQuirkLimitPreview> AnalyzeQuirkLimits(
@@ -154,6 +165,12 @@ public static class StagecoachHeroSaveEditor
         }
 
         return previews;
+    }
+
+    private static bool IsShardRecruitCandidate(JsonObject candidate)
+    {
+        return candidate["quirks"] is JsonObject quirks &&
+               quirks.Any(pair => pair.Key.Equals(ShardRecruitQuirkId, StringComparison.OrdinalIgnoreCase));
     }
 
     private static void AddUpgradePurchases(

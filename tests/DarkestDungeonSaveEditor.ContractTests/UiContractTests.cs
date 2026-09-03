@@ -187,6 +187,14 @@ internal static partial class ContractSuite
             mainWindowCode.Contains("编辑器会按控制台模式保留写入能力", StringComparison.Ordinal) &&
             !mainWindowCode.Contains("HeroQuirkLimitKind.RosterLimit", StringComparison.Ordinal),
             "Hero quirk warnings must remain scoped to singleton duplication across the roster and all stagecoach pools.");
+        Assert(
+            mainWindowCode.Contains(
+                "preparedHeroEdit.Preview.TargetPool == StagecoachRecruitPool.Shard",
+                StringComparison.Ordinal) &&
+            mainWindowCode.Contains("\"碎片马车\"", StringComparison.Ordinal) &&
+            mainWindowCode.Contains("\"普通马车\"", StringComparison.Ordinal) &&
+            !mainWindowCode.Contains("向普通马车加入", StringComparison.Ordinal),
+            "Hero preview and confirmation must name the actual ordinary or shard destination selected by the save mutation.");
         System.Xml.Linq.XElement ReadNamedMainElement(string elementName, string name) => mainWindowXaml
             .Descendants(presentationNamespace + elementName)
             .Single(element => element.Attribute(xamlName)?.Value == name);

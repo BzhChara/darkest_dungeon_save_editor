@@ -204,14 +204,15 @@ The displayed `自然怪癖范围` is only the positive/negative quirk range use
 
 ### 6.4 Destination and roster behavior
 
-- The current feature appends candidates to the ordinary stagecoach only; it does not insert directly into the roster.
-- A full roster neither evicts an existing hero nor prevents an ordinary stagecoach candidate from being generated.
-- The shard stagecoach is not written unless a future feature explicitly implements that destination.
+- A candidate carrying `shard_hungry` is appended to `shard_hero_recruit.generated`; every other candidate is appended to `hero_recruit.generated`.
+- Adding `shard_hungry` is therefore both the saved quirk choice and the explicit destination signal; a shard candidate must never also be appended to the ordinary pool.
+- A full roster neither evicts an existing hero nor prevents a stagecoach candidate from being generated.
+- The preview and confirmation text must identify the selected target pool and report counts for that pool only.
 - Candidate names, color variants, and equipped skills follow the active template and stable randomization rules.
 
 ### 6.5 Files involved in hero preview and commit
 
-- `persist.town.json`: ordinary stagecoach candidate and `nextGuid`;
+- `persist.town.json`: candidate in the selected ordinary/shard stagecoach pool;
 - `persist.roster.json`: advance GUID state without adding a recruited hero;
 - `persist.upgrades.json`: personal equipment, combat-skill, and camping-skill purchases for the same GUID.
 
@@ -272,7 +273,7 @@ For positive `roster_limit`:
 
 - it is a game-side recruitment limit over already recruited heroes carrying that quirk, not a count across every candidate pool;
 - the editor creates a stagecoach candidate and does not mutate the roster, so it neither counts nor warns at generation time;
-- `shard_hungry` has `roster_limit=6`; the base-game shard-mercenary recruitment path remains responsible for enforcing it.
+- `shard_hungry` has `roster_limit=6`; it routes the generated candidate to the shard stagecoach, while the base-game shard-mercenary recruitment path remains responsible for enforcing the recruited-roster limit.
 
 ### 7.4 Evolving quirks
 

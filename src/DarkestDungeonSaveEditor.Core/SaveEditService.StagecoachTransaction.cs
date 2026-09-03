@@ -209,6 +209,7 @@ public sealed partial class SaveEditService
             prepared.SessionId,
             prepared.Preview.CandidateGuid,
             prepared.Preview.HeroClass,
+            targetPool = prepared.Preview.TargetPool.ToString(),
             resolveXp = prepared.Preview.ResolveXp,
             weaponRank = prepared.Preview.WeaponRank,
             armourRank = prepared.Preview.ArmourRank,
@@ -427,6 +428,7 @@ public sealed partial class SaveEditService
             updatedAtUtc = DateTime.UtcNow,
             prepared.SessionId,
             prepared.Preview.CandidateGuid,
+            targetPool = prepared.Preview.TargetPool.ToString(),
             status,
             replacedFiles = replacedFiles.Select(file => file.FileName).ToArray(),
             error
