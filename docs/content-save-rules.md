@@ -153,16 +153,18 @@ Real game loading after a deliberate raid edit remains a user-run smoke test; co
 
 Total capacity comes from the final active overlay. If the highest-priority capacity source is missing, malformed, or remains ambiguous at equal priority, trinket preview/application is disabled. The editor must not silently fall back to the base-game capacity.
 
-### 5.3 Stateful trinkets that remain display-only
+### 5.3 Pristine stateful trinket creation
 
-The editor currently does not create trinkets carrying per-instance runtime state such as:
+The editor creates only brand-new, unconsumed trinket instances. It does not expose remaining-use or transformation controls.
 
-- `quest_uses`;
-- `trigger_limit`;
-- progressive transformations or replacement state;
-- consumption counters or comparable per-instance fields.
+- Every new trinket receives the native common fields with `added_buffs=0`, an empty hero and previous-trinket ID, `did_transform=false`, and `trinkets_gained_count=0`.
+- Definition `quest_uses=N` becomes `quest_uses_remaining=N` plus `used_during_quest=false`.
+- Definition `trigger_limit=N` becomes `triggers_remaining=N`.
+- Progressive art, trigger exhaustion transformation/destruction, slot blocking, and quest-complete effects remain definition-driven; they are not duplicated into the instance.
+- Multiple requested copies are separate pristine instances, each starting at the full definition count.
+- A present counter that is not a positive integer is invalid and blocks creation. Definition-only lifecycle fields do not by themselves make a trinket read-only.
 
-The ordinary ID/amount record is understood. The block exists because the current game version still lacks enough real saved instances to prove those state fields' initial values and lifecycle.
+These mappings are backed by naturally generated `tinker_box`, `rw_pyro_accelerant`, and `lifestyle_guide` save instances. Runtime decrement, art progression, transformation, and destruction remain game responsibilities after creation.
 
 ### 5.4 Preview invalidation
 

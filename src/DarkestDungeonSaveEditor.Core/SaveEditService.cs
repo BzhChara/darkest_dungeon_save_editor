@@ -196,10 +196,11 @@ public sealed class SaveEditService
                 $"Trinket '{trinket.Id}' has unresolved definitions from different content paths and is read-only.");
         }
 
-        if (trinket.IsStateful)
+        if (trinket.UnsupportedStateFields.Count > 0)
         {
             throw new InvalidOperationException(
-                $"Stateful trinket '{trinket.Id}' is read-only in phase 1: {string.Join(", ", trinket.StatefulFields)}");
+                $"饰品“{trinket.Id}”的次数定义无效（{string.Join(", ", trinket.UnsupportedStateFields)}），" +
+                "无法安全生成初始状态。");
         }
 
         if (expectedStorage is null)
@@ -230,7 +231,7 @@ public sealed class SaveEditService
         var currentTrinket = currentCatalog.Trinkets.SingleOrDefault(item =>
             item.Id.Equals(trinket.Id, StringComparison.OrdinalIgnoreCase));
         if (currentTrinket is null ||
-            currentTrinket.IsStateful ||
+            currentTrinket.UnsupportedStateFields.Count > 0 ||
             currentTrinket.HasProviderConflict ||
             !TrinketDefinitionMatches(currentTrinket, trinket))
         {
@@ -1541,7 +1542,7 @@ public sealed class SaveEditService
         var currentTrinket = currentCatalog.Trinkets.SingleOrDefault(item =>
             item.Id.Equals(prepared.Trinket.Id, StringComparison.OrdinalIgnoreCase));
         if (currentTrinket is null ||
-            currentTrinket.IsStateful ||
+            currentTrinket.UnsupportedStateFields.Count > 0 ||
             currentTrinket.HasProviderConflict ||
             !TrinketDefinitionMatches(currentTrinket, prepared.Trinket) ||
             !Path.GetFullPath(currentTrinket.SourcePath).Equals(
@@ -1690,6 +1691,11 @@ public sealed class SaveEditService
                    StringComparison.OrdinalIgnoreCase) &&
                left.IsStateful == right.IsStateful &&
                left.StatefulFields.SequenceEqual(right.StatefulFields, StringComparer.OrdinalIgnoreCase) &&
+               left.QuestUses == right.QuestUses &&
+               left.TriggerLimit == right.TriggerLimit &&
+               left.UnsupportedStateFields.SequenceEqual(
+                   right.UnsupportedStateFields,
+                   StringComparer.OrdinalIgnoreCase) &&
                left.HasProviderConflict == right.HasProviderConflict &&
                left.AllSources.SequenceEqual(right.AllSources, StringComparer.OrdinalIgnoreCase) &&
                left.LocalizedName == right.LocalizedName;

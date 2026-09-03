@@ -42,11 +42,11 @@ public static class TrinketSaveEditor
             throw new ArgumentOutOfRangeException(nameof(copies), "Copies must be between 1 and 999.");
         }
 
-        if (definition.IsStateful)
+        if (definition.UnsupportedStateFields.Count > 0)
         {
             throw new InvalidOperationException(
-                $"'{definition.Id}' uses stateful Fire's Edge fields ({string.Join(", ", definition.StatefulFields)}). " +
-                "Phase 1 refuses to create an incomplete item instance.");
+                $"饰品“{definition.Id}”的次数定义无效（{string.Join(", ", definition.UnsupportedStateFields)}），" +
+                "无法安全生成初始状态。");
         }
 
         var updated = estateRoot.DeepClone() as JsonObject
@@ -74,12 +74,8 @@ public static class TrinketSaveEditor
         for (var index = 0; index < copies; index++)
         {
             nextNumericKey++;
-            items[nextNumericKey.ToString(System.Globalization.CultureInfo.InvariantCulture)] = new JsonObject
-            {
-                ["id"] = definition.Id,
-                ["type"] = "trinket",
-                ["amount"] = 1
-            };
+            items[nextNumericKey.ToString(System.Globalization.CultureInfo.InvariantCulture)] =
+                CreatePristineInstance(definition);
         }
 
         return (
@@ -122,5 +118,39 @@ public static class TrinketSaveEditor
         }
 
         return highest;
+    }
+
+    private static JsonObject CreatePristineInstance(TrinketDefinition definition)
+    {
+        if (definition.QuestUses is <= 0 || definition.TriggerLimit is <= 0)
+        {
+            throw new InvalidOperationException(
+                $"饰品“{definition.Id}”的初始次数必须为正整数，无法安全生成。");
+        }
+
+        var instance = new JsonObject
+        {
+            ["id"] = definition.Id,
+            ["type"] = "trinket",
+            ["amount"] = 1,
+            ["added_buffs"] = 0,
+            ["hero_name"] = string.Empty,
+            ["previous_trinket_id"] = string.Empty,
+            ["did_transform"] = false,
+            ["trinkets_gained_count"] = 0
+        };
+
+        if (definition.QuestUses is int questUses)
+        {
+            instance["quest_uses_remaining"] = questUses;
+            instance["used_during_quest"] = false;
+        }
+
+        if (definition.TriggerLimit is int triggerLimit)
+        {
+            instance["triggers_remaining"] = triggerLimit;
+        }
+
+        return instance;
     }
 }
