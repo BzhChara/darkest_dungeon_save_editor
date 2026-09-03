@@ -1,0 +1,10 @@
+global using System.Buffers.Binary;
+global using System.IO;
+global using System.Security.Cryptography;
+global using System.Text;
+global using System.Text.Json.Nodes;
+global using System.Windows;
+global using System.Windows.Media;
+global using System.Windows.Media.Imaging;
+global using DarkestDungeonSaveEditor.Core;
+global using static ContractTestSupport;
