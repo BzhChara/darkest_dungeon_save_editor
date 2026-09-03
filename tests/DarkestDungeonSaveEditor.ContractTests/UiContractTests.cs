@@ -2,28 +2,29 @@ internal static partial class ContractSuite
 {
     private static void RunUiContracts(string repositoryRoot)
     {
-        var mainWindowXamlPath = Path.Combine(
+        var appSourceDirectory = Path.Combine(
             repositoryRoot,
             "src",
-            "DarkestDungeonSaveEditor.App",
+            "DarkestDungeonSaveEditor.App");
+        var mainWindowXamlPath = Path.Combine(
+            appSourceDirectory,
             "MainWindow.xaml");
         var mainWindowXaml = System.Xml.Linq.XDocument.Load(mainWindowXamlPath);
         var mainWindowCode = File.ReadAllText(Path.Combine(
-            repositoryRoot,
-            "src",
-            "DarkestDungeonSaveEditor.App",
+            appSourceDirectory,
             "MainWindow.xaml.cs"));
         var battleMapXamlPath = Path.Combine(
-            repositoryRoot,
-            "src",
-            "DarkestDungeonSaveEditor.App",
+            appSourceDirectory,
             "BattleMapView.xaml");
         var battleMapXaml = System.Xml.Linq.XDocument.Load(battleMapXamlPath);
-        var battleMapCode = File.ReadAllText(Path.Combine(
-            repositoryRoot,
-            "src",
-            "DarkestDungeonSaveEditor.App",
-            "BattleMapView.xaml.cs"));
+        var battleMapCode = string.Join(
+            Environment.NewLine,
+            Directory.EnumerateFiles(
+                    appSourceDirectory,
+                    "BattleMapView*.cs",
+                    SearchOption.TopDirectoryOnly)
+                .OrderBy(path => path, StringComparer.Ordinal)
+                .Select(File.ReadAllText));
         var battleMapReaderCode = File.ReadAllText(Path.Combine(
             repositoryRoot,
             "src",
