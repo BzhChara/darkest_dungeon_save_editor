@@ -1,0 +1,129 @@
+<Window x:Class="DarkestDungeonSaveEditor.App.BattleRoomAttachmentSelectionDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="选择战斗附加内容"
+        Width="1080"
+        Height="690"
+        MinWidth="820"
+        MinHeight="520"
+        Icon="Assets/save-editor.ico"
+        Background="{StaticResource AppTextureBrush}"
+        Foreground="{StaticResource TextPrimaryBrush}"
+        FontFamily="SimHei, Microsoft YaHei UI"
+        FontSize="14"
+        UseLayoutRounding="True"
+        SnapsToDevicePixels="True"
+        ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner">
+    <Grid Background="{StaticResource AppTextureBrush}">
+        <Border Margin="8"
+                Background="#90050505"
+                BorderBrush="{StaticResource GoldDarkBrush}"
+                BorderThickness="1">
+            <Border Margin="3" BorderBrush="#4B5351" BorderThickness="1">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="78" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <Border Grid.Row="0"
+                            Padding="21,9"
+                            Background="{StaticResource HeaderBrush}"
+                            BorderBrush="#59615E"
+                            BorderThickness="0,0,0,1">
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock x:Name="HeaderTitleTextBlock"
+                                       Style="{StaticResource PageTitleStyle}"
+                                       FontSize="27"
+                                       Text="选择战斗附加内容" />
+                            <TextBlock Margin="1,2,0,0"
+                                       Style="{StaticResource KickerTextStyle}"
+                                       Text="来自当前档案启用的原版、DLC 与 Mod" />
+                        </StackPanel>
+                    </Border>
+
+                    <Grid Grid.Row="1" Margin="16,12,16,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="420" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0"
+                                   Margin="2,0,10,0"
+                                   Style="{StaticResource FieldLabelStyle}"
+                                   Text="筛选" />
+                        <TextBox x:Name="SearchTextBox"
+                                 Grid.Column="1"
+                                 Margin="0"
+                                 TextChanged="SearchTextBox_TextChanged"
+                                 ToolTip="按中文名、英文名、ID 或来源筛选" />
+                        <TextBlock x:Name="CountTextBlock"
+                                   Grid.Column="2"
+                                   Margin="16,0,2,0"
+                                   VerticalAlignment="Center"
+                                   TextAlignment="Right"
+                                   Foreground="{StaticResource GoldBrush}"
+                                   FontWeight="Bold" />
+                    </Grid>
+
+                    <DataGrid x:Name="AttachmentGrid"
+                              Grid.Row="2"
+                              Margin="16,0"
+                              AutoGenerateColumns="False"
+                              IsReadOnly="True"
+                              CanUserAddRows="False"
+                              CanUserDeleteRows="False"
+                              HeadersVisibility="Column"
+                              SelectionMode="Single"
+                              SelectionUnit="FullRow"
+                              SelectionChanged="AttachmentGrid_SelectionChanged"
+                              MouseDoubleClick="AttachmentGrid_MouseDoubleClick"
+                              RowHeight="44"
+                              ScrollViewer.HorizontalScrollBarVisibility="Auto">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="中文名" Binding="{Binding ChineseName}" Width="1.35*" MinWidth="170" ElementStyle="{StaticResource DataGridTextElementStyle}" />
+                            <DataGridTextColumn Header="English" Binding="{Binding EnglishName}" Width="1.35*" MinWidth="190" ElementStyle="{StaticResource DataGridTextElementStyle}" />
+                            <DataGridTextColumn Header="ID" Binding="{Binding Id}" Width="1.45*" MinWidth="210" ElementStyle="{StaticResource DataGridTextElementStyle}" />
+                            <DataGridTextColumn Header="来源" Binding="{Binding Source}" Width="1.55*" MinWidth="220" ElementStyle="{StaticResource DataGridTextElementStyle}" />
+                        </DataGrid.Columns>
+                    </DataGrid>
+
+                    <TextBlock x:Name="SelectionTextBlock"
+                               Grid.Row="3"
+                               Margin="18,10,18,0"
+                               Foreground="{StaticResource TextSecondaryBrush}"
+                               Text="选择一项；现有战斗及敌方组合不会改变。"
+                               TextTrimming="CharacterEllipsis" />
+
+                    <Grid Grid.Row="4" Margin="16,14,16,14">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="1"
+                                MinWidth="104"
+                                Margin="0,0,10,0"
+                                Style="{StaticResource GhostButtonStyle}"
+                                Content="取消"
+                                IsCancel="True"
+                                Click="Cancel_Click" />
+                        <Button x:Name="ConfirmButton"
+                                Grid.Column="2"
+                                MinWidth="150"
+                                Margin="0"
+                                Style="{StaticResource PrimaryButtonStyle}"
+                                Content="应用附加内容"
+                                IsDefault="True"
+                                IsEnabled="False"
+                                Click="Confirm_Click" />
+                    </Grid>
+                </Grid>
+            </Border>
+        </Border>
+    </Grid>
+</Window>

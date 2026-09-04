@@ -104,6 +104,7 @@ public partial class BattleMapView : UserControl
                     tile.RawContent,
                     tile.MashIndex,
                     tile.MashType,
+                    tile.HasResidualContentBinding,
                     area.AreaId,
                     tile.TileId));
             }
@@ -298,6 +299,7 @@ public partial class BattleMapView : UserControl
         int rawContent = 0,
         int mashIndex = -1,
         int mashType = 7,
+        bool hasResidualContentBinding = false,
         string? sourceAreaId = null,
         string? sourceTileId = null)
     {
@@ -314,6 +316,7 @@ public partial class BattleMapView : UserControl
             rawContent,
             mashIndex,
             mashType,
+            hasResidualContentBinding,
             sourceAreaId,
             sourceTileId);
         _cells.Add(cell);
@@ -338,6 +341,7 @@ public partial class BattleMapView : UserControl
         int rawContent = 0,
         int mashIndex = -1,
         int mashType = 7,
+        bool hasResidualContentBinding = false,
         string? sourceAreaId = null,
         string? sourceTileId = null)
     {
@@ -434,6 +438,7 @@ public partial class BattleMapView : UserControl
             rawContent,
             mashIndex,
             mashType,
+            hasResidualContentBinding,
             sourceAreaId,
             sourceTileId)
         {

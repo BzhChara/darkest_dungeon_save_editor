@@ -171,6 +171,7 @@ public sealed class BattleMapSnapshotReader(DsonSaveCodec codec)
                     position[0],
                     position[1],
                     ReadInt(staticTile, "type", -1),
+                    ReadInt(staticTile, "cur", 0),
                     ReadInt(staticTile, "obstacle", 0),
                     ResolveKnowledge(rawKnowledge),
                     rawKnowledge,

@@ -29,6 +29,17 @@ public partial class MainWindow : Window
         }
     }
 
+    private void BattleMapPanel_ActiveContentChanged(ActiveContentSnapshot activeContent)
+    {
+        _activeContentSnapshot = activeContent;
+        _catalogProfileDirectory = activeContent.Profile.ProfileDirectory;
+        _catalogGameSaveSha256 = activeContent.SourceGameSha256;
+        CrashDiagnostics.RecordStatus(
+            $"托管遭遇 Bridge 已同步活动内容：档案={activeContent.Profile.ProfileId}；" +
+            $"活动来源={activeContent.Sources.Count}；启用 Mod={activeContent.AppliedModCount}；" +
+            $"persist.game.json SHA-256={activeContent.SourceGameSha256}");
+    }
+
     private void BattleMapPanel_SaveEditApplied(string message) =>
         AppendStatusSafely(message, "BattleMap: applied save edit");
 

@@ -55,6 +55,7 @@ public partial class MainWindow : Window
         HeroGrid.ItemsSource = _visibleHeroes;
         HeroLevelComboBox.ItemsSource = _heroLevelChoices;
         BattleMapPanel.SnapshotRefreshed += BattleMapPanel_SnapshotRefreshed;
+        BattleMapPanel.ActiveContentChanged += BattleMapPanel_ActiveContentChanged;
         BattleMapPanel.SaveEditApplied += BattleMapPanel_SaveEditApplied;
         BattleMapPanel.SaveEditBusyChanged += BattleMapPanel_SaveEditBusyChanged;
         UpdateCatalogMode();
@@ -70,6 +71,7 @@ public partial class MainWindow : Window
     {
         _titleLogoTimer?.Stop();
         BattleMapPanel.SnapshotRefreshed -= BattleMapPanel_SnapshotRefreshed;
+        BattleMapPanel.ActiveContentChanged -= BattleMapPanel_ActiveContentChanged;
         BattleMapPanel.SaveEditApplied -= BattleMapPanel_SaveEditApplied;
         BattleMapPanel.SaveEditBusyChanged -= BattleMapPanel_SaveEditBusyChanged;
         BattleMapPanel.ClearProfile();

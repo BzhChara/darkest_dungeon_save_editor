@@ -25,8 +25,16 @@ public partial class BattleMapView : UserControl
         _profileDirectory = null;
         _profileId = profileId;
         _profile = null;
+        _codec = null;
+        _activeContentSnapshot = null;
+        _workshopDirectory = null;
+        _localModDirectory = null;
         _snapshotReader = null;
         _editService = null;
+        _forceTownSaveService = null;
+        _managedEncounterBridgeService = null;
+        _encounterCatalog = null;
+        _roomAttachmentCatalog = null;
         _currentSnapshot = null;
         ConfigureOriginalMapAssets(gameDirectory);
         _selectedCell = null;
@@ -51,6 +59,9 @@ public partial class BattleMapView : UserControl
         SaveProfile profile,
         DsonSaveCodec codec,
         string? gameDirectory,
+        ActiveContentSnapshot? activeContent = null,
+        string? workshopDirectory = null,
+        string? localModDirectory = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(profile);
@@ -64,8 +75,20 @@ public partial class BattleMapView : UserControl
             ? Path.GetFileName(profileDirectory)
             : profile.ProfileId;
         _profile = profile;
+        _codec = codec;
+        _activeContentSnapshot = activeContent;
+        _workshopDirectory = string.IsNullOrWhiteSpace(workshopDirectory)
+            ? null
+            : Path.GetFullPath(workshopDirectory);
+        _localModDirectory = string.IsNullOrWhiteSpace(localModDirectory)
+            ? null
+            : Path.GetFullPath(localModDirectory);
         _snapshotReader = new BattleMapSnapshotReader(codec);
         _editService = new BattleMapEditService(codec);
+        _forceTownSaveService = new ForceTownSaveService(codec);
+        _managedEncounterBridgeService = new ManagedBattleEncounterBridgeService(codec);
+        _encounterCatalog = null;
+        _roomAttachmentCatalog = null;
         _currentSnapshot = null;
         ConfigureOriginalMapAssets(gameDirectory);
         ShowUnavailableState("正在安全读取当前副本地图……", "正在读取存档");
@@ -82,6 +105,82 @@ public partial class BattleMapView : UserControl
                 if (generation != _profileGeneration)
                 {
                     return null;
+                }
+
+                if (activeContent is not null)
+                {
+                    try
+                    {
+                        _encounterCatalog = await Task.Run(
+                            () => BattleEncounterCatalog.Load(activeContent, snapshot),
+                            cancellationToken);
+                        var directByType = _encounterCatalog.DirectEncounters
+                            .GroupBy(encounter => encounter.MashType)
+                            .ToDictionary(group => group.Key, group => group.Count());
+                        var bridgeByType = _encounterCatalog.BridgeEncounters
+                            .GroupBy(encounter => encounter.MashType)
+                            .ToDictionary(group => group.Key, group => group.Count());
+                        CrashDiagnostics.RecordStatus(
+                            $"战斗遭遇目录：地区={snapshot.DungeonId}；难度={snapshot.Difficulty}；" +
+                            $"当前可写 hall={directByType.GetValueOrDefault(0)}，" +
+                            $"room={directByType.GetValueOrDefault(1)}，" +
+                            $"boss={directByType.GetValueOrDefault(2)}；" +
+                            $"全局 Bridge 候选 hall={bridgeByType.GetValueOrDefault(0)}，" +
+                            $"room={bridgeByType.GetValueOrDefault(1)}，" +
+                            $"boss={bridgeByType.GetValueOrDefault(2)}；" +
+                            $"提示={_encounterCatalog.Issues.Count}");
+                        foreach (var issue in _encounterCatalog.Issues)
+                        {
+                            CrashDiagnostics.RecordStatus($"战斗遭遇目录提示：{issue}");
+                        }
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        throw;
+                    }
+                    catch (Exception ex)
+                    {
+                        _encounterCatalog = null;
+                        CrashDiagnostics.RecordException(
+                            "BattleMap: encounter catalog",
+                            ex,
+                            $"档案={profile.ProfileId}；地区={snapshot.DungeonId}；难度={snapshot.Difficulty}");
+                    }
+                    if (generation != _profileGeneration)
+                    {
+                        return null;
+                    }
+
+                    try
+                    {
+                        _roomAttachmentCatalog = await Task.Run(
+                            () => BattleRoomAttachmentCatalog.Load(activeContent),
+                            cancellationToken);
+                        CrashDiagnostics.RecordStatus(
+                            $"战斗附加内容目录：奇物={_roomAttachmentCatalog.Curios.Count}；" +
+                            $"宝箱={_roomAttachmentCatalog.Treasures.Count}；" +
+                            $"提示={_roomAttachmentCatalog.Issues.Count}");
+                        foreach (var issue in _roomAttachmentCatalog.Issues)
+                        {
+                            CrashDiagnostics.RecordStatus($"战斗附加内容目录提示：{issue}");
+                        }
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        throw;
+                    }
+                    catch (Exception ex)
+                    {
+                        _roomAttachmentCatalog = null;
+                        CrashDiagnostics.RecordException(
+                            "BattleMap: room attachment catalog",
+                            ex,
+                            $"档案={profile.ProfileId}；地区={snapshot.DungeonId}；难度={snapshot.Difficulty}");
+                    }
+                    if (generation != _profileGeneration)
+                    {
+                        return null;
+                    }
                 }
 
                 RenderSnapshot(snapshot, fitToView: true);
@@ -141,6 +240,7 @@ public partial class BattleMapView : UserControl
         ZoomInButton.IsEnabled = true;
         ResetZoomButton.IsEnabled = true;
         FitMapButton.IsEnabled = true;
+        ForceTownButton.IsEnabled = _currentSnapshot is not null;
     }
 
     private void ShowUnavailableState(string message, string liveStatus)
@@ -159,6 +259,7 @@ public partial class BattleMapView : UserControl
         ZoomInButton.IsEnabled = false;
         ResetZoomButton.IsEnabled = false;
         FitMapButton.IsEnabled = false;
+        ForceTownButton.IsEnabled = false;
         MapTitleTextBlock.Text = "当前副本地图";
         MapSelectionTextBlock.Text = "当前没有副本地图。";
         LiveStatusTextBlock.Text = liveStatus;

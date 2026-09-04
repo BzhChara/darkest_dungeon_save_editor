@@ -35,9 +35,22 @@ public partial class MainWindow : Window
                 ProfileDirectoryTextBox.Text = profile.ProfileDirectory;
             }
 
+            var discoverySummary = (game is not null, profile) switch
+            {
+                (true, { } selectedProfile) =>
+                    $"找到 {snapshot.GameInstallations.Count} 个游戏安装目录和 " +
+                    $"{snapshot.Profiles.Count} 个存档；已填写默认路径并选择 {selectedProfile.ProfileId}",
+                (true, null) =>
+                    $"找到 {snapshot.GameInstallations.Count} 个游戏安装目录，已填写默认路径；未找到存档",
+                (false, { } selectedProfile) =>
+                    $"未找到游戏安装目录；找到 {snapshot.Profiles.Count} 个存档并选择 {selectedProfile.ProfileId}",
+                _ => "未找到游戏安装目录；未找到存档"
+            };
             AppendStatus(
-                $"自动发现：游戏={snapshot.GameInstallations.Count}，档案={snapshot.Profiles.Count}。" +
-                (snapshot.Issues.Count == 0 ? string.Empty : $" 提示={string.Join(" | ", snapshot.Issues)}"));
+                $"自动发现完成：{discoverySummary}。" +
+                (snapshot.Issues.Count == 0
+                    ? string.Empty
+                    : $" 另有提示：{string.Join(" | ", snapshot.Issues)}"));
         }
         catch (Exception ex)
         {

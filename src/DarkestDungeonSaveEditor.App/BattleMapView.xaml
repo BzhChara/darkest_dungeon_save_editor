@@ -40,8 +40,9 @@
                                 BorderThickness="{TemplateBinding BorderThickness}"
                                 Padding="{TemplateBinding Padding}"
                                 SnapsToDevicePixels="True">
-                            <StackPanel IsItemsHost="True"
-                                        KeyboardNavigation.DirectionalNavigation="Cycle" />
+                            <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Cycle"
+                                            KeyboardNavigation.TabNavigation="Cycle"
+                                            SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}" />
                         </Border>
                     </ControlTemplate>
                 </Setter.Value>
@@ -89,23 +90,26 @@
                             </Border>
                             <Popup x:Name="PART_Popup"
                                    Placement="Right"
-                                   PlacementTarget="{Binding ElementName=ItemChrome}"
-                                   HorizontalOffset="-3"
+                                   VerticalOffset="-3"
                                    AllowsTransparency="True"
                                    Focusable="False"
-                                   PopupAnimation="Fade"
+                                   PopupAnimation="None"
                                    IsOpen="{Binding IsSubmenuOpen,
                                        RelativeSource={RelativeSource TemplatedParent}}">
                                 <Border Margin="0"
                                         Padding="3"
                                         Background="#F70A0A09"
                                         BorderBrush="{StaticResource GoldDarkBrush}"
-                                        BorderThickness="1">
-                                    <ScrollViewer MaxHeight="480"
+                                        BorderThickness="1"
+                                        Grid.IsSharedSizeScope="True">
+                                    <ScrollViewer x:Name="SubMenuScrollViewer"
+                                                  MaxHeight="480"
                                                   CanContentScroll="True"
                                                   VerticalScrollBarVisibility="Auto">
-                                        <StackPanel IsItemsHost="True"
-                                                    KeyboardNavigation.DirectionalNavigation="Cycle" />
+                                        <ItemsPresenter x:Name="ItemsPresenter"
+                                                        KeyboardNavigation.DirectionalNavigation="Cycle"
+                                                        KeyboardNavigation.TabNavigation="Cycle"
+                                                        SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}" />
                                     </ScrollViewer>
                                 </Border>
                             </Popup>
@@ -158,26 +162,32 @@
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
-            <StackPanel Grid.Column="0"
-                        Margin="16,0,12,0"
-                        Orientation="Horizontal"
-                        VerticalAlignment="Center">
+            <Grid Grid.Column="0"
+                  Margin="16,0,12,0"
+                  ClipToBounds="True"
+                  VerticalAlignment="Center">
                 <TextBlock x:Name="MapTitleTextBlock"
                            FontFamily="SimSun, Microsoft YaHei UI"
                            FontSize="18"
                            FontWeight="Bold"
                            Foreground="{StaticResource GoldBrush}"
                            Text="当前副本地图" />
-                <TextBlock Margin="12,1,0,0"
-                           VerticalAlignment="Center"
-                           Foreground="{StaticResource TextSecondaryBrush}"
-                           FontSize="12.5"
-                           Text="右击操作 · 右键拖拽 · 滚轮缩放" />
-            </StackPanel>
+            </Grid>
             <StackPanel Grid.Column="1"
                         Margin="8,0,12,0"
                         Orientation="Horizontal"
                         VerticalAlignment="Center">
+                <Button x:Name="ForceTownButton"
+                        Style="{StaticResource PrimaryButtonStyle}"
+                        MinWidth="118"
+                        MinHeight="32"
+                        Margin="3,0,11,0"
+                        Padding="12,4"
+                        FontSize="13"
+                        Content="强制返回城镇"
+                        ToolTip="修改当前档案的读档入口；完整备份后将下次载入强制切回城镇"
+                        IsEnabled="False"
+                        Click="ForceTownButton_Click" />
                 <Button x:Name="ZoomOutButton"
                         Style="{StaticResource MapToolbarButtonStyle}"
                         Content="－"
