@@ -22,6 +22,7 @@ internal static partial class ContractSuite
             appSourceDirectory,
             "BattleMapView.xaml");
         var battleMapXaml = System.Xml.Linq.XDocument.Load(battleMapXamlPath);
+        var battleMapXamlText = File.ReadAllText(battleMapXamlPath);
         var battleMapCode = string.Join(
             Environment.NewLine,
             Directory.EnumerateFiles(
@@ -45,6 +46,11 @@ internal static partial class ContractSuite
             "src",
             "DarkestDungeonSaveEditor.Core",
             "BattleMapEditService.cs"));
+        var forceTownSaveServiceCode = File.ReadAllText(Path.Combine(
+            repositoryRoot,
+            "src",
+            "DarkestDungeonSaveEditor.Core",
+            "ForceTownSaveService.cs"));
         var profileSaveMonitorCode = File.ReadAllText(Path.Combine(
             repositoryRoot,
             "src",
@@ -94,6 +100,18 @@ internal static partial class ContractSuite
             "DarkestDungeonSaveEditor.App",
             "Assets",
             "dialog-parchment.png");
+        var battleEncounterDialogPath = Path.Combine(
+            appSourceDirectory,
+            "BattleEncounterSelectionDialog.xaml");
+        var battleEncounterDialog = System.Xml.Linq.XDocument.Load(battleEncounterDialogPath);
+        var battleEncounterDialogCode = File.ReadAllText(
+            battleEncounterDialogPath + ".cs");
+        var battleAttachmentDialogPath = Path.Combine(
+            appSourceDirectory,
+            "BattleRoomAttachmentSelectionDialog.xaml");
+        var battleAttachmentDialog = System.Xml.Linq.XDocument.Load(battleAttachmentDialogPath);
+        var battleAttachmentDialogCode = File.ReadAllText(
+            battleAttachmentDialogPath + ".cs");
         var presentationNamespace = mainWindowXaml.Root?.Name.Namespace ??
             throw new InvalidDataException("MainWindow.xaml has no root namespace.");
         var xamlName = System.Xml.Linq.XName.Get("Name", "http://schemas.microsoft.com/winfx/2006/xaml");
@@ -101,8 +119,13 @@ internal static partial class ContractSuite
             !mainWindowCode.Contains("Loaded += (_, _) => Discover();", StringComparison.Ordinal) &&
             mainWindowCode.Contains("Discover_Click(object sender, RoutedEventArgs e) => Discover();", StringComparison.Ordinal) &&
             mainWindowCode.Contains("WorkshopDirectoryTextBox.Text = game.WorkshopDirectory;", StringComparison.Ordinal) &&
-            mainWindowCode.Contains("LocalModDirectoryTextBox.Text = game.DefaultLocalModDirectory;", StringComparison.Ordinal),
-            "Path discovery must run only after the user clicks the button and must then fill the derived Workshop/local Mod paths.");
+            mainWindowCode.Contains("LocalModDirectoryTextBox.Text = game.DefaultLocalModDirectory;", StringComparison.Ordinal) &&
+            mainWindowCode.Contains("自动发现完成：{discoverySummary}", StringComparison.Ordinal) &&
+            mainWindowCode.Contains("已填写默认路径并选择 {selectedProfile.ProfileId}", StringComparison.Ordinal) &&
+            mainWindowCode.Contains("未找到游戏安装目录", StringComparison.Ordinal) &&
+            mainWindowCode.Contains("未找到存档", StringComparison.Ordinal) &&
+            !mainWindowCode.Contains("自动发现：游戏=", StringComparison.Ordinal),
+            "Path discovery must run only after the user clicks the button, fill the derived Workshop/local Mod paths, and report its result in user-facing language instead of terse counters.");
         Assert(
             appCode.Contains("SaveEditorLocations.ResolveLogDirectory(AppContext.BaseDirectory)", StringComparison.Ordinal) &&
             mainWindowCode.Contains("CrashDiagnostics.RecordStatus(message);", StringComparison.Ordinal) &&
@@ -735,6 +758,7 @@ internal static partial class ContractSuite
             battleMapNamedElements.Contains("EmptyStatePanel") &&
             battleMapNamedElements.Contains("MapSelectionTextBlock") &&
             battleMapNamedElements.Contains("PrototypeBadgeTextBlock") &&
+            battleMapNamedElements.Contains("ForceTownButton") &&
             !battleMapNamedElements.Contains("MapLegend") &&
             battleMapRoot.Attribute("PreviewMouseWheel")?.Value == "BattleMapView_PreviewMouseWheel" &&
             battleMapRoot.Attribute("PreviewMouseRightButtonDown")?.Value ==
@@ -748,6 +772,9 @@ internal static partial class ContractSuite
             battleMapCode.Contains("MaximumZoom = 2.40", StringComparison.Ordinal) &&
             battleMapCode.Contains("FitMapToViewport", StringComparison.Ordinal) &&
             battleMapCode.Contains("hasPersistedContent ? \"替换\" : \"新建\"", StringComparison.Ordinal) &&
+            battleMapCode.Contains(
+                "hasPersistedContent || cell.HasResidualContentBinding",
+                StringComparison.Ordinal) &&
             battleMapCode.Contains("移动队伍到此", StringComparison.Ordinal) &&
             !battleMapCode.Contains("PrototypeCellKind.CorridorEndpoint", StringComparison.Ordinal) &&
             !battleMapCode.Contains("PrototypeCellKind.DoorTransition", StringComparison.Ordinal) &&
@@ -762,10 +789,36 @@ internal static partial class ContractSuite
             battleMapCode.Contains("_cells.Count} 个可操作格", StringComparison.Ordinal) &&
             battleMapCode.Contains("_selectedCell = null;", StringComparison.Ordinal) &&
             battleMapCode.Contains("BuildPrototypeMap();", StringComparison.Ordinal) &&
-            battleMapCode.Contains("首领遭遇", StringComparison.Ordinal) &&
-            battleMapCode.Contains("原版 / BASE", StringComparison.Ordinal) &&
-            battleMapCode.Contains("官方 DLC / DLC", StringComparison.Ordinal) &&
-            battleMapCode.Contains("Mod / MODS", StringComparison.Ordinal) &&
+            battleMapCode.Contains("BattleEncounterCatalog", StringComparison.Ordinal) &&
+            battleMapCode.Contains("普通战斗", StringComparison.Ordinal) &&
+            battleMapCode.Contains("BattleEncounterClassification.Ordinary", StringComparison.Ordinal) &&
+            !battleMapCode.Contains("随机（仅界面预览）", StringComparison.Ordinal) &&
+            !battleMapCode.Contains("AddDirectEncounterItems", StringComparison.Ordinal) &&
+            !battleMapCode.Contains("FormatEncounterHeader", StringComparison.Ordinal) &&
+            !battleMapCode.Contains("）…", StringComparison.Ordinal) &&
+            battleMapCode.Contains("游荡首领 / 特殊遭遇", StringComparison.Ordinal) &&
+            battleMapCode.Contains("固定首领", StringComparison.Ordinal) &&
+            battleMapCode.Contains("BattleEncounterClassification.RoamingBoss", StringComparison.Ordinal) &&
+            battleMapCode.Contains("BattleEncounterClassification.RoamingEncounter", StringComparison.Ordinal) &&
+            battleMapCode.Contains("BattleEncounterClassification.ConditionalOrAdditional", StringComparison.Ordinal) &&
+            battleMapCode.Contains("CreateEncounterPickerItem", StringComparison.Ordinal) &&
+            battleMapCode.Contains("FindDirectlyAddressableEncounter", StringComparison.Ordinal) &&
+            !battleMapCode.Contains("生成 Encounter Bridge", StringComparison.Ordinal) &&
+            battleMapCode.Contains("BridgeEncounters", StringComparison.Ordinal) &&
+            battleMapCode.Contains("OriginDungeonId", StringComparison.Ordinal) &&
+            battleMapCode.Contains("ManagedBattleEncounterBridgeService", StringComparison.Ordinal) &&
+            battleMapCode.Contains("EnsureEncounterAsync", StringComparison.Ordinal) &&
+            battleMapCode.Contains("encounterResolver", StringComparison.Ordinal) &&
+            battleMapCode.Contains("SelectAndPlaceEncounterAsync", StringComparison.Ordinal) &&
+            battleMapXamlText.Contains("x:Name=\"PART_Popup\"", StringComparison.Ordinal) &&
+            battleMapXamlText.Contains("x:Name=\"ItemsPresenter\"", StringComparison.Ordinal) &&
+            battleMapXamlText.Contains("PopupAnimation=\"None\"", StringComparison.Ordinal) &&
+            battleMapXamlText.Contains("VerticalOffset=\"-3\"", StringComparison.Ordinal) &&
+            !battleMapXamlText.Contains("HorizontalOffset=", StringComparison.Ordinal) &&
+            !battleMapXamlText.Contains("PlacementTarget=\"{Binding ElementName=ItemChrome}\"", StringComparison.Ordinal) &&
+            battleMapCode.Contains("cell.Content == PrototypeContent.Entrance", StringComparison.Ordinal) &&
+            battleMapCode.Contains("cell.Content == PrototypeContent.SecretDoor", StringComparison.Ordinal) &&
+            battleMapCode.Contains("IsUnsupportedScriptContent", StringComparison.Ordinal) &&
             battleMapCode.Contains(@"panels\panel_map.png", StringComparison.Ordinal) &&
             battleMapCode.Contains(@"panels\icons_map", StringComparison.Ordinal) &&
             battleMapCode.Contains("room_boss.png", StringComparison.Ordinal) &&
@@ -774,7 +827,7 @@ internal static partial class ContractSuite
             !battleMapCode.Contains("marker_hunger.png", StringComparison.Ordinal) &&
             battleMapCode.Contains("IsHiddenSystemContent", StringComparison.Ordinal) &&
             battleMapCode.Contains("cell.RawContent == (int)BattleMapTileContent.Hunger", StringComparison.Ordinal) &&
-            battleMapCode.Contains("if (!isHiddenSystemContent)", StringComparison.Ordinal) &&
+            battleMapCode.Contains("if (!isProtectedContent)", StringComparison.Ordinal) &&
             battleMapCode.Contains("marker_secret.png", StringComparison.Ordinal) &&
             battleMapCode.Contains("indicator.png", StringComparison.Ordinal) &&
             battleMapCode.Contains("PrototypeBadgeTextBlock.Text = \"全局视野\"", StringComparison.Ordinal) &&
@@ -815,12 +868,21 @@ internal static partial class ContractSuite
             battleMapReaderCode.Contains("does not belong to the captured map topology", StringComparison.Ordinal) &&
             battleMapReaderCode.Contains("area.Tiles.Count - 1 - savedAreaTile.Value", StringComparison.Ordinal) &&
             battleMapReaderCode.Contains("return area.Tiles[physicalOrdinal].TileIndex", StringComparison.Ordinal) &&
+            battleMapReaderCode.Contains("ReadInt(staticTile, \"cur\", 0)", StringComparison.Ordinal) &&
             profileSaveMonitorCode.Contains("FileSystemWatcher", StringComparison.Ordinal) &&
             profileSaveMonitorCode.Contains("PollNow", StringComparison.Ordinal) &&
             profileSaveMonitorCode.Contains("DetectChangesAndSchedule", StringComparison.Ordinal) &&
             battleMapCode.Contains("BattleMapEditService", StringComparison.Ordinal) &&
+            battleMapCode.Contains("ForceTownSaveService", StringComparison.Ordinal) &&
+            battleMapCode.Contains("ForceTownButton_Click", StringComparison.Ordinal) &&
+            battleMapCode.Contains("这不是正常撤退结算", StringComparison.Ordinal) &&
+            !battleMapCode.Contains("if (!committed && generation == _profileGeneration)", StringComparison.Ordinal) &&
             battleMapCode.Contains("PrepareDeleteContentAsync", StringComparison.Ordinal) &&
             battleMapCode.Contains("PrepareMovePartyAsync", StringComparison.Ordinal) &&
+            battleMapCode.Contains("PreparePlaceBattleAsync", StringComparison.Ordinal) &&
+            battleMapCode.Contains("战斗附加内容", StringComparison.Ordinal) &&
+            battleMapCode.Contains("PrepareSetBattleAttachmentAsync", StringComparison.Ordinal) &&
+            battleMapCode.Contains("PrepareRemoveBattleAttachmentAsync", StringComparison.Ordinal) &&
             battleMapCode.Contains("ThemedDialog.Confirm", StringComparison.Ordinal) &&
             !battleMapCode.Contains("File.Write", StringComparison.Ordinal) &&
             !battleMapCode.Contains("File.Copy", StringComparison.Ordinal) &&
@@ -828,6 +890,15 @@ internal static partial class ContractSuite
             !battleMapCode.Contains("File.Delete", StringComparison.Ordinal) &&
             battleMapEditorCode.Contains("dynamicTile[\"content\"] = 0", StringComparison.Ordinal) &&
             battleMapEditorCode.Contains("dynamicTile[\"mash_index\"] = -1", StringComparison.Ordinal) &&
+            battleMapEditorCode.Contains("dynamicTile[\"content\"] = (int)BattleMapTileContent.Battle", StringComparison.Ordinal) &&
+            battleMapEditorCode.Contains("BattleMapTileContent.GuardedCurio", StringComparison.Ordinal) &&
+            battleMapEditorCode.Contains("BattleMapTileContent.GuardedTreasure", StringComparison.Ordinal) &&
+            battleMapEditorCode.Contains("staticTile[\"cur\"] = attachment.PropHash", StringComparison.Ordinal) &&
+            battleMapEditorCode.Contains("dynamicTile[\"curio_prop\"] = attachment.PropHash", StringComparison.Ordinal) &&
+            battleMapEditorCode.Contains("SetScalarToZero(staticTile, \"cur\")", StringComparison.Ordinal) &&
+            battleMapEditorCode.Contains("SetScalarToZero(staticTile, \"obstacle\")", StringComparison.Ordinal) &&
+            battleMapEditorCode.Contains("SetScalarToZero(dynamicTile, \"curio_prop\")", StringComparison.Ordinal) &&
+            battleMapEditorCode.Contains("SetScalarToZero(dynamicTile, \"trap\")", StringComparison.Ordinal) &&
             battleMapEditorCode.Contains("area.Tiles.Count - 1 - physicalOrdinal", StringComparison.Ordinal) &&
             battleMapEditorCode.Contains("ValidateStationaryRaidState", StringComparison.Ordinal) &&
             battleMapEditorCode.Contains("当前正在战斗，不能修改地图", StringComparison.Ordinal) &&
@@ -836,8 +907,79 @@ internal static partial class ContractSuite
             battleMapEditServiceCode.Contains("检测到《暗黑地牢》仍在运行", StringComparison.Ordinal) &&
             battleMapEditServiceCode.Contains("ValidateLivePair", StringComparison.Ordinal) &&
             battleMapEditServiceCode.Contains("CreateBackup", StringComparison.Ordinal) &&
-            battleMapEditServiceCode.Contains("RestoreTarget", StringComparison.Ordinal),
-            "The battle workspace must expose a pannable, zoomable real save map rendered from original sprites, keep native hidden hunger nodes visually and operationally out of content editing, limit interaction to rooms and visible corridor tiles in native map orientation, keep create/replace as previews, and route confirmed delete/move actions through guarded, backed-up save transactions with localized safety errors.");
+            battleMapEditServiceCode.Contains("RestoreTarget", StringComparison.Ordinal) &&
+            battleMapEditServiceCode.Contains("BattleEncounterCatalog.ValidateGuard", StringComparison.Ordinal) &&
+            forceTownSaveServiceCode.Contains("baseRoot[\"inraid\"] = false", StringComparison.Ordinal) &&
+            forceTownSaveServiceCode.Contains("baseRoot[\"raiddungeon\"] = \"none\"", StringComparison.Ordinal) &&
+            forceTownSaveServiceCode.Contains("ValidateLiveState", StringComparison.Ordinal) &&
+            forceTownSaveServiceCode.Contains("EnsureGameIsNotRunning", StringComparison.Ordinal) &&
+            forceTownSaveServiceCode.Contains("CreateBackup", StringComparison.Ordinal) &&
+            forceTownSaveServiceCode.Contains("RestoreTarget", StringComparison.Ordinal) &&
+            forceTownSaveServiceCode.Contains("destinationBackupFileName: displacedTarget", StringComparison.Ordinal) &&
+            forceTownSaveServiceCode.Contains("RestoreFileVersion", StringComparison.Ordinal) &&
+            forceTownSaveServiceCode.Contains("FileShare.Read", StringComparison.Ordinal) &&
+            !forceTownSaveServiceCode.Contains("Process.Start", StringComparison.Ordinal) &&
+            !forceTownSaveServiceCode.Contains("-forcetown", StringComparison.Ordinal),
+            "The battle workspace must expose a pannable, zoomable real save map rendered from original sprites, keep system/script cells out of ordinary content editing, retain a native PART_Popup/ItemsPresenter menu chain for stable nested hover navigation, limit interaction to rooms and visible corridor tiles in native map orientation, retain previews for unresolved content, route proven battle/delete/move actions through guarded save transactions, and expose a backed-up two-field force-town save repair without launching the game.");
+        var battleEncounterDialogNames = battleEncounterDialog
+            .Descendants()
+            .Select(element => element.Attribute(xamlName)?.Value)
+            .Where(value => value is not null)
+            .ToHashSet(StringComparer.Ordinal);
+        Assert(
+            battleEncounterDialogNames.Contains("SearchTextBox") &&
+            battleEncounterDialogNames.Contains("DifficultyComboBox") &&
+            battleEncounterDialogNames.Contains("EncounterGrid") &&
+            battleEncounterDialogNames.Contains("ConfirmButton") &&
+            battleEncounterDialog.Descendants()
+                .Any(element => element.Name.LocalName == "TextBlock" &&
+                                ((string?)element.Attribute("Text"))?.Contains(
+                                    "ChineseComposition",
+                                    StringComparison.Ordinal) == true) &&
+            !battleEncounterDialog.Descendants()
+                .Any(element => (string?)element.Attribute("Header") == "游荡 ID") &&
+            !battleEncounterDialog.Descendants()
+                .Any(element => element.Name.LocalName == "DataGridTextColumn" &&
+                                (string?)element.Attribute("Header") == "难度") &&
+            battleEncounterDialogCode.Contains("CollectionViewSource.GetDefaultView", StringComparison.Ordinal) &&
+            battleEncounterDialogCode.Contains("choice.Value == currentDifficulty", StringComparison.Ordinal) &&
+            battleEncounterDialogCode.Contains("row.Definition.OriginDifficulty != selectedDifficulty.Value", StringComparison.Ordinal) &&
+            battleEncounterDialogCode.Contains("row.SearchText.Contains", StringComparison.Ordinal) &&
+            battleEncounterDialogCode.Contains("BattleEncounterClassification.FixedBoss", StringComparison.Ordinal) &&
+            battleEncounterDialogCode.Contains("BattleEncounterClassification.RoamingBoss", StringComparison.Ordinal) &&
+            battleEncounterDialogCode.Contains("BattleEncounterClassification.RoamingEncounter", StringComparison.Ordinal) &&
+            battleEncounterDialogCode.Contains("BattleEncounterClassification.ConditionalOrAdditional", StringComparison.Ordinal) &&
+            battleEncounterDialogCode.Contains("NativeWindowTheme.ApplyDarkTitleBar", StringComparison.Ordinal) &&
+            battleEncounterDialogCode.Contains("DialogResult = true", StringComparison.Ordinal),
+            "The global enabled-content encounter catalog must open in a themed picker, default to the current dungeon difficulty in a separate selector, search only that difficulty without repeating it in every row, and return one explicit complete composition for direct or managed placement.");
+        var battleAttachmentDialogNames = battleAttachmentDialog
+            .Descendants()
+            .Select(element => element.Attribute(xamlName)?.Value)
+            .Where(value => value is not null)
+            .ToHashSet(StringComparer.Ordinal);
+        Assert(
+            battleAttachmentDialogNames.Contains("SearchTextBox") &&
+            battleAttachmentDialogNames.Contains("AttachmentGrid") &&
+            battleAttachmentDialogNames.Contains("ConfirmButton") &&
+            battleAttachmentDialog.Descendants()
+                .Any(element => (string?)element.Attribute("Header") == "中文名") &&
+            battleAttachmentDialog.Descendants()
+                .Any(element => (string?)element.Attribute("Header") == "English") &&
+            battleAttachmentDialog.Descendants()
+                .Any(element => (string?)element.Attribute("Header") == "ID") &&
+            battleAttachmentDialog.Descendants()
+                .Any(element => (string?)element.Attribute("Header") == "来源") &&
+            battleAttachmentDialogCode.Contains(
+                "CollectionViewSource.GetDefaultView",
+                StringComparison.Ordinal) &&
+            battleAttachmentDialogCode.Contains(
+                "row.SearchText.Contains",
+                StringComparison.Ordinal) &&
+            battleAttachmentDialogCode.Contains(
+                "NativeWindowTheme.ApplyDarkTitleBar",
+                StringComparison.Ordinal) &&
+            battleAttachmentDialogCode.Contains("DialogResult = true", StringComparison.Ordinal),
+            "Room battle attachments must use a themed bilingual searchable picker and return one exact curio or treasure definition without exposing save hashes to the user.");
         Assert(
             mainWindowXaml.Descendants()
                 .Any(element => element.Name.LocalName == "BattleMapView" &&
@@ -860,9 +1002,14 @@ internal static partial class ContractSuite
             battleMapDesign.Contains("does not reveal the map inside the game or write scouting progress", StringComparison.Ordinal) &&
             battleMapDesign.Contains("Content previews must preserve the cell's persisted knowledge state", StringComparison.Ordinal) &&
             battleMapDesign.Contains("does not read game process memory", StringComparison.OrdinalIgnoreCase) &&
-            battleMapDesign.Contains("create and replace remain preview-only", StringComparison.OrdinalIgnoreCase) &&
+            battleMapDesign.Contains("guarded current-table battle placement", StringComparison.OrdinalIgnoreCase) &&
+            battleMapDesign.Contains("Deterministic Encounter Bridge probe", StringComparison.Ordinal) &&
+            battleMapDesign.Contains("does not require repeatedly starting expeditions", StringComparison.Ordinal) &&
+            battleMapDesign.Contains("direct save-based force-town recovery", StringComparison.OrdinalIgnoreCase) &&
+            battleMapDesign.Contains("base_root.inraid", StringComparison.Ordinal) &&
+            battleMapDesign.Contains("base_root.raiddungeon", StringComparison.Ordinal) &&
             battleMapDesign.Contains("full-profile backup", StringComparison.OrdinalIgnoreCase),
-            "The battle tab must hide catalog-only controls, show and refresh a real map only for a loaded raid, and retain the approved global-vision, arbitrary-boss, normal-tile-only, native-orientation, delete, and movement decisions in durable documentation.");
+            "The battle tab must hide catalog-only controls, show and refresh a real map only for a loaded raid, and retain the approved global-vision, arbitrary-boss, normal-tile-only, native-orientation, delete, movement, and direct save-based force-town decisions in durable documentation.");
         var rightSelectionPanel = mainWindowXaml
             .Descendants(presentationNamespace + "ContentControl")
             .Single(control => control.Attribute("Content")?.Value == "选择要生成的内容")

@@ -30,6 +30,8 @@ public sealed class BattleMapEditService
             areaId,
             tileId,
             BattleMapEditKind.DeleteContent,
+            encounter: null,
+            attachment: null,
             cancellationToken);
 
     public Task<PreparedBattleMapEdit> PrepareMovePartyAsync(
@@ -44,6 +46,58 @@ public sealed class BattleMapEditService
             areaId,
             tileId,
             BattleMapEditKind.MoveParty,
+            encounter: null,
+            attachment: null,
+            cancellationToken);
+
+    public Task<PreparedBattleMapEdit> PreparePlaceBattleAsync(
+        SaveProfile profile,
+        BattleMapSnapshot expectedSnapshot,
+        string areaId,
+        string tileId,
+        BattleEncounterDefinition encounter,
+        CancellationToken cancellationToken = default) =>
+        PrepareAsync(
+            profile,
+            expectedSnapshot,
+            areaId,
+            tileId,
+            BattleMapEditKind.PlaceBattle,
+            encounter,
+            attachment: null,
+            cancellationToken);
+
+    public Task<PreparedBattleMapEdit> PrepareSetBattleAttachmentAsync(
+        SaveProfile profile,
+        BattleMapSnapshot expectedSnapshot,
+        string areaId,
+        string tileId,
+        BattleRoomAttachmentDefinition attachment,
+        CancellationToken cancellationToken = default) =>
+        PrepareAsync(
+            profile,
+            expectedSnapshot,
+            areaId,
+            tileId,
+            BattleMapEditKind.SetBattleAttachment,
+            encounter: null,
+            attachment,
+            cancellationToken);
+
+    public Task<PreparedBattleMapEdit> PrepareRemoveBattleAttachmentAsync(
+        SaveProfile profile,
+        BattleMapSnapshot expectedSnapshot,
+        string areaId,
+        string tileId,
+        CancellationToken cancellationToken = default) =>
+        PrepareAsync(
+            profile,
+            expectedSnapshot,
+            areaId,
+            tileId,
+            BattleMapEditKind.RemoveBattleAttachment,
+            encounter: null,
+            attachment: null,
             cancellationToken);
 
     public async Task<SaveCommitResult> CommitAsync(
@@ -55,6 +109,7 @@ public sealed class BattleMapEditService
         EnsureGameIsNotRunning();
         var (mapPath, raidPath) = ValidateBattleProfile(prepared.Profile);
         ValidatePreparedTarget(prepared, mapPath, raidPath);
+        ValidateContentGuards(prepared);
         ValidateLivePair(prepared, mapPath, raidPath, "准备完成后");
 
         if (!File.Exists(prepared.TargetFile.EncodedPath) ||
@@ -66,11 +121,12 @@ public sealed class BattleMapEditService
         }
 
         var backupDirectory = CreateBackup(prepared.Profile, prepared);
+        ValidateContentGuards(prepared);
         ValidateLivePair(prepared, mapPath, raidPath, "创建档案备份期间");
         EnsureGameIsNotRunning();
 
         var targetPath = prepared.TargetFile.TargetPath;
-        var guardPath = prepared.Preview.Kind == BattleMapEditKind.DeleteContent ? raidPath : mapPath;
+        var guardPath = EditsMap(prepared.Preview.Kind) ? raidPath : mapPath;
         var targetDirectory = Path.GetDirectoryName(targetPath)
             ?? throw new InvalidOperationException($"无法确定存档目标目录：{targetPath}");
         var temporaryTarget = Path.Combine(
@@ -96,7 +152,7 @@ public sealed class BattleMapEditService
                 FileShare.Read | FileShare.Delete,
                 bufferSize: 4096,
                 FileOptions.SequentialScan);
-            var expectedGuardHash = prepared.Preview.Kind == BattleMapEditKind.DeleteContent
+            var expectedGuardHash = EditsMap(prepared.Preview.Kind)
                 ? prepared.RaidOriginalSha256
                 : prepared.MapOriginalSha256;
             if (!ComputeSha256(guardLock).Equals(expectedGuardHash, StringComparison.OrdinalIgnoreCase) ||
@@ -107,6 +163,7 @@ public sealed class BattleMapEditService
                 throw new InvalidOperationException(
                     "地图或副本存档在写入前发生了变化，本次修改未应用。请等待地图刷新后重试。");
             }
+            ValidateContentGuards(prepared);
 
             File.Replace(
                 temporaryTarget,
@@ -122,6 +179,7 @@ public sealed class BattleMapEditService
                 throw new IOException(
                     "写入后的地图与副本存档组合不符合已验证结果，程序将尝试自动恢复。");
             }
+            ValidateContentGuards(prepared);
 
             var result = new SaveCommitResult(
                 prepared.Profile.ProfileDirectory,
@@ -172,6 +230,8 @@ public sealed class BattleMapEditService
         string areaId,
         string tileId,
         BattleMapEditKind kind,
+        BattleEncounterDefinition? encounter,
+        BattleRoomAttachmentDefinition? attachment,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(profile);
@@ -182,6 +242,39 @@ public sealed class BattleMapEditService
         _codec.ValidateAvailability();
         var (mapPath, raidPath) = ValidateBattleProfile(profile);
         ValidateExpectedSnapshot(profile, expectedSnapshot, mapPath, raidPath);
+        if (kind == BattleMapEditKind.PlaceBattle)
+        {
+            ArgumentNullException.ThrowIfNull(encounter);
+            BattleEncounterCatalog.ValidateDirectEncounter(encounter);
+        }
+        else if (encounter is not null)
+        {
+            throw new ArgumentException("只有遭遇写入操作可以携带遭遇定义。", nameof(encounter));
+        }
+        if (kind == BattleMapEditKind.SetBattleAttachment)
+        {
+            ArgumentNullException.ThrowIfNull(attachment);
+            BattleRoomAttachmentCatalog.ValidateDefinition(attachment);
+            var expectedGamePath = Path.Combine(
+                Path.GetFullPath(profile.ProfileDirectory),
+                "persist.game.json");
+            if (!Path.GetFullPath(attachment.CatalogGuard.GameSavePath).Equals(
+                    expectedGamePath,
+                    StringComparison.OrdinalIgnoreCase) ||
+                !Path.GetFullPath(attachment.CatalogGuard.ProfileDirectory).Equals(
+                    Path.GetFullPath(profile.ProfileDirectory),
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException(
+                    "所选房间附加内容目录属于另一个档案，请重新加载内容目录。");
+            }
+        }
+        else if (attachment is not null)
+        {
+            throw new ArgumentException(
+                "只有设置房间战斗附加内容时可以携带奇物或宝箱定义。",
+                nameof(attachment));
+        }
 
         var mapHash = ComputeSha256(mapPath);
         var raidHash = ComputeSha256(raidPath);
@@ -238,15 +331,35 @@ public sealed class BattleMapEditService
                 capturedSnapshot,
                 areaId,
                 tileId),
+            BattleMapEditKind.PlaceBattle => BattleMapSaveEditor.PlaceBattle(
+                mapDocument,
+                raidDocument,
+                capturedSnapshot,
+                areaId,
+                tileId,
+                encounter!),
+            BattleMapEditKind.SetBattleAttachment => BattleMapSaveEditor.SetBattleAttachment(
+                mapDocument,
+                raidDocument,
+                capturedSnapshot,
+                areaId,
+                tileId,
+                attachment!),
+            BattleMapEditKind.RemoveBattleAttachment => BattleMapSaveEditor.RemoveBattleAttachment(
+                mapDocument,
+                raidDocument,
+                capturedSnapshot,
+                areaId,
+                tileId),
             _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null)
         };
 
-        var targetFileName = kind == BattleMapEditKind.DeleteContent
+        var targetFileName = EditsMap(kind)
             ? "persist.map.json"
             : "persist.raid.json";
-        var targetPath = kind == BattleMapEditKind.DeleteContent ? mapPath : raidPath;
-        var targetSourceCopy = kind == BattleMapEditKind.DeleteContent ? mapSourceCopy : raidSourceCopy;
-        var updatedDocument = kind == BattleMapEditKind.DeleteContent ? mapDocument : raidDocument;
+        var targetPath = EditsMap(kind) ? mapPath : raidPath;
+        var targetSourceCopy = EditsMap(kind) ? mapSourceCopy : raidSourceCopy;
+        var updatedDocument = EditsMap(kind) ? mapDocument : raidDocument;
         var proposedPath = Path.Combine(
             decodedDirectory,
             $"{Path.GetFileNameWithoutExtension(targetFileName)}.proposed.json");
@@ -273,6 +386,14 @@ public sealed class BattleMapEditService
         }
 
         ValidateCapturedPair(mapPath, raidPath, mapSourceCopy, raidSourceCopy, mapHash, raidHash);
+        if (encounter is not null)
+        {
+            BattleEncounterCatalog.ValidateGuard(encounter.TableGuard);
+        }
+        if (attachment is not null)
+        {
+            BattleRoomAttachmentCatalog.ValidateDefinition(attachment);
+        }
         var targetFile = new PreparedSaveFile(
             targetFileName,
             targetPath,
@@ -280,7 +401,7 @@ public sealed class BattleMapEditService
             proposedPath,
             encodedPath,
             roundTripPath,
-            kind == BattleMapEditKind.DeleteContent ? mapHash : raidHash,
+            EditsMap(kind) ? mapHash : raidHash,
             ComputeSha256(encodedPath),
             sourceWasDson);
         var prepared = new PreparedBattleMapEdit(
@@ -291,7 +412,11 @@ public sealed class BattleMapEditService
             targetFile,
             mapHash,
             raidHash,
-            DateTime.UtcNow);
+            DateTime.UtcNow)
+        {
+            Encounter = encounter,
+            Attachment = attachment
+        };
         WriteJson(Path.Combine(workspace, "session.json"), prepared);
         return prepared;
     }
@@ -346,7 +471,7 @@ public sealed class BattleMapEditService
         string mapPath,
         string raidPath)
     {
-        var expectedPath = prepared.Preview.Kind == BattleMapEditKind.DeleteContent ? mapPath : raidPath;
+        var expectedPath = EditsMap(prepared.Preview.Kind) ? mapPath : raidPath;
         var expectedFileName = Path.GetFileName(expectedPath);
         if (!Path.GetFullPath(prepared.TargetFile.TargetPath).Equals(
                 expectedPath,
@@ -357,6 +482,55 @@ public sealed class BattleMapEditService
                 "准备写入的地图目标不属于所选档案，或存档类型不正确。");
         }
     }
+
+    private static void ValidateContentGuards(PreparedBattleMapEdit prepared)
+    {
+        if (prepared.Preview.Kind == BattleMapEditKind.PlaceBattle)
+        {
+            if (prepared.Encounter is null)
+            {
+                throw new InvalidDataException("遭遇写入会话缺少已验证的遭遇定义。");
+            }
+
+            BattleEncounterCatalog.ValidateGuard(prepared.Encounter.TableGuard);
+        }
+        else if (prepared.Encounter is not null)
+        {
+            throw new InvalidDataException("非遭遇写入会话意外包含遭遇定义。");
+        }
+
+        if (prepared.Preview.Kind == BattleMapEditKind.SetBattleAttachment)
+        {
+            if (prepared.Attachment is null)
+            {
+                throw new InvalidDataException("房间战斗附加内容会话缺少已验证的奇物或宝箱定义。");
+            }
+
+            var expectedProfileDirectory = Path.GetFullPath(prepared.Profile.ProfileDirectory);
+            var expectedGamePath = Path.Combine(expectedProfileDirectory, "persist.game.json");
+            if (!Path.GetFullPath(prepared.Attachment.CatalogGuard.ProfileDirectory).Equals(
+                    expectedProfileDirectory,
+                    StringComparison.OrdinalIgnoreCase) ||
+                !Path.GetFullPath(prepared.Attachment.CatalogGuard.GameSavePath).Equals(
+                    expectedGamePath,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidDataException("房间战斗附加内容会话属于另一个档案。");
+            }
+
+            BattleRoomAttachmentCatalog.ValidateDefinition(prepared.Attachment);
+        }
+        else if (prepared.Attachment is not null)
+        {
+            throw new InvalidDataException("非附加内容写入会话意外包含奇物或宝箱定义。");
+        }
+    }
+
+    private static bool EditsMap(BattleMapEditKind kind) =>
+        kind is BattleMapEditKind.DeleteContent or
+            BattleMapEditKind.PlaceBattle or
+            BattleMapEditKind.SetBattleAttachment or
+            BattleMapEditKind.RemoveBattleAttachment;
 
     private static void ValidateCapturedPair(
         string mapPath,
@@ -439,6 +613,18 @@ public sealed class BattleMapEditService
             prepared.Preview.TileId,
             prepared.MapOriginalSha256,
             prepared.RaidOriginalSha256,
+            encounter = prepared.Encounter is null
+                ? null
+                : new
+                {
+                    prepared.Encounter.MashType,
+                    prepared.Encounter.MashIndex,
+                    prepared.Encounter.MonsterIds,
+                    prepared.Encounter.SourceLabel,
+                    prepared.Encounter.SourcePath,
+                    prepared.Encounter.SourceLine,
+                    tableFingerprint = prepared.Encounter.TableGuard.Fingerprint
+                },
             files
         });
         return backupDirectory;

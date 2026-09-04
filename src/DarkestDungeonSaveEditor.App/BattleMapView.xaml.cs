@@ -31,12 +31,20 @@ public partial class BattleMapView : UserControl
     private PrototypeMapCell? _selectedCell;
     private ContextMenu? _activeContextMenu;
     private string? _gameDirectory;
+    private string? _workshopDirectory;
+    private string? _localModDirectory;
     private bool _usesOriginalMapAssets;
     private string? _profileDirectory;
     private string? _profileId;
     private SaveProfile? _profile;
+    private DsonSaveCodec? _codec;
+    private ActiveContentSnapshot? _activeContentSnapshot;
     private BattleMapSnapshotReader? _snapshotReader;
     private BattleMapEditService? _editService;
+    private ForceTownSaveService? _forceTownSaveService;
+    private ManagedBattleEncounterBridgeService? _managedEncounterBridgeService;
+    private BattleEncounterCatalogResult? _encounterCatalog;
+    private BattleRoomAttachmentCatalogResult? _roomAttachmentCatalog;
     private ProfileSaveMonitor? _profileMonitor;
     private CancellationTokenSource? _refreshRetryCancellation;
     private BattleMapSnapshot? _currentSnapshot;
@@ -44,6 +52,7 @@ public partial class BattleMapView : UserControl
     private bool _isApplyingEdit;
 
     public event Action<BattleMapSnapshot>? SnapshotRefreshed;
+    public event Action<ActiveContentSnapshot>? ActiveContentChanged;
     public event Action<string>? SaveEditApplied;
     public event Action<bool>? SaveEditBusyChanged;
 

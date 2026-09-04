@@ -22,9 +22,10 @@ internal static class BattleMapSaveEditor
         {
             throw new InvalidOperationException("饥饿节点不属于地图编辑范围，程序不会修改它。");
         }
-        if (tile.RawContent == 0)
+        if (tile.RawContent == 0 && !tile.HasResidualContentBinding)
         {
-            throw new InvalidOperationException($"地图格 {area.AreaId}.{tile.TileId} 已经没有可删除的事件。");
+            throw new InvalidOperationException(
+                $"地图格 {area.AreaId}.{tile.TileId} 已经没有可删除的事件或残留资源。");
         }
 
         var dynamicTile = ResolveDynamicTile(mapDocument, area.AreaId, tile.TileId);
@@ -34,10 +35,14 @@ internal static class BattleMapSaveEditor
             throw new InvalidOperationException(
                 $"地图格 {area.AreaId}.{tile.TileId} 在显示后已经变化，请在刷新后的地图上重新操作。");
         }
+        var staticTile = ResolveStaticTile(mapDocument, area.AreaId, tile.TileId);
 
-        // Natural consumed tiles retain their knowledge and curio/trap identity. Content is the
-        // authoritative pending-event gate; the mash fields are normalized so a deleted battle
-        // cannot leave a stale encounter index behind.
+        // Delete means a visually empty tile rather than the game's natural "consumed" state.
+        // Preserve exploration/topology while removing every mutually exclusive event binding.
+        SetScalarToZero(staticTile, "cur");
+        SetScalarToZero(staticTile, "obstacle");
+        SetScalarToZero(dynamicTile, "curio_prop");
+        SetScalarToZero(dynamicTile, "trap");
         dynamicTile["content"] = 0;
         dynamicTile["mash_index"] = -1;
         dynamicTile["mash_type"] = 7;
@@ -125,6 +130,255 @@ internal static class BattleMapSaveEditor
             previousRoomHash);
     }
 
+    internal static BattleMapEditPreview PlaceBattle(
+        JsonObject mapDocument,
+        JsonObject raidDocument,
+        BattleMapSnapshot snapshot,
+        string areaId,
+        string tileId,
+        BattleEncounterDefinition encounter)
+    {
+        ArgumentNullException.ThrowIfNull(mapDocument);
+        ArgumentNullException.ThrowIfNull(raidDocument);
+        ArgumentNullException.ThrowIfNull(snapshot);
+        ArgumentNullException.ThrowIfNull(encounter);
+        var (area, tile) = ResolveEditableTile(snapshot, areaId, tileId);
+        ValidateStationaryRaidState(raidDocument);
+        if (!encounter.CanPlaceDirectly || encounter.MashIndex is null)
+        {
+            throw new InvalidOperationException(
+                string.IsNullOrWhiteSpace(encounter.UnavailableReason)
+                    ? "所选遭遇没有经过可写入索引验证。"
+                    : encounter.UnavailableReason);
+        }
+        if (!encounter.TableGuard.DungeonId.Equals(
+                snapshot.DungeonId,
+                StringComparison.OrdinalIgnoreCase) ||
+            encounter.TableGuard.Difficulty != snapshot.Difficulty)
+        {
+            throw new InvalidOperationException("所选遭遇不属于当前副本及难度的有效遭遇表。");
+        }
+        if (encounter.MashType is < 0 or > 2 || encounter.MashIndex is < 0)
+        {
+            throw new InvalidOperationException("所选遭遇的 mash 类型或索引无效。");
+        }
+        if (area.Kind != encounter.TargetAreaKind ||
+            (area.Kind == BattleMapAreaKind.Corridor && encounter.MashType != 0) ||
+            (area.Kind == BattleMapAreaKind.Room && encounter.MashType is not (1 or 2)))
+        {
+            throw new InvalidOperationException(
+                encounter.MashType == 0
+                    ? "走廊遭遇只能写入普通可见走廊格。"
+                    : "房间或首领遭遇只能写入房间。");
+        }
+        if (string.Equals(area.AreaId, snapshot.EntranceAreaId, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("出生房间不能新建、替换或删除地图内容。");
+        }
+        if (string.Equals(area.AreaId, snapshot.FinalRoomId, StringComparison.OrdinalIgnoreCase) &&
+            encounter.MashType != 2)
+        {
+            throw new InvalidOperationException("最终房间目前只允许写入已验证的首领遭遇。");
+        }
+        if (tile.Content is
+            BattleMapTileContent.Hunger or
+            BattleMapTileContent.SecretDoor or
+            BattleMapTileContent.Ambush or
+            BattleMapTileContent.Happening or
+            BattleMapTileContent.AmbushCurio or
+            BattleMapTileContent.AmbushTreasure or
+            BattleMapTileContent.Unknown)
+        {
+            throw new InvalidOperationException("该格属于系统或脚本内容，不能作为普通遭遇替换目标。");
+        }
+
+        var dynamicTile = ResolveDynamicTile(mapDocument, area.AreaId, tile.TileId);
+        var persistedContent = ReadRequiredInt(dynamicTile, "content");
+        if (persistedContent != tile.RawContent)
+        {
+            throw new InvalidOperationException(
+                $"地图格 {area.AreaId}.{tile.TileId} 在显示后已经变化，请在刷新后的地图上重新操作。");
+        }
+        var staticTile = ResolveStaticTile(mapDocument, area.AreaId, tile.TileId);
+
+        // A tile stores one active content binding. Replacing it with a battle must clear
+        // every prop/trap/obstacle scalar so a naturally consumed visual cannot overlap the
+        // injected encounter.
+        SetScalarToZero(staticTile, "cur");
+        SetScalarToZero(staticTile, "obstacle");
+        SetScalarToZero(dynamicTile, "curio_prop");
+        SetScalarToZero(dynamicTile, "trap");
+        dynamicTile["content"] = (int)BattleMapTileContent.Battle;
+        dynamicTile["mash_index"] = encounter.MashIndex.Value;
+        dynamicTile["mash_type"] = encounter.MashType;
+
+        return new BattleMapEditPreview(
+            BattleMapEditKind.PlaceBattle,
+            area.AreaId,
+            tile.TileId,
+            area.Kind,
+            area.AreaHash,
+            tile.RawContent,
+            null,
+            null);
+    }
+
+    internal static BattleMapEditPreview SetBattleAttachment(
+        JsonObject mapDocument,
+        JsonObject raidDocument,
+        BattleMapSnapshot snapshot,
+        string areaId,
+        string tileId,
+        BattleRoomAttachmentDefinition attachment)
+    {
+        ArgumentNullException.ThrowIfNull(mapDocument);
+        ArgumentNullException.ThrowIfNull(raidDocument);
+        ArgumentNullException.ThrowIfNull(snapshot);
+        ArgumentNullException.ThrowIfNull(attachment);
+        var (area, tile, staticTile, dynamicTile) = ResolveRoomBattleAttachmentTarget(
+            mapDocument,
+            raidDocument,
+            snapshot,
+            areaId,
+            tileId,
+            requireExistingAttachment: false);
+        if (attachment.PropHash == 0 ||
+            attachment.PropHash != BattleRoomAttachmentCatalog.ComputePropHash(attachment.Id))
+        {
+            throw new InvalidOperationException("所选奇物或宝箱的存档哈希无效。");
+        }
+
+        SetScalarToZero(staticTile, "obstacle");
+        SetScalarToZero(dynamicTile, "trap");
+        staticTile["cur"] = attachment.PropHash;
+        dynamicTile["curio_prop"] = attachment.PropHash;
+        dynamicTile["content"] = attachment.Kind switch
+        {
+            BattleRoomAttachmentKind.Curio => (int)BattleMapTileContent.GuardedCurio,
+            BattleRoomAttachmentKind.Treasure => (int)BattleMapTileContent.GuardedTreasure,
+            _ => throw new ArgumentOutOfRangeException(
+                nameof(attachment),
+                attachment.Kind,
+                "未知的房间战斗附加内容类型。")
+        };
+
+        return new BattleMapEditPreview(
+            BattleMapEditKind.SetBattleAttachment,
+            area.AreaId,
+            tile.TileId,
+            area.Kind,
+            area.AreaHash,
+            tile.RawContent,
+            null,
+            null);
+    }
+
+    internal static BattleMapEditPreview RemoveBattleAttachment(
+        JsonObject mapDocument,
+        JsonObject raidDocument,
+        BattleMapSnapshot snapshot,
+        string areaId,
+        string tileId)
+    {
+        ArgumentNullException.ThrowIfNull(mapDocument);
+        ArgumentNullException.ThrowIfNull(raidDocument);
+        ArgumentNullException.ThrowIfNull(snapshot);
+        var (area, tile, staticTile, dynamicTile) = ResolveRoomBattleAttachmentTarget(
+            mapDocument,
+            raidDocument,
+            snapshot,
+            areaId,
+            tileId,
+            requireExistingAttachment: true);
+
+        SetScalarToZero(staticTile, "cur");
+        SetScalarToZero(staticTile, "obstacle");
+        SetScalarToZero(dynamicTile, "curio_prop");
+        SetScalarToZero(dynamicTile, "trap");
+        dynamicTile["content"] = (int)BattleMapTileContent.Battle;
+
+        return new BattleMapEditPreview(
+            BattleMapEditKind.RemoveBattleAttachment,
+            area.AreaId,
+            tile.TileId,
+            area.Kind,
+            area.AreaHash,
+            tile.RawContent,
+            null,
+            null);
+    }
+
+    private static (
+        BattleMapAreaSnapshot Area,
+        BattleMapTileSnapshot Tile,
+        JsonObject StaticTile,
+        JsonObject DynamicTile) ResolveRoomBattleAttachmentTarget(
+        JsonObject mapDocument,
+        JsonObject raidDocument,
+        BattleMapSnapshot snapshot,
+        string areaId,
+        string tileId,
+        bool requireExistingAttachment)
+    {
+        var (area, tile) = ResolveEditableTile(snapshot, areaId, tileId);
+        ValidateStationaryRaidState(raidDocument);
+        if (area.Kind != BattleMapAreaKind.Room)
+        {
+            throw new InvalidOperationException("战斗附加内容只能用于普通房间战斗。");
+        }
+        if (string.Equals(area.AreaId, snapshot.EntranceAreaId, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("出生房间不能修改战斗附加内容。");
+        }
+        if (string.Equals(area.AreaId, snapshot.FinalRoomId, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("最终房间不能修改战斗附加内容。");
+        }
+        if (tile.MashType != 1 || tile.MashIndex < 0)
+        {
+            throw new InvalidOperationException("该房间不是带有有效普通房间索引的战斗。");
+        }
+        if (tile.RawContent is not (
+                (int)BattleMapTileContent.Battle or
+                (int)BattleMapTileContent.GuardedCurio or
+                (int)BattleMapTileContent.GuardedTreasure))
+        {
+            throw new InvalidOperationException(
+                "只有普通战斗、有奇物的战斗或有宝箱的战斗可以修改附加内容。");
+        }
+        if (requireExistingAttachment &&
+            tile.RawContent is not (
+                (int)BattleMapTileContent.GuardedCurio or
+                (int)BattleMapTileContent.GuardedTreasure))
+        {
+            throw new InvalidOperationException("该普通房间战斗当前没有可移除的附加内容。");
+        }
+
+        var dynamicTile = ResolveDynamicTile(mapDocument, area.AreaId, tile.TileId);
+        if (ReadRequiredInt(dynamicTile, "content") != tile.RawContent ||
+            ReadRequiredInt(dynamicTile, "mash_type") != tile.MashType ||
+            ReadRequiredInt(dynamicTile, "mash_index") != tile.MashIndex)
+        {
+            throw new InvalidOperationException(
+                $"地图格 {area.AreaId}.{tile.TileId} 的战斗绑定在显示后已经变化，请刷新后重试。");
+        }
+
+        var staticTile = ResolveStaticTile(mapDocument, area.AreaId, tile.TileId);
+        if (tile.RawContent is
+                (int)BattleMapTileContent.GuardedCurio or
+                (int)BattleMapTileContent.GuardedTreasure)
+        {
+            var staticCurioHash = JsonSupport.ReadInt(staticTile, "cur") ?? 0;
+            if (tile.CurioPropHash == 0 || staticCurioHash != tile.CurioPropHash)
+            {
+                throw new InvalidDataException(
+                    "当前守卫奇物/宝箱的静态与动态资源绑定不一致，程序不会猜测修复。");
+            }
+        }
+
+        return (area, tile, staticTile, dynamicTile);
+    }
+
     private static (BattleMapAreaSnapshot Area, BattleMapTileSnapshot Tile) ResolveEditableTile(
         BattleMapSnapshot snapshot,
         string areaId,
@@ -168,6 +422,26 @@ internal static class BattleMapSaveEditor
         return dynamicTiles[tileId] as JsonObject
             ?? throw new InvalidDataException($"存档缺少动态地图格“{areaId}.{tileId}”。");
     }
+
+    private static JsonObject ResolveStaticTile(JsonObject mapDocument, string areaId, string tileId)
+    {
+        var staticAreas = JsonSupport.RequireObject(
+            mapDocument,
+            "base_root",
+            "map",
+            "static_dynamic",
+            "static_save",
+            "base_root",
+            "areas");
+        var staticArea = staticAreas[areaId] as JsonObject
+            ?? throw new InvalidDataException($"存档缺少静态地图区域“{areaId}”。");
+        var staticTiles = staticArea["tiles"] as JsonObject
+            ?? throw new InvalidDataException($"静态地图区域“{areaId}”没有格子数据。");
+        return staticTiles[tileId] as JsonObject
+            ?? throw new InvalidDataException($"存档缺少静态地图格“{areaId}.{tileId}”。");
+    }
+
+    private static void SetScalarToZero(JsonObject value, string name) => value[name] = 0;
 
     private static int ResolveDoorDestination(
         JsonObject mapDocument,

@@ -224,6 +224,7 @@ public partial class BattleMapView : UserControl
         int rawContent,
         int mashIndex,
         int mashType,
+        bool hasResidualContentBinding,
         string? sourceAreaId,
         string? sourceTileId)
     {
@@ -244,6 +245,7 @@ public partial class BattleMapView : UserControl
         public int RawContent { get; } = rawContent;
         public int MashIndex { get; } = mashIndex;
         public int MashType { get; } = mashType;
+        public bool HasResidualContentBinding { get; } = hasResidualContentBinding;
         public string? SourceAreaId { get; } = sourceAreaId;
         public string? SourceTileId { get; } = sourceTileId;
     }

@@ -1,0 +1,160 @@
+<Window x:Class="DarkestDungeonSaveEditor.App.BattleEncounterSelectionDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="选择战斗遭遇"
+        Width="1180"
+        Height="720"
+        MinWidth="900"
+        MinHeight="560"
+        Icon="Assets/save-editor.ico"
+        Background="{StaticResource AppTextureBrush}"
+        Foreground="{StaticResource TextPrimaryBrush}"
+        FontFamily="SimHei, Microsoft YaHei UI"
+        FontSize="14"
+        UseLayoutRounding="True"
+        SnapsToDevicePixels="True"
+        ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner">
+    <Grid Background="{StaticResource AppTextureBrush}">
+        <Border Margin="8"
+                Background="#90050505"
+                BorderBrush="{StaticResource GoldDarkBrush}"
+                BorderThickness="1">
+            <Border Margin="3" BorderBrush="#4B5351" BorderThickness="1">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="78" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <Border Grid.Row="0"
+                            Padding="21,9"
+                            Background="{StaticResource HeaderBrush}"
+                            BorderBrush="#59615E"
+                            BorderThickness="0,0,0,1">
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock x:Name="HeaderTitleTextBlock"
+                                       Style="{StaticResource PageTitleStyle}"
+                                       FontSize="27"
+                                       Text="全局遭遇目录" />
+                            <TextBlock Margin="1,2,0,0"
+                                       Style="{StaticResource KickerTextStyle}"
+                                       Text="只读取当前档案启用的 Base、DLC 与 Mod" />
+                        </StackPanel>
+                    </Border>
+
+                    <Grid Grid.Row="1" Margin="16,12,16,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="170" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="360" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0"
+                                   Margin="2,0,10,0"
+                                   Style="{StaticResource FieldLabelStyle}"
+                                   Text="遭遇难度" />
+                        <ComboBox x:Name="DifficultyComboBox"
+                                 Grid.Column="1"
+                                 Margin="0"
+                                 DisplayMemberPath="DisplayName"
+                                 SelectionChanged="DifficultyComboBox_SelectionChanged"
+                                 ToolTip="默认选择当前副本难度；也可切换并生成其他难度的原始敌方组合" />
+                        <TextBlock Grid.Column="2"
+                                   Margin="16,0,10,0"
+                                   Style="{StaticResource FieldLabelStyle}"
+                                   Text="筛选" />
+                        <TextBox x:Name="SearchTextBox"
+                                 Grid.Column="3"
+                                 Margin="0"
+                                 TextChanged="SearchTextBox_TextChanged"
+                                 ToolTip="在当前所选难度内，按敌方中文名、敌方 ID、地区、来源或类型筛选" />
+                        <TextBlock x:Name="CountTextBlock"
+                                   Grid.Column="4"
+                                   Margin="16,0,2,0"
+                                   VerticalAlignment="Center"
+                                   TextAlignment="Right"
+                                   Foreground="{StaticResource GoldBrush}"
+                                   FontWeight="Bold" />
+                    </Grid>
+
+                    <DataGrid x:Name="EncounterGrid"
+                              Grid.Row="2"
+                              Margin="16,0"
+                              AutoGenerateColumns="False"
+                              IsReadOnly="True"
+                              CanUserAddRows="False"
+                              CanUserDeleteRows="False"
+                              HeadersVisibility="Column"
+                              SelectionMode="Single"
+                              SelectionUnit="FullRow"
+                              SelectionChanged="EncounterGrid_SelectionChanged"
+                              MouseDoubleClick="EncounterGrid_MouseDoubleClick"
+                              RowHeight="52"
+                              ScrollViewer.HorizontalScrollBarVisibility="Auto">
+                        <DataGrid.Columns>
+                            <DataGridTemplateColumn Header="敌方组成" Width="2.6*" MinWidth="310">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <StackPanel VerticalAlignment="Center"
+                                                    ToolTip="{Binding CompositionToolTip}">
+                                            <TextBlock Text="{Binding ChineseComposition}"
+                                                       Foreground="{StaticResource TextPrimaryBrush}"
+                                                       FontWeight="Bold"
+                                                       TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Margin="0,2,0,0"
+                                                       Text="{Binding Composition}"
+                                                       Foreground="{StaticResource TextSecondaryBrush}"
+                                                       FontFamily="Consolas, Microsoft YaHei UI"
+                                                       FontSize="12"
+                                                       TextTrimming="CharacterEllipsis" />
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            <DataGridTextColumn Header="遭遇类型" Binding="{Binding SourceKind}" Width="96" ElementStyle="{StaticResource DataGridTextElementStyle}" />
+                            <DataGridTextColumn Header="目标" Binding="{Binding TargetKind}" Width="82" ElementStyle="{StaticResource DataGridTextElementStyle}" />
+                            <DataGridTextColumn Header="来源地区" Binding="{Binding DungeonId}" Width="115" ElementStyle="{StaticResource DataGridTextElementStyle}" />
+                            <DataGridTextColumn Header="来源" Binding="{Binding Source}" Width="1.8*" MinWidth="220" ElementStyle="{StaticResource DataGridTextElementStyle}" />
+                        </DataGrid.Columns>
+                    </DataGrid>
+
+                    <TextBlock x:Name="SelectionTextBlock"
+                               Grid.Row="3"
+                               Margin="18,10,18,0"
+                               Foreground="{StaticResource TextSecondaryBrush}"
+                               Text="选择一个完整敌方组合；确认后会直接写入当前地图格。"
+                               TextTrimming="CharacterEllipsis" />
+
+                    <Grid Grid.Row="4" Margin="16,14,16,14">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="1"
+                                MinWidth="104"
+                                Margin="0,0,10,0"
+                                Style="{StaticResource GhostButtonStyle}"
+                                Content="取消"
+                                IsCancel="True"
+                                Click="Cancel_Click" />
+                        <Button x:Name="ConfirmButton"
+                                Grid.Column="2"
+                                MinWidth="150"
+                                Margin="0"
+                                Style="{StaticResource PrimaryButtonStyle}"
+                                Content="写入遭遇"
+                                IsDefault="True"
+                                IsEnabled="False"
+                                Click="Confirm_Click" />
+                    </Grid>
+                </Grid>
+            </Border>
+        </Border>
+    </Grid>
+</Window>

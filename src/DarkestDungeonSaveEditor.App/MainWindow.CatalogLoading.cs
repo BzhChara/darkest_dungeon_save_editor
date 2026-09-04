@@ -81,7 +81,10 @@ public partial class MainWindow : Window
                 _ = await BattleMapPanel.LoadProfileAsync(
                     profile,
                     codec,
-                    gameDirectory);
+                    gameDirectory,
+                    activeContent,
+                    workshopDirectory,
+                    additionalLocalModDirectory);
             }
             catch (Exception mapException)
             {

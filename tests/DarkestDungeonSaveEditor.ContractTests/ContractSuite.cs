@@ -137,7 +137,7 @@ internal static partial class ContractSuite
             quantityState);
         RunRealModLocalizationContracts(runRoot);
 
-        Console.WriteLine("PASS: active game-mode/Mod catalogs, bilingual names, town/raid quantity edits with stack and slot guards, pristine ordinary/stateful trinket construction, level 0-max progression, blank/default and explicit natural/special quirks, HP/skill/camping rules, ordinary/shard stagecoach routing with GUID/upgrade append, real battle-map snapshot/live-monitor plus guarded delete/move contracts, full-roster preservation, stale guards, DSON roundtrips, verified backups, three-file rollback, and trinket/quantity commit contracts.");
+        Console.WriteLine("PASS: active game-mode/Mod catalogs, bilingual names, town/raid quantity edits with stack and slot guards, pristine ordinary/stateful trinket construction, level 0-max progression, blank/default and explicit natural/special quirks, HP/skill/camping rules, ordinary/shard stagecoach routing with GUID/upgrade append, real battle-map snapshot/live-monitor plus guarded delete/move/battle placement and room battle attachments, global enabled-content encounter discovery and persistent managed Bridge append/reuse, force-town contracts, full-roster preservation, stale guards, DSON roundtrips, verified backups, three-file rollback, and trinket/quantity commit contracts.");
         Console.WriteLine($"Artifacts: {runRoot}");
     }
 }

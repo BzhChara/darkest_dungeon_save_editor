@@ -40,6 +40,7 @@ public sealed record BattleMapTileSnapshot(
     double MapX,
     double MapY,
     int StaticType,
+    int StaticCurioHash,
     int StaticObstacleHash,
     BattleMapTileKnowledge Knowledge,
     int RawKnowledge,
@@ -49,7 +50,16 @@ public sealed record BattleMapTileSnapshot(
     int TrapHash,
     int MashIndex,
     int MashType,
-    bool CriticalScout);
+    bool CriticalScout)
+{
+    public bool HasResidualContentBinding =>
+        StaticCurioHash != 0 ||
+        StaticObstacleHash != 0 ||
+        CurioPropHash != 0 ||
+        TrapHash != 0 ||
+        MashIndex >= 0 ||
+        MashType != 7;
+}
 
 public sealed record BattleMapAreaSnapshot(
     string AreaId,
@@ -94,7 +104,10 @@ public sealed record BattleMapSnapshot(
 public enum BattleMapEditKind
 {
     DeleteContent,
-    MoveParty
+    MoveParty,
+    PlaceBattle,
+    SetBattleAttachment,
+    RemoveBattleAttachment
 }
 
 public sealed record BattleMapEditPreview(
@@ -115,4 +128,9 @@ public sealed record PreparedBattleMapEdit(
     PreparedSaveFile TargetFile,
     string MapOriginalSha256,
     string RaidOriginalSha256,
-    DateTime PreparedAtUtc);
+    DateTime PreparedAtUtc)
+{
+    public BattleEncounterDefinition? Encounter { get; init; }
+
+    public BattleRoomAttachmentDefinition? Attachment { get; init; }
+}
