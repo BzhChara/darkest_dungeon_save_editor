@@ -47,6 +47,22 @@ internal static class ContentFileOverlay
                 StringComparison.OrdinalIgnoreCase));
     }
 
+    public static IReadOnlyList<string> GetFallbackContentRoots(
+        string root,
+        IReadOnlyList<string> enabledDlcPrefixes)
+    {
+        var fullRoot = Path.GetFullPath(root);
+        return new[] { fullRoot }
+            .Concat(enabledDlcPrefixes.Select(prefix => Path.GetFullPath(Path.Combine(
+                fullRoot, NormalizeVirtualPath(prefix).Replace('/', Path.DirectorySeparatorChar)))))
+            .Where(path => path.Equals(fullRoot, StringComparison.OrdinalIgnoreCase) ||
+                           path.StartsWith(fullRoot.TrimEnd(Path.DirectorySeparatorChar) +
+                                           Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+            .Where(Directory.Exists)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+
     public static int ComparePriority(ActiveContentSource left, ActiveContentSource right)
     {
         ArgumentNullException.ThrowIfNull(left);

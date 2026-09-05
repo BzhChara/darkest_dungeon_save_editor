@@ -244,29 +244,24 @@ public static class TrinketCatalog
         }
 
         var manifestPath = Path.Combine(root, "modfiles.txt");
-        if (!File.Exists(manifestPath))
+        if (!ModManifestFile.Exists(manifestPath))
         {
-            var trinketRoot = Path.Combine(root, "trinkets");
             issues.Add($"Mod has no modfiles.txt; standard fallback scan used: {root}");
-            if (!Directory.Exists(trinketRoot))
-            {
-                return [];
-            }
-
-            return Directory.EnumerateFiles(trinketRoot, "*.entries.trinkets.json", SearchOption.AllDirectories)
+            return ContentFileOverlay.GetFallbackContentRoots(root, enabledDlcPrefixes)
+                .Select(contentRoot => Path.Combine(contentRoot, "trinkets"))
+                .Where(Directory.Exists)
+                .SelectMany(directory => Directory.EnumerateFiles(
+                    directory, "*.entries.trinkets.json", SearchOption.AllDirectories))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
                 .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
                 .ToArray();
         }
 
         var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var rawLine in File.ReadLines(manifestPath))
+        foreach (var entry in ModManifestFile.ReadEntries(manifestPath, ".entries.trinkets.json"))
         {
-            const string suffix = ".entries.trinkets.json";
-            var relativePath = ModManifestPath.Extract(rawLine, suffix);
-            if (relativePath is null)
-            {
-                continue;
-            }
+            var rawLine = entry.RawLine;
+            var relativePath = entry.RelativePath;
 
             var path = Path.GetFullPath(Path.Combine(root, relativePath));
             var relativeToRoot = Path.GetRelativePath(root, path);

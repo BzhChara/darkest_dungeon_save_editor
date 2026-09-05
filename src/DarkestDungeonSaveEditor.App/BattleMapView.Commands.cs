@@ -300,7 +300,7 @@ public partial class BattleMapView : UserControl
             ? 2
             : GetOrdinaryMashType(cell);
         var directCandidates = catalog.DirectEncounters.Where(encounter =>
-            encounter.MashType == mashType &&
+            encounter.HasKnownClassification && encounter.MashType == mashType &&
             (fixedBossOnly
                 ? encounter.Classification == BattleEncounterClassification.FixedBoss
                 : ordinaryOnly

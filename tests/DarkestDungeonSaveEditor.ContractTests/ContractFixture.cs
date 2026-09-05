@@ -1534,7 +1534,7 @@ internal static partial class ContractSuite
             partiallyBrokenUtf8Path,
             new Dictionary<string, string>(StringComparer.Ordinal)
             {
-                ["str_inventory_title_trinketlocal_mod_trinket"] = "Corrupt File Must Be Ignored",
+                ["str_inventory_title_trinketlocal_mod_trinket"] = "Compiled Local Trinket",
                 ["unrequested_corrupt_utf8"] = "broken"
             });
         CorruptLoc2ValueUtf8(partiallyBrokenUtf8Path, "unrequested_corrupt_utf8");
@@ -1783,6 +1783,8 @@ internal static partial class ContractSuite
       "base_root": {
         "version": 2,
         "game_mode": "base",
+        "inraid": false,
+        "raiddungeon": "none",
         "applied_ugcs_1_0": {
           "10": { "name": "111", "source": "Steam" },
           "2": { "name": "Local Test Mod", "source": "mod_local_source" },

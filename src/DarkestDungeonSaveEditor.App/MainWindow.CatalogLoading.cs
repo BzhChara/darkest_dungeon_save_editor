@@ -48,6 +48,9 @@ public partial class MainWindow : Window
                 $"内容目录档案：ID={activeContent.Profile.ProfileId}；" +
                 $"档案目录={activeContent.Profile.ProfileDirectory}；" +
                 $"persist.game.json SHA-256={activeContent.SourceGameSha256}");
+            CrashDiagnostics.SetStage("LoadCatalog: inventorying active Mod files");
+            var inventory = await Task.Run(() => ScanContentFilesForDiagnostics(activeContent));
+            await RecordContentFileDiagnosticsAsync(inventory);
             CrashDiagnostics.SetStage("LoadCatalog: building content catalogs");
             var staticCatalogTask = Task.Run(() => new
             {

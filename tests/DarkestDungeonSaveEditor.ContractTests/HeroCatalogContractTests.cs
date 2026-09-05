@@ -70,8 +70,8 @@ internal static partial class ContractSuite
             runtimeHero.IncompatibleInitialQuirkIds.ToHashSet(StringComparer.OrdinalIgnoreCase).SetEquals(["runtime_excluded_a", "runtime_excluded_b"]),
             "Hero definitions that only reorder set-like fields should merge, while an explicit false override must remove a previously guaranteed skill.");
         Assert(
-            runtimeHero.LocalizedName == new BilingualContentName("未列清单英雄", "Unlisted Runtime Hero"),
-            "A direct authoring string table should supply hero names when a Mod manifest lists only an unreadable legacy .loc file or omits the XML source.");
+            runtimeHero.LocalizedName == BilingualContentName.Empty,
+            "An unlisted XML authoring table must not supply hero names when a Mod has a manifest.");
         Assert(runtimeHero.RecruitEvents.Single().Id == "recruit_runtime_hero", "Workshop bonus_recruit event was not linked to its hero class.");
         Assert(
             runtimeHero.RuntimeQuirkSignals.Count == 2 &&
@@ -200,8 +200,10 @@ internal static partial class ContractSuite
         Assert(heroCatalog.Issues.All(issue => !issue.Contains("identical_recruit", StringComparison.Ordinal)), "Identical town event definitions should not be reported as conflicts.");
 
         Assert(
-            heroCatalog.HeroNames.SequenceEqual(["Contract Lenient", "Contract One", "Contract Two"]),
-            "The hero_name_* pool should reuse tolerant localization parsing.");
+            heroCatalog.HeroNames.SequenceEqual(["Contract One", "Contract Two"]) &&
+            heroCatalog.Issues.Any(issue => issue.Contains("Failed to read hero names", StringComparison.Ordinal) &&
+                                            issue.Contains("lenient.string_table.xml", StringComparison.Ordinal)),
+            "Malformed XML must be reported and excluded from the hero_name_* pool without losing valid names.");
         Assert(
             heroCatalog.HeroNames.All(name => name != "Ignored Unused Name") &&
             heroCatalog.Issues.All(issue => !issue.Contains("ignored.string_table.xml", StringComparison.OrdinalIgnoreCase)) &&

@@ -15,10 +15,12 @@ internal static class Loc2LocalizationReader
 
     public static IReadOnlyDictionary<string, string> Read(
         string path,
-        IReadOnlyCollection<string> requestedKeys)
+        IReadOnlyCollection<string> requestedKeys,
+        ICollection<string> issues)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
         ArgumentNullException.ThrowIfNull(requestedKeys);
+        ArgumentNullException.ThrowIfNull(issues);
 
         var keysByHash = requestedKeys
             .Where(key => !string.IsNullOrWhiteSpace(key))
@@ -32,8 +34,10 @@ internal static class Loc2LocalizationReader
 
         var bytes = File.ReadAllBytes(path);
         var layout = ReadLayout(bytes, path);
-        var decodedValues = ReadAndValidateValues(bytes, path, layout);
         var index = ReadAndValidateIndex(bytes, path, layout);
+        var diagnostics = new LocalizationEntryDiagnostics(path);
+        var decodedValues = CompiledLocalizationValueReader.Read(bytes, path, "LOC2",
+            layout.ValueTableOffset, layout.StringDataOffset, layout.ValueRecordCount, diagnostics);
         var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var pair in keysByHash)
         {
@@ -54,6 +58,7 @@ internal static class Loc2LocalizationReader
             }
         }
 
+        diagnostics.AppendTo(issues);
         return values;
     }
 
@@ -120,46 +125,6 @@ internal static class Loc2LocalizationReader
             valueBytes / ValueRecordSize);
     }
 
-    private static string[] ReadAndValidateValues(
-        byte[] bytes,
-        string path,
-        Loc2Layout layout)
-    {
-        var values = new string[layout.ValueRecordCount];
-        for (var valueIndex = 0; valueIndex < layout.ValueRecordCount; valueIndex++)
-        {
-            var recordOffset = checked(layout.ValueTableOffset + valueIndex * ValueRecordSize);
-            var relativeOffset = ReadUInt32(bytes, recordOffset);
-            var byteLength = ReadUInt32(bytes, recordOffset + 4);
-            if ((ulong)relativeOffset + byteLength > (ulong)(bytes.Length - layout.StringDataOffset))
-            {
-                throw new InvalidDataException(
-                    $"LOC2 '{path}' string {valueIndex} points outside the string data.");
-            }
-
-            if (byteLength == 0)
-            {
-                throw new InvalidDataException(
-                    $"LOC2 '{path}' string {valueIndex} has no NUL terminator.");
-            }
-
-            var absoluteOffset = checked(layout.StringDataOffset + (int)relativeOffset);
-            var length = checked((int)byteLength);
-            if (bytes[absoluteOffset + length - 1] != 0)
-            {
-                throw new InvalidDataException(
-                    $"LOC2 '{path}' string {valueIndex} is not NUL-terminated.");
-            }
-
-            values[valueIndex] = DecodeValue(
-                bytes.AsSpan(absoluteOffset, length - 1),
-                path,
-                (uint)valueIndex);
-        }
-
-        return values;
-    }
-
     private static Loc2Index ReadAndValidateIndex(
         byte[] bytes,
         string path,
@@ -218,10 +183,12 @@ internal static class Loc2LocalizationReader
         return string.Empty;
     }
 
-    private static string DecodeValue(
+    // Legacy LOC uses the same compiled string colour controls as LOC2.
+    internal static string DecodeValue(
         ReadOnlySpan<byte> valueBytes,
         string path,
-        uint valueIndex)
+        uint valueIndex,
+        string format = "LOC2")
     {
         ReadOnlySpan<byte> colourOpen = "<c>"u8;
         ReadOnlySpan<byte> colourClose = "</c>"u8;
@@ -235,7 +202,7 @@ internal static class Loc2LocalizationReader
                 if (remaining.Length < compiledColourTagLength)
                 {
                     throw new InvalidDataException(
-                        $"LOC2 '{path}' string {valueIndex} has a truncated compiled colour tag.");
+                        $"{format} '{path}' string {valueIndex} has a truncated compiled colour tag.");
                 }
 
                 index += compiledColourTagLength;

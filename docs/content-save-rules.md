@@ -2,7 +2,7 @@
 
 This document is the durable record of the Darkest Dungeon Save Editor's confirmed content-resolution, hero-generation, quirk, trinket, and save-write rules. It separates behavior proven by the game or real saves from implementation conclusions and remaining live-test requirements, so later work does not turn one example Mod into a hard-coded special case.
 
-- Last updated: 2026-09-05
+- Last updated: 2026-09-06
 - Historical audit baseline: `profile_1` (the counts and hash below are a snapshot, not live state)
 - Baseline `persist.game.json` SHA-256: `f0f707d734a93b9e04c9792d47490acbc8bbc046edd51ee8b2c108ca712e6b17`
 - Active Mods in the baseline: 124
@@ -12,7 +12,7 @@ This document is the durable record of the Darkest Dungeon Save Editor's confirm
 
 | Level | Meaning | What it can prove |
 | --- | --- | --- |
-| A | Real saves, encode/decode round trips, or a user-confirmed in-game load | Direct evidence for save compatibility or observed game behavior |
+| A | Real saves, encode/decode round trips, or a documented authorized in-game observation operated by the user or through Computer Use | Direct evidence for save compatibility or observed game behavior; not blanket user acceptance |
 | B | Effective base-game/Mod definition files in the active content set | IDs, fields, values, override order, and author-declared conditions |
 | C | An independent reverse-engineered implementation or behavior repeated across several samples | Corroborating evidence for a calculation order; never represented as official source code |
 | D | An inference with no clean real-save instance | Enough to design a minimal test, not enough to claim live validation |
@@ -51,16 +51,61 @@ These files are read-only analysis snapshots. They do not automatically follow l
 - A base quantity item, hero, quirk, or trinket overridden by a Mod is displayed as `原版（当前由 … 覆盖）` rather than losing its base origin.
 - A Mod-only ID shows only that Mod as its origin.
 - Workshop providers are mapped by Workshop ID. Local providers are mapped by `project.xml/Title`. Missing or ambiguous mappings are reported and never guessed.
-- A local Mod without `modfiles.txt` still receives the standard-content-directory fallback scan. This is normal for many of the user's local Mods and does not make the Mod invalid.
+- A local or Workshop Mod without `modfiles.txt` receives the standard-content-directory fallback scan at its root and at each explicitly enabled DLC package/feature virtual root. Hero dependencies, trinkets, inventory definitions/capacity, mash files, monster metadata, and display-name localization use the same root selection. Localization uses recursive XML discovery and direct English/Simplified-Chinese `.loc`/`.loc2` files at each eligible root. Disabled DLC and unrelated backup roots remain excluded; absence of a manifest is not an invalid-Mod condition.
+- Item, hero, and trinket searches match both the internal source ID and the displayed provenance label, including original-content override labels.
+
+### 2.4 File inventory and manifest-difference diagnostics
+
+Each explicit content load performs one fresh, read-only inventory of every resolved active Mod directory, regardless of whether it has `modfiles.txt`. Only file metadata and manifests are read; assets are not decoded, scripts are not executed, and neither Mods nor saves are changed. Inactive Mods are not scanned. Reparse points are skipped and scan failures are reported as incomplete observations, not as manifest-free or missing content.
+
+This inventory is a diagnostic layer separate from the effective catalogs. Existing manifest/fallback selection, enabled DLC paths, Mod priority, localization precedence, item scene rules and all generation/write guards are unchanged. A candidate means only a data/localization file under a root or enabled-DLC content directory; it does not mean that a definition was parsed, referenced, loaded by the game, or approved for writing. Unknown manifest relations remain unknown after a failed/invalid manifest read.
+
+The runtime log shows one summary. The full project log retains profile/path/game-hash context, per-Mod counts, unlisted data/localization candidates, missing entries, declared/actual size differences and scan errors. Unlisted XML is diagnostic-only, not a supplemental source. Other unlisted files are aggregated in per-Mod counts. Size differences, equal bytes, absent references, or names such as `old` are not used to declare a file obsolete or corrupt. This milestone does not automatically promote unlisted definitions, rewrite manifests, or add new warnings to catalog tables. The inventory is rebuilt on load and is not a permanent filesystem cache or an atomic content lock.
+
+### 2.5 Observed local manifest loading
+
+The 2026-09-06 Computer Use A/B experiment on build 27890 confirms a manifest gate for the tested local Mod's existing-hero `.info.darkest` overrides. With both files listed, Crusader and Highwayman displayed speed 21 and 57. After a full game exit and removal of only the Highwayman manifest entry, the same heroes displayed 21 and 7. Both hero files remained present and byte-identical; the listed Crusader stayed active as a positive control. The same temporary `profile_2`, sole active Mod, DLC selection, hero progression and position were retained.
+
+This result supports keeping filesystem inventory separate from effective definition loading: finding an unlisted file is not sufficient to promote it into a writable catalog. It does not establish that the file is obsolete, nor decide manifest-free Mods, Workshop loading, new hero IDs, other definition types, enabled-DLC subdirectories or XML/LOC2 behavior. No production scan rule was changed for this experiment. See the [test result and evidence boundaries](manifest-loading-result-2026-09-06.md).
+
+### 2.6 Adopted resource-discovery policy
+
+Confirmed by the user on 2026-09-06: retain the existing primary discovery strategy rather than treating every file found by a full scan as effective game content.
+
+1. **Branch by manifest presence, not Mod distribution channel.** A local Mod with `modfiles.txt` follows the manifest branch; a Workshop Mod without it follows the standard-directory fallback. Do not assume every Workshop package has a manifest or every local Mod lacks one.
+2. **Manifest present:** use `modfiles.txt` as the primary resource-file index. Resolve entries inside the selected Mod root, retain supported content directories and file types, apply the selected profile's enabled-DLC conditions, and verify that each file exists. A listed missing file remains a diagnostic; it does not authorize automatic inclusion of unrelated unlisted definitions.
+3. **Manifest absent:** recursively discover supported resource files under standard content directories at the Mod root, and supplement them with the corresponding standard directories beneath explicitly enabled DLC package/feature roots. Do not turn this into unrestricted effective-content loading from the entire Mod tree. Disabled DLC and unrelated backup directories remain excluded.
+4. **Keep diagnostic inventory separate.** The full read-only scan in section 2.4 continues to report unlisted files, missing entries, size differences and incomplete reads. Finding an extra file does not automatically make it effective or writable, and a manifest-read failure must not be reported as proof that no manifest exists. Do not automatically rewrite manifests or delete suspected leftovers.
+5. **Apply the manifest boundary to localization too.** Following the user's subsequent confirmation on 2026-09-06, remove unlisted top-level XML supplementation and malformed-XML recovery. Read valid listed XML and supported compiled `.loc`/`.loc2` tables; only the manifest-free branch discovers unlisted files under eligible roots. See section 3 for language and format precedence.
+
+Active Mod/DLC selection, overlay priority, conflict handling, item scene/reachability rules and save-write guards remain unchanged. This is the adopted editor policy, not a claim that all game resource loaders or the manifest-absent runtime branch have been exhaustively tested. The bounded live evidence remains in section 2.5 and its linked result.
+
+### 2.7 Discovery consistency and manifest-read failures
+
+- Room battle attachment `.props.darkest` files use the same root/enabled-DLC fallback selection as encounter mash files. With or without a manifest, the same Mod/DLC virtual-path override produces the same attachment definitions and source fingerprint; disabled DLC and unrelated backup roots stay outside discovery.
+- Resource paths are extracted from the complete manifest path plus its optional trailing byte-count field, not from the first occurrence of a supported suffix. Embedded extension-like directory names and spaces are preserved. The final extension must still match a supported resource type.
+- Effective catalog readers share an eager manifest reader. A manifest that is locked/unreadable, is a directory rather than a file, or contains an unparsable selected resource path causes that catalog request to fail with the manifest path and, for an invalid resource path, the line number. It must not produce a partial catalog or select manifest-free fallback. A readable empty manifest remains authoritative. Existing missing listed-file diagnostics and path-containment/DLC/type checks are retained.
+- This is bounded error reporting, not automatic manifest repair, content promotion, or a guarantee that every malformed/semantically wrong package can be detected. Diagnostic inventory remains independent; it may report incomplete observations without returning an effective catalog. Unrelated workflows that do not require the failed catalog are not given a new global prohibition.
+- The discovery fixes themselves did not remove localization compatibility. The later approved removal of XML supplementation/recovery and addition of legacy LOC support are recorded below and in [the compatibility inventory](content-compatibility-audit-2026-09-06.md). Ordinary nested-directory discovery is not a deliberate fallback to old files and was not changed by those removals.
 
 ## 3. Localization
 
-1. Quantity-item, hero, quirk, and trinket catalogs read Simplified Chinese and English while always retaining the internal ID.
-2. When the same provider contains XML source tables and compiled LOC2 data, LOC2 has effective-game precedence.
-3. Even when `modfiles.txt` only lists an old `.loc`, directly contained `.string_table.xml` files under the Mod's top-level `localization` directory are supplemental sources.
-4. Do not recurse into `unused`, platform directories, or files whose extension is `.unused`.
-5. Validate LOC2 offsets, lengths, NUL boundaries, UTF-8, and color-marker cleanup. A corrupt table produces a catalog issue without contaminating other providers.
+1. Quantity-item, hero, quirk, trinket, monster and curio catalogs share Simplified Chinese/English name resolution while retaining internal IDs.
+2. Preserve the existing file overlay and Mod priority first. Within one provider, non-empty values have per-language precedence `.loc2 > .loc > valid .string_table.xml`; the relative-path order remains the tie-breaker within one format. A higher-priority provider's XML can override a lower provider's binary name. Missing values may still come from other eligible files, but an exact-path-replaced file is not resurrected. This is the editor's name-resolution policy, not proof of every current game build's handling of legacy LOC.
+3. With a manifest, every XML/LOC/LOC2 source must be listed and pass containment, supported-directory, enabled-DLC and existence checks. Do not supplement unlisted XML even when a listed binary is missing, corrupt, or lacks the requested name. A readable empty manifest remains authoritative. With no manifest, discover XML recursively under eligible localization roots and binary tables directly under those roots.
+4. Binary tables must end exactly in `.loc` or `.loc2`; the stem must be `english`/`schinese` or end in `_english`/`_schinese`. Do not recurse into `unused`, platform or other nested directories for binary tables. `.string_table.xml.unused`, `.loc.unused` and `.loc2.unused` are unsupported final extensions. There is no blanket `old/backup/unused` directory-name filter for listed XML or recursive manifest-free XML; changing that separate policy requires a separate decision.
+5. Isolate invalid text only when its boundaries are trustworthy; never guess encodings or substitute replacement characters. LOC and LOC2 retain distinct layout/index validation and share bounded value decoding. Invalid headers, table alignment, indexes, offsets, lengths or NUL terminators reject the entire file, including when the bad record was not requested. A bounded value with invalid UTF-8 or an incomplete compiled colour control is skipped instead; other valid values, including later values in the same hash group, remain eligible. Colour starts/ends may cross strings and are not required to balance within one value. Diagnostics report the file, skipped-value count and at most three examples, only after structural validation succeeds. Other eligible same-language files retain their existing fallback role; unreadable/invalid manifests still stop the catalog request as described in section 2.7.
 6. A missing language displays as `—`. Do not substitute the other language, the internal ID, a `[简中]` suffix, or invented translation.
+7. Random personal names remain XML-only because hashed binary tables cannot enumerate original `hero_name_*` keys. Valid XML keeps the existing English-first, otherwise first-language-group rule; this does not change the separate bilingual fields.
+8. XML must finish normal strict parsing before any entry is exposed. Invalid byte encoding, declarations, comments, CDATA or closing tags reject the entire document, including random personal names; XML has no independent binary value index with which to safely skip undecodable bytes. Do not sanitize or regex-recover it (A2 remains removed). Within a well-formed document, entries without a key/language ID or with ambiguous nested entry/language ownership are skipped and summarized like binary values. Blank translations remain absent without warning; a display-name normalization timeout is isolated to that entry. These checks apply to all shared display-name consumers and, where applicable, the XML random-name pool. A1 remains removed: no unlisted XML is made eligible by an invalid or absent binary value.
+
+### 3.1 Legacy LOC evidence and implementation boundary
+
+Ruler (Workshop `1596685165`, hero ID `JoanofArc`) lists `localization/1596685165_english.loc` and `localization/1596685165_schinese.loc` in its existing manifest. Its `localization/JoanofArc.string_table.xml` is unlisted. Both listed binary tables contain `hero_class_name_JoanofArc` (hash `819493669`) with the exact value `Ruler`, including the Simplified Chinese table; no translation or XML fallback is needed.
+
+The observed legacy layout starts with two little-endian 32-bit offsets (value table, string data), followed by a 4096-byte bucket area. Hash records begin at byte 4104 and hold `(hash, value count, first value index)` in 12 bytes. Value records hold `(relative string offset, byte length including NUL, metadata)` in 12 bytes. Unlike LOC2, there is no separate value-group table. The editor scans validated hash records rather than relying on the bucket lookup area; unused bucket/metadata fields are not runtime-validated. Known key hashes select the first non-empty value from their validated group, consistent with the existing LOC2 display-name policy. No claim is made about unobserved format variants or the game's runtime loader.
+
+For the read-only Ruler samples, the value/string offsets are 4896/5712, with 66 hash records and 68 values in each file. The English file is 7506 bytes (SHA-256 `AAF4ED3F760A3B217B21389BF15C60B5A5E22635E0F48BC92D6D2EA44F2CFD9E`); Simplified Chinese is 7547 bytes (SHA-256 `78F83463DFC2DAE98682F6259D019D3FE0E87086846C0194705C9D28E8278B8E`). This format support changes editor names only; it does not repair the Mod, rewrite manifests or change generation/save rules.
 
 The baseline `profile_1` quirk-localization snapshot contains 473 bilingual entries, 58 Simplified-Chinese-only entries, 3 English-only entries, and 11 entries missing both names. A missing display name does not make an otherwise valid quirk save structure unwritable.
 
@@ -70,10 +115,11 @@ The baseline `profile_1` quirk-localization snapshot contains 473 bilingual entr
 
 The quantity editor chooses one target from the selected profile before building its item catalog:
 
-- If `persist.raid.json` is absent, the profile is treated as being in town. The editor exposes `base_root.wallet` and `base_root.estate_items.items` from `persist.estate.json`.
-- If `persist.raid.json` exists, the profile is treated as being in an expedition. The editor exposes `base_root.party.inventory.items` from that raid save and writes actual inventory stacks into empty bag slots.
+- If the hash-guarded game snapshot declares `inraid=false` and `raiddungeon=none`, the editor exposes `base_root.wallet` and `base_root.estate_items.items` from `persist.estate.json`. A remaining raid file is logged as residue, not selected as the target.
+- If `inraid=true`, `raiddungeon` names a dungeon, and `persist.raid.json` exists, the editor exposes `base_root.party.inventory.items` from that raid save and writes actual inventory stacks into empty bag slots.
+- Missing/invalid game-state fields, contradictory flags, or a missing raid file while the game still declares an expedition block quantity loading and preparation instead of falling back to another container.
 
-The existence check is the game-observed lifecycle boundary: live town profiles do not retain `persist.raid.json`, while active expeditions do. An empty raid inventory is not treated as town. If the file appears or disappears after catalog load or preview, the stale operation is rejected and the user must reload; an edit is never redirected from one container to the other.
+File existence alone is not a scene boundary: force-town intentionally leaves map/raid files behind. An empty raid inventory is not treated as town. The UI and commit preserve the game hash established by scene resolution; scene changes after catalog load or preview invalidate the operation even if the old raid file remains. Removal of an active raid target also blocks the edit. An edit is never redirected from one container to the other, and a town write does not clean up raid residue.
 
 Town mode includes gold, heirlooms, shards, memories, blueprints, standard Mod wallet currencies, The Blood, invitations, and base/DLC/Mod `estate` or `estate_currency` items. Raid mode includes active inventory definitions such as `supply`, `provision`, `gem`, `gold`, `heirloom`, `shard`, `quest_item`, `estate`, `estate_currency`, and equivalent Mod-defined types. Trinket instances—including trinkets already carried in the raid bag—remain in the dedicated trinket workflow because their save shape can contain per-instance state. Scores, progression counters, hero fields, and unrelated numbers remain outside the item editor.
 
@@ -133,7 +179,7 @@ The manual `heirloom/koban` experiment additionally established that two injecte
 - Commit requires the game to be closed, rechecks context and all hashes, backs up every current `persist*.json`, locks relevant content files, atomically replaces only the chosen target, verifies the final hash, and restores from backup if replacement fails.
 - Contract fixtures cover town and raid catalogs, exact identity, overlapping definitions, carried-trinket exclusion, stack filling, first-empty-slot insertion, full-bag rejection, physical zero-stack removal, conflicting item/capacity fail-closed behavior, context changes, capacity changes, DSON roundtrips, revision preservation, complete backups, and proof that a raid edit leaves `persist.estate.json` byte-for-byte unchanged.
 
-Real game loading after a deliberate raid edit remains a user-run smoke test; contract validation proves the save transformation, not undocumented runtime side effects of every Mod item.
+Real game loading after a deliberate raid edit remains a separate authorized smoke test, now preferably operated through Computer Use. Contract validation proves the save transformation, not undocumented runtime side effects of every Mod item. This operator preference does not authorize new save targets or expand a test's write scope.
 
 ## 5. Trinkets
 
@@ -201,6 +247,8 @@ The displayed `自然怪癖范围` is only the positive/negative quirk range use
 7. Unlocked and currently equipped are different. The equipped count still follows the class/Mod selection template; it is not hard-coded to four and does not equip every unlocked skill.
 8. When same-priority upgrade files conflict, select one only if its exact combat-tree IDs and equipment requirements are uniquely more compatible with the effective hero; otherwise leave the conflict unresolved.
 9. A skill defined at level 0 and at no higher level may synthesize the observed `<class>.<skill>` / requirement `0` purchase when no upgrade tree exists. Reject missing trees for every multilevel skill, and reject a selected level with no purchasable requirement, a requirement code that cannot fit the save's single ASCII-character representation, or two tree IDs that collide under the game's hash.
+
+Catalog availability is preflighted per resolve level through the same in-memory candidate factory, using blank initial quirks. It covers missing skill upgrade trees, class camping counts, names, skins, HP, and generation prerequisites in that path; it does not write a candidate or weaken any check. The UI shows genuinely available levels and the selected level's failure in the existing warning area. Explicit quirk choices, GUID allocation, existing save state, and transactional guards remain validated during the actual preview/write workflow. Special multilevel skills without purchase trees are not automatically exempted.
 
 ### 6.4 Destination and roster behavior
 

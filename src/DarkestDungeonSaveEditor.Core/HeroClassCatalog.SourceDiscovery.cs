@@ -16,7 +16,7 @@ public static partial class HeroClassCatalog
         if (source.Kind is "workshop" or "local")
         {
             var manifestPath = Path.Combine(source.Directory, "modfiles.txt");
-            if (File.Exists(manifestPath))
+            if (ModManifestFile.Exists(manifestPath))
             {
                 return EnumerateManifestFiles(source.Directory, manifestPath, enabledDlcPrefixes, issues);
             }
@@ -24,17 +24,23 @@ public static partial class HeroClassCatalog
             issues.Add($"Mod has no modfiles.txt; standard fallback scan used: {source.Directory}");
         }
 
+        var roots = ContentFileOverlay.GetFallbackContentRoots(
+            source.Directory, source.Kind is "workshop" or "local" ? enabledDlcPrefixes : []);
+        IReadOnlyList<string> Files(string directory, string pattern) => SortPaths(
+            roots.SelectMany(root => EnumerateFiles(root, directory, pattern))
+                .Distinct(StringComparer.OrdinalIgnoreCase));
+
         return new SourceFileSet(
-            EnumerateFiles(source.Directory, "heroes", $"*{HeroInfoSuffix}"),
-            EnumerateFiles(source.Directory, "heroes", $"*{HeroOverrideSuffix}"),
-            EnumerateFiles(source.Directory, "effects", "*.effects.darkest"),
-            EnumerateFiles(source.Directory, Path.Combine("shared", "quirk"), "*quirk_library.json"),
-            EnumerateFiles(source.Directory, Path.Combine("campaign", "town_events"), "*.events.json"),
-            EnumerateFiles(source.Directory, Path.Combine("shared", "buffs"), "*.buffs.json"),
-            EnumerateFiles(source.Directory, Path.Combine("raid", "camping"), "*.camping_skills.json"),
-            EnumerateFiles(source.Directory, "localization", "*.string_table.xml"),
-            EnumerateHeroUpgradeFiles(source.Directory),
-            EnumerateFiles(source.Directory, Path.Combine("campaign", "roster"), "roster.variables.json"));
+            Files("heroes", $"*{HeroInfoSuffix}"),
+            Files("heroes", $"*{HeroOverrideSuffix}"),
+            Files("effects", "*.effects.darkest"),
+            Files(Path.Combine("shared", "quirk"), "*quirk_library.json"),
+            Files(Path.Combine("campaign", "town_events"), "*.events.json"),
+            Files(Path.Combine("shared", "buffs"), "*.buffs.json"),
+            Files(Path.Combine("raid", "camping"), "*.camping_skills.json"),
+            Files("localization", "*.string_table.xml"),
+            SortPaths(roots.SelectMany(EnumerateHeroUpgradeFiles).Distinct(StringComparer.OrdinalIgnoreCase)),
+            Files(Path.Combine("campaign", "roster"), "roster.variables.json"));
     }
 
     private static SourceFileSet EnumerateManifestFiles(
@@ -53,13 +59,10 @@ public static partial class HeroClassCatalog
         var nameFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var upgradeFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var rosterVariableFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var rawLine in File.ReadLines(manifestPath))
+        foreach (var entry in ModManifestFile.ReadEntries(manifestPath, ExtractManifestPath))
         {
-            var relativePath = ExtractManifestPath(rawLine);
-            if (relativePath is null)
-            {
-                continue;
-            }
+            var rawLine = entry.RawLine;
+            var relativePath = entry.RelativePath;
 
             var path = Path.GetFullPath(Path.Combine(root, relativePath));
             var relativeToRoot = Path.GetRelativePath(root, path);

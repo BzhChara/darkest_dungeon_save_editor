@@ -236,36 +236,28 @@ public static partial class RaidInventoryStorageCatalog
         }
 
         var manifestPath = Path.Combine(source.Directory, "modfiles.txt");
-        if (!File.Exists(manifestPath))
+        if (!ModManifestFile.Exists(manifestPath))
         {
-            var inventoryRoot = Path.Combine(source.Directory, "inventory");
-            if (!Directory.Exists(inventoryRoot))
-            {
-                return [];
-            }
-
-            var files = Directory.EnumerateFiles(
-                    inventoryRoot,
-                    $"*{InventoryConfigSuffix}",
-                    SearchOption.AllDirectories)
+            var files = ContentFileOverlay.GetFallbackContentRoots(source.Directory, enabledDlcPrefixes)
+                .Select(root => Path.Combine(root, "inventory"))
+                .Where(Directory.Exists)
+                .SelectMany(directory => Directory.EnumerateFiles(
+                    directory, $"*{InventoryConfigSuffix}", SearchOption.AllDirectories))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
                 .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
                 .ToArray();
             if (files.Length > 0)
             {
-                issues.Add($"Mod has no modfiles.txt; raid inventory config scan used its standard inventory directory: {source.Directory}");
+                issues.Add($"Mod has no modfiles.txt; raid inventory config scan used standard inventory directories including enabled DLC paths: {source.Directory}");
             }
 
             return files;
         }
 
         var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var line in File.ReadLines(manifestPath))
+        foreach (var entry in ModManifestFile.ReadEntries(manifestPath, InventoryConfigSuffix))
         {
-            var relative = ModManifestPath.Extract(line, InventoryConfigSuffix);
-            if (relative is null)
-            {
-                continue;
-            }
+            var relative = entry.RelativePath;
 
             var path = Path.GetFullPath(Path.Combine(source.Directory, relative));
             var relativeToRoot = Path.GetRelativePath(source.Directory, path);

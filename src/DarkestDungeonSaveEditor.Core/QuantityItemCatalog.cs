@@ -23,9 +23,12 @@ public static partial class QuantityItemCatalog
         ArgumentNullException.ThrowIfNull(codec);
         codec.ValidateAvailability();
 
-        if (File.Exists(activeContent.Profile.RaidSavePath))
+        var scene = QuantityItemSaveScene.Read(activeContent);
+        if (scene.Context == QuantityItemSaveContext.Raid)
         {
-            return await LoadRaidAsync(activeContent, codec, cancellationToken).ConfigureAwait(false);
+            var raidCatalog = await LoadRaidAsync(activeContent, codec, cancellationToken).ConfigureAwait(false);
+            _ = QuantityItemSaveScene.Read(activeContent);
+            return raidCatalog;
         }
 
         var estatePath = Path.GetFullPath(activeContent.Profile.EstateSavePath);
@@ -51,7 +54,11 @@ public static partial class QuantityItemCatalog
         }
 
         await codec.DecodeAsync(sourceCopy, decodedPath, cancellationToken).ConfigureAwait(false);
-        return Load(activeContent, JsonSupport.ReadObject(decodedPath), originalSha256);
+        _ = QuantityItemSaveScene.Read(activeContent);
+        var catalog = Load(activeContent, JsonSupport.ReadObject(decodedPath), originalSha256);
+        return scene.HasRaidResidue
+            ? catalog with { Issues = catalog.Issues.Append("当前为小镇状态；残留副本文件已忽略，物品修改只作用于小镇库存。").ToArray() }
+            : catalog;
     }
 
     private static async Task<QuantityItemCatalogResult> LoadRaidAsync(

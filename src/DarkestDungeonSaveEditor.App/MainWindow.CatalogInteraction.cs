@@ -48,7 +48,8 @@ public partial class MainWindow : Window
             definition.LocalizedName.Chinese.Contains(keyword, StringComparison.OrdinalIgnoreCase) ||
             definition.LocalizedName.English.Contains(keyword, StringComparison.OrdinalIgnoreCase) ||
             definition.Rarity.Contains(keyword, StringComparison.OrdinalIgnoreCase) ||
-            definition.Source.Contains(keyword, StringComparison.OrdinalIgnoreCase));
+            definition.Source.Contains(keyword, StringComparison.OrdinalIgnoreCase) ||
+            definition.SourceLabel.Contains(keyword, StringComparison.OrdinalIgnoreCase));
 
         _visibleTrinkets.Clear();
         foreach (var definition in filteredTrinkets)
@@ -62,6 +63,7 @@ public partial class MainWindow : Window
             definition.LocalizedName.Chinese.Contains(keyword, StringComparison.OrdinalIgnoreCase) ||
             definition.LocalizedName.English.Contains(keyword, StringComparison.OrdinalIgnoreCase) ||
             definition.Source.Contains(keyword, StringComparison.OrdinalIgnoreCase) ||
+            definition.SourceLabel.Contains(keyword, StringComparison.OrdinalIgnoreCase) ||
             definition.RecruitEvents.Any(item => item.Id.Contains(keyword, StringComparison.OrdinalIgnoreCase)) ||
             definition.RuntimeQuirkSignals.Any(item => item.QuirkId.Contains(keyword, StringComparison.OrdinalIgnoreCase)));
 

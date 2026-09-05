@@ -92,6 +92,28 @@ public partial class MainWindow : Window
             PreviewWarningTextBlock.Text = string.Empty;
             PreviewWarningTextBlock.Visibility = Visibility.Collapsed;
         }
+        UpdateHeroGenerationAvailability();
+    }
+
+    private HeroGenerationAvailability? SelectedHeroGenerationAvailability =>
+        HeroGrid?.SelectedItem is HeroRow hero && HeroLevelComboBox?.SelectedItem is HeroLevelChoice level
+            ? hero.Definition.GenerationAvailability.SingleOrDefault(item => item.ResolveLevel == level.ResolveLevel)
+            : null;
+
+    private void UpdateHeroGenerationAvailability()
+    {
+        if (CatalogTabs?.SelectedIndex != 2 || PreviewButton is null || PreviewWarningTextBlock is null)
+        {
+            return;
+        }
+
+        var availability = SelectedHeroGenerationAvailability;
+        PreviewButton.IsEnabled = CatalogTabs.IsEnabled && CanPreviewCurrentTab();
+        if (availability is { CanGenerate: false })
+        {
+            PreviewWarningTextBlock.Text = availability.UnavailableReason;
+            PreviewWarningTextBlock.Visibility = Visibility.Visible;
+        }
     }
 
     private void SetBusy(bool busy)
@@ -147,11 +169,11 @@ public partial class MainWindow : Window
 
         if (requireCurrentQuantitySnapshot)
         {
-            var currentlyInRaid = File.Exists(profile.RaidSavePath);
             var expectedInRaid = _quantitySaveContext == QuantityItemSaveContext.Raid;
             var quantitySavePath = expectedInRaid ? profile.RaidSavePath : profile.EstateSavePath;
-            if (currentlyInRaid != expectedInRaid ||
-                _catalogQuantitySaveSha256 is null ||
+            // The game-save hash above guards the scene resolved at load time.
+            // A town profile may legitimately retain an old raid file after force-town.
+            if (_catalogQuantitySaveSha256 is null ||
                 !File.Exists(quantitySavePath) ||
                 !ComputeSha256(quantitySavePath).Equals(
                     _catalogQuantitySaveSha256,
@@ -187,8 +209,7 @@ public partial class MainWindow : Window
             0 => _allItems.Count > 0,
             1 => _allTrinkets.Count > 0,
             2 => _heroCatalog is not null &&
-                 _allHeroes.Count > 0 &&
-                 HeroLevelComboBox.SelectedItem is HeroLevelChoice,
+                 SelectedHeroGenerationAvailability is { CanGenerate: true },
             _ => false
         };
     }
@@ -230,6 +251,7 @@ public partial class MainWindow : Window
             HeroGrid.SelectedItem is HeroRow;
         UpdateInitialQuirkSelectionSummary();
         PreviewButton.IsEnabled = !isBattleTab && CanPreviewCurrentTab();
+        UpdateHeroGenerationAvailability();
     }
 
 }

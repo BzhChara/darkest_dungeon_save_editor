@@ -2,7 +2,6 @@ using System.Xml;
 using System.Xml.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
-using System.Net;
 
 namespace DarkestDungeonSaveEditor.Core;
 
@@ -105,17 +104,28 @@ internal sealed class ContentLocalizationCatalog
             .ThenBy(file => file.Source.Kind is "workshop" or "local"
                 ? -file.Source.LoadOrder
                 : file.Source.LoadOrder)
-            .ThenBy(file => IsLoc2File(file.Path) ? 1 : 0)
+            .ThenBy(file => GetFormatPriority(file.Path))
             .ThenBy(file => file.RelativePath, StringComparer.OrdinalIgnoreCase)
             .ToArray();
         foreach (var file in files)
         {
             try
             {
-                foreach (var entry in ReadRequestedEntries(file.Path, requestedKeyArray)
+                var diagnostics = new LocalizationEntryDiagnostics(file.Path);
+                foreach (var entry in ReadRequestedEntries(file.Path, requestedKeyArray, issues, diagnostics)
                              .Where(entry => IsTargetLanguage(entry.LanguageId)))
                 {
-                    var displayValue = NormalizeDisplayName(entry.Value);
+                    string displayValue;
+                    try
+                    {
+                        displayValue = NormalizeDisplayName(entry.Value);
+                    }
+                    catch (RegexMatchTimeoutException)
+                    {
+                        diagnostics.Skip(entry.Key, "名称格式化超时");
+                        continue;
+                    }
+
                     if (string.IsNullOrWhiteSpace(entry.Key) || string.IsNullOrWhiteSpace(displayValue) ||
                         !requestedKeySet.Contains(entry.Key))
                     {
@@ -137,6 +147,8 @@ internal sealed class ContentLocalizationCatalog
                         builder.Chinese = displayValue;
                     }
                 }
+
+                diagnostics.AppendTo(issues);
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or XmlException or
                                             RegexMatchTimeoutException or InvalidDataException or
@@ -159,28 +171,34 @@ internal sealed class ContentLocalizationCatalog
 
     private static IReadOnlyList<LocalizedEntry> ReadRequestedEntries(
         string path,
-        IReadOnlyCollection<string> requestedKeys)
+        IReadOnlyCollection<string> requestedKeys,
+        ICollection<string> issues,
+        LocalizationEntryDiagnostics diagnostics)
     {
-        if (!IsLoc2File(path))
+        if (!IsCompiledFile(path))
         {
-            return ReadLanguageEntries(path);
+            return ReadLanguageEntries(path, diagnostics);
         }
 
-        var languageId = TryGetLoc2LanguageId(path);
+        var languageId = TryGetCompiledLanguageId(path);
         return languageId is null
             ? []
-            : Loc2LocalizationReader.Read(path, requestedKeys)
+            : (IsLoc2File(path)
+                ? Loc2LocalizationReader.Read(path, requestedKeys, issues)
+                : LocLocalizationReader.Read(path, requestedKeys, issues))
                 .Select(pair => new LocalizedEntry(languageId, pair.Key, pair.Value))
                 .ToArray();
     }
 
-    internal static IReadOnlyList<string> ReadHeroNames(string path)
+    internal static IReadOnlyList<string> ReadHeroNames(string path, ICollection<string> issues)
     {
-        var groups = ReadLanguageEntries(path)
+        var diagnostics = new LocalizationEntryDiagnostics(path);
+        var groups = ReadLanguageEntries(path, diagnostics)
             .Where(entry => entry.Key.StartsWith("hero_name_", StringComparison.OrdinalIgnoreCase))
             .Where(entry => !string.IsNullOrWhiteSpace(entry.Value))
             .GroupBy(entry => entry.LanguageId, StringComparer.OrdinalIgnoreCase)
             .ToArray();
+        diagnostics.AppendTo(issues);
         var selected = groups.FirstOrDefault(group =>
                 group.Key.Equals("english", StringComparison.OrdinalIgnoreCase)) ??
             groups.FirstOrDefault();
@@ -191,91 +209,40 @@ internal sealed class ContentLocalizationCatalog
             [];
     }
 
-    private static IReadOnlyList<LocalizedEntry> ReadLanguageEntries(string path)
+    private static IReadOnlyList<LocalizedEntry> ReadLanguageEntries(
+        string path,
+        LocalizationEntryDiagnostics diagnostics)
     {
-        try
+        // Finish strict parsing before exposing any entry: invalid byte encoding,
+        // declarations, comments or markup can invalidate the document's boundaries.
+        var document = XDocument.Load(path, LoadOptions.None);
+        var result = new List<LocalizedEntry>();
+        var entryIndex = 0;
+        foreach (var language in document.Root?.Elements("language") ?? [])
         {
-            var document = LoadDocument(path);
-            return (document.Root?.Elements("language") ?? [])
-                .SelectMany(language =>
-                {
-                    var languageId = ((string?)language.Attribute("id"))?.Trim() ?? string.Empty;
-                    return language.Descendants("entry").Select(entry => new LocalizedEntry(
-                            languageId,
-                            ((string?)entry.Attribute("id"))?.Trim() ?? string.Empty,
-                            entry.Value.Trim()));
-                })
-                .ToArray();
-        }
-        catch (XmlException)
-        {
-            var text = ReadSanitizedText(path);
-            var result = new List<LocalizedEntry>();
-            var languagePattern = new Regex(
-                @"<language\b[^>]*\bid\s*=\s*(?<quote>[""'])(?<language>.*?)\k<quote>[^>]*>(?<body>.*?)</language\s*>",
-                RegexOptions.IgnoreCase | RegexOptions.Singleline,
-                TimeSpan.FromSeconds(2));
-            var entryPattern = new Regex(
-                @"<entry\b[^>]*\bid\s*=\s*(?<quote>[""'])(?<key>.*?)\k<quote>[^>]*>(?<value>.*?)</[^>]+>",
-                RegexOptions.IgnoreCase | RegexOptions.Singleline,
-                TimeSpan.FromSeconds(2));
-            foreach (Match languageMatch in languagePattern.Matches(text))
+            var languageId = ((string?)language.Attribute("id"))?.Trim() ?? string.Empty;
+            foreach (var entry in language.Descendants("entry"))
             {
-                var languageId = languageMatch.Groups["language"].Value.Trim();
-                foreach (Match entryMatch in entryPattern.Matches(languageMatch.Groups["body"].Value))
+                entryIndex++;
+                var key = ((string?)entry.Attribute("id"))?.Trim() ?? string.Empty;
+                if (string.IsNullOrWhiteSpace(key) || string.IsNullOrWhiteSpace(languageId))
                 {
-                    var value = entryMatch.Groups["value"].Value.Trim();
-                    if (value.StartsWith("<![CDATA[", StringComparison.Ordinal) &&
-                        value.EndsWith("]]>", StringComparison.Ordinal))
-                    {
-                        value = value[9..^3];
-                    }
-                    else
-                    {
-                        value = WebUtility.HtmlDecode(value);
-                    }
-
-                    result.Add(new LocalizedEntry(
-                        languageId,
-                        entryMatch.Groups["key"].Value.Trim(),
-                        value.Trim()));
+                    diagnostics.Skip($"XML 条目 {entryIndex}", string.IsNullOrWhiteSpace(key) ? "缺少 ID" : "缺少语言 ID");
+                    continue;
                 }
+
+                if (entry.Ancestors("entry").Any() || entry.Descendants("entry").Any() ||
+                    entry.Descendants("language").Any() || entry.Ancestors("language").FirstOrDefault() != language)
+                {
+                    diagnostics.Skip(key, "条目或语言嵌套导致归属不明确");
+                    continue;
+                }
+
+                result.Add(new LocalizedEntry(languageId, key, entry.Value.Trim()));
             }
-
-            return result;
         }
-    }
 
-    private static XDocument LoadDocument(string path)
-    {
-        try
-        {
-            return XDocument.Load(path, LoadOptions.None);
-        }
-        catch (XmlException)
-        {
-            return XDocument.Parse(ReadSanitizedText(path), LoadOptions.None);
-        }
-    }
-
-    private static string ReadSanitizedText(string path)
-    {
-        var text = File.ReadAllText(path, new UTF8Encoding(false, false));
-        text = Regex.Replace(
-            text,
-            @"<\?xml[^>]*\?>",
-            string.Empty,
-            RegexOptions.IgnoreCase,
-            TimeSpan.FromSeconds(2));
-        text = Regex.Replace(
-            text,
-            @"<!--.*?-->",
-            string.Empty,
-            RegexOptions.Singleline,
-            TimeSpan.FromSeconds(2));
-        return new string(text.Where(character =>
-                character is '\t' or '\n' or '\r' || character >= ' ')
-            .ToArray());
+        return result;
     }
 
     private static bool IsTargetLanguage(string languageId) =>
@@ -317,32 +284,20 @@ internal sealed class ContentLocalizationCatalog
         }
 
         var manifestPath = Path.Combine(source.Directory, "modfiles.txt");
-        if (!File.Exists(manifestPath))
+        if (!ModManifestFile.Exists(manifestPath))
         {
-            return EnumerateDirectory(Path.Combine(source.Directory, "localization"));
+            return ContentFileOverlay.GetFallbackContentRoots(source.Directory, enabledDlcPrefixes)
+                .SelectMany(root => EnumerateDirectory(Path.Combine(root, "localization")))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
         }
 
         var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        AddDirectAuthoringStringTables(
-            result,
-            Path.Combine(source.Directory, "localization"));
-        foreach (var dlcPrefix in enabledDlcPrefixes)
+        foreach (var entry in ModManifestFile.ReadEntries(manifestPath, ".string_table.xml", ".loc", ".loc2"))
         {
-            AddDirectAuthoringStringTables(
-                result,
-                Path.Combine(
-                    source.Directory,
-                    dlcPrefix.Replace('/', Path.DirectorySeparatorChar),
-                    "localization"));
-        }
-
-        foreach (var rawLine in File.ReadLines(manifestPath))
-        {
-            var relativePath = ModManifestPath.Extract(rawLine, ".string_table.xml", ".loc2");
-            if (relativePath is null)
-            {
-                continue;
-            }
+            var rawLine = entry.RawLine;
+            var relativePath = entry.RelativePath;
 
             var path = Path.GetFullPath(Path.Combine(source.Directory, relativePath));
             var relativeToRoot = Path.GetRelativePath(source.Directory, path);
@@ -362,8 +317,8 @@ internal sealed class ContentLocalizationCatalog
                 continue;
             }
 
-            if (IsLoc2File(path) &&
-                (TryGetLoc2LanguageId(path) is null ||
+            if (IsCompiledFile(path) &&
+                (TryGetCompiledLanguageId(path) is null ||
                  !IsDirectLocalizationFile(relativeToRoot, enabledDlcPrefixes)))
             {
                 continue;
@@ -381,22 +336,6 @@ internal sealed class ContentLocalizationCatalog
         return result.OrderBy(path => path, StringComparer.OrdinalIgnoreCase).ToArray();
     }
 
-    private static void AddDirectAuthoringStringTables(HashSet<string> result, string directory)
-    {
-        if (!Directory.Exists(directory))
-        {
-            return;
-        }
-
-        foreach (var path in Directory.EnumerateFiles(
-                     directory,
-                     "*.string_table.xml",
-                     SearchOption.TopDirectoryOnly))
-        {
-            result.Add(Path.GetFullPath(path));
-        }
-    }
-
     private static IReadOnlyList<string> EnumerateDirectory(string directory)
     {
         if (!Directory.Exists(directory))
@@ -405,8 +344,8 @@ internal sealed class ContentLocalizationCatalog
         }
 
         return Directory.EnumerateFiles(directory, "*.string_table.xml", SearchOption.AllDirectories)
-            .Concat(Directory.EnumerateFiles(directory, "*.loc2", SearchOption.TopDirectoryOnly)
-                .Where(path => TryGetLoc2LanguageId(path) is not null))
+            .Concat(Directory.EnumerateFiles(directory, "*", SearchOption.TopDirectoryOnly)
+                .Where(path => IsCompiledFile(path) && TryGetCompiledLanguageId(path) is not null))
             .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
             .ToArray();
     }
@@ -414,7 +353,13 @@ internal sealed class ContentLocalizationCatalog
     private static bool IsLoc2File(string path) =>
         path.EndsWith(".loc2", StringComparison.OrdinalIgnoreCase);
 
-    private static string? TryGetLoc2LanguageId(string path)
+    private static bool IsCompiledFile(string path) =>
+        IsLoc2File(path) || path.EndsWith(".loc", StringComparison.OrdinalIgnoreCase);
+
+    private static int GetFormatPriority(string path) =>
+        IsLoc2File(path) ? 2 : IsCompiledFile(path) ? 1 : 0;
+
+    private static string? TryGetCompiledLanguageId(string path)
     {
         var name = Path.GetFileNameWithoutExtension(path);
         if (name.Equals("english", StringComparison.OrdinalIgnoreCase) ||

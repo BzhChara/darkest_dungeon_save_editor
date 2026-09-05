@@ -8,6 +8,21 @@ internal static partial class ContractSuite
         var mainWindow = XDocument.Load(Path.Combine(appDirectory, "MainWindow.xaml"));
         var quirkDialog = XDocument.Load(Path.Combine(appDirectory, "InitialQuirkSelectionDialog.xaml"));
         var app = XDocument.Load(Path.Combine(appDirectory, "App.xaml"));
+        var interaction = File.ReadAllText(Path.Combine(appDirectory, "MainWindow.CatalogInteraction.cs"));
+        var stateCode = File.ReadAllText(Path.Combine(appDirectory, "MainWindow.State.cs"));
+        foreach (var section in new[] { "filteredTrinkets", "filteredHeroes" })
+        {
+            var predicateStart = interaction.IndexOf("var " + section, StringComparison.Ordinal);
+            var predicateEnd = interaction.IndexOf(";", predicateStart, StringComparison.Ordinal);
+            var predicate = interaction[predicateStart..predicateEnd];
+            Assert(predicate.Contains("definition.Source.Contains(keyword, StringComparison.OrdinalIgnoreCase)", StringComparison.Ordinal) &&
+                   predicate.Contains("definition.SourceLabel.Contains(keyword, StringComparison.OrdinalIgnoreCase)", StringComparison.Ordinal),
+                "Hero and trinket search must match both internal and displayed provenance labels.");
+        }
+        Assert(stateCode.Contains("SelectedHeroGenerationAvailability is { CanGenerate: true }", StringComparison.Ordinal) &&
+               stateCode.Contains("PreviewWarningTextBlock.Text = availability.UnavailableReason", StringComparison.Ordinal) &&
+               !stateCode.Contains("currentlyInRaid != expectedInRaid", StringComparison.Ordinal),
+            "UI guards must use generation preflight and the game-state-guarded quantity scene, not infer town/raid from residue files.");
         XNamespace presentation = "http://schemas.microsoft.com/winfx/2006/xaml/presentation";
         XNamespace xaml = "http://schemas.microsoft.com/winfx/2006/xaml";
 

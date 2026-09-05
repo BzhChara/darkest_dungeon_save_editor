@@ -162,7 +162,7 @@ public static partial class HeroClassCatalog
         {
             try
             {
-                foreach (var name in ContentLocalizationCatalog.ReadHeroNames(file.Path))
+                foreach (var name in ContentLocalizationCatalog.ReadHeroNames(file.Path, issues))
                 {
                     heroNames.Add(name);
                 }
@@ -320,7 +320,7 @@ public static partial class HeroClassCatalog
             })
             .OrderBy(quirk => quirk.Id, StringComparer.OrdinalIgnoreCase)
             .ToArray();
-        return new HeroClassCatalogResult(
+        var catalog = new HeroClassCatalogResult(
             activeContent.GameMode,
             resolveLevelThresholds,
             heroClasses,
@@ -328,5 +328,23 @@ public static partial class HeroClassCatalog
             initialQuirks,
             heroNames.OrderBy(name => name, StringComparer.Ordinal).ToArray(),
             issues);
+        var validatedHeroes = heroClasses.Select(hero => hero with
+        {
+            GenerationAvailability = StagecoachHeroCandidateFactory.GetGenerationAvailability(catalog, hero)
+        }).ToArray();
+        foreach (var hero in validatedHeroes)
+        {
+            var firstFailure = hero.GenerationAvailability.FirstOrDefault(level => !level.CanGenerate);
+            if (firstFailure is not null)
+            {
+                var levels = hero.GenerationAvailability.Where(level => level.CanGenerate)
+                    .Select(level => level.ResolveLevel).ToArray();
+                issues.Add($"人物生成预检：{hero.Id}；可用等级：" +
+                           (levels.Length == 0 ? "无" : string.Join(",", levels)) +
+                           $"；首个限制：{firstFailure.UnavailableReason}");
+            }
+        }
+
+        return catalog with { HeroClasses = validatedHeroes };
     }
 }

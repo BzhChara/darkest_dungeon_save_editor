@@ -187,28 +187,24 @@ public static partial class TrinketStorageCatalog
         }
 
         var manifestPath = Path.Combine(root, "modfiles.txt");
-        if (!File.Exists(manifestPath))
+        if (!ModManifestFile.Exists(manifestPath))
         {
             issues.Add($"Mod has no modfiles.txt; standard fallback scan used: {root}");
-            var inventoryRoot = Path.Combine(root, "inventory");
-            return Directory.Exists(inventoryRoot)
-                ? Directory.EnumerateFiles(
-                        inventoryRoot,
-                        $"*{InventoryConfigSuffix}",
-                        SearchOption.AllDirectories)
-                    .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
-                    .ToArray()
-                : [];
+            return ContentFileOverlay.GetFallbackContentRoots(root, enabledDlcPrefixes)
+                .Select(contentRoot => Path.Combine(contentRoot, "inventory"))
+                .Where(Directory.Exists)
+                .SelectMany(directory => Directory.EnumerateFiles(
+                    directory, $"*{InventoryConfigSuffix}", SearchOption.AllDirectories))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
         }
 
         var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var rawLine in File.ReadLines(manifestPath))
+        foreach (var entry in ModManifestFile.ReadEntries(manifestPath, InventoryConfigSuffix))
         {
-            var relativePath = ModManifestPath.Extract(rawLine, InventoryConfigSuffix);
-            if (relativePath is null)
-            {
-                continue;
-            }
+            var rawLine = entry.RawLine;
+            var relativePath = entry.RelativePath;
 
             var path = Path.GetFullPath(Path.Combine(root, relativePath));
             var relativeToRoot = Path.GetRelativePath(root, path);

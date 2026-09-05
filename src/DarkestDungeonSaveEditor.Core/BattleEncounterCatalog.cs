@@ -70,6 +70,8 @@ public sealed record BattleEncounterDefinition(
 
     public BattleEncounterClassification Classification { get; init; }
 
+    public bool HasKnownClassification { get; init; } = true;
+
     public bool ContainsBossMonster { get; init; }
 
     public IReadOnlyList<BilingualContentName> MonsterNames { get; init; } = [];
@@ -204,12 +206,12 @@ public static partial class BattleEncounterCatalog
         }
 
         var globalIssues = new List<string>();
-        var bridgeCandidateRows = ResolveGlobalEffectiveMashFiles(
+        var globalRows = ResolveGlobalEffectiveMashFiles(
                 activeContent.Sources,
                 globalIssues)
             .SelectMany(file => ParseFile(file, activeContent.Sources, guard, globalIssues))
-            .Where(IsBridgeCandidate)
             .ToArray();
+        var bridgeCandidateRows = globalRows.Where(IsBridgeCandidate).ToArray();
         var availableMonsters = ResolveAvailableMonsterDefinitions(
             activeContent.Sources,
             globalIssues);
@@ -221,10 +223,22 @@ public static partial class BattleEncounterCatalog
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .Select(ContentLocalizationCatalog.GetMonsterNameKey));
         globalIssues.AddRange(localization.Issues);
+        var classifiedRows = encounters.Concat(globalRows)
+            .DistinctBy(ManagedBattleEncounterBridgeService.ClassificationKey, StringComparer.OrdinalIgnoreCase)
+            .Select(encounter => ClassifyEncounter(encounter, availableMonsters.BossIds)).ToArray();
+        var managedClassifications = ManagedBattleEncounterBridgeService.ReadClassificationOverrides(
+            activeContent, classifiedRows, globalIssues);
+        BattleEncounterDefinition ClassifyWithOrigin(BattleEncounterDefinition encounter)
+        {
+            var classified = ClassifyEncounter(encounter, availableMonsters.BossIds);
+            return managedClassifications.TryGetValue(ManagedBattleEncounterBridgeService.ClassificationKey(encounter), out var original)
+                ? classified with { Classification = original ?? classified.Classification, HasKnownClassification = original.HasValue }
+                : classified;
+        }
         for (var index = 0; index < encounters.Count; index++)
         {
             encounters[index] = LocalizeEncounter(
-                ClassifyEncounter(encounters[index], availableMonsters.BossIds),
+                ClassifyWithOrigin(encounters[index]),
                 localization);
         }
 
@@ -255,13 +269,14 @@ public static partial class BattleEncounterCatalog
         var bridgeEncounters = bridgeCandidateRows
             .Where(encounter => encounter.MonsterIds.All(availableMonsters.Ids.Contains))
             .Select(encounter => LocalizeEncounter(
-                ClassifyEncounter(encounter, availableMonsters.BossIds) with
+                ClassifyWithOrigin(encounter) with
                 {
                     MashIndex = null,
                     CanPlaceDirectly = false,
                     UnavailableReason = "需要 Encounter Bridge 才能写入当前副本遭遇表"
                 },
                 localization))
+            .Where(encounter => encounter.HasKnownClassification)
             .OrderBy(encounter => encounter.OriginDungeonId, StringComparer.OrdinalIgnoreCase)
             .ThenBy(encounter => encounter.OriginDifficulty)
             .ThenBy(encounter => encounter.MashType)
@@ -391,7 +406,7 @@ public static partial class BattleEncounterCatalog
     public static void ValidateBridgeEncounter(BattleEncounterDefinition encounter)
     {
         ArgumentNullException.ThrowIfNull(encounter);
-        if (!IsBridgeCandidate(encounter) ||
+        if (!encounter.HasKnownClassification || !IsBridgeCandidate(encounter) ||
             encounter.CanPlaceDirectly ||
             encounter.MashIndex is not null)
         {
