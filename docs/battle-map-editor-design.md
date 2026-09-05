@@ -143,6 +143,8 @@ Persisted hunger (`content=8`) and secret doors (`content=13`) are not generic e
 
 ### Roaming bosses and special encounters
 
+Managed carrier weight is not an encounter category. New version-3 manifest entries retain an optional original `Classification` field. Catalog loading validates the managed package identity, generated mash hash, per-type index, and ordered actors before applying that classification. Legacy entries without the field recover from roaming/source-kind metadata or a matching current original source row; loading does not migrate or rewrite the package. If the original category cannot be established, the appended row is omitted from generation choices with a diagnostic, while existing map bindings and indexes remain untouched. Authored zero-weight special rows remain special.
+
 `游荡首领` is not the same thing as a boss room. A boss-room encounter comes from a `boss:` mash, uses `mash_type=2`, belongs in a room, and may be tied to the quest's final room. A roaming encounter remains an ordinary map battle at its authored location: `hall:` writes `content=1, mash_type=0` to a visible corridor tile, while `room:` writes `content=1, mash_type=1` to a room. It never changes `final_room_id`; consequently the in-game map continues to use the ordinary battle marker rather than a final-room skull.
 
 The catalog recognizes the source mechanisms separately:

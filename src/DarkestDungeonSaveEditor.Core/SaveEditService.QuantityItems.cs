@@ -40,6 +40,12 @@ public sealed partial class SaveEditService
         var saveContext = item.StorageKind == QuantityItemStorageKind.RaidInventory
             ? QuantityItemSaveContext.Raid
             : QuantityItemSaveContext.Town;
+        if (QuantityItemSaveScene.Read(activeContent).Context != saveContext)
+        {
+            throw new InvalidOperationException(saveContext == QuantityItemSaveContext.Town
+                ? "当前档案已经进入副本；请重新加载内容目录，程序将切换为当前背包修改模式。"
+                : "当前档案已不在副本中；请重新加载内容目录，程序不会把背包修改误写到小镇存档。");
+        }
         ValidateQuantityItemSaveContext(profile, saveContext);
         var manifestFingerprints = CaptureManifestFingerprints(activeContent.Sources);
         var currentDefinitions = QuantityItemCatalog.LoadDefinitions(activeContent, saveContext);
@@ -99,6 +105,7 @@ public sealed partial class SaveEditService
         File.Copy(targetSavePath, sourceCopy, overwrite: false);
 
         var copyHash = ComputeSha256(sourceCopy);
+        _ = QuantityItemSaveScene.Read(activeContent);
         ValidateQuantityItemSaveContext(profile, saveContext);
         var currentHash = ComputeSha256(targetSavePath);
         if (!copyHash.Equals(originalHash, StringComparison.OrdinalIgnoreCase) ||
@@ -362,11 +369,6 @@ public sealed partial class SaveEditService
                 "当前档案已不在副本中；请重新加载内容目录，程序不会把背包修改误写到小镇存档。");
         }
 
-        if (saveContext == QuantityItemSaveContext.Town && raidExists)
-        {
-            throw new InvalidOperationException(
-                "当前档案已经进入副本；请重新加载内容目录，程序将切换为当前背包修改模式。");
-        }
     }
 
     private static void ValidateQuantityItemContentGuard(PreparedQuantityItemEdit prepared)

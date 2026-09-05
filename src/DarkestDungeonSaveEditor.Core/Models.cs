@@ -130,6 +130,7 @@ public sealed record HeroClassDefinition(
 {
     public BilingualContentName LocalizedName { get; init; } = BilingualContentName.Empty;
     public string SourceLabel { get; init; } = string.Empty;
+    public IReadOnlyList<HeroGenerationAvailability> GenerationAvailability { get; init; } = [];
 }
 
 public enum HeroMaxHpModifierKind

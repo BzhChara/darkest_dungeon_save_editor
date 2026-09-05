@@ -27,7 +27,7 @@ public sealed record ManagedBattleEncounterBridgeResult(
 /// Maintains one append-only encounter carrier per save profile. The game still consumes
 /// numeric mash indexes, but callers never have to install, reorder, or retire one-off Mods.
 /// </summary>
-public sealed class ManagedBattleEncounterBridgeService
+public sealed partial class ManagedBattleEncounterBridgeService
 {
     public const string ManifestFileName = "ddse-managed-encounter-bridge.json";
     public const int ManifestVersion = 3;
@@ -194,6 +194,7 @@ public sealed class ManagedBattleEncounterBridgeService
                 OriginDungeonId = encounter.OriginDungeonId,
                 OriginDifficulty = encounter.OriginDifficulty,
                 RoamingId = encounter.RoamingId,
+                Classification = encounter.Classification.ToString(),
                 AddedAtUtc = DateTime.UtcNow
             };
             table.Entries.Add(entry);
@@ -1232,6 +1233,7 @@ public sealed class ManagedBattleEncounterBridgeService
         public string OriginDungeonId { get; set; } = string.Empty;
         public int OriginDifficulty { get; set; }
         public string? RoamingId { get; set; }
+        public string? Classification { get; set; }
         public DateTime AddedAtUtc { get; set; }
     }
 }

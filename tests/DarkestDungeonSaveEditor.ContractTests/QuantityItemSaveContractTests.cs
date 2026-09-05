@@ -98,6 +98,32 @@ internal static partial class ContractSuite
         File.WriteAllText(quantityDecodedRaidSeedPath, quantityRaidRoot.ToJsonString(), new UTF8Encoding(false));
         await codec.EncodeAsync(quantityDecodedRaidSeedPath, quantityRaidPath, originalBinaryPath: null);
         SetRevision(quantityRaidPath, [0x00, 0x00, 0x4A, 0x70]);
+        var townWithRaidResidue = await QuantityItemCatalog.LoadAsync(quantityActiveContent with
+        {
+            WorkspaceDirectory = Path.Combine(runRoot, "quantity-town-residue-catalog")
+        }, codec);
+        Assert(townWithRaidResidue.SaveContext == QuantityItemSaveContext.Town &&
+               townWithRaidResidue.Issues.Any(issue => issue.Contains("残留副本", StringComparison.Ordinal)),
+            "A town game state with an old raid save must expose town quantities, not the stale raid backpack.");
+        var townResidueEdit = await quantityService.PrepareQuantityItemEditAsync(
+            quantityProfile, catalogModEssence, 12, quantityActiveContent);
+        var residueHash = ComputeSha256(quantityRaidPath);
+        var townResidueCommit = await quantityService.CommitAsync(townResidueEdit);
+        Assert(Path.GetFileName(townResidueCommit.TargetPath) == "persist.estate.json" &&
+               ComputeSha256(quantityRaidPath) == residueHash,
+            "Editing town quantities must remain available with raid residue and must preserve the old backpack.");
+
+        var quantityGameRoot = JsonNode.Parse(File.ReadAllText(quantityActiveContent.DecodedGamePath))!.AsObject();
+        var quantityDecodedGamePath = Path.Combine(runRoot, "quantity.scene.persist.game.json");
+        quantityGameRoot["base_root"]!["inraid"] = true;
+        quantityGameRoot["base_root"]!["raiddungeon"] = "cove";
+        File.WriteAllText(quantityDecodedGamePath, quantityGameRoot.ToJsonString(), new UTF8Encoding(false));
+        await codec.EncodeAsync(quantityDecodedGamePath, quantityGamePath, originalBinaryPath: null);
+        quantityActiveContent = quantityActiveContent with
+        {
+            DecodedGamePath = quantityDecodedGamePath,
+            SourceGameSha256 = ComputeSha256(quantityGamePath)
+        };
         var quantityEstateBytesBeforeRaidEdit = File.ReadAllBytes(quantityEstatePath);
         var autoRaidCatalog = await QuantityItemCatalog.LoadAsync(
             quantityActiveContent with
@@ -129,7 +155,7 @@ internal static partial class ContractSuite
 
         Assert(
             townItemBlockedDuringRaid,
-            "Once persist.raid.json appears, a stale town item row must be rejected and the user must reload into raid mode.");
+            "Once the game state enters an expedition, a stale town item row must be rejected and the user must reload into raid mode.");
         var preparedRaidQuantity = await quantityService.PrepareQuantityItemEditAsync(
             quantityProfile,
             serviceRaidTorch,
@@ -205,6 +231,78 @@ internal static partial class ContractSuite
             RaidInventorySaveEditor.CountAmount(quantityCommittedRaidRoot, serviceRaidTorch) == 10 &&
             ReadRevision(quantityRaidPath).SequenceEqual(new byte[] { 0x00, 0x00, 0x4A, 0x70 }),
             "A raid quantity commit must write the requested stacks and preserve the DSON revision.");
+
+        var beforeSceneChange = await quantityService.PrepareQuantityItemEditAsync(
+            quantityProfile, serviceRaidTorch, 11, quantityActiveContent);
+        quantityGameRoot["base_root"]!["inraid"] = false;
+        quantityGameRoot["base_root"]!["raiddungeon"] = "none";
+        File.WriteAllText(quantityDecodedGamePath, quantityGameRoot.ToJsonString(), new UTF8Encoding(false));
+        await codec.EncodeAsync(quantityDecodedGamePath, quantityGamePath, originalBinaryPath: null);
+        var oldRaidHash = ComputeSha256(quantityRaidPath);
+        var changedSceneBlocked = false;
+        try
+        {
+            _ = await quantityService.CommitAsync(beforeSceneChange);
+        }
+        catch (InvalidOperationException)
+        {
+            changedSceneBlocked = true;
+        }
+        Assert(changedSceneBlocked && ComputeSha256(quantityRaidPath) == oldRaidHash,
+            "A force-town flag change after raid preview must reject commit even while persist.raid.json remains present.");
+        quantityActiveContent = quantityActiveContent with { SourceGameSha256 = ComputeSha256(quantityGamePath) };
+        var staleRaidRowBlocked = false;
+        try
+        {
+            _ = await quantityService.PrepareQuantityItemEditAsync(quantityProfile, serviceRaidTorch, 11, quantityActiveContent);
+        }
+        catch (InvalidOperationException error) when (error.Message.Contains("已不在副本", StringComparison.Ordinal))
+        {
+            staleRaidRowBlocked = true;
+        }
+        Assert(staleRaidRowBlocked, "Town with residue must not permit an old raid row to create a new raid preview.");
+
+        foreach (var invalidState in new[] { "missing-flag", "contradictory", "missing-raid" })
+        {
+            if (invalidState == "missing-flag")
+            {
+                quantityGameRoot["base_root"]!.AsObject().Remove("inraid");
+            }
+            else
+            {
+                quantityGameRoot["base_root"]!["inraid"] = true;
+            }
+            quantityGameRoot["base_root"]!["raiddungeon"] = invalidState == "contradictory" ? "none" : "cove";
+            File.WriteAllText(quantityDecodedGamePath, quantityGameRoot.ToJsonString(), new UTF8Encoding(false));
+            await codec.EncodeAsync(quantityDecodedGamePath, quantityGamePath, originalBinaryPath: null);
+            quantityActiveContent = quantityActiveContent with
+            {
+                SourceGameSha256 = ComputeSha256(quantityGamePath),
+                WorkspaceDirectory = Path.Combine(runRoot, "quantity-scene-" + invalidState)
+            };
+            if (invalidState == "missing-raid")
+            {
+                File.Move(quantityRaidPath, parkedRaidPath);
+            }
+            var invalidSceneBlocked = false;
+            try
+            {
+                _ = await QuantityItemCatalog.LoadAsync(quantityActiveContent, codec);
+            }
+            catch (Exception error) when (error is InvalidDataException or InvalidOperationException)
+            {
+                invalidSceneBlocked = true;
+            }
+            finally
+            {
+                if (invalidState == "missing-raid")
+                {
+                    File.Move(parkedRaidPath, quantityRaidPath);
+                }
+            }
+            Assert(invalidSceneBlocked && File.ReadAllBytes(quantityEstatePath).SequenceEqual(quantityEstateBytesBeforeRaidEdit),
+                $"An invalid scene ({invalidState}) must fail closed without falling back to town or changing estate data.");
+        }
 
     }
 }

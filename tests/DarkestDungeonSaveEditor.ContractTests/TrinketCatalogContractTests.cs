@@ -191,8 +191,10 @@ internal static partial class ContractSuite
             invalidCounterStateful.UnsupportedStateFields.SequenceEqual(["quest_uses"]),
             "A non-positive instance counter must be retained as a creation blocker.");
         Assert(
-            stateful.LocalizedName == new BilingualContentName("容错火焰探针", "Lenient Fire Probe"),
-            "Display-name parsing should tolerate common malformed Mod XML without changing the source file.");
+            stateful.LocalizedName == BilingualContentName.Empty &&
+            activeCatalog.Issues.Any(issue => issue.Contains("Failed to read localization", StringComparison.Ordinal) &&
+                                             issue.Contains("lenient.string_table.xml", StringComparison.Ordinal)),
+            "Malformed Mod XML must be reported and must not supply recovered display names.");
         Assert(
             prioritizedTrinket.Source == "local:Local Test Mod" &&
             prioritizedTrinket.Rarity == "uncommon" &&
@@ -218,13 +220,19 @@ internal static partial class ContractSuite
             new[]
             {
         "partially_broken_bounds_english.loc2",
-        "partially_broken_utf8_english.loc2",
         "partially_broken_nul_english.loc2",
         "partially_broken_zero_length_english.loc2"
             }.All(fileName => activeCatalog.Issues.Any(issue =>
                 issue.Contains(fileName, StringComparison.OrdinalIgnoreCase) &&
                 issue.Contains("Failed to read localization", StringComparison.Ordinal))),
-            "A LOC2 file must be rejected when any unrequested value has invalid bounds, UTF-8, or termination.");
+            "A LOC2 file must be rejected when any unrequested value has invalid bounds or termination.");
+        Assert(activeCatalog.Issues.Any(issue =>
+                   issue.Contains("partially_broken_utf8_english.loc2", StringComparison.OrdinalIgnoreCase) &&
+                   issue.Contains("本地化部分读取", StringComparison.Ordinal) && issue.Contains("跳过 1 个", StringComparison.Ordinal)) &&
+               activeCatalog.Issues.All(issue =>
+                   !issue.Contains("partially_broken_utf8_english.loc2", StringComparison.OrdinalIgnoreCase) ||
+                   !issue.Contains("Failed to read localization", StringComparison.Ordinal)),
+            "An unrequested LOC2 text encoding error must be aggregated as a skipped item while keeping valid names.");
         Assert(
             activeCatalog.Issues.All(issue =>
                 !issue.Contains("legal_duplicate_zero_english.loc2", StringComparison.OrdinalIgnoreCase)),

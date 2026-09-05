@@ -33,6 +33,7 @@ internal static partial class ContractSuite
         var codec = fixture.Codec;
 
         await RunBattleMapContractsAsync(runRoot, codec);
+        await RunBridgeClassificationContractsAsync(runRoot, codec);
         await codec.EncodeAsync(decodedSeedPath, estatePath, originalBinaryPath: null);
         await codec.EncodeAsync(decodedGameSeedPath, gameSavePath, originalBinaryPath: null);
         await codec.EncodeAsync(decodedTownSeedPath, townSavePath, originalBinaryPath: null);
@@ -83,6 +84,12 @@ internal static partial class ContractSuite
             "A DLC feature source must preserve its game-root virtual path prefix.");
 
 
+        RunContentDiscoveryContracts(activeContent, fixture);
+        RunManifestDiscoveryContracts(activeContent, fixture);
+        RunLocalizationPolicyContracts(activeContent, fixture);
+        RunLegacyLocalizationContracts(activeContent, fixture);
+        RunLocalizationEntryIsolationContracts(activeContent, fixture);
+        RunContentInventoryContracts(activeContent, fixture, repositoryRoot);
         var quantityState = await RunQuantityItemCatalogContractsAsync(
             activeContent,
             decodedSeedPath,

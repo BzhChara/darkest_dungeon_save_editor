@@ -45,7 +45,7 @@ public static partial class BattleEncounterCatalog
         if (source.Kind is "workshop" or "local")
         {
             var manifestPath = Path.Combine(source.Directory, "modfiles.txt");
-            if (File.Exists(manifestPath))
+            if (ModManifestFile.Exists(manifestPath))
             {
                 return EnumerateManifestMashFiles(
                     source,
@@ -55,18 +55,15 @@ public static partial class BattleEncounterCatalog
             }
         }
 
-        var dungeonDirectory = Path.Combine(source.Directory, "dungeons");
-        if (!Directory.Exists(dungeonDirectory))
-        {
-            return [];
-        }
-
         try
         {
-            return Directory.EnumerateFiles(
-                    dungeonDirectory,
-                    "*.mash.darkest",
-                    SearchOption.AllDirectories)
+            return ContentFileOverlay.GetFallbackContentRoots(
+                    source.Directory, source.Kind is "workshop" or "local" ? enabledDlcPrefixes : [])
+                .Select(root => Path.Combine(root, "dungeons"))
+                .Where(Directory.Exists)
+                .SelectMany(directory => Directory.EnumerateFiles(
+                    directory, "*.mash.darkest", SearchOption.AllDirectories))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
                 .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
                 .ToArray();
         }
@@ -87,13 +84,10 @@ public static partial class BattleEncounterCatalog
         var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         try
         {
-            foreach (var rawLine in File.ReadLines(manifestPath))
+            foreach (var entry in ModManifestFile.ReadEntries(manifestPath, ".mash.darkest"))
             {
-                var relativePath = ModManifestPath.Extract(rawLine, ".mash.darkest");
-                if (relativePath is null)
-                {
-                    continue;
-                }
+                var rawLine = entry.RawLine;
+                var relativePath = entry.RelativePath;
 
                 var path = Path.GetFullPath(Path.Combine(source.Directory, relativePath));
                 var relativeToRoot = Path.GetRelativePath(source.Directory, path);
@@ -234,7 +228,7 @@ public static partial class BattleEncounterCatalog
         if (source.Kind is "workshop" or "local")
         {
             var manifestPath = Path.Combine(source.Directory, "modfiles.txt");
-            if (File.Exists(manifestPath))
+            if (ModManifestFile.Exists(manifestPath))
             {
                 return EnumerateManifestMonsterInfoFiles(
                     source,
@@ -244,18 +238,15 @@ public static partial class BattleEncounterCatalog
             }
         }
 
-        var monsterDirectory = Path.Combine(source.Directory, "monsters");
-        if (!Directory.Exists(monsterDirectory))
-        {
-            return [];
-        }
-
         try
         {
-            return Directory.EnumerateFiles(
-                    monsterDirectory,
-                    "*.info.darkest",
-                    SearchOption.AllDirectories)
+            return ContentFileOverlay.GetFallbackContentRoots(
+                    source.Directory, source.Kind is "workshop" or "local" ? enabledDlcPrefixes : [])
+                .Select(root => Path.Combine(root, "monsters"))
+                .Where(Directory.Exists)
+                .SelectMany(directory => Directory.EnumerateFiles(
+                    directory, "*.info.darkest", SearchOption.AllDirectories))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
                 .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
                 .ToArray();
         }
@@ -276,13 +267,10 @@ public static partial class BattleEncounterCatalog
         var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         try
         {
-            foreach (var rawLine in File.ReadLines(manifestPath))
+            foreach (var entry in ModManifestFile.ReadEntries(manifestPath, ".info.darkest"))
             {
-                var relativePath = ModManifestPath.Extract(rawLine, ".info.darkest");
-                if (relativePath is null)
-                {
-                    continue;
-                }
+                var rawLine = entry.RawLine;
+                var relativePath = entry.RelativePath;
 
                 var path = Path.GetFullPath(Path.Combine(source.Directory, relativePath));
                 var relativeToRoot = Path.GetRelativePath(source.Directory, path);

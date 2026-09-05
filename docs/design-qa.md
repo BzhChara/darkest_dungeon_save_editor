@@ -100,6 +100,7 @@ The relevant assertions live in [UiContractTests.cs](../tests/DarkestDungeonSave
 - Item-filter and quirk checkboxes share fixed-size dark chrome, a clear checked mark, and visible disabled/keyboard-focus states without click scaling.
 - `自然怪癖范围` is rendered as `正面 n–m / 负面 n–m`, not the ambiguous `+1-2 -1-2` shorthand.
 - Hero generation status uses `游戏自然 / 编辑器手动`, `仅编辑器手动`, or `自然状态未知 / 编辑器手动`; an absent flag is not treated as proof of natural generation.
+- If no level passes the candidate-factory preflight, the hero instead shows `暂不可生成` and `不可生成`. Partial support lists only available levels; selecting a failed level disables preview and shows its actual failure in the existing warning area, without adding a new panel or weakening generation checks.
 
 ### 3.4 Application dialogs
 
@@ -147,4 +148,4 @@ Never adjust brightness, hue, or geometry solely from a screenshot that a chat c
 6. keyboard Tab focus, mouse hover, pressed state, row selection, and close/reopen behavior;
 7. XAML parsing, Release build, and the complete contract suite.
 
-There is no known title-animation blocker in this record. The native dark-red border and full-window charcoal texture have automated XAML coverage. The 2026-09-05 review also captured the current Release window through Windows Computer Use without changing desktop permissions. This is bounded visual evidence, not user acceptance at every DPI or a replacement for user-operated game testing.
+There is no known title-animation blocker in this record. The native dark-red border and full-window charcoal texture have automated XAML coverage. The 2026-09-05 review also captured the current Release window through Windows Computer Use without changing desktop permissions. This is bounded visual evidence, not user acceptance at every DPI or a replacement for game-level tests. Since 2026-09-06, the user prefers the assistant to operate authorized live tests through Computer Use; preserve each test's approved save target and mutation boundaries, and record observed evidence separately from user acceptance.

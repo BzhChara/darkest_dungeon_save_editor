@@ -83,19 +83,30 @@ public partial class MainWindow : Window
         public string Source => string.IsNullOrWhiteSpace(Definition.SourceLabel)
             ? Definition.Source
             : Definition.SourceLabel;
-        public string GenerationMode => Definition.Generation switch
-        {
-            null => "生成模板缺失",
-            { IsEnabled: true } => "游戏自然 / 编辑器手动",
-            { IsEnabled: false } => "仅编辑器手动",
-            _ => "自然状态未知 / 编辑器手动"
-        };
+        public string GenerationMode => !Definition.GenerationAvailability.Any(level => level.CanGenerate)
+            ? "暂不可生成"
+            : Definition.Generation switch
+            {
+                null => "生成模板缺失",
+                { IsEnabled: true } => "游戏自然 / 编辑器手动",
+                { IsEnabled: false } => "仅编辑器手动",
+                _ => "自然状态未知 / 编辑器手动"
+            };
         public bool HasProviderConflict => Definition.HasProviderConflict;
         public double? BaseHp => Definition.BaseHp;
-        public string LevelSummary => string.IsNullOrWhiteSpace(Definition.ProgressionUnsupportedReason)
-            ? $"0-{Math.Max(0, Definition.LevelProfiles.Count - 1)}级完整"
-            : $"仅可用 {string.Join(",", Definition.LevelProfiles.Select(profile => profile.ResolveLevel))}级：" +
-              Definition.ProgressionUnsupportedReason;
+        public string LevelSummary
+        {
+            get
+            {
+                var levels = Definition.GenerationAvailability.Where(level => level.CanGenerate)
+                    .Select(level => level.ResolveLevel).ToArray();
+                return levels.Length == 0
+                    ? "不可生成"
+                    : levels.Length == Definition.GenerationAvailability.Count
+                        ? $"0-{levels[^1]}级可生成"
+                        : $"可生成 {string.Join(",", levels)} 级";
+            }
+        }
         public int ColourVariationCount => Definition.ColourVariationCount;
         public string QuirkRange => Definition.Generation is not { } generation
             ? "未知"

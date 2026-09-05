@@ -29,37 +29,30 @@ public static partial class QuantityItemCatalog
         }
 
         var manifestPath = Path.Combine(source.Directory, "modfiles.txt");
-        if (!File.Exists(manifestPath))
+        if (!ModManifestFile.Exists(manifestPath))
         {
-            var inventoryRoot = Path.Combine(source.Directory, "inventory");
-            if (!Directory.Exists(inventoryRoot))
-            {
-                return [];
-            }
-
-            var files = Directory.EnumerateFiles(
-                    inventoryRoot,
-                    $"*{InventoryItemSuffix}",
-                    SearchOption.AllDirectories)
+            var files = ContentFileOverlay.GetFallbackContentRoots(source.Directory, enabledDlcPrefixes)
+                .Select(root => Path.Combine(root, "inventory"))
+                .Where(Directory.Exists)
+                .SelectMany(directory => Directory.EnumerateFiles(
+                    directory, $"*{InventoryItemSuffix}", SearchOption.AllDirectories))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
                 .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
                 .ToArray();
             if (files.Length > 0)
             {
                 issues.Add(
-                    $"Mod has no modfiles.txt; quantity-item scan used its standard inventory directory: {source.Directory}");
+                    $"Mod has no modfiles.txt; quantity-item scan used standard inventory directories including enabled DLC paths: {source.Directory}");
             }
 
             return files;
         }
 
         var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var rawLine in File.ReadLines(manifestPath))
+        foreach (var entry in ModManifestFile.ReadEntries(manifestPath, InventoryItemSuffix))
         {
-            var relativePath = ModManifestPath.Extract(rawLine, InventoryItemSuffix);
-            if (relativePath is null)
-            {
-                continue;
-            }
+            var rawLine = entry.RawLine;
+            var relativePath = entry.RelativePath;
 
             var path = Path.GetFullPath(Path.Combine(source.Directory, relativePath));
             var relativeToRoot = Path.GetRelativePath(source.Directory, path);

@@ -72,19 +72,15 @@ internal static partial class QuantityItemReferenceAnalyzer
         ref bool scanComplete)
     {
         var manifestPath = Path.Combine(source.Directory, "modfiles.txt");
-        if (source.Kind is not ("workshop" or "local") || !File.Exists(manifestPath))
+        if (source.Kind is not ("workshop" or "local") || !ModManifestFile.Exists(manifestPath))
         {
             return;
         }
 
         var reported = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var line in File.ReadLines(manifestPath))
+        foreach (var entry in ModManifestFile.ReadEntries(manifestPath, ".json", ".darkest", ".csv"))
         {
-            var relative = ModManifestPath.Extract(line, ".json", ".darkest", ".csv");
-            if (relative is null)
-            {
-                continue;
-            }
+            var relative = entry.RelativePath;
 
             var path = Path.GetFullPath(Path.Combine(source.Directory, relative));
             if (!IsInsideSource(source.Directory, path))
@@ -120,12 +116,10 @@ internal static partial class QuantityItemReferenceAnalyzer
 
         IEnumerable<string> paths;
         var manifestPath = Path.Combine(source.Directory, "modfiles.txt");
-        if ((source.Kind is "workshop" or "local") && File.Exists(manifestPath))
+        if ((source.Kind is "workshop" or "local") && ModManifestFile.Exists(manifestPath))
         {
-            paths = File.ReadLines(manifestPath)
-                .Select(line => ModManifestPath.Extract(line, ".json", ".darkest", ".csv"))
-                .Where(path => path is not null)
-                .Select(path => Path.GetFullPath(Path.Combine(source.Directory, path!)))
+            paths = ModManifestFile.ReadEntries(manifestPath, ".json", ".darkest", ".csv")
+                .Select(entry => Path.GetFullPath(Path.Combine(source.Directory, entry.RelativePath)))
                 .Where(path => IsInsideSource(source.Directory, path) && File.Exists(path))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToArray();
