@@ -19,7 +19,21 @@ public partial class MainWindow : Window
         public string Id => Definition.DisplayId;
         public string ChineseName => FormatLocalizedName(Definition.LocalizedName.Chinese);
         public string EnglishName => FormatLocalizedName(Definition.LocalizedName.English);
-        public string Storage => FormatItemStorage(Definition);
+        public string Location => FormatItemStorage(Definition.StorageKind);
+        public string InventoryType => Definition.InventoryType;
+        public string StackSummary => Definition.StorageKind != QuantityItemStorageKind.RaidInventory
+            ? "不适用"
+            : Definition.BaseStackLimit is > 0
+                ? "每格 " + Definition.BaseStackLimit.Value.ToString(CultureInfo.InvariantCulture)
+                : "未知";
+        public string ProvisionSummary => Definition.StorageKind != QuantityItemStorageKind.EstateItems
+            ? string.Empty
+            : Definition.EstateCanBeProvision switch
+            {
+                true => "配给：可手动配给",
+                false => "配给：不可手动配给",
+                null => "配给：未声明"
+            };
         public int CurrentAmount => Definition.CurrentAmount;
         public string Source
         {

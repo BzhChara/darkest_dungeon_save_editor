@@ -155,11 +155,9 @@ internal static partial class ContractSuite
             mainWindowCode.Contains("有招募事件的人物", StringComparison.Ordinal) &&
             mainWindowCode.Contains("有后续玩法怪癖线索的人物", StringComparison.Ordinal),
             "The crowded top catalog summary must be removed; the runtime log must retain current scene, visible/hidden item, raid-slot, trinket, hero, quirk, name, level, and runtime-signal diagnostics.");
-        var generationModeColumn = mainWindowXaml
-            .Descendants(presentationNamespace + "DataGridTextColumn")
-            .Single(column => column.Attribute("Header")?.Value == "生成方式");
         Assert(
-            generationModeColumn.Attribute("Binding")?.Value == "{Binding GenerationMode}" &&
+            mainWindowXaml.Descendants(presentationNamespace + "Run")
+                .Any(run => run.Attribute("Text")?.Value == "{Binding GenerationMode, Mode=OneWay}") &&
             !mainWindowXaml.Descendants(presentationNamespace + "DataGridCheckBoxColumn").Any() &&
             mainWindowCode.Contains("{ IsEnabled: true } => \"游戏自然 / 编辑器手动\"", StringComparison.Ordinal) &&
             mainWindowCode.Contains("{ IsEnabled: false } => \"仅编辑器手动\"", StringComparison.Ordinal) &&
@@ -193,11 +191,9 @@ internal static partial class ContractSuite
         Assert(
             pathTextBoxes[1].Attribute("ToolTip")?.Value.Contains("点击自动发现后按 Steam 库默认路径填写", StringComparison.Ordinal) == true,
             "The Workshop directory must communicate that the button derives its Steam library path.");
-        var trinketLimitColumn = mainWindowXaml
-            .Descendants(presentationNamespace + "DataGridTextColumn")
-            .Single(column => column.Attribute("Header")?.Value == "定义上限");
         Assert(
-            trinketLimitColumn.Attribute("Binding")?.Value == "{Binding LimitDisplay}" &&
+            mainWindowXaml.Descendants(presentationNamespace + "Run")
+                .Any(run => run.Attribute("Text")?.Value == "{Binding LimitDisplay, Mode=OneWay}") &&
             mainWindowCode.Contains("0 => \"无限\"", StringComparison.Ordinal) &&
             mainWindowCode.Contains("PreviewWarningTextBlock", StringComparison.Ordinal),
             "The trinket UI must render limit zero as unlimited and expose a dedicated preview warning area.");
@@ -251,9 +247,6 @@ internal static partial class ContractSuite
                               element.Name == presentationNamespace + "DataGridCheckBoxColumn")
             .Select(element => element.Attribute("Header")?.Value)
             .ToArray();
-        var heroQuirkRangeColumn = heroGridElement
-            .Descendants(presentationNamespace + "DataGridTextColumn")
-            .Single(column => column.Attribute("Header")?.Value == "自然怪癖范围");
         var itemEnglishColumn = itemGridElement
             .Descendants(presentationNamespace + "DataGridTextColumn")
             .Single(column => column.Attribute("Header")?.Value == "English");
@@ -262,16 +255,16 @@ internal static partial class ContractSuite
             .Single(column => column.Attribute("Header")?.Value == "来源");
         Assert(
                 itemColumnHeaders.SequenceEqual(
-                    new[] { "物品 ID", "中文名", "English", "位置 / 类型 / 堆叠", "当前数量", "来源" },
+                    new[] { "物品 ID", "中文名", "English", "当前数量", "来源" },
                     StringComparer.Ordinal) &&
             trinketColumnHeaders.SequenceEqual(
-                new[] { "饰品 ID", "中文名", "English", "稀有度", "来源", "定义上限" },
+                new[] { "饰品 ID", "中文名", "English", "来源" },
                 StringComparer.Ordinal) &&
             heroColumnHeaders.SequenceEqual(
-                new[] { "职业 ID", "中文名", "English", "来源", "生成方式", "等级范围", "自然怪癖范围" },
+                new[] { "职业 ID", "中文名", "English", "来源", "等级范围" },
                 StringComparer.Ordinal) &&
-            heroQuirkRangeColumn.Attribute("Width")?.Value == "1.75*" &&
-            heroQuirkRangeColumn.Attribute("MinWidth")?.Value == "170" &&
+            heroSourceColumn.Attribute("Width")?.Value == "2*" &&
+            heroSourceColumn.Attribute("MinWidth")?.Value == "180" &&
             itemEnglishColumn.Attribute("CellStyle") is null &&
             itemEnglishColumn.Attribute("HeaderStyle") is null &&
             heroSourceColumn.Attribute("CellStyle") is null &&
@@ -1095,7 +1088,7 @@ internal static partial class ContractSuite
             "InitialQuirkSelectionDialog.xaml.cs"));
         var initialQuirkOpenPanels = initialQuirkDialogXaml
             .Descendants(presentationNamespace + "ContentControl")
-            .Where(control => control.Attribute("Content")?.Value is "写入规则" or "怪癖目录")
+            .Where(control => control.Attribute("Content")?.Value == "怪癖目录")
             .Select(control => control.Ancestors(presentationNamespace + "Border").First())
             .ToArray();
         Assert(
@@ -1109,10 +1102,10 @@ internal static partial class ContractSuite
             mainWindowXaml.Descendants(presentationNamespace + "ContentControl")
                 .Count(element => element.Attribute("Style")?.Value.Contains("PanelHeaderStyle", StringComparison.Ordinal) == true) >= 3 &&
             initialQuirkDialogXaml.Descendants(presentationNamespace + "ContentControl")
-                .Count(element => element.Attribute("Style")?.Value.Contains("PanelHeaderStyle", StringComparison.Ordinal) == true) >= 2 &&
+                .Count(element => element.Attribute("Style")?.Value.Contains("PanelHeaderStyle", StringComparison.Ordinal) == true) >= 1 &&
             initialQuirkDialogXaml.Descendants(presentationNamespace + "Border")
-                .Count(border => border.Attribute("Style")?.Value == "{StaticResource OpenPanelStyle}") >= 2 &&
-            initialQuirkOpenPanels.Length == 2 &&
+                .Count(border => border.Attribute("Style")?.Value == "{StaticResource OpenPanelStyle}") >= 1 &&
+            initialQuirkOpenPanels.Length == 1 &&
             initialQuirkOpenPanels.All(border => border.Attribute("BorderThickness")?.Value == "0") &&
             !initialQuirkDialogXaml.Descendants(presentationNamespace + "Border")
                 .Any(border => border.Attribute("Background")?.Value == "#9A211E" &&
@@ -1203,9 +1196,6 @@ internal static partial class ContractSuite
                 .Single(column => column.Attribute("Header")?.Value == "限制 / 不可用原因")
                 .Attribute("MinWidth")?.Value == "190" &&
             !initialQuirkDialogXaml.ToString().Contains("职业禁用项", StringComparison.Ordinal) &&
-            initialQuirkDialogXaml.ToString().Contains(
-                "roster_limit 由游戏在招募进入 roster 时执行，生成马车候选不检查也不警告",
-                StringComparison.Ordinal) &&
             !initialQuirkDialogCode.Contains("selectedIds.Append(row.Id)", StringComparison.Ordinal) &&
             initialQuirkDialogCode.Contains("IncompatibleQuirkIds.Contains", StringComparison.Ordinal) &&
             initialQuirkDialogCode.Contains(
@@ -1266,6 +1256,6 @@ internal static partial class ContractSuite
                 StringComparison.Ordinal),
             "Quirk filtering must use stable catalog fields only; selecting an incompatible quirk must not make its counterpart appear merely because the dynamic unavailable reason names the query quirk.");
 
-        var jarPath = Path.Combine(repositoryRoot, "tools", "DDSaveEditor", "DDSaveEditor.jar");
+        RunUiLayoutContracts(repositoryRoot);
     }
 }
