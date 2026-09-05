@@ -21,7 +21,7 @@ internal static partial class QuantityItemReferenceAnalyzer
     private static bool MayContainTownReachabilityOverride(string relativePath)
     {
         // JSON roots outside the town directories can still contain currency_cost,
-        // event_cost, currencies, or explicit estate/wallet inventory targets. If such
+        // event_cost, completion rewards, currencies, or explicit estate/wallet inventory targets. If such
         // a file cannot be inspected, fail open instead of hiding town-side definitions.
         return Path.GetExtension(relativePath).Equals(".json", StringComparison.OrdinalIgnoreCase);
     }
@@ -57,9 +57,17 @@ internal static partial class QuantityItemReferenceAnalyzer
     {
         if (parentProperty.Equals("currency_cost", StringComparison.OrdinalIgnoreCase) ||
             parentProperty.Equals("currencies", StringComparison.OrdinalIgnoreCase) ||
-            parentProperty.Equals("quest_fail_keep_rates", StringComparison.OrdinalIgnoreCase))
+            parentProperty.Equals("quest_fail_keep_rates", StringComparison.OrdinalIgnoreCase) ||
+            parentProperty.Equals("completion_reward", StringComparison.OrdinalIgnoreCase) ||
+            ReadString(node, "system_config_type").Equals("quest_rewards", StringComparison.OrdinalIgnoreCase))
         {
             return ReferenceReachability.TownOnly;
+        }
+
+        if (parentProperty.Equals("additional_provisions", StringComparison.OrdinalIgnoreCase) ||
+            ReadString(node, "system_config_type").Equals("quest_provision", StringComparison.OrdinalIgnoreCase))
+        {
+            return ReferenceReachability.RaidCapable;
         }
 
         var type = ReadString(node, "type");

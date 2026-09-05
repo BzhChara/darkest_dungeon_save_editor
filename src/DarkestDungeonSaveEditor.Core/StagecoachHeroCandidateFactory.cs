@@ -134,7 +134,7 @@ public static partial class StagecoachHeroCandidateFactory
                 quirk,
                 ResolveEvolutionDuration(seed, quirk)))
             .ToArray();
-        var upgradePurchases = BuildUpgradePurchases(heroClass, levelProfile.ResolveLevel);
+        var upgradePurchases = BuildUpgradePurchases(heroClass, levelProfile.ResolveLevel, warnings);
 
         var evolvingQuirkSummaries = initialQuirkStates
             .Where(state => state.Definition.Evolution is not null)

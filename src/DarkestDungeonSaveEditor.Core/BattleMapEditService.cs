@@ -388,7 +388,7 @@ public sealed class BattleMapEditService
         ValidateCapturedPair(mapPath, raidPath, mapSourceCopy, raidSourceCopy, mapHash, raidHash);
         if (encounter is not null)
         {
-            BattleEncounterCatalog.ValidateGuard(encounter.TableGuard);
+            BattleEncounterCatalog.ValidateDirectEncounter(encounter);
         }
         if (attachment is not null)
         {
@@ -492,7 +492,7 @@ public sealed class BattleMapEditService
                 throw new InvalidDataException("遭遇写入会话缺少已验证的遭遇定义。");
             }
 
-            BattleEncounterCatalog.ValidateGuard(prepared.Encounter.TableGuard);
+            BattleEncounterCatalog.ValidateDirectEncounter(prepared.Encounter);
         }
         else if (prepared.Encounter is not null)
         {

@@ -1369,7 +1369,9 @@ internal static partial class ContractSuite
     combat_skill: .id "scaling_strike" .level 0
     combat_skill: .id "scaling_strike" .level 1
     combat_skill: .id "fixed_command" .level 0
-    skill_selection: .can_select_combat_skills false .number_of_selected_combat_skills_max 2
+    combat_skill: .id "implicit_command" .level 0
+    combat_skill: .id "implicit_command" .level 1
+    skill_selection: .can_select_combat_skills true .number_of_selected_combat_skills_max 1
     generation: .is_generation_enabled true .number_of_positive_quirks_min 0 .number_of_positive_quirks_max 0 .number_of_negative_quirks_min 0 .number_of_negative_quirks_max 0 .number_of_random_combat_skills 2
     """,
             new UTF8Encoding(false));

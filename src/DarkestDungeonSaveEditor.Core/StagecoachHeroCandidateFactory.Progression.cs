@@ -7,7 +7,8 @@ public static partial class StagecoachHeroCandidateFactory
 {
     internal static IReadOnlyList<HeroUpgradePurchase> BuildUpgradePurchases(
         HeroClassDefinition heroClass,
-        int resolveLevel)
+        int resolveLevel,
+        List<string>? warnings = null)
     {
         var combatTrees = heroClass.UpgradeTrees
             .Where(tree => tree.Kind == HeroUpgradeTreeKind.CombatSkill)
@@ -16,24 +17,11 @@ public static partial class StagecoachHeroCandidateFactory
             .Select(skillId => $"{heroClass.Id}.{skillId}")
             .Distinct(StringComparer.Ordinal)
             .ToArray();
-        var singleLevelCombatTreeIds = heroClass.SingleLevelCombatSkillIds
-            .Select(skillId => $"{heroClass.Id}.{skillId}")
-            .ToHashSet(StringComparer.Ordinal);
+        // Selection rules control equipped skills, not the purchase-based level lookup.
+        // Every tree-less skill uses the same bounded implicit progression policy.
         var syntheticCombatTreeIds = expectedCombatTreeIds
-            .Where(treeId => !combatTrees.ContainsKey(treeId) &&
-                             singleLevelCombatTreeIds.Contains(treeId))
+            .Where(treeId => !combatTrees.ContainsKey(treeId))
             .ToArray();
-        var missingCombatTreeIds = expectedCombatTreeIds
-            .Where(treeId => !combatTrees.ContainsKey(treeId) &&
-                             !singleLevelCombatTreeIds.Contains(treeId))
-            .ToArray();
-        if (missingCombatTreeIds.Length > 0)
-        {
-            throw new InvalidOperationException(
-                $"职业 '{heroClass.Id}' 的活动 upgrade 模板缺少战斗技能升级树：" +
-                $"{string.Join(", ", missingCombatTreeIds)}；" +
-                $"不能安全生成 {resolveLevel} 级全技能解锁人物。");
-        }
 
         var unavailableCombatTreeIds = expectedCombatTreeIds
             .Where(combatTrees.ContainsKey)
@@ -53,7 +41,7 @@ public static partial class StagecoachHeroCandidateFactory
                 .Where(combatTrees.ContainsKey)
                 .Select(treeId => combatTrees[treeId]));
         var syntheticCombatPurchases = syntheticCombatTreeIds
-            .Select(treeId => new HeroUpgradePurchase(treeId, "0"));
+            .SelectMany(treeId => BuildImplicitCombatPurchases(heroClass, treeId, resolveLevel, warnings));
         var campingPurchases = heroClass.SharedCampingSkillIds
             .Concat(heroClass.ClassCampingSkillIds)
             .Distinct(StringComparer.Ordinal)

@@ -484,6 +484,10 @@ internal static partial class ContractSuite
         CreateBattleMonsterDefinitions(
             encounterGameRoot,
             [
+                "brigand_cutthroat_B",
+                "cultist_brawler_B",
+                "pelagic_grouper_B",
+                "pelagic_shaman_B",
                 "siren_B",
                 "drowned_crew_anchor_B",
                 "collector_B",
@@ -741,6 +745,8 @@ internal static partial class ContractSuite
         var encounterCatalog = BattleEncounterCatalog.Load(
             encounterContent,
             snapshotAfterGuardedTreasureDelete);
+        VerifyDirectEncounterDependencyContracts(encounterContent, snapshotAfterGuardedTreasureDelete, standardEncounterPath);
+        VerifyEncounterSelectionContracts(encounterCatalog);
         var directHallEncounters = encounterCatalog.DirectEncounters
             .Where(encounter => encounter.MashType == 0)
             .ToArray();
@@ -1092,6 +1098,8 @@ internal static partial class ContractSuite
             preparedBattlePlacement.Encounter?.MonsterIds.SequenceEqual(["shambler_B"]) == true &&
             preparedBattlePlacement.TargetFile.FileName == "persist.map.json",
             "A proven current-table battle must prepare only the selected map tile for replacement.");
+        await VerifyPendingEncounterDependencyContractAsync(battleEditService, preparedBattlePlacement,
+            Path.Combine(encounterGameRoot, "monsters", "shambler_B", "shambler_B.info.darkest"));
         _ = await battleEditService.CommitAsync(preparedBattlePlacement);
         var snapshotAfterBattlePlacement = await new BattleMapSnapshotReader(codec)
             .LoadAsync(battleMapProfileRoot);
@@ -1388,7 +1396,7 @@ internal static partial class ContractSuite
 
         File.AppendAllText(
             standardEncounterPath,
-            "hall: .chance 1 .types changed_after_selection_B\n",
+            "\nhall: .chance 1 .types changed_after_selection_B\n",
             new UTF8Encoding(false));
         var rejectedChangedEncounterTable = false;
         try

@@ -136,7 +136,7 @@ internal static partial class ContractSuite
             compatibleUpgradeHero.SingleLevelCombatSkillIds.SequenceEqual(["fixed_command"]) &&
             heroCatalog.Issues.All(issue =>
                 !issue.Contains("Hero upgrade 'compatible_upgrade_hero'", StringComparison.Ordinal)),
-            "A unique same-priority upgrade template compatible with the active hero skill ids should win, while a truly level-zero-only skill remains explicit.");
+            "A selectable class with an implicit multilevel skill must still resolve a uniquely compatible upgrade template, preserving exact ID ranking and the single-level distinction.");
         var compatibleLevelZeroCandidate = StagecoachHeroCandidateFactory.Generate(
             heroCatalog,
             compatibleUpgradeHero,
@@ -144,12 +144,20 @@ internal static partial class ContractSuite
             resolveLevel: 0,
             selectedInitialQuirkIds: []);
         Assert(
-            compatibleLevelZeroCandidate.UpgradePurchases.Count == 2 &&
+            compatibleLevelZeroCandidate.UpgradePurchases.Count == 3 &&
+            compatibleLevelZeroCandidate.Preview.CombatSkills.Count == 1 &&
             compatibleLevelZeroCandidate.UpgradePurchases.Contains(
                 new HeroUpgradePurchase("compatible_upgrade_hero.scaling_strike", "0")) &&
             compatibleLevelZeroCandidate.UpgradePurchases.Contains(
-                new HeroUpgradePurchase("compatible_upgrade_hero.fixed_command", "0")),
-            "A level-zero-only combat skill omitted from the upgrade JSON should receive the proven code-0 purchase without weakening multilevel missing-tree validation.");
+                new HeroUpgradePurchase("compatible_upgrade_hero.fixed_command", "0")) &&
+            compatibleLevelZeroCandidate.UpgradePurchases.Contains(
+                new HeroUpgradePurchase("compatible_upgrade_hero.implicit_command", "0")),
+            "Single- and multilevel tree-less skills must receive base unlocks independently of the selected skill limit.");
+        var compatibleHighLevelCandidate = StagecoachHeroCandidateFactory.Generate(heroCatalog, compatibleUpgradeHero, 1729, 6, []);
+        Assert(compatibleUpgradeHero.GenerationAvailability.All(level => level.CanGenerate) &&
+               compatibleHighLevelCandidate.UpgradePurchases.Where(purchase => purchase.TreeId == "compatible_upgrade_hero.implicit_command")
+                   .Select(purchase => purchase.RequirementCode).SequenceEqual(["0", "1"]),
+            "Real catalog resolution, availability, and generation must agree on selectable tree-less skill progression.");
         Assert(localHero.ColourVariationCount == 2, "Only the continuous A/B skin directories should be available for random colour selection.");
         Assert(localHero.ClassCampingSkillIds.Count == 2 && localHero.SharedCampingSkillIds.Count == 2, "Class and shared camping skills were not separated by the camping configuration.");
         Assert(localHero.IncompatibleInitialQuirkIds.Contains("excluded_quirk"), "Class-level incompatible initial quirks were not parsed.");

@@ -240,16 +240,26 @@ public static partial class BattleEncounterCatalog
             encounters[index] = LocalizeEncounter(
                 ClassifyWithOrigin(encounters[index]),
                 localization);
+            var missingIds = GetMissingMonsterIds(encounters[index], availableMonsters.Ids);
+            if (encounters[index].CanPlaceDirectly && missingIds.Length > 0)
+            {
+                // Keep the native row and its index: removing it would renumber valid rows.
+                encounters[index] = encounters[index] with
+                {
+                    CanPlaceDirectly = false,
+                    UnavailableReason = "缺少当前活动敌方定义：" + string.Join(", ", missingIds)
+                };
+                issues.Add(
+                    $"Unavailable direct encounter at {encounters[index].SourcePath}:{encounters[index].SourceLine} " +
+                    $"(index {encounters[index].MashIndex} preserved): " + string.Join(", ", missingIds));
+            }
         }
 
         var unresolvedBridgeRows = bridgeCandidateRows
             .Select(encounter => new
             {
                 Encounter = encounter,
-                MissingIds = encounter.MonsterIds
-                    .Where(monsterId => !availableMonsters.Ids.Contains(monsterId))
-                    .Distinct(StringComparer.OrdinalIgnoreCase)
-                    .ToArray()
+                MissingIds = GetMissingMonsterIds(encounter, availableMonsters.Ids)
             })
             .Where(item => item.MissingIds.Length > 0)
             .ToArray();
@@ -375,6 +385,7 @@ public static partial class BattleEncounterCatalog
             throw new InvalidOperationException(
                 "所选遭遇的索引、组成或来源与当前有效表不一致，请重新加载内容目录。");
         }
+        ValidateMonsterDefinitions(encounter);
     }
 
     public static void ValidateSpecialEncounter(BattleEncounterDefinition encounter)
@@ -415,21 +426,8 @@ public static partial class BattleEncounterCatalog
         }
 
         ValidateGuard(encounter.TableGuard);
+        ValidateMonsterDefinitions(encounter);
         var issues = new List<string>();
-        var availableMonsters = ResolveAvailableMonsterDefinitions(
-            encounter.TableGuard.ActiveSources,
-            issues);
-        var missingMonsterIds = encounter.MonsterIds
-            .Where(monsterId => !availableMonsters.Ids.Contains(monsterId))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToArray();
-        if (missingMonsterIds.Length > 0)
-        {
-            throw new InvalidOperationException(
-                "所选遭遇引用了当前启用内容中不存在的敌方定义：" +
-                string.Join(", ", missingMonsterIds));
-        }
-
         var matchingFile = ResolveGlobalEffectiveMashFiles(
                 encounter.TableGuard.ActiveSources,
                 issues)
@@ -456,6 +454,24 @@ public static partial class BattleEncounterCatalog
         {
             throw new InvalidOperationException(
                 "所选遭遇已变化、消失或存在歧义，请重新加载内容目录。");
+        }
+    }
+
+    private static string[] GetMissingMonsterIds(
+        BattleEncounterDefinition encounter,
+        IReadOnlySet<string> availableIds) => encounter.MonsterIds
+        .Where(monsterId => !availableIds.Contains(monsterId))
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .ToArray();
+
+    private static void ValidateMonsterDefinitions(BattleEncounterDefinition encounter)
+    {
+        var availableMonsters = ResolveAvailableMonsterDefinitions(encounter.TableGuard.ActiveSources, []);
+        var missingIds = GetMissingMonsterIds(encounter, availableMonsters.Ids);
+        if (missingIds.Length > 0)
+        {
+            throw new InvalidOperationException(
+                "所选遭遇引用了当前启用内容中不存在的敌方定义：" + string.Join(", ", missingIds));
         }
     }
 

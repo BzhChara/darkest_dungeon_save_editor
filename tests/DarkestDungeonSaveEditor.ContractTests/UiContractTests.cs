@@ -795,6 +795,7 @@ internal static partial class ContractSuite
             battleMapCode.Contains("BattleEncounterClassification.RoamingEncounter", StringComparison.Ordinal) &&
             battleMapCode.Contains("BattleEncounterClassification.ConditionalOrAdditional", StringComparison.Ordinal) &&
             battleMapCode.Contains("CreateEncounterPickerItem", StringComparison.Ordinal) &&
+            battleMapCode.Contains("BattleEncounterCatalog.GetSelectionCandidates", StringComparison.Ordinal) &&
             battleMapCode.Contains("FindDirectlyAddressableEncounter", StringComparison.Ordinal) &&
             !battleMapCode.Contains("生成 Encounter Bridge", StringComparison.Ordinal) &&
             battleMapCode.Contains("BridgeEncounters", StringComparison.Ordinal) &&
@@ -901,7 +902,7 @@ internal static partial class ContractSuite
             battleMapEditServiceCode.Contains("ValidateLivePair", StringComparison.Ordinal) &&
             battleMapEditServiceCode.Contains("CreateBackup", StringComparison.Ordinal) &&
             battleMapEditServiceCode.Contains("RestoreTarget", StringComparison.Ordinal) &&
-            battleMapEditServiceCode.Contains("BattleEncounterCatalog.ValidateGuard", StringComparison.Ordinal) &&
+            battleMapEditServiceCode.Contains("BattleEncounterCatalog.ValidateDirectEncounter", StringComparison.Ordinal) &&
             forceTownSaveServiceCode.Contains("baseRoot[\"inraid\"] = false", StringComparison.Ordinal) &&
             forceTownSaveServiceCode.Contains("baseRoot[\"raiddungeon\"] = \"none\"", StringComparison.Ordinal) &&
             forceTownSaveServiceCode.Contains("ValidateLiveState", StringComparison.Ordinal) &&
