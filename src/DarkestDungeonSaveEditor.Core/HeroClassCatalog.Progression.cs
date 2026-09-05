@@ -76,13 +76,7 @@ public static partial class HeroClassCatalog
         IReadOnlyList<HeroUpgradeDefinition> candidates)
     {
         var expectedTreeIds = hero.CombatSkillIds
-            .ToDictionary(
-                skillId => $"{hero.Id}.{skillId}",
-                skillId => skillId,
-                StringComparer.Ordinal);
-        var singleLevelSkillIds = hero.CombatSkillLevels
-            .Where(pair => pair.Value.Count == 1 && pair.Value[0] == 0)
-            .Select(pair => pair.Key)
+            .Select(skillId => $"{hero.Id}.{skillId}")
             .ToHashSet(StringComparer.Ordinal);
         var ranked = candidates
             .Select(candidate =>
@@ -91,10 +85,6 @@ public static partial class HeroClassCatalog
                     .Where(tree => tree.Kind == HeroUpgradeTreeKind.CombatSkill)
                     .Select(tree => tree.Id)
                     .ToHashSet(StringComparer.Ordinal);
-                var unsupportedMissing = expectedTreeIds
-                    .Where(pair => !combatTreeIds.Contains(pair.Key) &&
-                                   !singleLevelSkillIds.Contains(pair.Value))
-                    .Count();
                 var equipmentFailures =
                     (string.IsNullOrWhiteSpace(BuildEquipmentProgression(
                         "weapon",
@@ -108,9 +98,9 @@ public static partial class HeroClassCatalog
                         requireHp: true).UnsupportedReason) ? 0 : 1);
                 return new HeroUpgradeCompatibility(
                     candidate,
-                    equipmentFailures + unsupportedMissing,
-                    expectedTreeIds.Keys.Count(combatTreeIds.Contains),
-                    combatTreeIds.Count(treeId => !expectedTreeIds.ContainsKey(treeId)));
+                    equipmentFailures,
+                    expectedTreeIds.Count(combatTreeIds.Contains),
+                    combatTreeIds.Count(treeId => !expectedTreeIds.Contains(treeId)));
             })
             .OrderBy(item => item.HardFailureCount)
             .ThenByDescending(item => item.MatchedCombatTreeCount)

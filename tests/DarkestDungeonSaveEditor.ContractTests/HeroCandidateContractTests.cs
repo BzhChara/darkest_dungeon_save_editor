@@ -56,11 +56,10 @@ internal static partial class ContractSuite
                 .Where(tree => tree.Id != "local_hero.local_skill_two")
                 .ToArray()
         };
-        AssertHeroLevelGenerationRejected(
-            heroCatalog,
-            partialCombatUpgradeHero,
-            0,
-            "local_hero.local_skill_two");
+        var partialCombatCandidate = StagecoachHeroCandidateFactory.Generate(heroCatalog, partialCombatUpgradeHero, 1729, 0, []);
+        Assert(partialCombatCandidate.UpgradePurchases.Contains(new HeroUpgradePurchase("local_hero.local_skill_two", "0")) &&
+               partialCombatCandidate.Preview.Warnings.Any(warning => warning.Contains("仅做基础解锁", StringComparison.Ordinal)),
+            "A selectable missing-tree skill must receive a base unlock and explain why no valid numeric reference could establish higher tiers.");
 
         var emptyCombatUpgradeHero = localHero with
         {

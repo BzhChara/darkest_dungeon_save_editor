@@ -265,7 +265,7 @@ public partial class BattleMapView : UserControl
         params BattleEncounterClassification[] classifications)
     {
         var candidates = GetEncounterPickerCandidates(cell, classifications);
-        if (candidates.Length == 0)
+        if (candidates.Count == 0)
         {
             var unavailable = CreateMenuItem($"{label}（0）", icon);
             unavailable.IsEnabled = false;
@@ -277,12 +277,12 @@ public partial class BattleMapView : UserControl
             ? "房间"
             : cell.Kind == PrototypeCellKind.Room ? "房间" : "走廊";
         return CreateAsyncActionMenuItem(
-            $"{label}（{candidates.Length}）",
+            $"{label}（{candidates.Count}）",
             icon,
             () => SelectAndPlaceEncounterAsync(cell, candidates, $"选择{targetLabel}{label}"));
     }
 
-    private BattleEncounterDefinition[] GetEncounterPickerCandidates(
+    private IReadOnlyList<BattleEncounterDefinition> GetEncounterPickerCandidates(
         PrototypeMapCell cell,
         IReadOnlyCollection<BattleEncounterClassification> classifications)
     {
@@ -294,68 +294,10 @@ public partial class BattleMapView : UserControl
 
         var fixedBossOnly = classifications.Count == 1 &&
                             classifications.Contains(BattleEncounterClassification.FixedBoss);
-        var ordinaryOnly = classifications.Count == 1 &&
-                           classifications.Contains(BattleEncounterClassification.Ordinary);
         var mashType = fixedBossOnly
             ? 2
             : GetOrdinaryMashType(cell);
-        var directCandidates = catalog.DirectEncounters.Where(encounter =>
-            encounter.HasKnownClassification && encounter.MashType == mashType &&
-            (fixedBossOnly
-                ? encounter.Classification == BattleEncounterClassification.FixedBoss
-                : ordinaryOnly
-                    ? encounter.Classification == BattleEncounterClassification.Ordinary
-                    : encounter.Weight is <= 0));
-        return directCandidates
-            .Concat(catalog.BridgeEncounters.Where(encounter => encounter.MashType == mashType))
-            .GroupBy(
-                encounter => $"{encounter.MashType}\n{string.Join('\n', encounter.MonsterIds)}",
-                StringComparer.Ordinal)
-            .Select(group =>
-            {
-                var resolvedClassification = ResolveEncounterClassification(group);
-                var encounter = group
-                    .Where(candidate => candidate.Classification == resolvedClassification)
-                    .OrderBy(encounter => encounter.CanPlaceDirectly)
-                    .ThenByDescending(encounter => !string.IsNullOrWhiteSpace(encounter.RoamingId))
-                    .ThenBy(encounter => encounter.SourceKind)
-                    .First();
-                return new
-                {
-                    Classification = resolvedClassification,
-                    Encounter = encounter
-                };
-            })
-            .Where(candidate => classifications.Contains(candidate.Classification))
-            .Select(candidate => candidate.Encounter)
-            .OrderBy(encounter => encounter.OriginDungeonId, StringComparer.OrdinalIgnoreCase)
-            .ThenBy(encounter => encounter.OriginDifficulty)
-            .ThenBy(encounter => encounter.SourceKind)
-            .ThenBy(encounter => encounter.DisplayName, StringComparer.OrdinalIgnoreCase)
-            .ToArray();
-    }
-
-    private static BattleEncounterClassification ResolveEncounterClassification(
-        IEnumerable<BattleEncounterDefinition> encounters)
-    {
-        var classifications = encounters
-            .Select(encounter => encounter.Classification)
-            .ToHashSet();
-        foreach (var classification in new[]
-                 {
-                     BattleEncounterClassification.FixedBoss,
-                     BattleEncounterClassification.RoamingBoss,
-                     BattleEncounterClassification.RoamingEncounter,
-                     BattleEncounterClassification.ConditionalOrAdditional
-                 })
-        {
-            if (classifications.Contains(classification))
-            {
-                return classification;
-            }
-        }
-
-        return BattleEncounterClassification.Ordinary;
+        return BattleEncounterCatalog.GetSelectionCandidates(catalog, mashType, classifications);
     }
 
     private static BattleEncounterDefinition? FindDirectlyAddressableEncounter(

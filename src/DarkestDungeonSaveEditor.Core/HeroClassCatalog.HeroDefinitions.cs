@@ -129,7 +129,13 @@ public static partial class HeroClassCatalog
             recruitEvents,
             runtimeQuirks,
             false,
-            sources);
+            sources)
+        {
+            CombatSkillLevels = selected.CombatSkillLevels.ToDictionary(
+                pair => pair.Key,
+                pair => (IReadOnlyList<int>)pair.Value.ToArray(),
+                StringComparer.Ordinal)
+        };
     }
 
     private static HeroCandidate ApplyHeroOverrides(

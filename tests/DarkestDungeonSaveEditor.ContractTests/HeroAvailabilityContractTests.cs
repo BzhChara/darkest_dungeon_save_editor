@@ -26,9 +26,22 @@ internal static partial class ContractSuite
         {
             UpgradeTrees = hero.UpgradeTrees.Where(tree => tree.Id != "local_hero.local_skill_two").ToArray()
         };
-        Assert(StagecoachHeroCandidateFactory.GetGenerationAvailability(catalog, missingCombatTree)
-                .All(level => !level.CanGenerate && level.UnavailableReason.Contains("local_hero.local_skill_two", StringComparison.Ordinal)),
-            "A missing multilevel skill tree must be reported before attempting a preview at every level.");
+        foreach (var selectability in new bool?[] { false, true, null })
+        {
+            var implicitSkillHero = missingCombatTree with { CanSelectCombatSkills = selectability, SelectedCombatSkillsMax = 1 };
+            Assert(StagecoachHeroCandidateFactory.GetGenerationAvailability(catalog, implicitSkillHero).All(level => level.CanGenerate),
+                "Missing multilevel trees must use the same implicit policy regardless of skill selectability.");
+            foreach (var level in hero.LevelProfiles)
+            {
+                var generated = StagecoachHeroCandidateFactory.Generate(catalog, implicitSkillHero, 1729, level.ResolveLevel, []);
+                Assert(generated.UpgradePurchases.Where(purchase => purchase.TreeId == "local_hero.local_skill_two")
+                           .Select(purchase => purchase.RequirementCode).SequenceEqual(["0"]) &&
+                       generated.Preview.CombatSkills.Count == (selectability == false ? hero.CombatSkillIds.Count : 1) &&
+                       generated.Preview.WeaponRank == level.WeaponRank && generated.Preview.ArmourRank == level.ArmourRank &&
+                       generated.Preview.Warnings.Any(warning => warning.Contains("仅做基础解锁", StringComparison.Ordinal)),
+                    "A missing numeric reference schedule must retain a visible base-only unlock without changing selection or equipment progression.");
+            }
+        }
         var missingCamping = hero with { ClassCampingSkillIds = [] };
         Assert(StagecoachHeroCandidateFactory.GetGenerationAvailability(catalog, missingCamping)
                 .All(level => !level.CanGenerate && level.UnavailableReason.Contains("职业露营技能", StringComparison.Ordinal)),

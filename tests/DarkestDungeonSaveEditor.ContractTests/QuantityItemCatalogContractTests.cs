@@ -22,6 +22,7 @@ internal static partial class ContractSuite
         string decodedGameSeedPath,
         string activeWorkshopDistrictRoot)
     {
+        VerifyQuestItemReachabilityContracts(activeContent, runRoot);
         var quantityEstateRoot = JsonNode.Parse(File.ReadAllText(decodedSeedPath)) as JsonObject
             ?? throw new InvalidDataException("Quantity-item estate seed is invalid.");
         var quantityCatalog = QuantityItemCatalog.Load(activeContent, quantityEstateRoot, "contract-estate-sha");
