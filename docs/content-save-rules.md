@@ -2,8 +2,8 @@
 
 This document is the durable record of the Darkest Dungeon Save Editor's confirmed content-resolution, hero-generation, quirk, trinket, and save-write rules. It separates behavior proven by the game or real saves from implementation conclusions and remaining live-test requirements, so later work does not turn one example Mod into a hard-coded special case.
 
-- Last updated: 2026-09-02
-- Audit baseline: `profile_1`
+- Last updated: 2026-09-05
+- Historical audit baseline: `profile_1` (the counts and hash below are a snapshot, not live state)
 - Baseline `persist.game.json` SHA-256: `f0f707d734a93b9e04c9792d47490acbc8bbc046edd51ee8b2c108ca712e6b17`
 - Active Mods in the baseline: 124
 - Current product behavior: [README](../README.md)
@@ -315,7 +315,7 @@ Evidence:
 
 `always` is active at generation. `no_trinkets` is also active for an unequipped stagecoach candidate. The game handles later equip/unequip changes; the editor does not serialize quirk buffs into `buff_group`.
 
-### 8.2 Implemented model and current catalog result
+### 8.2 Implemented model and historical catalog result
 
 The application now retains every recognized `max_hp` Buff on a quirk, distinguishes `combat_stat_add` from `combat_stat_multiply`, preserves `rule_data.float`/`string`, and supports `always`, `no_trinkets`, `afflicted`, `in_mode`, and `lightabove` with `is_false_rule`. Constant effects determine the stagecoach candidate's full-health `current_hp`; runtime-only conditions are left inactive at generation and are evaluated only for reachable-state safety. Unknown HP operations, conditions, or malformed condition data remain Unverified.
 
@@ -329,7 +329,7 @@ A read-only rebuild against the `profile_1` baseline after implementation produc
 | Unsupported | 0 | None |
 | Total | 545 | Effective `profile_1` catalog |
 
-This establishes parser and editor write-path support, not in-game behavior for every Mod. Positive flat HP, the mixed Mordekaiser tiers, and `Ailuoli_Quirk2` still retain the live-test requirements below.
+This establishes parser and editor write-path support, not in-game behavior for every Mod. The user subsequently completed the positive-flat and mixed-HP test groups and accepted the available evidence without further repetitive quirk testing. The conditional runtime cases below retain their narrower evidence limits; they are not outstanding mandatory release tasks.
 
 ### 8.3 Thirteen constant flat-HP quirks
 
@@ -349,7 +349,7 @@ This establishes parser and editor write-path support, not in-game behavior for 
 | `Floss_QuirkA7` | 无尽的欲望 VII / Endless Desire VII | +28 | Evolves to VIII after 150 |
 | `Floss_QuirkA8` | 无尽的欲望 VIII / Endless Desire VIII | +32 | Terminal |
 
-Audit conclusion: all are `combat_stat_add max_hp + always` and enter `F`. Negative flat HP has Level-A evidence. Positive flat HP still needs one clean ordinary-stagecoach full-health test. Existing shard-stagecoach samples retained base HP 37/46 while carrying `hearty_ship`; because they belong to `shard_hero_recruit`, they neither prove nor disprove the ordinary-stagecoach full-health policy.
+Audit conclusion: all are `combat_stat_add max_hp + always` and enter `F`. Negative flat HP has Level-A evidence. The subsequent ordinary-stagecoach `hearty_ship` test group was completed by the user; it is no longer pending. The earlier shard-stagecoach samples retained base HP 37/46 while carrying `hearty_ship`; those historical samples alone neither prove nor disprove the ordinary-stagecoach full-health policy.
 
 ### 8.4 Ten Mordekaiser mixed-HP quirks
 
@@ -364,7 +364,7 @@ initial full HP = (B + 4n) * (1 + 0.04n), n = 1..10
 - X is terminal;
 - each defines `evolution_town_progression_duration_change=0`; the editor initializes the declared interval and does not invent an additional decrement rule.
 
-Audit conclusion: multiple HP buffs are not an unknown shape once represented as `F` and `P`. None of the 268 corpus files contains a Mordekaiser quirk instance, so tiers I and X still need live tests after implementation to cover fractional and large results.
+Audit conclusion: multiple HP buffs are not an unknown shape once represented as `F` and `P`. The original 268-file corpus had no Mordekaiser quirk instance. The user subsequently completed the mixed-HP test group (tiers I and X), and the follow-up save analysis found empty `buff_group` values. The frozen corpus must not be described as containing those later tests unless it is explicitly refreshed.
 
 ### 8.5 Three runtime-conditional HP quirks
 
@@ -378,17 +378,19 @@ Audit conclusion: write the quirk record but not an initial HP adjustment or `ac
 
 The corpus proves structural persistence for `Octopus_Quirk5` and `Kaltsit_Quirk`; it has no `Ailuoli_Quirk2` instance. Existing conditional samples are injured or at 1 HP and cannot prove a full-health formula.
 
-### 8.6 Implementation result and minimum live tests
+### 8.6 Implementation result and validation record
 
 All 545 baseline quirks now have an individual write path: 520 Direct and 25 context-warning entries. No individual item remains blocked merely because its known HP rule was not modeled; a specific selection whose reachable HP can become zero or negative is still rejected. Contract tests cover flat and percentage ordering, multiple Buffs, all three runtime condition shapes, the selected hero level's armour HP, and a conditionally dangerous `-100%` boundary combination.
 
-Minimum release tests:
+The original live-test plan is retained here as a validation record, not an instruction to repeat completed work:
 
-1. Generate blank and `hearty_ship` candidates of the same class and level in the ordinary stagecoach. The latter must save and recruit at full HP exactly 4 above base.
-2. Generate `Mordekaiser_Quirk1` and `Mordekaiser_Quirk10`. Decode the preview and verify `(B+4)*1.04` and `(B+40)*1.40`, then verify no duplicate application in game.
-3. Generate a candidate carrying only `Ailuoli_Quirk2` among HP quirks. Stagecoach HP remains base; raid maximum HP changes between light `>1` and extinguished light `0`.
-4. Construct boundary selections containing `Ailuoli_Quirk2` and negative-HP quirks. Any combination that can reach maximum HP `<=0` must be rejected before preview.
-5. Optional: on Kal'tsit, mode A has no +20 and another mode has +20; on a class without a mode, the effect remains inactive.
+1. **User-completed:** blank versus `hearty_ship` ordinary-stagecoach candidates, covering the positive flat-HP path.
+2. **User-completed:** `Mordekaiser_Quirk1` and `Mordekaiser_Quirk10`, covering `(B+4)*1.04` and `(B+40)*1.40`; subsequent analysis recorded empty `buff_group` values.
+3. **Not individually live-verified in this record:** `Ailuoli_Quirk2` across raid light `>1` and extinguished light `0`. Its definition, generation policy, and reachable-state safety are covered by the implemented model; do not invent a live result.
+4. **Automated contract coverage:** combinations that can reach maximum HP `<=0` are rejected before preview, including the conditional negative-HP boundary.
+5. **Optional future investigation only:** Kal'tsit mode transitions and effects on a class without modes.
+
+The user explicitly ended further repetitive quirk verification after the first two test groups. Reopen a test only for a new failure, changed rule, or separately authorized investigation.
 
 ## 9. Transactions, backup, and explicitly unaffected state
 
@@ -396,7 +398,7 @@ Minimum release tests:
 2. Any relevant live-save or content-semantic change after preview invalidates the commit.
 3. Before commit, verify `Darkest.exe` is not running and back up all `persist*.json` files in the profile.
 4. Use atomic replacement; a multi-file hero write rolls back every target if any step fails.
-5. Do not modify game content files, Mod files, week count, quests, town-event history, or existing heroes.
+5. The item, trinket, and hero-generation workflows do not modify game content files, Mod files, week count, quests, town-event history, or existing heroes. The separate battle workflow has an explicit managed Encounter Bridge exception: it creates/updates its own local Mod and selected-profile activation entries, but does not edit unrelated Mods. See [battle-map rules](battle-map-editor-design.md).
 6. Event triggering, including `从陵墓归来`, remains a separate future feature and does not belong in the hero-generation chain.
 
 ## 10. Maintenance requirements

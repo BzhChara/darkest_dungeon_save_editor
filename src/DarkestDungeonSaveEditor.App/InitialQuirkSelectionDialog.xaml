@@ -60,28 +60,12 @@
                     <Grid Grid.Row="1" Margin="14">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
             <Border Grid.Row="0" Style="{StaticResource OpenPanelStyle}"
-                    BorderThickness="0" Padding="0" Margin="0,0,0,10">
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                    </Grid.RowDefinitions>
-                    <ContentControl Grid.Row="0" Style="{StaticResource OlivePanelHeaderStyle}"
-                                    Content="写入规则" />
-                    <TextBlock Grid.Row="1" Margin="15,10,15,11" TextWrapping="Wrap"
-                               Style="{StaticResource MutedTextStyle}"
-                               Text="可验证为安全直写的自然怪癖、固定/特殊怪癖和疾病均可选择，编辑器不限制怪癖对应的职业。正负怪癖各最多 5 个，疾病单独最多 3 个；进化怪癖按各自内容定义初始化持续值。singleton 统计 roster 与全部马车池，超限只警告；roster_limit 由游戏在招募进入 roster 时执行，生成马车候选不检查也不警告。未验证的 HP 或进化规则仍不可勾选，怪癖互斥会随当前选择更新。" />
-                </Grid>
-            </Border>
-
-            <Border Grid.Row="1" Style="{StaticResource OpenPanelStyle}"
                     BorderThickness="0" Padding="0" Margin="0,0,0,10">
                 <Grid>
                     <Grid.RowDefinitions>
@@ -110,7 +94,7 @@
                 </Grid>
             </Border>
 
-            <DataGrid x:Name="QuirkGrid" Grid.Row="2"
+            <DataGrid x:Name="QuirkGrid" Grid.Row="1"
                           AutoGenerateColumns="False"
                           IsReadOnly="True"
                           CanUserAddRows="False"
@@ -144,12 +128,22 @@
                     </DataGrid.Columns>
             </DataGrid>
 
-            <TextBlock x:Name="ValidationTextBlock" Grid.Row="3"
+            <TextBlock x:Name="ValidationTextBlock" Grid.Row="2"
                        Margin="0,10,0,0" Padding="12,9"
                        Background="#421314" Foreground="{StaticResource DangerBrush}"
-                       FontWeight="SemiBold" TextWrapping="Wrap" />
+                       FontWeight="SemiBold" TextWrapping="Wrap">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock">
+                        <Style.Triggers>
+                            <Trigger Property="Text" Value="">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                            </Trigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
 
-            <Grid Grid.Row="4" Margin="0,14,0,0">
+            <Grid Grid.Row="3" Margin="0,14,0,0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />

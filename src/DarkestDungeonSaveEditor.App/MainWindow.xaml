@@ -82,6 +82,7 @@
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
 
                     <StackPanel Grid.Row="0">
@@ -90,26 +91,12 @@
                         <TextBlock Margin="18,10,18,11"
                                    Style="{StaticResource MutedTextStyle}"
                                    TextWrapping="Wrap"
-                                   Text="选择游戏、Mod 与存档目录，然后载入当前 Profile 的真实活动内容。" />
+                                   Text="自动发现或手动选择目录，载入所选存档的活动内容。" />
                     </StackPanel>
 
-                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto"
+                    <ScrollViewer x:Name="PathInputsScrollViewer" Grid.Row="1" VerticalScrollBarVisibility="Auto"
                                   HorizontalScrollBarVisibility="Disabled">
-                        <StackPanel Margin="18,16,18,18">
-                            <Border Margin="0,0,0,12" Padding="0,2"
-                                    Background="Transparent" BorderThickness="0">
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="4" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <Border Grid.Column="0" Background="{StaticResource GoldBrush}" />
-                                    <TextBlock Grid.Column="1" Margin="11,0,0,0"
-                                               Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap"
-                                               Text="建议先点击自动发现。所有路径仍可手动修改；不会在启动时写死你的本机目录。" />
-                                </Grid>
-                            </Border>
-
+                        <StackPanel Margin="18,6,18,0">
                             <Button Style="{StaticResource GoldButtonStyle}" Margin="0,0,0,16"
                                     Content="自动发现游戏、Mod 与 profile_0"
                                     Click="Discover_Click" />
@@ -127,7 +114,7 @@
                                         Style="{StaticResource GhostButtonStyle}"
                                         Content="浏览…" Click="BrowseGame_Click" />
                             </Grid>
-                            <TextBlock Margin="1,4,0,14" Style="{StaticResource MutedTextStyle}"
+                            <TextBlock Margin="1,4,0,12" Style="{StaticResource MutedTextStyle}"
                                        Text="DarkestDungeon 安装目录" />
 
                             <TextBlock Style="{StaticResource FieldLabelStyle}" Text="Steam 创意工坊目录（可选）" />
@@ -143,7 +130,7 @@
                                         Style="{StaticResource GhostButtonStyle}"
                                         Content="浏览…" Click="BrowseWorkshop_Click" />
                             </Grid>
-                            <TextBlock Margin="1,4,0,14" Style="{StaticResource MutedTextStyle}"
+                            <TextBlock Margin="1,4,0,12" Style="{StaticResource MutedTextStyle}"
                                        Text="Steam Workshop / content / 262060" />
 
                             <TextBlock Style="{StaticResource FieldLabelStyle}" Text="额外本地 Mod 目录（可选）" />
@@ -159,7 +146,7 @@
                                         Style="{StaticResource GhostButtonStyle}"
                                         Content="浏览…" Click="BrowseLocalMods_Click" />
                             </Grid>
-                            <TextBlock Margin="1,4,0,14" Style="{StaticResource MutedTextStyle}"
+                            <TextBlock Margin="1,4,0,12" Style="{StaticResource MutedTextStyle}"
                                        TextWrapping="Wrap"
                                        Text="默认 mods 目录仍会扫描；这里可补充其他位置。" />
 
@@ -176,14 +163,14 @@
                                         Style="{StaticResource GhostButtonStyle}"
                                         Content="浏览…" Click="BrowseProfile_Click" />
                             </Grid>
-                            <TextBlock Margin="1,4,0,16" Style="{StaticResource MutedTextStyle}"
+                            <TextBlock Margin="1,4,0,0" Style="{StaticResource MutedTextStyle}"
                                        Text="当前要读取和修改的 profile_* 目录" />
-
-                            <Button Style="{StaticResource PrimaryButtonStyle}" Margin="0"
-                                    Content="载入当前档案的内容目录"
-                                    Click="LoadCatalog_Click" />
                         </StackPanel>
                     </ScrollViewer>
+                    <Button x:Name="LoadCatalogButton" Grid.Row="2" Margin="18,12,18,18"
+                            Style="{StaticResource PrimaryButtonStyle}"
+                            Content="载入当前档案的内容目录"
+                            Click="LoadCatalog_Click" />
                 </Grid>
             </Border>
 
@@ -265,17 +252,48 @@
                                       AutoGenerateColumns="False"
                                       IsReadOnly="True"
                                       SelectionMode="Single"
+                                      RowDetailsVisibilityMode="VisibleWhenSelected"
+                                      AreRowDetailsFrozen="True"
+                                      VirtualizingPanel.ScrollUnit="Pixel"
                                       SelectionChanged="ItemGrid_SelectionChanged"
                                       CanUserAddRows="False"
                                       HeadersVisibility="Column">
+                                <DataGrid.RowDetailsTemplate>
+                                    <DataTemplate>
+                                        <WrapPanel Margin="12,6,12,8">
+                                            <TextBlock Margin="0,0,24,0" TextWrapping="Wrap"
+                                                       Foreground="{StaticResource TextSecondaryBrush}">
+                                                <Run Text="位置：" /><Run Text="{Binding Location, Mode=OneWay}" />
+                                            </TextBlock>
+                                            <TextBlock Margin="0,0,24,0" TextWrapping="Wrap"
+                                                       Foreground="{StaticResource TextSecondaryBrush}">
+                                                <Run Text="类型：" /><Run Text="{Binding InventoryType, Mode=OneWay}" />
+                                            </TextBlock>
+                                            <TextBlock Margin="0,0,24,0" TextWrapping="Wrap"
+                                                       Foreground="{StaticResource TextSecondaryBrush}">
+                                                <Run Text="堆叠：" /><Run Text="{Binding StackSummary, Mode=OneWay}" />
+                                            </TextBlock>
+                                            <TextBlock Text="{Binding ProvisionSummary}" TextWrapping="Wrap"
+                                                       Foreground="{StaticResource TextSecondaryBrush}">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock">
+                                                        <Style.Triggers>
+                                                            <Trigger Property="Text" Value="">
+                                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                            </Trigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
+                                        </WrapPanel>
+                                    </DataTemplate>
+                                </DataGrid.RowDetailsTemplate>
                                 <DataGrid.Columns>
                                     <DataGridTextColumn Header="物品 ID" Binding="{Binding Id}" Width="1.25*" MinWidth="105"
                                                         ElementStyle="{StaticResource DataGridTextElementStyle}" />
-                                    <DataGridTextColumn Header="中文名" Binding="{Binding ChineseName}" Width="1.05*" MinWidth="86"
+                                    <DataGridTextColumn Header="中文名" Binding="{Binding ChineseName}" Width="1.2*" MinWidth="110"
                                                         ElementStyle="{StaticResource DataGridTextElementStyle}" />
-                                    <DataGridTextColumn Header="English" Binding="{Binding EnglishName}" Width="1.05*" MinWidth="86"
-                                                        ElementStyle="{StaticResource DataGridTextElementStyle}" />
-                                    <DataGridTextColumn Header="位置 / 类型 / 堆叠" Binding="{Binding Storage}" Width="180"
+                                    <DataGridTextColumn Header="English" Binding="{Binding EnglishName}" Width="1.2*" MinWidth="110"
                                                         ElementStyle="{StaticResource DataGridTextElementStyle}" />
                                     <DataGridTextColumn Header="当前数量" Binding="{Binding CurrentAmount}" Width="88"
                                                         ElementStyle="{StaticResource DataGridTextElementStyle}" />
@@ -289,21 +307,29 @@
                                       AutoGenerateColumns="False"
                                       IsReadOnly="True"
                                       SelectionMode="Single"
+                                      RowDetailsVisibilityMode="VisibleWhenSelected"
+                                      AreRowDetailsFrozen="True"
+                                      VirtualizingPanel.ScrollUnit="Pixel"
                                       SelectionChanged="TrinketGrid_SelectionChanged"
                                       CanUserAddRows="False"
                                       HeadersVisibility="Column">
+                                <DataGrid.RowDetailsTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Margin="12,6,12,8" TextWrapping="Wrap"
+                                                   Foreground="{StaticResource TextSecondaryBrush}">
+                                            <Run Text="稀有度：" /><Run Text="{Binding Rarity, Mode=OneWay}" />
+                                            <Run Text="　　定义上限：" /><Run Text="{Binding LimitDisplay, Mode=OneWay}" />
+                                        </TextBlock>
+                                    </DataTemplate>
+                                </DataGrid.RowDetailsTemplate>
                                 <DataGrid.Columns>
                                     <DataGridTextColumn Header="饰品 ID" Binding="{Binding Id}" Width="1.3*" MinWidth="105"
                                                         ElementStyle="{StaticResource DataGridTextElementStyle}" />
-                                    <DataGridTextColumn Header="中文名" Binding="{Binding ChineseName}" Width="1.1*" MinWidth="90"
+                                    <DataGridTextColumn Header="中文名" Binding="{Binding ChineseName}" Width="1.2*" MinWidth="110"
                                                         ElementStyle="{StaticResource DataGridTextElementStyle}" />
-                                    <DataGridTextColumn Header="English" Binding="{Binding EnglishName}" Width="1.1*" MinWidth="90"
+                                    <DataGridTextColumn Header="English" Binding="{Binding EnglishName}" Width="1.2*" MinWidth="110"
                                                         ElementStyle="{StaticResource DataGridTextElementStyle}" />
-                                    <DataGridTextColumn Header="稀有度" Binding="{Binding Rarity}" Width="95"
-                                                        ElementStyle="{StaticResource DataGridTextElementStyle}" />
-                                    <DataGridTextColumn Header="来源" Binding="{Binding Source}" Width="1.8*" MinWidth="125"
-                                                        ElementStyle="{StaticResource DataGridTextElementStyle}" />
-                                    <DataGridTextColumn Header="定义上限" Binding="{Binding LimitDisplay}" Width="78"
+                                    <DataGridTextColumn Header="来源" Binding="{Binding Source}" Width="1.8*" MinWidth="180"
                                                         ElementStyle="{StaticResource DataGridTextElementStyle}" />
                                     </DataGrid.Columns>
                             </DataGrid>
@@ -313,23 +339,34 @@
                                       AutoGenerateColumns="False"
                                       IsReadOnly="True"
                                       SelectionMode="Single"
+                                      RowDetailsVisibilityMode="VisibleWhenSelected"
+                                      AreRowDetailsFrozen="True"
+                                      VirtualizingPanel.ScrollUnit="Pixel"
                                       SelectionChanged="HeroGrid_SelectionChanged"
                                       CanUserAddRows="False"
                                       HeadersVisibility="Column">
+                                <DataGrid.RowDetailsTemplate>
+                                    <DataTemplate>
+                                        <WrapPanel Margin="12,6,12,8">
+                                            <TextBlock Margin="0,0,24,0" Foreground="{StaticResource TextSecondaryBrush}">
+                                                <Run Text="生成方式：" /><Run Text="{Binding GenerationMode, Mode=OneWay}" />
+                                            </TextBlock>
+                                            <TextBlock Foreground="{StaticResource TextSecondaryBrush}">
+                                                <Run Text="自然怪癖范围：" /><Run Text="{Binding QuirkRange, Mode=OneWay}" />
+                                            </TextBlock>
+                                        </WrapPanel>
+                                    </DataTemplate>
+                                </DataGrid.RowDetailsTemplate>
                                 <DataGrid.Columns>
-                                    <DataGridTextColumn Header="职业 ID" Binding="{Binding Id}" Width="1.35*" MinWidth="105"
+                                    <DataGridTextColumn Header="职业 ID" Binding="{Binding Id}" Width="1.15*" MinWidth="105"
                                                         ElementStyle="{StaticResource DataGridTextElementStyle}" />
-                                    <DataGridTextColumn Header="中文名" Binding="{Binding ChineseName}" Width="1.05*" MinWidth="82"
+                                    <DataGridTextColumn Header="中文名" Binding="{Binding ChineseName}" Width="1.05*" MinWidth="110"
                                                         ElementStyle="{StaticResource DataGridTextElementStyle}" />
-                                    <DataGridTextColumn Header="English" Binding="{Binding EnglishName}" Width="1.05*" MinWidth="82"
+                                    <DataGridTextColumn Header="English" Binding="{Binding EnglishName}" Width="1.05*" MinWidth="110"
                                                         ElementStyle="{StaticResource DataGridTextElementStyle}" />
-                                    <DataGridTextColumn Header="来源" Binding="{Binding Source}" Width="1.25*" MinWidth="105"
-                                                        ElementStyle="{StaticResource DataGridTextElementStyle}" />
-                                    <DataGridTextColumn Header="生成方式" Binding="{Binding GenerationMode}" Width="180"
+                                    <DataGridTextColumn Header="来源" Binding="{Binding Source}" Width="2*" MinWidth="180"
                                                         ElementStyle="{StaticResource DataGridTextElementStyle}" />
                                     <DataGridTextColumn Header="等级范围" Binding="{Binding LevelSummary}" Width="1.0*" MinWidth="90"
-                                                        ElementStyle="{StaticResource DataGridTextElementStyle}" />
-                                    <DataGridTextColumn Header="自然怪癖范围" Binding="{Binding QuirkRange}" Width="1.75*" MinWidth="170"
                                                         ElementStyle="{StaticResource DataGridTextElementStyle}" />
                                     </DataGrid.Columns>
                             </DataGrid>
