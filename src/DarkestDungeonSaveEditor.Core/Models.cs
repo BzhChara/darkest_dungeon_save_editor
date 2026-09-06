@@ -377,6 +377,7 @@ public sealed record StagecoachHeroMutationPreview(
 {
     public StagecoachRecruitPool TargetPool { get; init; } = StagecoachRecruitPool.Ordinary;
     public IReadOnlyList<HeroQuirkLimitPreview> QuirkLimits { get; init; } = [];
+    public bool MayRefreshOnTownReturn { get; init; }
 }
 
 public sealed record HeroQuirkLimitPreview(

@@ -16,6 +16,7 @@ public partial class MainWindow : Window
 {
     private async void LoadCatalog_Click(object sender, RoutedEventArgs e)
     {
+        var diagnosticBatch = new CatalogDiagnosticBatch();
         try
         {
             CrashDiagnostics.SetStage("LoadCatalog: invalidating previous catalog");
@@ -44,6 +45,7 @@ public partial class MainWindow : Window
                 workshopDirectory,
                 additionalLocalModDirectory,
                 codec);
+            diagnosticBatch.Add("活动来源", activeContent.Issues);
             CrashDiagnostics.RecordStatus(
                 $"内容目录档案：ID={activeContent.Profile.ProfileId}；" +
                 $"档案目录={activeContent.Profile.ProfileDirectory}；" +
@@ -54,10 +56,11 @@ public partial class MainWindow : Window
             CrashDiagnostics.SetStage("LoadCatalog: building content catalogs");
             var staticCatalogTask = Task.Run(() => new
             {
-                Trinkets = TrinketCatalog.Load(activeContent),
-                Heroes = HeroClassCatalog.Load(activeContent)
+                Trinkets = diagnosticBatch.Capture("饰品", () => TrinketCatalog.Load(activeContent), catalog => catalog.Issues),
+                Heroes = diagnosticBatch.Capture("人物/怪癖/姓名", () => HeroClassCatalog.Load(activeContent), catalog => catalog.Issues)
             });
-            var quantityItemCatalogTask = QuantityItemCatalog.LoadAsync(activeContent, codec);
+            var quantityItemCatalogTask = diagnosticBatch.CaptureAsync("物品",
+                () => QuantityItemCatalog.LoadAsync(activeContent, codec), catalog => catalog.Issues);
             await Task.WhenAll(staticCatalogTask, quantityItemCatalogTask);
             var catalogs = await staticCatalogTask;
             var quantityItems = await quantityItemCatalogTask;
@@ -87,7 +90,8 @@ public partial class MainWindow : Window
                     gameDirectory,
                     activeContent,
                     workshopDirectory,
-                    additionalLocalModDirectory);
+                    additionalLocalModDirectory,
+                    diagnosticBatch: diagnosticBatch);
             }
             catch (Exception mapException)
             {
@@ -96,7 +100,7 @@ public partial class MainWindow : Window
                     mapException,
                     $"档案={profile.ProfileId}；目录={profile.ProfileDirectory}");
                 AppendStatus(
-                    $"战斗地图暂时无法读取，其他目录仍已正常加载：{mapException.Message}");
+                    $"战斗地图暂时无法读取，其他目录仍已正常加载：{mapException.Message}", level: DiagnosticLogLevel.Warning);
             }
             CrashDiagnostics.SetStage("LoadCatalog: populating visible rows");
             UpdateCatalogMode();
@@ -104,12 +108,7 @@ public partial class MainWindow : Window
             CrashDiagnostics.SetStage("LoadCatalog: recording catalog diagnostics");
             var hiddenItemCount = _allItems.Count(item => item.IsHiddenByDefault);
             var defaultVisibleItemCount = _allItems.Count - hiddenItemCount;
-            var issues = activeContent.Issues
-                .Concat(quantityItems.Issues)
-                .Concat(catalogs.Trinkets.Issues)
-                .Concat(catalogs.Heroes.Issues)
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToArray();
+            var diagnostics = diagnosticBatch.Summarize();
             var quantitySourcePath = _quantitySaveContext == QuantityItemSaveContext.Raid
                 ? Path.Combine(profile.ProfileDirectory, "persist.raid.json")
                 : profile.EstateSavePath;
@@ -122,8 +121,9 @@ public partial class MainWindow : Window
                     : string.Empty));
             AppendStatus(
                 $"目录加载完成：档案 {profile.ProfileId}；模式 {catalogs.Heroes.GameMode}；" +
-                $"档案启用 Mod {activeContent.AppliedModCount} 个；活动来源 {activeContent.Sources.Count} 个；" +
-                $"读取提示 {issues.Length} 条。");
+                CatalogLogDiagnostics.FormatSourceCounts(activeContent) + "；" +
+                $"本轮目录日志说明 {diagnostics.Count(entry => entry.Level == DiagnosticLogLevel.Information)} 条，" +
+                $"警告 {diagnostics.Count(entry => entry.Level == DiagnosticLogLevel.Warning)} 条（含战斗目录，跨模块按文件/原因合并，不等于不可用内容数量）。");
             AppendStatus(
                 $"目录统计：{FormatQuantitySaveContext(_quantitySaveContext)}物品 {defaultVisibleItemCount} 个" +
                 $"（当前场景隐藏项 {hiddenItemCount} 个）" +
@@ -138,22 +138,16 @@ public partial class MainWindow : Window
                 $" 人物线索：有招募事件的人物 {_allHeroes.Count(item => item.RecruitEvents.Count > 0)} 个；" +
                 $"有后续玩法怪癖线索的人物 {_allHeroes.Count(item => item.RuntimeQuirkSignals.Count > 0)} 个" +
                 "（不作为初始怪癖）。");
-            var issueMessages = issues
-                .Select(issue => $"目录提示：{issue}")
-                .ToArray();
-            foreach (var issueMessage in issueMessages)
+            CrashDiagnostics.RecordCatalogDiagnostics(diagnosticBatch);
+
+            foreach (var entry in diagnostics.Take(30))
             {
-                CrashDiagnostics.RecordStatus(issueMessage);
+                AppendStatus(entry.Message, persist: false);
             }
 
-            foreach (var issueMessage in issueMessages.Take(30))
+            if (diagnostics.Count > 30)
             {
-                AppendStatus(issueMessage, persist: false);
-            }
-
-            if (issueMessages.Length > 30)
-            {
-                AppendStatus($"另有 {issueMessages.Length - 30} 条目录提示仅写入完整日志。", persist: false);
+                AppendStatus($"另有 {diagnostics.Count - 30} 条目录说明/警告仅写入完整日志。", persist: false);
             }
 
             CrashDiagnostics.SetStage("LoadCatalog: synchronous UI update completed");
@@ -161,10 +155,12 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             CrashDiagnostics.RecordException("LoadCatalog handled exception", ex);
-            AppendStatusSafely($"加载内容目录失败：{ex.Message}", "LoadCatalog failure status");
+            AppendStatusSafely($"加载内容目录失败：{ex.Message}", "LoadCatalog failure status", DiagnosticLogLevel.Error);
         }
         finally
         {
+            // Flush partial results even if another catalog or UI update failed.
+            CrashDiagnostics.RecordCatalogDiagnostics(diagnosticBatch);
             try
             {
                 CrashDiagnostics.SetStage("LoadCatalog: leaving busy state");
@@ -175,7 +171,7 @@ public partial class MainWindow : Window
             catch (Exception ex)
             {
                 CrashDiagnostics.RecordException("LoadCatalog cleanup exception", ex);
-                AppendStatusSafely($"恢复界面状态失败：{ex.Message}", "LoadCatalog cleanup status");
+                AppendStatusSafely($"恢复界面状态失败：{ex.Message}", "LoadCatalog cleanup status", DiagnosticLogLevel.Error);
             }
         }
     }

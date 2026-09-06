@@ -11,6 +11,15 @@ public partial class App : Application
     protected override void OnStartup(StartupEventArgs e)
     {
         CrashDiagnostics.SetStage("Application: startup");
+        try
+        {
+            CrashDiagnostics.RecordStatus(RuntimeLogIdentity.Describe(typeof(App).Assembly) +
+                $"；本次日志={CrashDiagnostics.LogFilePath}");
+        }
+        catch (Exception ex)
+        {
+            CrashDiagnostics.RecordException("Application: startup identity", ex);
+        }
         DispatcherUnhandledException += OnDispatcherUnhandledException;
         AppDomain.CurrentDomain.UnhandledException += OnAppDomainUnhandledException;
         TaskScheduler.UnobservedTaskException += OnUnobservedTaskException;
@@ -48,14 +57,17 @@ public partial class App : Application
 
 internal static class CrashDiagnostics
 {
-    private static readonly object WriteGate = new();
+    private static readonly Lazy<SessionLogFile> SessionLog = new(() => new SessionLogFile(
+        SaveEditorLocations.ResolveLogDirectory(AppContext.BaseDirectory), DateTimeOffset.Now, Environment.ProcessId));
     private static string _stage = "Application: not started";
+
+    public static string LogFilePath => SessionLog.Value.FilePath;
 
     public static void SetStage(string stage)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(stage);
         Interlocked.Exchange(ref _stage, stage);
-        WriteEntry("Stage", null, stage);
+        WriteEntry("Stage", null, stage, DiagnosticLogLevel.Trace);
     }
 
     public static void RecordException(
@@ -65,29 +77,43 @@ internal static class CrashDiagnostics
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(source);
         ArgumentNullException.ThrowIfNull(exception);
-        WriteEntry(source, exception, details);
+        WriteEntry(source, exception, details, DiagnosticLogLevel.Error);
     }
 
-    public static void RecordStatus(string message)
+    public static void RecordStatus(string message, DiagnosticLogLevel level = DiagnosticLogLevel.Information)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(message);
-        WriteEntry("Status", null, message);
+        WriteEntry("Status", null, message, level);
+    }
+
+    public static void RecordCatalogDiagnostics(CatalogDiagnosticBatch batch)
+    {
+        try
+        {
+            foreach (var entry in batch.Drain())
+            {
+                RecordStatus(entry.Message, entry.Level);
+            }
+        }
+        catch (Exception ex)
+        {
+            RecordException("Catalog diagnostics: flush", ex);
+        }
     }
 
     private static void WriteEntry(
         string source,
         Exception? exception,
-        string? details)
+        string? details,
+        DiagnosticLogLevel level)
     {
         try
         {
-            var logDirectory = SaveEditorLocations.ResolveLogDirectory(AppContext.BaseDirectory);
-            Directory.CreateDirectory(logDirectory);
-            var logPath = Path.Combine(logDirectory, $"app-{DateTime.Now:yyyyMMdd}.log");
             var builder = new StringBuilder()
                 .AppendLine("---")
                 .AppendLine($"Time: {DateTimeOffset.Now:O}")
                 .AppendLine($"Source: {source}")
+                .AppendLine($"Level: {level}")
                 .AppendLine($"Stage: {Volatile.Read(ref _stage)}")
                 .AppendLine($"ProcessId: {Environment.ProcessId}")
                 .AppendLine($"ManagedThreadId: {Environment.CurrentManagedThreadId}")
@@ -102,10 +128,7 @@ internal static class CrashDiagnostics
                 builder.AppendLine("Exception:").AppendLine(exception.ToString());
             }
 
-            lock (WriteGate)
-            {
-                File.AppendAllText(logPath, builder.ToString(), new UTF8Encoding(false));
-            }
+            SessionLog.Value.Append(builder.ToString());
         }
         catch
         {

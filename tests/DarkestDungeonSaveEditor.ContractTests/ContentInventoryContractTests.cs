@@ -92,12 +92,32 @@ internal static partial class ContractSuite
             "Inventory must distinguish missing metadata, missing content, no-manifest files and inactive Mods.");
         var lines = ContentFileInventory.FormatDetails(snapshot).ToArray();
         Assert(ContentFileInventory.FormatSummary(snapshot).Contains("未改变内容纳入规则", StringComparison.Ordinal) &&
-               lines.Any(line => line.Contains("清单外数据/译文：待核查，未自动纳入", StringComparison.Ordinal) && line.Contains("localization/new", StringComparison.Ordinal)) &&
+               lines.Any(line => line.Contains("清单外数据/译文文件：仅盘点、未加载", StringComparison.Ordinal) && line.Contains("localization/new", StringComparison.Ordinal)) &&
                lines.All(line => !line.Contains("补读范围", StringComparison.Ordinal)) &&
                lines.Any(line => line.Contains("清单长度不同", StringComparison.Ordinal) && line.Contains(listedPath, StringComparison.Ordinal)) &&
-               lines.Any(line => line.Contains("清单缺失：当前内容范围外", StringComparison.Ordinal) && line.Contains("desktop.ini", StringComparison.Ordinal)) &&
+               lines.Any(line => line.Contains("清单缺失：Windows 文件夹设置", StringComparison.Ordinal) && line.Contains("desktop.ini", StringComparison.Ordinal)) &&
                lines.All(line => !line.Contains("路径=preview.png", StringComparison.Ordinal)),
             "Detailed logs must explain relevant differences while aggregating unrelated assets and avoiding claims of successful parsing.");
+        var severityProbe = snapshot with
+        {
+            Mods = [mod with
+            {
+                Files = [
+                    new("panels/DESKTOP.INI", ContentInventoryFileKind.Other, ContentManifestMatch.Missing, null, 10, false),
+                    new("desktop.ini.bak", ContentInventoryFileKind.Other, ContentManifestMatch.Missing, null, 10, false),
+                    new("preview.png", ContentInventoryFileKind.Asset, ContentManifestMatch.Missing, null, 10, false),
+                    new("localization/english.loc", ContentInventoryFileKind.LocalizationBinary, ContentManifestMatch.Missing, null, 10, true),
+                    files["dungeons/probe/missing.1.mash.darkest"]
+                ]
+            }]
+        };
+        var severityEntries = ContentFileInventory.FormatLogDetails(severityProbe)
+            .Where(entry => entry.Message.StartsWith("清单缺失：", StringComparison.Ordinal)).ToArray();
+        Assert(severityEntries.Count(entry => entry.Level == DiagnosticLogLevel.Information) == 1 &&
+               severityEntries.Single(entry => entry.Level == DiagnosticLogLevel.Information).Message.Contains("panels/DESKTOP.INI", StringComparison.Ordinal) &&
+               severityEntries.Count(entry => entry.Level == DiagnosticLogLevel.Warning) == 4 &&
+               ContentFileInventory.FormatDetails(severityProbe).SequenceEqual(ContentFileInventory.FormatLogDetails(severityProbe).Select(entry => entry.Message)),
+            "Only exact desktop.ini metadata may be downgraded; missing definitions, translations, assets and similarly named files remain warnings and the string formatter stays compatible.");
         Assert(trinketsBefore == JsonSerializer.Serialize(TrinketCatalog.Load(content)) &&
                heroesBefore == JsonSerializer.Serialize(HeroClassCatalog.Load(content)) &&
                itemsBefore == JsonSerializer.Serialize(QuantityItemCatalog.Load(content, estate)) &&
@@ -181,9 +201,9 @@ internal static partial class ContractSuite
         var logging = File.ReadAllText(Path.Combine(repositoryRoot, "src", "DarkestDungeonSaveEditor.App", "MainWindow.CatalogDiagnostics.cs"));
         Assert(loading.IndexOf("await RecordContentFileDiagnosticsAsync(inventory)", StringComparison.Ordinal) >= 0 &&
                loading.IndexOf("await RecordContentFileDiagnosticsAsync(inventory)", StringComparison.Ordinal) <
-               loading.IndexOf("Trinkets = TrinketCatalog.Load(activeContent)", StringComparison.Ordinal) &&
+               loading.IndexOf("Trinkets = diagnosticBatch.Capture", StringComparison.Ordinal) &&
                loading.Contains("Task.Run(() => ScanContentFilesForDiagnostics(activeContent))", StringComparison.Ordinal) &&
-               logging.Contains("CrashDiagnostics.RecordStatus(line);", StringComparison.Ordinal) &&
+               logging.Contains("CrashDiagnostics.RecordStatus(entry.Message, entry.Level);", StringComparison.Ordinal) &&
                logging.Contains("await Task.Run(() =>", StringComparison.Ordinal) &&
                !logging.Contains("AppendStatus(line)", StringComparison.Ordinal),
             "File diagnostics must run off the UI thread before catalog parsing, with full details persisted rather than appended to table/UI messages.");

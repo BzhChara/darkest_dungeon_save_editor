@@ -87,6 +87,23 @@ public partial class MainWindow : Window
         return ids.Length == 0 ? "空白" : string.Join(", ", ids);
     }
 
+    private static string FormatHeroPreviewWarnings(StagecoachHeroMutationPreview preview)
+    {
+        var warnings = new List<string>();
+        if (preview.MayRefreshOnTownReturn)
+        {
+            warnings.Add("当前档案仍在副本中；回城过周刷新马车时，新人物可能被清除。建议回到小镇后再生成。");
+        }
+
+        var quirkLimitWarnings = FormatHeroQuirkLimitWarnings(preview);
+        if (!string.IsNullOrWhiteSpace(quirkLimitWarnings))
+        {
+            warnings.Add(quirkLimitWarnings);
+        }
+
+        return string.Join(Environment.NewLine, warnings);
+    }
+
     private static string FormatHeroQuirkLimitWarnings(StagecoachHeroMutationPreview preview)
     {
         return string.Join(

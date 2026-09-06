@@ -50,11 +50,13 @@ public partial class MainWindow : Window
                 $"自动发现完成：{discoverySummary}。" +
                 (snapshot.Issues.Count == 0
                     ? string.Empty
-                    : $" 另有提示：{string.Join(" | ", snapshot.Issues)}"));
+                    : $" 另有提示：{string.Join(" | ", snapshot.Issues)}"),
+                level: snapshot.Issues.Count == 0 ? DiagnosticLogLevel.Information : DiagnosticLogLevel.Warning);
         }
         catch (Exception ex)
         {
-            AppendStatus($"自动发现失败：{ex.Message}");
+            CrashDiagnostics.RecordException("Discover: handled exception", ex);
+            AppendStatusSafely($"自动发现失败：{ex.Message}", "Discover: failure status", DiagnosticLogLevel.Error);
         }
     }
 

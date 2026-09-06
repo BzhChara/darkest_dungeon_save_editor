@@ -66,6 +66,7 @@ public partial class BattleMapView : UserControl
             committed = true;
             SaveEditApplied?.Invoke(
                 $"强制回城状态已写入：档案={profile.ProfileId}；" +
+                $"目录={profile.ProfileDirectory}；操作编号={prepared.SessionId}；" +
                 $"原副本={prepared.Preview.PreviousRaidDungeon}；备份={result.BackupDirectory}");
             ShowUnavailableState(
                 $"已将 {profile.ProfileId} 的下次读档入口设置为城镇。现在请启动游戏并载入该档案。",

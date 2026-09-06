@@ -107,11 +107,14 @@ internal sealed class ContentLocalizationCatalog
             .ThenBy(file => GetFormatPriority(file.Path))
             .ThenBy(file => file.RelativePath, StringComparer.OrdinalIgnoreCase)
             .ToArray();
+        var readFailures = new List<(EffectiveContentFile File, string Reason)>();
+        var compiledEvidence = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
         foreach (var file in files)
         {
             try
             {
                 var diagnostics = new LocalizationEntryDiagnostics(file.Path);
+                var acceptedEntries = 0;
                 foreach (var entry in ReadRequestedEntries(file.Path, requestedKeyArray, issues, diagnostics)
                              .Where(entry => IsTargetLanguage(entry.LanguageId)))
                 {
@@ -146,16 +149,38 @@ internal sealed class ContentLocalizationCatalog
                     {
                         builder.Chinese = displayValue;
                     }
+                    acceptedEntries++;
                 }
 
                 diagnostics.AppendTo(issues);
+                if (acceptedEntries > 0 &&
+                    (file.Path.EndsWith(".loc", StringComparison.OrdinalIgnoreCase) ||
+                     file.Path.EndsWith(".loc2", StringComparison.OrdinalIgnoreCase)))
+                {
+                    if (!compiledEvidence.TryGetValue(file.Source.Id, out var paths))
+                    {
+                        paths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                        compiledEvidence.Add(file.Source.Id, paths);
+                    }
+                    paths.Add(file.Path);
+                }
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or XmlException or
                                             RegexMatchTimeoutException or InvalidDataException or
                                             DecoderFallbackException or OverflowException)
             {
-                issues.Add($"Failed to read localization '{file.Path}': {ex.Message}");
+                readFailures.Add((file, ex.Message));
             }
+        }
+
+        foreach (var (file, reason) in readFailures)
+        {
+            var evidence = compiledEvidence.TryGetValue(file.Source.Id, out var paths)
+                ? $"名称读取器已从同一来源的其他编译表取得有效条目（LOC={paths.Count(path => path.EndsWith(".loc", StringComparison.OrdinalIgnoreCase))}，" +
+                  $"LOC2={paths.Count(path => path.EndsWith(".loc2", StringComparison.OrdinalIgnoreCase))}）；不保证覆盖失败文件的所有名称"
+                : "本次所请求的名称中，未从同一来源的其他编译表取得有效条目；这不是其他来源或语言全部缺失的结论";
+            issues.Add($"Failed to read localization '{file.Path}': {reason}" +
+                CatalogLogDiagnostics.LocalizationEvidenceMarker + evidence);
         }
 
         return new ContentLocalizationCatalog(

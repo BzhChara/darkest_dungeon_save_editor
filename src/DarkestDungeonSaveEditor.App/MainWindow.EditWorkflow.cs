@@ -64,7 +64,7 @@ public partial class MainWindow : Window
                     _activeContentSnapshot);
                 if (previewRevision != _editRevision || CatalogTabs.SelectedIndex != 0)
                 {
-                    AppendStatus("预览期间目录状态发生变化，已丢弃本次结果。");
+                    AppendStatus("预览期间目录状态发生变化，已丢弃本次结果。", level: DiagnosticLogLevel.Warning);
                     return;
                 }
 
@@ -85,6 +85,10 @@ public partial class MainWindow : Window
                 PreviewWarningTextBlock.Visibility = string.IsNullOrWhiteSpace(itemWarning)
                     ? Visibility.Collapsed
                     : Visibility.Visible;
+                if (!string.IsNullOrWhiteSpace(itemWarning))
+                {
+                    AppendStatus($"物品预览警告：{itemWarning}", level: DiagnosticLogLevel.Warning);
+                }
                 ApplyButton.IsEnabled = true;
                 AppendStatus(
                     $"物品数量预览通过：{preview.ItemId}，{preview.ExistingAmount} → {preview.TargetAmount}；" +
@@ -110,7 +114,7 @@ public partial class MainWindow : Window
                     PreviewWarningTextBlock.Text =
                         "未能从当前活动内容解析唯一有效的饰品仓库上限。为避免写入超过实际容量，饰品预览与应用已禁用。";
                     PreviewWarningTextBlock.Visibility = Visibility.Visible;
-                    AppendStatus($"饰品预览已阻止：{PreviewWarningTextBlock.Text}");
+                    AppendStatus($"饰品预览已阻止：{PreviewWarningTextBlock.Text}", level: DiagnosticLogLevel.Warning);
                     throw new InvalidOperationException("当前饰品仓库容量未知，无法安全生成预览。");
                 }
 
@@ -127,7 +131,7 @@ public partial class MainWindow : Window
                     _activeContentSnapshot);
                 if (previewRevision != _editRevision || CatalogTabs.SelectedIndex != 1)
                 {
-                    AppendStatus("预览期间目录状态发生变化，已丢弃本次结果。");
+                    AppendStatus("预览期间目录状态发生变化，已丢弃本次结果。", level: DiagnosticLogLevel.Warning);
                     return;
                 }
 
@@ -145,7 +149,7 @@ public partial class MainWindow : Window
                         $"已超过该饰品的定义持有上限 {preview.DefinitionLimit}。编辑器会按控制台模式保留写入能力，" +
                         "但游戏之后不会再正常奖励该饰品；已装备副本未计入这里的仓库数量。";
                     PreviewWarningTextBlock.Visibility = Visibility.Visible;
-                    AppendStatus($"饰品预览提示：{PreviewWarningTextBlock.Text}");
+                    AppendStatus($"饰品预览提示：{PreviewWarningTextBlock.Text}", level: DiagnosticLogLevel.Warning);
                 }
                 ApplyButton.IsEnabled = true;
                 AppendStatus($"饰品预览通过，工作区：{preparedEdit.WorkspaceDirectory}");
@@ -174,24 +178,24 @@ public partial class MainWindow : Window
                 _activeContentSnapshot);
             if (previewRevision != _editRevision || CatalogTabs.SelectedIndex != 2)
             {
-                AppendStatus("预览期间目录状态发生变化，已丢弃本次结果。");
+                AppendStatus("预览期间目录状态发生变化，已丢弃本次结果。", level: DiagnosticLogLevel.Warning);
                 return;
             }
 
             _editService = editService;
             _preparedHeroEdit = preparedHeroEdit;
             _preparedHeroCandidatePreview = generated.Preview;
-            var heroLimitWarning = FormatHeroQuirkLimitWarnings(preparedHeroEdit.Preview);
-            if (string.IsNullOrWhiteSpace(heroLimitWarning))
+            var heroWarning = FormatHeroPreviewWarnings(preparedHeroEdit.Preview);
+            if (string.IsNullOrWhiteSpace(heroWarning))
             {
                 PreviewWarningTextBlock.Visibility = Visibility.Collapsed;
                 PreviewWarningTextBlock.Text = string.Empty;
             }
             else
             {
-                PreviewWarningTextBlock.Text = heroLimitWarning;
+                PreviewWarningTextBlock.Text = heroWarning;
                 PreviewWarningTextBlock.Visibility = Visibility.Visible;
-                AppendStatus($"人物怪癖上限提示：{heroLimitWarning.Replace(Environment.NewLine, "；", StringComparison.Ordinal)}");
+                AppendStatus($"人物预览警告：{heroWarning.Replace(Environment.NewLine, "；", StringComparison.Ordinal)}", level: DiagnosticLogLevel.Warning);
             }
             var heroPreview = generated.Preview;
             var targetStagecoach = preparedHeroEdit.Preview.TargetPool == StagecoachRecruitPool.Shard
@@ -217,13 +221,15 @@ public partial class MainWindow : Window
                 $"个人升级记录 {preparedHeroEdit.Preview.UpgradePurchaseCount} 条。");
             foreach (var warning in heroPreview.Warnings)
             {
-                AppendStatus($"人物预览提示：{warning}");
+                AppendStatus($"人物预览提示：{warning}", level: DiagnosticLogLevel.Warning);
             }
             AppendStatus($"人物预览工作区：{preparedHeroEdit.WorkspaceDirectory}");
         }
         catch (Exception ex)
         {
-            AppendStatus($"生成预览失败：{ex.Message}");
+            CrashDiagnostics.RecordException("Save edit: preview", ex,
+                $"档案目录={ProfileDirectoryTextBox.Text.Trim()}；功能页={CatalogTabs.SelectedIndex}");
+            AppendStatusSafely($"生成预览失败：{ex.Message}", "Save edit: preview failure status", DiagnosticLogLevel.Error);
         }
         finally
         {
@@ -266,7 +272,7 @@ public partial class MainWindow : Window
                 $"个人升级记录 {_preparedHeroEdit.Preview.UpgradePurchaseCount} 条；" +
                 $"GUID {_preparedHeroEdit.Preview.CandidateGuid}；" +
                 $"初始怪癖 [{FormatSelectedQuirks(_preparedHeroCandidatePreview)}]）";
-            definitionLimitWarningText = FormatHeroQuirkLimitWarnings(_preparedHeroEdit.Preview);
+            definitionLimitWarningText = FormatHeroPreviewWarnings(_preparedHeroEdit.Preview);
         }
         else
         {
@@ -279,6 +285,11 @@ public partial class MainWindow : Window
                 : string.Empty;
         }
 
+        var operationDetails = isItemEdit
+            ? SaveEditLogFormatter.Describe(_preparedQuantityItemEdit!)
+            : isHeroEdit
+                ? SaveEditLogFormatter.Describe(_preparedHeroEdit!, _preparedHeroCandidatePreview)
+                : SaveEditLogFormatter.Describe(_preparedTrinketEdit!);
         var definitionLimitWarning = string.IsNullOrWhiteSpace(definitionLimitWarningText)
             ? string.Empty
             : $"\n\n注意：\n{definitionLimitWarningText}";
@@ -290,13 +301,15 @@ public partial class MainWindow : Window
             "确认应用存档修改");
         if (!confirmation)
         {
-            AppendStatus("已取消应用，真实存档未修改。");
+            AppendStatus($"已取消应用，真实存档未修改：{operationDetails}");
             return;
         }
 
+        var committed = false;
         try
         {
             SetBusy(true);
+            AppendStatusSafely($"开始应用：{operationDetails}", "Save edit: start diagnostics");
             string backupDirectory;
             SaveCommitResult? estateCommit = null;
             if (isItemEdit)
@@ -313,6 +326,9 @@ public partial class MainWindow : Window
                 estateCommit = await _editService.CommitAsync(_preparedTrinketEdit!);
                 backupDirectory = estateCommit.BackupDirectory;
             }
+
+            committed = true;
+            AppendStatusSafely($"应用成功：{operationDetails}；备份={backupDirectory}", "Save edit: success diagnostics");
 
             if (isItemEdit && estateCommit is not null)
             {
@@ -346,7 +362,6 @@ public partial class MainWindow : Window
                 UpdateCatalogMode();
             }
 
-            AppendStatus($"应用成功。备份：{backupDirectory}");
             ThemedDialog.ShowMessage(
                 this,
                 $"存档修改成功。\n\n备份目录：\n{backupDirectory}",
@@ -356,8 +371,10 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            AppendStatus($"应用失败：{ex.Message}");
-            ThemedDialog.ShowMessage(this, ex.Message, "应用失败", ThemedDialogKind.Error);
+            var failureLabel = committed ? "存档已写入，但后续界面更新失败" : "应用失败";
+            CrashDiagnostics.RecordException("Save edit: " + (committed ? "post-commit UI" : "commit"), ex, operationDetails);
+            AppendStatusSafely($"{failureLabel}：{ex.Message}；{operationDetails}", "Save edit: failure diagnostics", DiagnosticLogLevel.Error);
+            ThemedDialog.ShowMessage(this, ex.Message, failureLabel, ThemedDialogKind.Error);
         }
         finally
         {

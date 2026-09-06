@@ -18,6 +18,7 @@ internal static partial class ContractSuite
         await VerifyImplicitSkillProgressionContractsAsync(catalog.HeroCatalog, catalog.LocalHero, codec, runRoot);
         VerifyHeroQuirkContracts(catalog.HeroCatalog, catalog.LocalHero);
         var candidates = VerifyHeroCandidateContracts(catalog.HeroCatalog, catalog.LocalHero);
+        await VerifyStagecoachRefreshWarningContractsAsync(activeContent, profile, codec, runRoot, catalog.HeroCatalog, candidates);
         await VerifyStagecoachHeroSaveContractsAsync(
             activeContent,
             profile,
