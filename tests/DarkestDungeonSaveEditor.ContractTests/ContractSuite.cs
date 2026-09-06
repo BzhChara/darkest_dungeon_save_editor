@@ -90,6 +90,7 @@ internal static partial class ContractSuite
         RunLegacyLocalizationContracts(activeContent, fixture);
         RunLocalizationEntryIsolationContracts(activeContent, fixture);
         RunContentInventoryContracts(activeContent, fixture, repositoryRoot);
+        RunLoggingContracts(activeContent, runRoot);
         var quantityState = await RunQuantityItemCatalogContractsAsync(
             activeContent,
             decodedSeedPath,

@@ -22,16 +22,17 @@ public partial class MainWindow
     {
         if (inventory is null)
         {
-            AppendStatus("文件清点未完成，原因已记录到完整日志；业务目录仍按现有规则加载。");
+            AppendStatus("文件清点未完成，原因已记录到完整日志；业务目录仍按现有规则加载。", level: DiagnosticLogLevel.Warning);
             return;
         }
 
-        AppendStatus(ContentFileInventory.FormatSummary(inventory));
+        AppendStatus(ContentFileInventory.FormatSummary(inventory),
+            level: inventory.Mods.Any(mod => !mod.IsComplete) ? DiagnosticLogLevel.Warning : DiagnosticLogLevel.Information);
         await Task.Run(() =>
         {
-            foreach (var line in ContentFileInventory.FormatDetails(inventory))
+            foreach (var entry in ContentFileInventory.FormatLogDetails(inventory))
             {
-                CrashDiagnostics.RecordStatus(line);
+                CrashDiagnostics.RecordStatus(entry.Message, entry.Level);
             }
         });
     }

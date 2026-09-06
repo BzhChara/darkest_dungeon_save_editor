@@ -129,7 +129,7 @@ public partial class MainWindow : Window
     {
         if (HeroGrid.SelectedItem is not HeroRow selectedHero || _heroCatalog is null)
         {
-            AppendStatus("请先选择一个人物职业。");
+            AppendStatus("请先选择一个人物职业。", level: DiagnosticLogLevel.Warning);
             return;
         }
 
@@ -162,12 +162,13 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
+            CrashDiagnostics.RecordException("Initial quirks: selection dialog", ex);
             if (dialog?.IsVisible == true)
             {
                 dialog.Close();
             }
 
-            AppendStatus($"打开初始怪癖选择失败：{ex.Message}");
+            AppendStatusSafely($"打开初始怪癖选择失败：{ex.Message}", "Initial quirks: failure status", DiagnosticLogLevel.Error);
         }
     }
 

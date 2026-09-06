@@ -746,6 +746,8 @@ internal static partial class ContractSuite
             encounterContent,
             snapshotAfterGuardedTreasureDelete);
         VerifyDirectEncounterDependencyContracts(encounterContent, snapshotAfterGuardedTreasureDelete, standardEncounterPath);
+        VerifyEncounterDiagnosticContracts(encounterContent, snapshotAfterGuardedTreasureDelete, runRoot);
+        VerifyBattleMapLogContracts(snapshotAfterGuardedTreasureDelete);
         VerifyEncounterSelectionContracts(encounterCatalog);
         var directHallEncounters = encounterCatalog.DirectEncounters
             .Where(encounter => encounter.MashType == 0)
@@ -824,7 +826,7 @@ internal static partial class ContractSuite
                 !encounter.MonsterIds.Contains("manifest_residue_B") &&
                 !encounter.MonsterIds.Contains("missing_dependency_B")) &&
             encounterCatalog.Issues.Any(issue =>
-                issue.Contains("unresolved active monster ids", StringComparison.Ordinal) &&
+                issue.Contains("遭遇排除明细（全局 Bridge）：未找到活动怪物定义", StringComparison.Ordinal) &&
                 issue.Contains("missing_dependency_B", StringComparison.Ordinal)),
             "The global Bridge catalog must include enabled Base/Mod encounters across regions and difficulties, preserve authored target kinds, apply exact-path overlays, and exclude unlisted Mod residue or rows with unresolved active monster dependencies.");
 

@@ -814,7 +814,12 @@ public partial class BattleMapView : UserControl
             };
             SaveEditApplied?.Invoke(
                 $"战斗地图{operationLabel}已应用：" +
-                $"目标={target.SourceAreaId}.{target.SourceTileId}；备份={result.BackupDirectory}");
+                $"操作编号={prepared.SessionId}；档案={profile.ProfileId}；目录={profile.ProfileDirectory}；" +
+                $"目标={target.SourceAreaId}.{target.SourceTileId}；" +
+                (kind == BattleMapEditKind.MoveParty ? $"原位置={snapshot.PartyAreaId}/tile{snapshot.PartyTileIndex}；" : string.Empty) +
+                (prepared.Encounter is { } appliedEncounter ? $"敌方=[{appliedEncounter.DisplayName}]；难度={appliedEncounter.OriginDifficulty}；" : string.Empty) +
+                (prepared.Attachment is { } appliedAttachment ? $"附加内容={appliedAttachment.Id}；" : string.Empty) +
+                $"备份={result.BackupDirectory}");
             if (generation != _profileGeneration || _snapshotReader is null)
             {
                 return;

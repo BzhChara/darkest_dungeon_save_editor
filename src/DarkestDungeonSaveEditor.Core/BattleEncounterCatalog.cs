@@ -250,31 +250,13 @@ public static partial class BattleEncounterCatalog
                     UnavailableReason = "缺少当前活动敌方定义：" + string.Join(", ", missingIds)
                 };
                 issues.Add(
-                    $"Unavailable direct encounter at {encounters[index].SourcePath}:{encounters[index].SourceLine} " +
-                    $"(index {encounters[index].MashIndex} preserved): " + string.Join(", ", missingIds));
+                    $"当前副本遭遇不可直写（索引 {encounters[index].MashIndex} 保留，不重排后续索引）：" +
+                    FormatUnresolvedEncounter(CreateUnresolvedEncounterDiagnostic(
+                        encounters[index], missingIds, availableMonsters.Ids)));
             }
         }
 
-        var unresolvedBridgeRows = bridgeCandidateRows
-            .Select(encounter => new
-            {
-                Encounter = encounter,
-                MissingIds = GetMissingMonsterIds(encounter, availableMonsters.Ids)
-            })
-            .Where(item => item.MissingIds.Length > 0)
-            .ToArray();
-        if (unresolvedBridgeRows.Length > 0)
-        {
-            var unresolvedIds = unresolvedBridgeRows
-                .SelectMany(item => item.MissingIds)
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .OrderBy(id => id, StringComparer.OrdinalIgnoreCase)
-                .ToArray();
-            globalIssues.Add(
-                $"Excluded {unresolvedBridgeRows.Length} Bridge encounter rows with " +
-                $"{unresolvedIds.Length} unresolved active monster ids: " +
-                string.Join(", ", unresolvedIds));
-        }
+        AddUnresolvedEncounterIssues(bridgeCandidateRows, availableMonsters.Ids, globalIssues);
 
         var bridgeEncounters = bridgeCandidateRows
             .Where(encounter => encounter.MonsterIds.All(availableMonsters.Ids.Contains))
@@ -667,7 +649,7 @@ public static partial class BattleEncounterCatalog
                 token.Equals(".types", StringComparison.OrdinalIgnoreCase));
             if (typesIndex < 0)
             {
-                issues.Add($"Encounter row has no .types list: {file.Path}:{lineIndex + 1}");
+                issues.Add($"遭遇行缺少怪物列表（.types），已跳过：{file.Path}:{lineIndex + 1}");
                 continue;
             }
             var monsters = tokens
@@ -677,7 +659,7 @@ public static partial class BattleEncounterCatalog
                 .ToArray();
             if (monsters.Length == 0)
             {
-                issues.Add($"Encounter row has an empty .types list: {file.Path}:{lineIndex + 1}");
+                issues.Add($"遭遇行的怪物列表（.types）为空，已跳过：{file.Path}:{lineIndex + 1}");
                 continue;
             }
 

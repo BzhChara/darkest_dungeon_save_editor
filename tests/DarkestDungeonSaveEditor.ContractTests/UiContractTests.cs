@@ -128,9 +128,10 @@ internal static partial class ContractSuite
             "Path discovery must run only after the user clicks the button, fill the derived Workshop/local Mod paths, and report its result in user-facing language instead of terse counters.");
         Assert(
             appCode.Contains("SaveEditorLocations.ResolveLogDirectory(AppContext.BaseDirectory)", StringComparison.Ordinal) &&
-            mainWindowCode.Contains("CrashDiagnostics.RecordStatus(message);", StringComparison.Ordinal) &&
-            mainWindowCode.Contains("foreach (var issueMessage in issueMessages)", StringComparison.Ordinal),
-            "Project-local logging must persist ordinary UI status and every catalog issue.");
+            mainWindowCode.Contains("CrashDiagnostics.RecordStatus(message, level);", StringComparison.Ordinal) &&
+            mainWindowCode.Contains("CrashDiagnostics.RecordCatalogDiagnostics(diagnosticBatch)", StringComparison.Ordinal) &&
+            appCode.Contains("foreach (var entry in batch.Drain())", StringComparison.Ordinal),
+            "Project-local logging must persist ordinary UI status and all grouped catalog diagnostics, including those outside the visible-message limit.");
         Assert(
             mainWindowCode.Contains("内容目录档案：ID={activeContent.Profile.ProfileId}", StringComparison.Ordinal) &&
             mainWindowCode.Contains("档案目录={activeContent.Profile.ProfileDirectory}", StringComparison.Ordinal) &&
@@ -199,13 +200,21 @@ internal static partial class ContractSuite
             "The trinket UI must render limit zero as unlimited and expose a dedicated preview warning area.");
         Assert(
             mainWindowCode.Contains(
-                "FormatHeroQuirkLimitWarnings(preparedHeroEdit.Preview)",
+                "FormatHeroPreviewWarnings(preparedHeroEdit.Preview)",
                 StringComparison.Ordinal) &&
             mainWindowCode.Contains("全部马车池", StringComparison.Ordinal) &&
             mainWindowCode.Contains("（singleton）", StringComparison.Ordinal) &&
             mainWindowCode.Contains("编辑器会按控制台模式保留写入能力", StringComparison.Ordinal) &&
             !mainWindowCode.Contains("HeroQuirkLimitKind.RosterLimit", StringComparison.Ordinal),
             "Hero quirk warnings must remain scoped to singleton duplication across the roster and all stagecoach pools.");
+        Assert(
+            mainWindowCode.Contains("preview.MayRefreshOnTownReturn", StringComparison.Ordinal) &&
+            mainWindowCode.Contains("回城过周刷新马车时，新人物可能被清除", StringComparison.Ordinal) &&
+            mainWindowCode.Contains("FormatHeroQuirkLimitWarnings(preview)", StringComparison.Ordinal) &&
+            mainWindowCode.Contains("FormatHeroPreviewWarnings(_preparedHeroEdit.Preview)", StringComparison.Ordinal) &&
+            mainWindowCode.Contains("PreviewWarningTextBlock.Text = heroWarning", StringComparison.Ordinal) &&
+            mainWindowCode.Contains("人物预览警告：", StringComparison.Ordinal),
+            "Hero refresh risk must share the existing preview warning, confirmation, and log path without replacing singleton warnings.");
         Assert(
             mainWindowCode.Contains(
                 "preparedHeroEdit.Preview.TargetPool == StagecoachRecruitPool.Shard",
@@ -1257,6 +1266,7 @@ internal static partial class ContractSuite
                 StringComparison.Ordinal),
             "Quirk filtering must use stable catalog fields only; selecting an incompatible quirk must not make its counterpart appear merely because the dynamic unavailable reason names the query quirk.");
 
+        RunLoggingUiContracts(repositoryRoot);
         RunUiLayoutContracts(repositoryRoot);
     }
 }

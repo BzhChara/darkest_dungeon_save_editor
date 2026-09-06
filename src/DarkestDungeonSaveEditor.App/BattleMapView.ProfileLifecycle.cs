@@ -62,10 +62,13 @@ public partial class BattleMapView : UserControl
         ActiveContentSnapshot? activeContent = null,
         string? workshopDirectory = null,
         string? localModDirectory = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        CatalogDiagnosticBatch? diagnosticBatch = null)
     {
         ArgumentNullException.ThrowIfNull(profile);
         ArgumentNullException.ThrowIfNull(codec);
+        var ownsDiagnosticBatch = diagnosticBatch is null;
+        diagnosticBatch ??= new CatalogDiagnosticBatch();
         var profileDirectory = Path.GetFullPath(profile.ProfileDirectory);
         var generation = unchecked(++_profileGeneration);
         CancelScheduledRefreshRetry();
@@ -120,19 +123,16 @@ public partial class BattleMapView : UserControl
                         var bridgeByType = _encounterCatalog.BridgeEncounters
                             .GroupBy(encounter => encounter.MashType)
                             .ToDictionary(group => group.Key, group => group.Count());
+                        diagnosticBatch.Add("战斗遭遇", _encounterCatalog.Issues);
                         CrashDiagnostics.RecordStatus(
                             $"战斗遭遇目录：地区={snapshot.DungeonId}；难度={snapshot.Difficulty}；" +
-                            $"当前可写 hall={directByType.GetValueOrDefault(0)}，" +
-                            $"room={directByType.GetValueOrDefault(1)}，" +
-                            $"boss={directByType.GetValueOrDefault(2)}；" +
-                            $"全局 Bridge 候选 hall={bridgeByType.GetValueOrDefault(0)}，" +
-                            $"room={bridgeByType.GetValueOrDefault(1)}，" +
-                            $"boss={bridgeByType.GetValueOrDefault(2)}；" +
-                            $"提示={_encounterCatalog.Issues.Count}");
-                        foreach (var issue in _encounterCatalog.Issues)
-                        {
-                            CrashDiagnostics.RecordStatus($"战斗遭遇目录提示：{issue}");
-                        }
+                            $"无需 Bridge 的直接索引：走廊={directByType.GetValueOrDefault(0)}，" +
+                            $"房间={directByType.GetValueOrDefault(1)}，" +
+                            $"首领房间={directByType.GetValueOrDefault(2)}；" +
+                            $"全局 Bridge 候选：走廊={bridgeByType.GetValueOrDefault(0)}，" +
+                            $"房间={bridgeByType.GetValueOrDefault(1)}，" +
+                            $"首领房间={bridgeByType.GetValueOrDefault(2)}；" +
+                            "直接索引为 0 不代表没有 Bridge 候选；实际写入仍需满足存档状态和安全检查。诊断并入本轮目录日志。");
                     }
                     catch (OperationCanceledException)
                     {
@@ -156,14 +156,10 @@ public partial class BattleMapView : UserControl
                         _roomAttachmentCatalog = await Task.Run(
                             () => BattleRoomAttachmentCatalog.Load(activeContent),
                             cancellationToken);
+                        diagnosticBatch.Add("战斗附加内容", _roomAttachmentCatalog.Issues);
                         CrashDiagnostics.RecordStatus(
                             $"战斗附加内容目录：奇物={_roomAttachmentCatalog.Curios.Count}；" +
-                            $"宝箱={_roomAttachmentCatalog.Treasures.Count}；" +
-                            $"提示={_roomAttachmentCatalog.Issues.Count}");
-                        foreach (var issue in _roomAttachmentCatalog.Issues)
-                        {
-                            CrashDiagnostics.RecordStatus($"战斗附加内容目录提示：{issue}");
-                        }
+                            $"宝箱={_roomAttachmentCatalog.Treasures.Count}；诊断并入本轮目录日志。");
                     }
                     catch (OperationCanceledException)
                     {
@@ -212,6 +208,10 @@ public partial class BattleMapView : UserControl
         }
         finally
         {
+            if (ownsDiagnosticBatch)
+            {
+                CrashDiagnostics.RecordCatalogDiagnostics(diagnosticBatch);
+            }
             if (generation == _profileGeneration)
             {
                 StartProfileMonitoring();

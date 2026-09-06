@@ -18,6 +18,7 @@ public partial class MainWindow : Window
 
     private void InvalidateCatalog()
     {
+        _battleMapLogTracker.Reset();
         InvalidatePreparedEdit();
         _catalogProfileDirectory = null;
         _catalogGameSaveSha256 = null;
