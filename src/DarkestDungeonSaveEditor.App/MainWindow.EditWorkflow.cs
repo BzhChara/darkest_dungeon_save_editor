@@ -293,6 +293,7 @@ public partial class MainWindow : Window
         var definitionLimitWarning = string.IsNullOrWhiteSpace(definitionLimitWarningText)
             ? string.Empty
             : $"\n\n注意：\n{definitionLimitWarningText}";
+        var confirmationRevision = _editRevision;
         var confirmation = ThemedDialog.Confirm(
             this,
             $"将对以下档案执行：{changeSummary}\n\n" +
@@ -302,6 +303,12 @@ public partial class MainWindow : Window
         if (!confirmation)
         {
             AppendStatus($"已取消应用，真实存档未修改：{operationDetails}");
+            return;
+        }
+        if (confirmationRevision != _editRevision || _editService is null ||
+            (_preparedQuantityItemEdit is null && _preparedTrinketEdit is null && _preparedHeroEdit is null))
+        {
+            AppendStatus("确认期间存档已变化，旧预览已取消；同步完成后请重新生成预览。", level: DiagnosticLogLevel.Warning);
             return;
         }
 
@@ -358,7 +365,7 @@ public partial class MainWindow : Window
                         }
                         : item)
                     .ToArray();
-                ApplyFilter();
+                RefreshCatalogRowsPreservingInput(sceneChanged: false, contentChanged: false);
                 UpdateCatalogMode();
             }
 
@@ -378,6 +385,7 @@ public partial class MainWindow : Window
         }
         finally
         {
+            RequestProfileSync(invalidatePreview: false);
             SetBusy(false);
         }
     }

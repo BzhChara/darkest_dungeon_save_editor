@@ -61,7 +61,7 @@ internal static partial class ContractSuite
                loading.Contains("quantityItemCatalogTask = diagnosticBatch.CaptureAsync(\"物品\"", StringComparison.Ordinal) &&
                loading.Replace("\r\n", "\n", StringComparison.Ordinal).Contains("finally\n        {\n            // Flush partial results", StringComparison.Ordinal) &&
                battleLoading.Contains("diagnosticBatch.Add(\"战斗遭遇\", _encounterCatalog.Issues)", StringComparison.Ordinal) &&
-               battleLoading.Contains("diagnosticBatch.Add(\"战斗附加内容\", _roomAttachmentCatalog.Issues)", StringComparison.Ordinal) &&
+               battleLoading.Contains("diagnosticBatch.Add(\"地图内容\", _roomAttachmentCatalog.Issues)", StringComparison.Ordinal) &&
                battleLoading.Contains("if (ownsDiagnosticBatch)", StringComparison.Ordinal) &&
                app.Contains("foreach (var entry in batch.Drain())", StringComparison.Ordinal) &&
                app.Contains("RecordException(\"Catalog diagnostics: flush\", ex)", StringComparison.Ordinal),

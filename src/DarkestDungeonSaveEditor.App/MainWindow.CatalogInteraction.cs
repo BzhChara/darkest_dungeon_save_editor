@@ -22,7 +22,7 @@ public partial class MainWindow : Window
         ApplyFilter();
     }
 
-    private void ApplyFilter()
+    private void ApplyFilter(bool itemsOnly = false)
     {
         var keyword = SearchTextBox.Text.Trim();
         var showHiddenItemsOnly = ShowUnusedItemsCheckBox.IsChecked == true;
@@ -41,6 +41,8 @@ public partial class MainWindow : Window
         {
             _visibleItems.Add(new ItemRow(definition));
         }
+
+        if (itemsOnly) return;
 
         var filteredTrinkets = _allTrinkets.Where(definition =>
             string.IsNullOrWhiteSpace(keyword) ||
@@ -76,20 +78,24 @@ public partial class MainWindow : Window
 
     private void ItemGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
+        if (_restoringCatalogSelection) return;
         InvalidatePreparedEdit();
         if (CatalogTabs.SelectedIndex == 0 && ItemGrid.SelectedItem is ItemRow selected)
         {
             CopiesTextBox.Text = selected.CurrentAmount.ToString(CultureInfo.InvariantCulture);
         }
+        UpdateEnabledState();
     }
 
     private void TrinketGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
+        if (_restoringCatalogSelection) return;
         InvalidatePreparedEdit();
         if (CatalogTabs.SelectedIndex == 1 && TrinketGrid.SelectedItem is TrinketRow)
         {
             CopiesTextBox.Text = "1";
         }
+        UpdateEnabledState();
     }
 
     private void CopiesTextBox_TextChanged(object sender, TextChangedEventArgs e) => InvalidatePreparedEdit();
@@ -116,6 +122,7 @@ public partial class MainWindow : Window
 
     private void HeroGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
+        if (_restoringCatalogSelection) return;
         InvalidatePreparedEdit();
         _selectedInitialQuirkIds = [];
         UpdateInitialQuirkSelectionSummary();
@@ -134,6 +141,7 @@ public partial class MainWindow : Window
         }
 
         InitialQuirkSelectionDialog? dialog = null;
+        var catalog = _heroCatalog;
         try
         {
             dialog = new InitialQuirkSelectionDialog(
@@ -146,6 +154,12 @@ public partial class MainWindow : Window
             };
             if (dialog.ShowDialog() != true)
             {
+                return;
+            }
+
+            if (!ReferenceEquals(catalog, _heroCatalog))
+            {
+                AppendStatus("活动内容已更新，请重新选择初始怪癖。", level: DiagnosticLogLevel.Warning);
                 return;
             }
 

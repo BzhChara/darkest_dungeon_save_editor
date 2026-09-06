@@ -89,15 +89,13 @@ public partial class BattleMapView : UserControl
             {
                 _refreshGate.Release();
             }
+            // A successful return hides the map, but the same canvas is reused on the next raid.
             _isApplyingEdit = false;
+            MapCanvas.IsHitTestVisible = true;
             SaveEditBusyChanged?.Invoke(false);
             if (generation == _profileGeneration)
             {
-                if (!committed)
-                {
-                    MapCanvas.IsHitTestVisible = true;
-                    ForceTownButton.IsEnabled = _currentSnapshot is not null;
-                }
+                ForceTownButton.IsEnabled = _currentSnapshot is not null;
                 StartProfileMonitoring();
             }
         }

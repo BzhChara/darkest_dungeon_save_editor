@@ -107,7 +107,8 @@ public enum BattleMapEditKind
     MoveParty,
     PlaceBattle,
     SetBattleAttachment,
-    RemoveBattleAttachment
+    RemoveBattleAttachment,
+    PlaceContent
 }
 
 public sealed record BattleMapEditPreview(

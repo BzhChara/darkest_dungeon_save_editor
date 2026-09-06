@@ -21,6 +21,7 @@ public partial class MainWindow : Window
         {
             CrashDiagnostics.SetStage("LoadCatalog: invalidating previous catalog");
             InvalidateCatalog();
+            var generation = _catalogGeneration;
             CrashDiagnostics.SetStage("LoadCatalog: entering busy state");
             SetBusy(true);
             var gameDirectory = RequireDirectory(GameDirectoryTextBox.Text, "游戏目录");
@@ -64,6 +65,7 @@ public partial class MainWindow : Window
             await Task.WhenAll(staticCatalogTask, quantityItemCatalogTask);
             var catalogs = await staticCatalogTask;
             var quantityItems = await quantityItemCatalogTask;
+            if (generation != _catalogGeneration) return;
             CrashDiagnostics.SetStage("LoadCatalog: assigning catalog results");
             _allItems = quantityItems.Items;
             _allTrinkets = catalogs.Trinkets.Trinkets;
@@ -144,6 +146,7 @@ public partial class MainWindow : Window
             {
                 AppendStatus(entry.Message, persist: false);
             }
+            if (generation != _catalogGeneration) return;
 
             if (diagnostics.Count > 30)
             {
@@ -151,6 +154,8 @@ public partial class MainWindow : Window
             }
 
             CrashDiagnostics.SetStage("LoadCatalog: synchronous UI update completed");
+            StartProfileSync(activeContent, quantityItems, codec, gameDirectory,
+                workshopDirectory, additionalLocalModDirectory);
         }
         catch (Exception ex)
         {

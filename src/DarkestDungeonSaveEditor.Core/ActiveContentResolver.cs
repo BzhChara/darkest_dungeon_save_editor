@@ -80,6 +80,23 @@ public static class ActiveContentResolver
         }
 
         await codec.DecodeAsync(sourceCopyPath, decodedGamePath, cancellationToken).ConfigureAwait(false);
+        return ResolveDecoded(profile, gameDirectory, workshopDirectory,
+            normalizedAdditionalLocalModDirectory, workspace, decodedGamePath, originalHash, cancellationToken);
+    }
+
+    public static ActiveContentSnapshot ResolveDecoded(
+        SaveProfile profile,
+        string gameDirectory,
+        string? workshopDirectory,
+        string? additionalLocalModDirectory,
+        string workspace,
+        string decodedGamePath,
+        string originalHash,
+        CancellationToken cancellationToken = default)
+    {
+        gameDirectory = Path.GetFullPath(gameDirectory);
+        var normalizedAdditionalLocalModDirectory = string.IsNullOrWhiteSpace(additionalLocalModDirectory)
+            ? null : Path.GetFullPath(additionalLocalModDirectory);
         var root = JsonSupport.ReadObject(decodedGamePath);
         var baseRoot = JsonSupport.RequireObject(root, "base_root");
         var gameMode = JsonSupport.ReadString(baseRoot, "game_mode");

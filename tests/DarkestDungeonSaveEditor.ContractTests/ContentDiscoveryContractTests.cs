@@ -44,6 +44,7 @@ internal static partial class ContractSuite
             WriteProbe($"{prefix}/dungeons/probe/probe.props.darkest",
                 $"room_curios: .chance 1 .types {id}_curio\n" +
                 $"room_treasures: .chance 1 .types {id}_chest\n");
+            WriteMapCurioFixtures(Path.Combine(root, prefix), "probe", $"{id}_curio", $"{id}_chest");
             WriteProbe($"{prefix}/inventory/probe.inventory.system_configs.darkest",
                 "inventory_system_config: .type \"trinket_storage\" .max_slots 18\n" +
                 "inventory_system_config: .type \"raid\" .max_slots 20 .use_stack_limits true\n");
@@ -130,6 +131,8 @@ internal static partial class ContractSuite
         Directory.CreateDirectory(Path.GetDirectoryName(modPath)!);
         File.WriteAllText(builtinPath, "room_curios: .chance 1 .types original_dlc_curio\n");
         File.WriteAllText(modPath, "room_curios: .chance 1 .types mod_dlc_curio\nroom_treasures: .chance 1 .types mod_dlc_chest\n");
+        WriteMapCurioFixtures(builtinRoot, "probe", "original_dlc_curio");
+        WriteMapCurioFixtures(Path.Combine(modRoot, prefix), "probe", "mod_dlc_curio", "mod_dlc_chest");
         var content = activeContent with
         {
             Sources =
@@ -142,13 +145,14 @@ internal static partial class ContractSuite
             ]
         };
         var withoutManifest = BattleRoomAttachmentCatalog.Load(content);
-        File.WriteAllText(Path.Combine(modRoot, "modfiles.txt"), $"{prefix}/{relativePath} {new FileInfo(modPath).Length}\n");
+        File.WriteAllText(Path.Combine(modRoot, "modfiles.txt"), $"{prefix}/{relativePath} {new FileInfo(modPath).Length}\n" +
+            $"{prefix}/curios/probe_curio_props.csv 1\n{prefix}/curios/probe_curio_type_library.csv 1\n");
         var withManifest = BattleRoomAttachmentCatalog.Load(content);
         Assert(
             withoutManifest.Definitions.Select(item => item.Id).Order().SequenceEqual(["mod_dlc_chest", "mod_dlc_curio"]) &&
             withoutManifest.Definitions.Select(item => item.Id).SequenceEqual(withManifest.Definitions.Select(item => item.Id)) &&
-            withoutManifest.Guard.EffectiveFiles.Count == 1 &&
-            withoutManifest.Guard.EffectiveFiles.Single().SourceId == "local:prop-probe" &&
+            withoutManifest.Guard.EffectiveFiles.Count == 3 &&
+            withoutManifest.Guard.EffectiveFiles.All(file => file.SourceId == "local:prop-probe") &&
             withoutManifest.Guard.Fingerprint == withManifest.Guard.Fingerprint,
             "The same enabled-DLC room prop overlay must replace its builtin provider with or without a manifest, including its write-guard fingerprint.");
     }

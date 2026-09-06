@@ -2,7 +2,7 @@ using System.Text.Json.Nodes;
 
 namespace DarkestDungeonSaveEditor.Core;
 
-internal static class BattleMapSaveEditor
+internal static partial class BattleMapSaveEditor
 {
     private const int NoAreaHash = 1701736302;
 

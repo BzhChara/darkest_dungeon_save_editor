@@ -110,8 +110,6 @@
                                     <CheckBox HorizontalAlignment="Center" VerticalAlignment="Center"
                                               IsChecked="{Binding IsSelected, Mode=OneWay}"
                                               IsEnabled="{Binding IsSelectable}"
-                                              ToolTip="{Binding UnavailableReason}"
-                                              ToolTipService.ShowOnDisabled="True"
                                               Click="QuirkCheckBox_Click" />
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellTemplate>

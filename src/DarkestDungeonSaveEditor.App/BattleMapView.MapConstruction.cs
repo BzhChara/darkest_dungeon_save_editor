@@ -63,11 +63,8 @@ public partial class BattleMapView : UserControl
                 var kind = area.Kind == BattleMapAreaKind.Room
                     ? PrototypeCellKind.Room
                     : PrototypeCellKind.Corridor;
-                var isHiddenSystemContent = tile.Content == BattleMapTileContent.Hunger;
                 var content = ConvertContent(tile.Content);
-                var contentLabel = isHiddenSystemContent
-                    ? null
-                    : FormatSnapshotContent(tile.Content, tile.RawContent);
+                var contentLabel = FormatSnapshotContent(tile.Content, tile.RawContent);
                 if (kind == PrototypeCellKind.Room &&
                     string.Equals(area.AreaId, snapshot.EntranceAreaId, StringComparison.OrdinalIgnoreCase))
                 {
@@ -136,6 +133,7 @@ public partial class BattleMapView : UserControl
         BattleMapTileContent.Battle or BattleMapTileContent.Ambush => PrototypeContent.Battle,
         BattleMapTileContent.Trap => PrototypeContent.Trap,
         BattleMapTileContent.Obstacle => PrototypeContent.Obstacle,
+        BattleMapTileContent.Hunger => PrototypeContent.Hunger,
         BattleMapTileContent.Happening or
             BattleMapTileContent.GuardedCurio or
             BattleMapTileContent.Curio or
@@ -157,7 +155,7 @@ public partial class BattleMapView : UserControl
         BattleMapTileContent.Happening => "事件",
         BattleMapTileContent.GuardedCurio => "守卫奇物",
         BattleMapTileContent.Curio => "奇物",
-        BattleMapTileContent.Hunger => "空白",
+        BattleMapTileContent.Hunger => "进食格",
         BattleMapTileContent.Treasure => "宝藏",
         BattleMapTileContent.GuardedTreasure => "守卫宝藏",
         BattleMapTileContent.AmbushCurio => "伏击奇物",

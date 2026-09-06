@@ -15,6 +15,7 @@ The suite is split by responsibility:
 - `HeroAvailabilityContractTests.cs`: per-level catalog preflight agreement with generation, missing skill/camping dependencies, and partially available levels;
 - `BridgeClassificationContractTests.cs`: original classification preservation, authored zero-weight special rows, legacy metadata recovery, and read-only unknown-origin/corrupt-manifest handling;
 - `BattleMapContractTests.cs`: map reading/monitoring, movement, hard deletion, battle placement, room attachments, global encounter catalogs, managed Bridge append/reuse, and force-town transactions;
+- `RegionalMapContentContractTests.cs`: current-region trap/obstacle weighted selection, zero/invalid weights, rejected resources, duplicate rows, file/ID overlays, numeric boundaries, and refreshed catalog guard rebinding;
 - `QuantityItemCatalogContractTests.cs`: town/raid item discovery and direct mutations;
 - `QuantityItemSaveContractTests.cs`: guarded quantity preview and commit transactions;
 - `TrinketCatalogContractTests.cs`: trinket overlays, localization, limits, and state definitions;

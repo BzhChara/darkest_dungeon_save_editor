@@ -50,6 +50,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        BattleMapPanel.UsesSharedProfileMonitor = true;
         ItemGrid.ItemsSource = _visibleItems;
         TrinketGrid.ItemsSource = _visibleTrinkets;
         HeroGrid.ItemsSource = _visibleHeroes;
@@ -69,6 +70,7 @@ public partial class MainWindow : Window
 
     protected override void OnClosed(EventArgs e)
     {
+        StopProfileSync();
         _titleLogoTimer?.Stop();
         BattleMapPanel.SnapshotRefreshed -= BattleMapPanel_SnapshotRefreshed;
         BattleMapPanel.ActiveContentChanged -= BattleMapPanel_ActiveContentChanged;
@@ -76,6 +78,12 @@ public partial class MainWindow : Window
         BattleMapPanel.SaveEditBusyChanged -= BattleMapPanel_SaveEditBusyChanged;
         BattleMapPanel.ClearProfile();
         base.OnClosed(e);
+    }
+
+    protected override void OnActivated(EventArgs e)
+    {
+        base.OnActivated(e);
+        RequestProfileSync(invalidatePreview: false);
     }
 
 }

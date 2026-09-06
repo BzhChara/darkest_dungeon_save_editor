@@ -11,8 +11,7 @@ public partial class BattleMapView : UserControl
     private ContextMenu BuildContextMenu(PrototypeMapCell cell)
     {
         CloseActiveContextMenu();
-        var isHiddenSystemContent = IsHiddenSystemContent(cell);
-        var isProtectedContent = isHiddenSystemContent ||
+        var isProtectedContent = IsHungerContent(cell) ||
                                  cell.Content == PrototypeContent.Entrance ||
                                  cell.Content == PrototypeContent.SecretDoor ||
                                  IsUnsupportedScriptContent(cell);
@@ -79,9 +78,10 @@ public partial class BattleMapView : UserControl
         return contextMenu;
     }
 
-    private static bool IsHiddenSystemContent(PrototypeMapCell cell) =>
-        cell.SourceAreaId is not null &&
-        cell.RawContent == (int)BattleMapTileContent.Hunger;
+    private static bool IsHungerContent(PrototypeMapCell cell) =>
+        cell.Content == PrototypeContent.Hunger ||
+        (cell.SourceAreaId is not null &&
+         cell.RawContent == (int)BattleMapTileContent.Hunger);
 
     private static bool IsUnsupportedScriptContent(PrototypeMapCell cell) =>
         cell.SourceAreaId is not null &&
@@ -142,19 +142,19 @@ public partial class BattleMapView : UserControl
             return;
         }
 
-        root.Items.Insert(0, CreateActionMenuItem("奇物", "?", () =>
-            ApplyContentPreview(cell, PrototypeContent.Curio, "奇物")));
+        var propCatalog = GetCurrentRoomAttachmentCatalog();
+        root.Items.Insert(0, CreateContentPickerItem(cell, "奇物", "?",
+            cell.Kind == PrototypeCellKind.Room ? propCatalog?.Curios ?? [] : propCatalog?.HallCurios ?? []));
         if (cell.Kind == PrototypeCellKind.Room)
         {
-            root.Items.Add(CreateActionMenuItem("宝箱", "✦", () =>
-                ApplyContentPreview(cell, PrototypeContent.Treasure, "宝箱")));
+            root.Items.Add(CreateContentPickerItem(cell, "宝箱", "✦", propCatalog?.Treasures ?? []));
         }
         else
         {
-            root.Items.Add(CreateActionMenuItem("陷阱", "!", () =>
-                ApplyContentPreview(cell, PrototypeContent.Trap, "陷阱")));
-            root.Items.Add(CreateActionMenuItem("障碍", "▰", () =>
-                ApplyContentPreview(cell, PrototypeContent.Obstacle, "障碍")));
+            root.Items.Add(CreateRegionalContentItem(cell, "陷阱", "!",
+                BattleRoomAttachmentKind.Trap));
+            root.Items.Add(CreateRegionalContentItem(cell, "障碍", "▰",
+                BattleRoomAttachmentKind.Obstacle));
         }
     }
 
@@ -488,30 +488,11 @@ public partial class BattleMapView : UserControl
         };
     }
 
-    private MenuItem CreateActionMenuItem(string header, string icon, Action action)
-    {
-        var menuItem = CreateMenuItem(header, icon);
-        menuItem.Click += (_, _) => action();
-        return menuItem;
-    }
-
     private MenuItem CreateAsyncActionMenuItem(string header, string icon, Func<Task> action)
     {
         var menuItem = CreateMenuItem(header, icon);
         menuItem.Click += async (_, _) => await action();
         return menuItem;
-    }
-
-    private void ApplyContentPreview(
-        PrototypeMapCell cell,
-        PrototypeContent content,
-        string contentLabel)
-    {
-        cell.Content = content;
-        cell.ContentLabel = contentLabel;
-        RefreshCellVisual(cell);
-        MapSelectionTextBlock.Text =
-            $"已在界面预览中把 {cell.DisplayName} 设置为“{contentLabel}”；存档未发生变化。";
     }
 
     private async Task DeleteContentAsync(PrototypeMapCell target)
@@ -567,7 +548,7 @@ public partial class BattleMapView : UserControl
             return;
         }
 
-        var contentWarning = target.RawContent == 0 || IsHiddenSystemContent(target)
+        var contentWarning = target.RawContent == 0 || IsHungerContent(target)
             ? string.Empty
             : Environment.NewLine +
               $"目标仍保留“{target.ContentLabel ?? "地图事件"}”；移动只修改队伍落点，" +
@@ -738,6 +719,7 @@ public partial class BattleMapView : UserControl
             BattleMapEditKind.DeleteContent => $"正在删除 {target.DisplayName} 的内容并验证存档……",
             BattleMapEditKind.MoveParty => $"正在把队伍移动到 {target.DisplayName} 并验证存档……",
             BattleMapEditKind.PlaceBattle => $"正在向 {target.DisplayName} 写入战斗并验证存档……",
+            BattleMapEditKind.PlaceContent => $"正在向 {target.DisplayName} 写入{attachment?.KindLabel}并验证存档……",
             BattleMapEditKind.SetBattleAttachment => $"正在修改 {target.DisplayName} 的战斗附加内容并验证存档……",
             BattleMapEditKind.RemoveBattleAttachment => $"正在移除 {target.DisplayName} 的战斗附加内容并验证存档……",
             _ => "正在验证战斗地图操作……"
@@ -786,6 +768,9 @@ public partial class BattleMapView : UserControl
                         target.SourceAreaId,
                         target.SourceTileId,
                         encounter),
+                BattleMapEditKind.PlaceContent when attachment is not null =>
+                    await service.PreparePlaceContentAsync(
+                        profile, snapshot, target.SourceAreaId, target.SourceTileId, attachment),
                 BattleMapEditKind.SetBattleAttachment when attachment is not null =>
                     await service.PrepareSetBattleAttachmentAsync(
                         profile,
@@ -808,6 +793,7 @@ public partial class BattleMapView : UserControl
                 BattleMapEditKind.DeleteContent => "删除",
                 BattleMapEditKind.MoveParty => "移动",
                 BattleMapEditKind.PlaceBattle => "遭遇写入",
+                BattleMapEditKind.PlaceContent => "内容写入",
                 BattleMapEditKind.SetBattleAttachment => "战斗附加内容写入",
                 BattleMapEditKind.RemoveBattleAttachment => "战斗附加内容移除",
                 _ => kind.ToString()
@@ -818,7 +804,12 @@ public partial class BattleMapView : UserControl
                 $"目标={target.SourceAreaId}.{target.SourceTileId}；" +
                 (kind == BattleMapEditKind.MoveParty ? $"原位置={snapshot.PartyAreaId}/tile{snapshot.PartyTileIndex}；" : string.Empty) +
                 (prepared.Encounter is { } appliedEncounter ? $"敌方=[{appliedEncounter.DisplayName}]；难度={appliedEncounter.OriginDifficulty}；" : string.Empty) +
-                (prepared.Attachment is { } appliedAttachment ? $"附加内容={appliedAttachment.Id}；" : string.Empty) +
+                (prepared.Attachment is { } appliedAttachment
+                    ? kind == BattleMapEditKind.PlaceContent
+                        ? $"内容={appliedAttachment.KindLabel}/{appliedAttachment.Id}；原内容={prepared.Preview.PreviousRawContent}；" +
+                          $"新内容={(int)appliedAttachment.StandaloneContent}；来源={appliedAttachment.SourceLabel}；"
+                        : $"附加内容={appliedAttachment.Id}；"
+                    : string.Empty) +
                 $"备份={result.BackupDirectory}");
             if (generation != _profileGeneration || _snapshotReader is null)
             {
@@ -841,6 +832,7 @@ public partial class BattleMapView : UserControl
                 BattleMapEditKind.DeleteContent => $"已删除 {target.DisplayName} 的内容。",
                 BattleMapEditKind.MoveParty => $"已将队伍移动到 {target.DisplayName}。",
                 BattleMapEditKind.PlaceBattle => $"已在 {target.DisplayName} 写入战斗遭遇。",
+                BattleMapEditKind.PlaceContent => $"已在 {target.DisplayName} 写入{attachment?.KindLabel}。",
                 BattleMapEditKind.SetBattleAttachment => $"已更新 {target.DisplayName} 的战斗附加内容。",
                 BattleMapEditKind.RemoveBattleAttachment => $"已移除 {target.DisplayName} 的战斗附加内容。",
                 _ => "战斗地图操作已完成。"

@@ -36,7 +36,7 @@ public partial class BattleMapView : UserControl
 
     private void StartProfileMonitoring()
     {
-        if (_profileDirectory is null || _profileMonitor is not null)
+        if (UsesSharedProfileMonitor || _profileDirectory is null || _profileMonitor is not null)
         {
             return;
         }
@@ -83,7 +83,7 @@ public partial class BattleMapView : UserControl
 
     private void ScheduleRefreshRetry(int generation)
     {
-        if (generation != _profileGeneration ||
+        if (UsesSharedProfileMonitor || generation != _profileGeneration ||
             _profileDirectory is null ||
             _snapshotReader is null ||
             _refreshRetryCancellation is not null)
@@ -152,7 +152,8 @@ public partial class BattleMapView : UserControl
         await _refreshGate.WaitAsync();
         try
         {
-            if (generation != _profileGeneration ||
+            if (UsesSharedProfileMonitor ||
+                generation != _profileGeneration ||
                 _profileDirectory is null ||
                 _snapshotReader is null)
             {
