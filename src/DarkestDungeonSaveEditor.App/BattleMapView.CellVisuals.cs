@@ -111,6 +111,7 @@ public partial class BattleMapView : UserControl
             PrototypeContent.Curio => "marker_curio.png",
             PrototypeContent.Trap => "marker_trap.png",
             PrototypeContent.Obstacle => "marker_obstacle.png",
+            PrototypeContent.Hunger => "marker_hunger.png",
             PrototypeContent.Treasure => "marker_curio.png",
             PrototypeContent.SecretDoor => "marker_secret.png",
             _ => null
@@ -149,6 +150,7 @@ public partial class BattleMapView : UserControl
             PrototypeContent.Treasure => "宝藏",
             PrototypeContent.Boss => "首领遭遇",
             PrototypeContent.Obstacle => "障碍",
+            PrototypeContent.Hunger => "进食格",
             PrototypeContent.SecretDoor => "秘密房间入口",
             _ => "未知"
         };
@@ -164,6 +166,7 @@ public partial class BattleMapView : UserControl
         PrototypeContent.Treasure => "✦",
         PrototypeContent.Boss => "☠",
         PrototypeContent.Obstacle => "▰",
+        PrototypeContent.Hunger => "食",
         PrototypeContent.SecretDoor => "◆",
         _ => "·"
     };
@@ -176,6 +179,7 @@ public partial class BattleMapView : UserControl
         PrototypeContent.Treasure => Color.FromRgb(225, 194, 103),
         PrototypeContent.Curio => Color.FromRgb(187, 178, 133),
         PrototypeContent.Obstacle => Color.FromRgb(142, 122, 84),
+        PrototypeContent.Hunger => Color.FromRgb(211, 164, 64),
         PrototypeContent.SecretDoor => Color.FromRgb(94, 160, 151),
         _ => Color.FromRgb(97, 99, 92)
     };
@@ -204,6 +208,7 @@ public partial class BattleMapView : UserControl
         Treasure,
         Boss,
         Obstacle,
+        Hunger,
         SecretDoor
     }
 

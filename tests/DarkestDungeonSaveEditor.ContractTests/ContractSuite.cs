@@ -84,6 +84,7 @@ internal static partial class ContractSuite
             "A DLC feature source must preserve its game-root virtual path prefix.");
 
 
+        await RunProfileSyncContractsAsync(fixture);
         RunContentDiscoveryContracts(activeContent, fixture);
         RunManifestDiscoveryContracts(activeContent, fixture);
         RunLocalizationPolicyContracts(activeContent, fixture);

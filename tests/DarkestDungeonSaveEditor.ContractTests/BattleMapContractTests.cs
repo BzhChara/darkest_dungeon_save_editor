@@ -396,6 +396,7 @@ internal static partial class ContractSuite
             """,
             new UTF8Encoding(false));
         var standardPropPath = Path.Combine(encounterDungeonRoot, "cove.props.darkest");
+        WriteMapCurioFixtures(encounterGameRoot, "base", "fish_idol", "unlocked_strongbox");
         File.WriteAllText(
             standardPropPath,
             "room_curios: .chance 1 .types fish_idol\n" +
@@ -469,14 +470,17 @@ internal static partial class ContractSuite
             Path.Combine(encounterModRoot, "modfiles.txt"),
             "dungeons/weald/weald.2.mash.darkest 1\n" +
             "dungeons/ship/ship.additional.2.mash.darkest 1\n" +
-            "dungeons/ship/ship.props.darkest 1\n",
+            "dungeons/ship/ship.props.darkest 1\n" +
+            "curios/ship_curio_props.csv 1\ncurios/ship_curio_type_library.csv 1\n",
             new UTF8Encoding(false));
+        WriteMapCurioFixtures(encounterModRoot, "ship", "mod_telescope", "mod_reliquary");
         var noManifestPropModRoot = Path.Combine(runRoot, "battle-room-prop-no-manifest-mod");
         var noManifestPropDungeonRoot = Path.Combine(
             noManifestPropModRoot,
             "dungeons",
             "ruins");
         Directory.CreateDirectory(noManifestPropDungeonRoot);
+        WriteMapCurioFixtures(noManifestPropModRoot, "fallback", "fallback_curio");
         File.WriteAllText(
             Path.Combine(noManifestPropDungeonRoot, "ruins.props.darkest"),
             "room_curios: .chance 1 .types fallback_curio\n",
@@ -558,6 +562,7 @@ internal static partial class ContractSuite
             SourceGameSha256 = ComputeSha256(attachmentGamePath)
         };
         var attachmentCatalog = BattleRoomAttachmentCatalog.Load(attachmentContent);
+        await RunBattleMapContentContractsAsync(runRoot, codec, attachmentContent);
         var fishIdol = attachmentCatalog.Curios.Single(definition => definition.Id == "fish_idol");
         var unlockedStrongbox = attachmentCatalog.Treasures.Single(definition =>
             definition.Id == "unlocked_strongbox");
@@ -601,7 +606,7 @@ internal static partial class ContractSuite
             _ = await attachmentService.CommitAsync(preparedStaleAttachment);
         }
         catch (InvalidOperationException ex) when (
-            ex.Message.Contains("奇物/宝箱定义", StringComparison.Ordinal))
+            ex.Message.Contains("地图内容定义", StringComparison.Ordinal))
         {
             rejectedStaleAttachment = true;
         }

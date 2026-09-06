@@ -18,7 +18,7 @@ public partial class BattleMapView : UserControl
         {
             FitMapToViewport();
         }
-        if (_profileDirectory is not null)
+        if (!UsesSharedProfileMonitor && _profileDirectory is not null)
         {
             _ = RefreshLiveSnapshotAsync(_profileGeneration);
         }

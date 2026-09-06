@@ -18,6 +18,18 @@ internal static partial class ContractSuite
                     SearchOption.TopDirectoryOnly)
                 .OrderBy(path => path, StringComparer.Ordinal)
                 .Select(File.ReadAllText));
+        Assert(mainWindowCode.Contains("StartProfileSync(activeContent, quantityItems", StringComparison.Ordinal) &&
+            mainWindowCode.Contains("confirmationRevision != _editRevision", StringComparison.Ordinal) &&
+            mainWindowCode.Contains("RefreshCatalogRowsPreservingInput", StringComparison.Ordinal) &&
+            mainWindowCode.Contains("if (_restoringCatalogSelection) return;", StringComparison.Ordinal) &&
+            mainWindowCode.Contains("sceneChanged ? null", StringComparison.Ordinal) &&
+            mainWindowCode.Contains("generation != _catalogGeneration", StringComparison.Ordinal) &&
+            mainWindowCode.Contains("BattleMapPanel.UsesSharedProfileMonitor = true", StringComparison.Ordinal) &&
+            mainWindowCode.Contains("!IsBusy && _syncRequested", StringComparison.Ordinal),
+            "Profile sync must preserve input, clear cross-scene targets, reject stale dialogs/profiles, and defer until writers finish.");
+        Assert(System.Text.RegularExpressions.Regex.IsMatch(mainWindowCode,
+                @"UpdateInitialQuirkSelectionSummary\(\);\s+UpdateEnabledState\(\);"),
+            "Changing catalog tabs must restore search and input availability after synchronization on the battle tab.");
         var battleMapXamlPath = Path.Combine(
             appSourceDirectory,
             "BattleMapView.xaml");
@@ -31,6 +43,11 @@ internal static partial class ContractSuite
                     SearchOption.TopDirectoryOnly)
                 .OrderBy(path => path, StringComparer.Ordinal)
                 .Select(File.ReadAllText));
+        var liveRefreshCode = File.ReadAllText(Path.Combine(appSourceDirectory, "BattleMapView.LiveRefresh.cs"));
+        var battleMapIntegrationCode = File.ReadAllText(Path.Combine(appSourceDirectory, "MainWindow.BattleMapIntegration.cs"));
+        Assert(liveRefreshCode.Contains("if (UsesSharedProfileMonitor ||", StringComparison.Ordinal) &&
+            battleMapIntegrationCode.Contains("RequestProfileSync(invalidatePreview: false);", StringComparison.Ordinal),
+            "Shared profile sync must suppress legacy map-only refreshes and catch up after map operations, including failures.");
         var battleMapReaderCode = File.ReadAllText(Path.Combine(
             repositoryRoot,
             "src",
@@ -827,8 +844,11 @@ internal static partial class ContractSuite
             battleMapCode.Contains("room_boss.png", StringComparison.Ordinal) &&
             !battleMapCode.Contains("TryLoadMapIcon(\"hall_door.png\")", StringComparison.Ordinal) &&
             battleMapCode.Contains("marker_curio.png", StringComparison.Ordinal) &&
-            !battleMapCode.Contains("marker_hunger.png", StringComparison.Ordinal) &&
-            battleMapCode.Contains("IsHiddenSystemContent", StringComparison.Ordinal) &&
+            battleMapCode.Contains("PrototypeContent.Hunger => \"marker_hunger.png\"", StringComparison.Ordinal) &&
+            battleMapCode.Contains("BattleMapTileContent.Hunger => PrototypeContent.Hunger", StringComparison.Ordinal) &&
+            battleMapCode.Contains("BattleMapTileContent.Hunger => \"进食格\"", StringComparison.Ordinal) &&
+            battleMapCode.Contains("IsHungerContent", StringComparison.Ordinal) &&
+            !battleMapCode.Contains("isHiddenSystemContent", StringComparison.Ordinal) &&
             battleMapCode.Contains("cell.RawContent == (int)BattleMapTileContent.Hunger", StringComparison.Ordinal) &&
             battleMapCode.Contains("if (!isProtectedContent)", StringComparison.Ordinal) &&
             battleMapCode.Contains("marker_secret.png", StringComparison.Ordinal) &&
@@ -840,7 +860,7 @@ internal static partial class ContractSuite
             !battleMapCode.Contains("只读监听 · 已同步", StringComparison.Ordinal) &&
             !battleMapCode.Contains("真实地图：", StringComparison.Ordinal) &&
             !battleMapCode.Contains("右击操作仍只作用于界面预览", StringComparison.Ordinal) &&
-            battleMapCode.Split("存档未发生变化。", StringSplitOptions.None).Length - 1 == 3 &&
+            battleMapCode.Split("存档未发生变化。", StringSplitOptions.None).Length - 1 == 2 &&
             battleMapCode.Contains("cell.Knowledge is PrototypeKnowledge.Unknown or PrototypeKnowledge.Scouted", StringComparison.Ordinal) &&
             !battleMapCode.Contains("return TryLoadMapIcon(\"room_unknown.png\")", StringComparison.Ordinal) &&
             !battleMapCode.Contains("return TryLoadMapIcon(\"hall_dark.png\")", StringComparison.Ordinal) &&
@@ -883,6 +903,16 @@ internal static partial class ContractSuite
             battleMapCode.Contains("PrepareDeleteContentAsync", StringComparison.Ordinal) &&
             battleMapCode.Contains("PrepareMovePartyAsync", StringComparison.Ordinal) &&
             battleMapCode.Contains("PreparePlaceBattleAsync", StringComparison.Ordinal) &&
+            battleMapCode.Contains("PreparePlaceContentAsync", StringComparison.Ordinal) &&
+            battleMapCode.Contains("preserveBattle: false", StringComparison.Ordinal) &&
+            !battleMapCode.Contains("ApplyContentPreview", StringComparison.Ordinal) &&
+            battleMapCode.Contains("CreateRegionalContentItem(cell, \"陷阱\"", StringComparison.Ordinal) &&
+            battleMapCode.Contains("CreateRegionalContentItem(cell, \"障碍\"", StringComparison.Ordinal) &&
+            battleMapCode.Contains("GetRegionalCandidates(kind, _currentSnapshot?.DungeonId", StringComparison.Ordinal) &&
+            battleMapCode.Contains("CreateAsyncActionMenuItem(label, icon, () => PlaceRegionalContentAsync(target, kind))", StringComparison.Ordinal) &&
+            battleMapCode.Contains("SelectRegionalContent(kind, snapshot.DungeonId, Random.Shared.NextDouble())", StringComparison.Ordinal) &&
+            battleMapCode.Contains("await PlaceContentAsync(target, definition);", StringComparison.Ordinal) &&
+            battleMapCode.Contains("!definition.IsAvailableInDungeon(snapshot.DungeonId)", StringComparison.Ordinal) &&
             battleMapCode.Contains("战斗附加内容", StringComparison.Ordinal) &&
             battleMapCode.Contains("PrepareSetBattleAttachmentAsync", StringComparison.Ordinal) &&
             battleMapCode.Contains("PrepareRemoveBattleAttachmentAsync", StringComparison.Ordinal) &&
@@ -924,6 +954,24 @@ internal static partial class ContractSuite
             !forceTownSaveServiceCode.Contains("Process.Start", StringComparison.Ordinal) &&
             !forceTownSaveServiceCode.Contains("-forcetown", StringComparison.Ordinal),
             "The battle workspace must expose a pannable, zoomable real save map rendered from original sprites, keep system/script cells out of ordinary content editing, retain a native PART_Popup/ItemsPresenter menu chain for stable nested hover navigation, limit interaction to rooms and visible corridor tiles in native map orientation, retain previews for unresolved content, route proven battle/delete/move actions through guarded save transactions, and expose a backed-up two-field force-town save repair without launching the game.");
+        var forceTownViewCode = File.ReadAllText(Path.Combine(
+            appSourceDirectory, "BattleMapView.ForceTown.cs"));
+        var forceTownFinally = forceTownViewCode[
+            forceTownViewCode.LastIndexOf("finally", StringComparison.Ordinal)..];
+        Assert(
+            System.Text.RegularExpressions.Regex.IsMatch(
+                forceTownFinally,
+                @"_isApplyingEdit = false;\s*MapCanvas.IsHitTestVisible = true;\s*SaveEditBusyChanged\?\.Invoke\(false\);") &&
+            !forceTownFinally.Contains("if (!committed)", StringComparison.Ordinal) &&
+            forceTownFinally.Contains("ForceTownButton.IsEnabled = _currentSnapshot is not null;", StringComparison.Ordinal),
+            "Force-town completion must unconditionally release the map input lock before notifying the owner, on success as well as failure; the button must follow current snapshot availability.");
+        var battleMapLifecycleCode = File.ReadAllText(Path.Combine(
+            appSourceDirectory, "BattleMapView.ProfileLifecycle.cs"));
+        var showMapSurfaceCode = battleMapLifecycleCode[
+            battleMapLifecycleCode.IndexOf("private void ShowMapSurface()", StringComparison.Ordinal)..battleMapLifecycleCode.IndexOf("private void ShowUnavailableState", StringComparison.Ordinal)];
+        Assert(
+            showMapSurfaceCode.Contains("MapCanvas.IsHitTestVisible = !_isApplyingEdit;", StringComparison.Ordinal),
+            "Showing a new or reloaded map must clear a stale input lock while preserving the lock during an active save edit.");
         var battleEncounterDialogNames = battleEncounterDialog
             .Descendants()
             .Select(element => element.Attribute(xamlName)?.Value)
@@ -1003,7 +1051,7 @@ internal static partial class ContractSuite
             battleMapDesign.Contains("must not apply a Cartesian Y-axis inversion", StringComparison.Ordinal) &&
             battleMapDesign.Contains("display-only global-vision rule", StringComparison.Ordinal) &&
             battleMapDesign.Contains("does not reveal the map inside the game or write scouting progress", StringComparison.Ordinal) &&
-            battleMapDesign.Contains("Content previews must preserve the cell's persisted knowledge state", StringComparison.Ordinal) &&
+            battleMapDesign.Contains("Both paths preserve persisted knowledge, topology and quest identifiers", StringComparison.Ordinal) &&
             battleMapDesign.Contains("does not read game process memory", StringComparison.OrdinalIgnoreCase) &&
             battleMapDesign.Contains("guarded current-table battle placement", StringComparison.OrdinalIgnoreCase) &&
             battleMapDesign.Contains("Deterministic Encounter Bridge probe", StringComparison.Ordinal) &&
@@ -1241,6 +1289,14 @@ internal static partial class ContractSuite
         var initialQuirkCheckBox = initialQuirkGrid
             .Descendants(presentationNamespace + "CheckBox")
             .Single(checkBox => checkBox.Attribute("Click")?.Value == "QuirkCheckBox_Click");
+        Assert(
+            initialQuirkCheckBox.Attribute("ToolTip") is null &&
+            initialQuirkCheckBox.Attribute("ToolTipService.ShowOnDisabled") is null &&
+            initialQuirkCheckBox.Attribute("IsEnabled")?.Value == "{Binding IsSelectable}" &&
+            initialQuirkGrid.Descendants(presentationNamespace + "DataGridTextColumn").Any(column =>
+                column.Attribute("Header")?.Value == "限制 / 不可用原因" &&
+                column.Attribute("Binding")?.Value == "{Binding UnavailableReason}"),
+            "Quirk checkboxes must not show hover tooltips; selection guards and the unavailable-reason column must remain intact.");
         Assert(
             initialQuirkGrid.Attribute("IsReadOnly")?.Value == "True" &&
             initialQuirkGrid.Attribute("SelectionUnit")?.Value == "FullRow" &&

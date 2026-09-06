@@ -34,8 +34,9 @@ internal static partial class ContractSuite
         var pathRows = paths.Parent!.Element(presentation + "Grid.RowDefinitions")!
             .Elements(presentation + "RowDefinition").ToArray();
         Assert(
-            loadButton.Parent == paths.Parent &&
-            loadButton.Attribute("Grid.Row")?.Value == "2" &&
+            loadButton.Parent?.Parent == paths.Parent &&
+            loadButton.Parent.Attribute("Grid.Row")?.Value == "2" &&
+            Named(mainWindow, "ProfileSyncStatusTextBlock").Parent == loadButton.Parent &&
             loadButton.Attribute("Click")?.Value == "LoadCatalog_Click" &&
             !loadButton.Ancestors(presentation + "ScrollViewer").Any() &&
             paths.Attribute("Grid.Row")?.Value == "1" &&

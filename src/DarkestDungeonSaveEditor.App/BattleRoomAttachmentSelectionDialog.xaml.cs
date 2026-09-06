@@ -12,17 +12,22 @@ public partial class BattleRoomAttachmentSelectionDialog : Window
 {
     private readonly ObservableCollection<AttachmentChoiceRow> _rows = [];
     private readonly string _kindLabel;
+    private readonly bool _preserveBattle;
     private ICollectionView? _view;
 
     public BattleRoomAttachmentSelectionDialog(
         IReadOnlyCollection<BattleRoomAttachmentDefinition> definitions,
-        string kindLabel)
+        string kindLabel,
+        bool preserveBattle = true)
     {
         ArgumentNullException.ThrowIfNull(definitions);
         ArgumentException.ThrowIfNullOrWhiteSpace(kindLabel);
-        InitializeComponent();
         _kindLabel = kindLabel;
+        _preserveBattle = preserveBattle;
+        InitializeComponent();
+        Title = $"选择{kindLabel}";
         HeaderTitleTextBlock.Text = $"选择{kindLabel}";
+        SelectionTextBlock.Text = SelectionHint;
         ConfirmButton.Content = $"应用{kindLabel}";
         foreach (var definition in definitions)
         {
@@ -38,6 +43,10 @@ public partial class BattleRoomAttachmentSelectionDialog : Window
     }
 
     public BattleRoomAttachmentDefinition? SelectedAttachment { get; private set; }
+
+    private string SelectionHint => _preserveBattle
+        ? $"选择一项{_kindLabel}；现有战斗及敌方组合不会改变。"
+        : $"选择一项{_kindLabel}替换目标格内容。";
 
     protected override void OnSourceInitialized(EventArgs e)
     {
@@ -69,7 +78,7 @@ public partial class BattleRoomAttachmentSelectionDialog : Window
         var selected = AttachmentGrid.SelectedItem as AttachmentChoiceRow;
         ConfirmButton.IsEnabled = selected is not null;
         SelectionTextBlock.Text = selected is null
-            ? $"选择一项{_kindLabel}；现有战斗及敌方组合不会改变。"
+            ? SelectionHint
             : $"{selected.ChineseName} / {selected.EnglishName} · {selected.Id} · {selected.Source}";
     }
 

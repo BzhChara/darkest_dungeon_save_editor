@@ -84,6 +84,17 @@ public sealed class BattleMapEditService
             attachment,
             cancellationToken);
 
+    public Task<PreparedBattleMapEdit> PreparePlaceContentAsync(
+        SaveProfile profile,
+        BattleMapSnapshot expectedSnapshot,
+        string areaId,
+        string tileId,
+        BattleRoomAttachmentDefinition definition,
+        CancellationToken cancellationToken = default) =>
+        PrepareAsync(
+            profile, expectedSnapshot, areaId, tileId, BattleMapEditKind.PlaceContent,
+            encounter: null, attachment: definition, cancellationToken);
+
     public Task<PreparedBattleMapEdit> PrepareRemoveBattleAttachmentAsync(
         SaveProfile profile,
         BattleMapSnapshot expectedSnapshot,
@@ -251,7 +262,7 @@ public sealed class BattleMapEditService
         {
             throw new ArgumentException("只有遭遇写入操作可以携带遭遇定义。", nameof(encounter));
         }
-        if (kind == BattleMapEditKind.SetBattleAttachment)
+        if (kind is BattleMapEditKind.SetBattleAttachment or BattleMapEditKind.PlaceContent)
         {
             ArgumentNullException.ThrowIfNull(attachment);
             BattleRoomAttachmentCatalog.ValidateDefinition(attachment);
@@ -266,13 +277,13 @@ public sealed class BattleMapEditService
                     StringComparison.OrdinalIgnoreCase))
             {
                 throw new InvalidOperationException(
-                    "所选房间附加内容目录属于另一个档案，请重新加载内容目录。");
+                    "所选地图内容目录属于另一个档案，请重新加载内容目录。");
             }
         }
         else if (attachment is not null)
         {
             throw new ArgumentException(
-                "只有设置房间战斗附加内容时可以携带奇物或宝箱定义。",
+                "只有地图内容或战斗附加内容写入操作可以携带资源定义。",
                 nameof(attachment));
         }
 
@@ -338,6 +349,8 @@ public sealed class BattleMapEditService
                 areaId,
                 tileId,
                 encounter!),
+            BattleMapEditKind.PlaceContent => BattleMapSaveEditor.PlaceContent(
+                mapDocument, raidDocument, capturedSnapshot, areaId, tileId, attachment!),
             BattleMapEditKind.SetBattleAttachment => BattleMapSaveEditor.SetBattleAttachment(
                 mapDocument,
                 raidDocument,
@@ -499,11 +512,11 @@ public sealed class BattleMapEditService
             throw new InvalidDataException("非遭遇写入会话意外包含遭遇定义。");
         }
 
-        if (prepared.Preview.Kind == BattleMapEditKind.SetBattleAttachment)
+        if (prepared.Preview.Kind is BattleMapEditKind.SetBattleAttachment or BattleMapEditKind.PlaceContent)
         {
             if (prepared.Attachment is null)
             {
-                throw new InvalidDataException("房间战斗附加内容会话缺少已验证的奇物或宝箱定义。");
+                throw new InvalidDataException("地图内容写入会话缺少已验证的资源定义。");
             }
 
             var expectedProfileDirectory = Path.GetFullPath(prepared.Profile.ProfileDirectory);
@@ -515,20 +528,21 @@ public sealed class BattleMapEditService
                     expectedGamePath,
                     StringComparison.OrdinalIgnoreCase))
             {
-                throw new InvalidDataException("房间战斗附加内容会话属于另一个档案。");
+                throw new InvalidDataException("地图内容写入会话属于另一个档案。");
             }
 
             BattleRoomAttachmentCatalog.ValidateDefinition(prepared.Attachment);
         }
         else if (prepared.Attachment is not null)
         {
-            throw new InvalidDataException("非附加内容写入会话意外包含奇物或宝箱定义。");
+            throw new InvalidDataException("非内容写入会话意外包含地图资源定义。");
         }
     }
 
     private static bool EditsMap(BattleMapEditKind kind) =>
         kind is BattleMapEditKind.DeleteContent or
             BattleMapEditKind.PlaceBattle or
+            BattleMapEditKind.PlaceContent or
             BattleMapEditKind.SetBattleAttachment or
             BattleMapEditKind.RemoveBattleAttachment;
 
@@ -625,6 +639,15 @@ public sealed class BattleMapEditService
                     prepared.Encounter.SourceLine,
                     tableFingerprint = prepared.Encounter.TableGuard.Fingerprint
                 },
+            mapContent = prepared.Attachment is null ? null : new
+            {
+                prepared.Attachment.Id,
+                prepared.Attachment.Kind,
+                prepared.Attachment.PropHash,
+                prepared.Attachment.SourcePath,
+                prepared.Attachment.SourceLine,
+                catalogFingerprint = prepared.Attachment.CatalogGuard.Fingerprint
+            },
             files
         });
         return backupDirectory;

@@ -7,7 +7,10 @@ namespace DarkestDungeonSaveEditor.Core;
 public enum BattleRoomAttachmentKind
 {
     Curio,
-    Treasure
+    Treasure,
+    HallCurio,
+    Trap,
+    Obstacle
 }
 
 public sealed record BattleRoomAttachmentFileFingerprint(
@@ -37,6 +40,50 @@ public sealed record BattleRoomAttachmentDefinition(
 {
     public BilingualContentName LocalizedName { get; init; } = BilingualContentName.Empty;
 
+    public string OriginDungeonId
+    {
+        get
+        {
+            var parts = SourceRelativePath.Replace('\\', '/').Split('/');
+            var index = Array.FindIndex(parts, part => part.Equals("dungeons", StringComparison.OrdinalIgnoreCase));
+            return index >= 0 && index + 2 < parts.Length ? parts[index + 1] : string.Empty;
+        }
+    }
+
+    public bool IsRegionBound => Kind is BattleRoomAttachmentKind.Trap or BattleRoomAttachmentKind.Obstacle;
+
+    public bool IsAvailableInDungeon(string? dungeonId) => !IsRegionBound ||
+        (!string.IsNullOrWhiteSpace(OriginDungeonId) &&
+         OriginDungeonId.Equals(dungeonId, StringComparison.OrdinalIgnoreCase));
+
+    // The original room-attachment catalog is shared with standalone map content.
+    // Keep hall and room curios distinct even when they reference the same prop ID.
+    public BattleMapAreaKind TargetAreaKind => Kind switch
+    {
+        BattleRoomAttachmentKind.Curio or BattleRoomAttachmentKind.Treasure => BattleMapAreaKind.Room,
+        BattleRoomAttachmentKind.HallCurio or BattleRoomAttachmentKind.Trap or
+            BattleRoomAttachmentKind.Obstacle => BattleMapAreaKind.Corridor,
+        _ => throw new InvalidOperationException("未知的地图内容类型。")
+    };
+
+    public BattleMapTileContent StandaloneContent => Kind switch
+    {
+        BattleRoomAttachmentKind.Curio or BattleRoomAttachmentKind.HallCurio => BattleMapTileContent.Curio,
+        BattleRoomAttachmentKind.Treasure => BattleMapTileContent.Treasure,
+        BattleRoomAttachmentKind.Trap => BattleMapTileContent.Trap,
+        BattleRoomAttachmentKind.Obstacle => BattleMapTileContent.Obstacle,
+        _ => throw new InvalidOperationException("未知的地图内容类型。")
+    };
+
+    public string KindLabel => StandaloneContent switch
+    {
+        BattleMapTileContent.Curio => "奇物",
+        BattleMapTileContent.Treasure => "宝箱",
+        BattleMapTileContent.Trap => "陷阱",
+        BattleMapTileContent.Obstacle => "障碍",
+        _ => throw new InvalidOperationException("未知的地图内容类型。")
+    };
+
     public string ChineseName => string.IsNullOrWhiteSpace(LocalizedName.Chinese)
         ? "—"
         : LocalizedName.Chinese;
@@ -46,7 +93,7 @@ public sealed record BattleRoomAttachmentDefinition(
         : LocalizedName.English;
 }
 
-public sealed record BattleRoomAttachmentCatalogResult(
+public sealed partial record BattleRoomAttachmentCatalogResult(
     IReadOnlyList<BattleRoomAttachmentDefinition> Definitions,
     IReadOnlyList<string> Issues,
     BattleRoomAttachmentCatalogGuard Guard)
@@ -58,9 +105,26 @@ public sealed record BattleRoomAttachmentCatalogResult(
     public IReadOnlyList<BattleRoomAttachmentDefinition> Treasures => Definitions
         .Where(definition => definition.Kind == BattleRoomAttachmentKind.Treasure)
         .ToArray();
+
+    public IReadOnlyList<BattleRoomAttachmentDefinition> HallCurios => Definitions
+        .Where(definition => definition.Kind == BattleRoomAttachmentKind.HallCurio)
+        .ToArray();
+
+    public IReadOnlyList<BattleRoomAttachmentDefinition> Traps => Definitions
+        .Where(definition => definition.Kind == BattleRoomAttachmentKind.Trap)
+        .ToArray();
+
+    public IReadOnlyList<BattleRoomAttachmentDefinition> Obstacles => Definitions
+        .Where(definition => definition.Kind == BattleRoomAttachmentKind.Obstacle)
+        .ToArray();
+
+    public IReadOnlyList<BattleRoomAttachmentDefinition> GetCandidates(
+        BattleRoomAttachmentKind kind, string dungeonId) => Definitions
+        .Where(definition => definition.Kind == kind && definition.IsAvailableInDungeon(dungeonId))
+        .ToArray();
 }
 
-public static class BattleRoomAttachmentCatalog
+public static partial class BattleRoomAttachmentCatalog
 {
     private static readonly Regex TokenPattern = new(
         "\"(?:\\\\.|[^\"])*\"|\\S+",
@@ -80,12 +144,18 @@ public static class BattleRoomAttachmentCatalog
                 StringComparison.OrdinalIgnoreCase))
         {
             throw new InvalidOperationException(
-                "活动 Mod 配置在房间附加内容目录加载前已经变化，请重新加载内容目录。");
+                "活动 Mod 配置在地图内容目录加载前已经变化，请重新加载内容目录。");
         }
 
         var issues = new List<string>();
         var effectiveFiles = ResolveEffectivePropFiles(activeContent.Sources, issues);
+        var resourceFiles = ResolveEffectiveResourceFiles(activeContent.Sources, issues);
+        var resources = ReadResources(resourceFiles, issues);
+        var curioFiles = ResolveEffectiveCurioFiles(activeContent.Sources, issues);
+        var curios = ReadCurioResources(curioFiles, issues);
         var fingerprints = effectiveFiles
+            .Concat(resourceFiles)
+            .Concat(curioFiles)
             .Select(file => new BattleRoomAttachmentFileFingerprint(
                 file.Source.Id,
                 Path.GetFullPath(file.Path),
@@ -107,9 +177,7 @@ public static class BattleRoomAttachmentCatalog
             .SelectMany(file => ParseFile(file, activeContent.Sources, guard, issues))
             .ToArray();
         var selected = parsed
-            .GroupBy(
-                candidate => $"{candidate.Definition.Kind}\n{candidate.Definition.Id}",
-                StringComparer.OrdinalIgnoreCase)
+            .GroupBy(candidate => DefinitionKey(candidate.Definition), StringComparer.Ordinal)
             .Select(SelectRepresentative)
             .ToArray();
 
@@ -117,36 +185,47 @@ public static class BattleRoomAttachmentCatalog
             .GroupBy(candidate => candidate.Definition.PropHash)
             .Where(group => group
                 .Select(candidate => candidate.Definition.Id)
-                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Distinct(StringComparer.Ordinal)
                 .Skip(1)
                 .Any())
             .ToArray();
         var collidingIds = collisions
             .SelectMany(group => group.Select(candidate => candidate.Definition.Id))
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            .ToHashSet(StringComparer.Ordinal);
         foreach (var collision in collisions)
         {
             issues.Add(
                 $"Room attachment hash collision {collision.Key}: " +
                 string.Join(", ", collision.Select(item => item.Definition.Id)
-                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .Distinct(StringComparer.Ordinal)
                     .OrderBy(id => id, StringComparer.OrdinalIgnoreCase)));
         }
 
         var definitions = selected
             .Select(candidate => candidate.Definition)
             .Where(definition => !collidingIds.Contains(definition.Id))
+            .Where(definition =>
+            {
+                var reason = GetResourceRejection(definition, resources, curios);
+                if (reason is null)
+                {
+                    return true;
+                }
+                issues.Add($"地图内容候选未纳入：{definition.KindLabel}/{definition.Id}；原因={reason}；" +
+                    $"来源={definition.SourcePath}:{definition.SourceLine}");
+                return false;
+            })
             .ToArray();
         var localization = ContentLocalizationCatalog.Load(
             activeContent,
             definitions
-                .Select(definition => ContentLocalizationCatalog.GetCurioTitleKey(definition.Id))
+                .Select(definition => ContentLocalizationCatalog.GetCurioTitleKey(GetCurioNameId(definition, curios)))
                 .Distinct(StringComparer.OrdinalIgnoreCase));
         issues.AddRange(localization.Issues);
         definitions = definitions
             .Select(definition => definition with
             {
-                LocalizedName = localization.GetCurioTitle(definition.Id)
+                LocalizedName = localization.GetCurioTitle(GetCurioNameId(definition, curios))
             })
             .OrderBy(definition => definition.Kind)
             .ThenBy(definition => definition.ChineseName == "—")
@@ -159,7 +238,10 @@ public static class BattleRoomAttachmentCatalog
         return new BattleRoomAttachmentCatalogResult(
             definitions,
             issues.Distinct(StringComparer.OrdinalIgnoreCase).ToArray(),
-            guard);
+            guard)
+        {
+            RegionalPool = BuildRegionalPool(parsed, selected, definitions)
+        };
     }
 
     public static void ValidateGuard(BattleRoomAttachmentCatalogGuard guard)
@@ -171,11 +253,13 @@ public static class BattleRoomAttachmentCatalog
                 StringComparison.OrdinalIgnoreCase))
         {
             throw new InvalidOperationException(
-                "活动 Mod 配置在附加内容选择后已经变化，请重新加载内容目录。");
+                "活动 Mod 配置在地图内容选择后已经变化，请重新加载内容目录。");
         }
 
         var issues = new List<string>();
         var currentFiles = ResolveEffectivePropFiles(guard.ActiveSources, issues)
+            .Concat(ResolveEffectiveResourceFiles(guard.ActiveSources, issues))
+            .Concat(ResolveEffectiveCurioFiles(guard.ActiveSources, issues))
             .Select(file => new BattleRoomAttachmentFileFingerprint(
                 file.Source.Id,
                 Path.GetFullPath(file.Path),
@@ -191,7 +275,7 @@ public static class BattleRoomAttachmentCatalog
                 StringComparison.OrdinalIgnoreCase))
         {
             throw new InvalidOperationException(
-                "有效房间奇物/宝箱定义在选择后已经变化，请重新加载内容目录。");
+                "有效地图内容定义在选择后已经变化，请重新加载内容目录。");
         }
     }
 
@@ -199,21 +283,34 @@ public static class BattleRoomAttachmentCatalog
     {
         ArgumentNullException.ThrowIfNull(definition);
         ValidateGuard(definition.CatalogGuard);
-        if (definition.PropHash != ComputePropHash(definition.Id))
+        if (definition.PropHash == 0 || definition.PropHash != ComputePropHash(definition.Id))
         {
-            throw new InvalidOperationException("所选附加内容的 ID 与存档哈希不一致。");
+            throw new InvalidOperationException("所选地图内容的 ID 与存档哈希无效或不一致。");
         }
 
         var issues = new List<string>();
-        var matches = ResolveEffectivePropFiles(definition.CatalogGuard.ActiveSources, issues)
+        var parsed = ResolveEffectivePropFiles(definition.CatalogGuard.ActiveSources, issues)
             .SelectMany(file => ParseFile(
                 file,
                 definition.CatalogGuard.ActiveSources,
                 definition.CatalogGuard,
                 issues))
-            .Count(candidate =>
+            .ToArray();
+        if (parsed.Any(candidate => candidate.Definition.PropHash == definition.PropHash &&
+                !candidate.Definition.Id.Equals(definition.Id, StringComparison.Ordinal)))
+        {
+            throw new InvalidOperationException("所选地图内容的存档哈希与另一项资源冲突。");
+        }
+        var resources = ReadResources(ResolveEffectiveResourceFiles(definition.CatalogGuard.ActiveSources, issues), issues);
+        var curios = ReadCurioResources(ResolveEffectiveCurioFiles(definition.CatalogGuard.ActiveSources, issues), issues);
+        if (GetResourceRejection(definition, resources, curios) is { } rejection)
+        {
+            throw new InvalidOperationException($"所选地图内容不可写入：{rejection}");
+        }
+        var matches = parsed.Count(candidate =>
                 candidate.Definition.Kind == definition.Kind &&
-                candidate.Definition.Id.Equals(definition.Id, StringComparison.OrdinalIgnoreCase) &&
+                candidate.Definition.Id.Equals(definition.Id, StringComparison.Ordinal) &&
+                candidate.Definition.PropHash == definition.PropHash &&
                 candidate.Definition.SourceLine == definition.SourceLine &&
                 candidate.Definition.SourceRelativePath.Equals(
                     definition.SourceRelativePath,
@@ -227,7 +324,7 @@ public static class BattleRoomAttachmentCatalog
         if (matches != 1)
         {
             throw new InvalidOperationException(
-                "所选房间附加内容已变化、消失或存在歧义，请重新加载内容目录。");
+                "所选地图内容已变化、消失或存在歧义，请重新加载内容目录。");
         }
     }
 
@@ -279,7 +376,10 @@ public static class BattleRoomAttachmentCatalog
     private static IReadOnlyList<string> EnumeratePropFiles(
         ActiveContentSource source,
         IReadOnlyList<string> enabledDlcPrefixes,
-        List<string> issues)
+        List<string> issues,
+        string contentDirectory = "dungeons",
+        string pattern = "*.props.darkest",
+        string extension = ".props.darkest")
     {
         if (!Directory.Exists(source.Directory))
         {
@@ -296,7 +396,7 @@ public static class BattleRoomAttachmentCatalog
                     source,
                     manifestPath,
                     enabledDlcPrefixes,
-                    issues);
+                    issues, contentDirectory, extension);
             }
         }
 
@@ -304,10 +404,10 @@ public static class BattleRoomAttachmentCatalog
         {
             return ContentFileOverlay.GetFallbackContentRoots(
                     source.Directory, source.Kind is "workshop" or "local" ? enabledDlcPrefixes : [])
-                .Select(root => Path.Combine(root, "dungeons"))
+                .Select(root => Path.Combine(root, contentDirectory))
                 .Where(Directory.Exists)
                 .SelectMany(directory => Directory.EnumerateFiles(
-                    directory, "*.props.darkest", SearchOption.AllDirectories))
+                    directory, pattern, SearchOption.AllDirectories))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
                 .ToArray();
@@ -323,12 +423,14 @@ public static class BattleRoomAttachmentCatalog
         ActiveContentSource source,
         string manifestPath,
         IReadOnlyList<string> enabledDlcPrefixes,
-        List<string> issues)
+        List<string> issues,
+        string contentDirectory,
+        string extension)
     {
         var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         try
         {
-            foreach (var entry in ModManifestFile.ReadEntries(manifestPath, ".props.darkest"))
+            foreach (var entry in ModManifestFile.ReadEntries(manifestPath, extension))
             {
                 var rawLine = entry.RawLine;
                 var relativePath = entry.RelativePath;
@@ -347,7 +449,7 @@ public static class BattleRoomAttachmentCatalog
                 }
                 if (!ContentFileOverlay.IsRootOrEnabledDlcPath(
                         relativeToRoot,
-                        "dungeons",
+                        contentDirectory,
                         enabledDlcPrefixes))
                 {
                     continue;
@@ -404,6 +506,9 @@ public static class BattleRoomAttachmentCatalog
             {
                 "room_curios" => BattleRoomAttachmentKind.Curio,
                 "room_treasures" => BattleRoomAttachmentKind.Treasure,
+                "hall_curios" => BattleRoomAttachmentKind.HallCurio,
+                "traps" => BattleRoomAttachmentKind.Trap,
+                "obstacles" => BattleRoomAttachmentKind.Obstacle,
                 _ => (BattleRoomAttachmentKind?)null
             };
             if (kind is null)
@@ -418,7 +523,7 @@ public static class BattleRoomAttachmentCatalog
                 token.Equals(".types", StringComparison.OrdinalIgnoreCase));
             if (typesIndex < 0)
             {
-                issues.Add($"Room prop row has no .types list: {file.Path}:{lineIndex + 1}");
+                issues.Add($"地图内容行缺少资源列表（.types），已跳过：{file.Path}:{lineIndex + 1}");
                 continue;
             }
 
@@ -426,14 +531,17 @@ public static class BattleRoomAttachmentCatalog
                 .Skip(typesIndex + 1)
                 .TakeWhile(token => !token.StartsWith(".", StringComparison.Ordinal))
                 .Where(token => !string.IsNullOrWhiteSpace(token))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Distinct(StringComparer.Ordinal)
                 .ToArray();
             if (ids.Length == 0)
             {
-                issues.Add($"Room prop row has an empty .types list: {file.Path}:{lineIndex + 1}");
+                issues.Add($"地图内容行的资源列表（.types）为空，已跳过：{file.Path}:{lineIndex + 1}");
                 continue;
             }
 
+            var regionalWeight = kind is BattleRoomAttachmentKind.Trap or BattleRoomAttachmentKind.Obstacle
+                ? ReadRegionalWeight(tokens, file.Path, lineIndex + 1, issues) / ids.Length
+                : 0;
             foreach (var id in ids)
             {
                 yield return new ParsedAttachment(
@@ -447,7 +555,8 @@ public static class BattleRoomAttachmentCatalog
                         file.RelativePath,
                         sourceSha256,
                         lineIndex + 1,
-                        guard));
+                        guard),
+                    regionalWeight);
             }
         }
     }
@@ -481,5 +590,6 @@ public static class BattleRoomAttachmentCatalog
 
     private sealed record ParsedAttachment(
         ActiveContentSource Source,
-        BattleRoomAttachmentDefinition Definition);
+        BattleRoomAttachmentDefinition Definition,
+        double RegionalWeight);
 }

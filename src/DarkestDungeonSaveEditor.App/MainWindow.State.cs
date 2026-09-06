@@ -18,6 +18,7 @@ public partial class MainWindow : Window
 
     private void InvalidateCatalog()
     {
+        StopProfileSync();
         _battleMapLogTracker.Reset();
         InvalidatePreparedEdit();
         _catalogProfileDirectory = null;
@@ -119,11 +120,20 @@ public partial class MainWindow : Window
 
     private void SetBusy(bool busy)
     {
+        _busyDepth = busy ? _busyDepth + 1 : Math.Max(0, _busyDepth - 1);
+        UpdateEnabledState();
+        if (!IsBusy && _syncRequested) _ = DrainProfileSyncAsync();
+    }
+
+    private void UpdateEnabledState()
+    {
+        if (CatalogTabs is null || BattleMapPanel is null) return;
+        var busy = IsBusy;
         var isBattleTab = CatalogTabs.SelectedIndex == BattleTabIndex;
         PathInputsBorder.IsEnabled = !busy;
         CatalogTabs.IsEnabled = !busy;
         SearchTextBox.IsEnabled = !busy && !isBattleTab;
-        BattleMapPanel.IsEnabled = !busy;
+        BattleMapPanel.IsEnabled = !busy && _syncReady;
         ShowUnusedItemsCheckBox.IsEnabled = !busy &&
             CatalogTabs.SelectedIndex == 0 && _allItems.Count > 0;
         CopiesTextBox.IsEnabled = !busy && CatalogTabs.SelectedIndex is 0 or 1;
@@ -136,7 +146,7 @@ public partial class MainWindow : Window
             _heroCatalog is not null &&
             HeroGrid.SelectedItem is HeroRow;
         PreviewButton.IsEnabled = !busy && CanPreviewCurrentTab();
-        ApplyButton.IsEnabled = !busy &&
+        ApplyButton.IsEnabled = !busy && _syncReady &&
             (_preparedQuantityItemEdit is not null ||
              _preparedTrinketEdit is not null ||
              _preparedHeroEdit is not null);
@@ -161,11 +171,18 @@ public partial class MainWindow : Window
         }
 
         var gameSavePath = Path.Combine(profile.ProfileDirectory, "persist.game.json");
+        if (!_syncReady || _catalogFileHashes is null ||
+            !ProfileCatalogSnapshotReader.HashesEqual(_catalogFileHashes,
+                ProfileCatalogSnapshotReader.CaptureHashes(profile.ProfileDirectory)))
+        {
+            RequestProfileSync();
+            throw new InvalidOperationException("存档已变化，正在自动同步；同步完成后请重新生成预览，无需重新加载目录。");
+        }
         if (!File.Exists(gameSavePath) ||
             !ComputeSha256(gameSavePath).Equals(_catalogGameSaveSha256, StringComparison.OrdinalIgnoreCase))
         {
-            InvalidateCatalog();
-            throw new InvalidOperationException("当前档案的 Mod/DLC 配置已变化，请重新加载内容目录。");
+            RequestProfileSync();
+            throw new InvalidOperationException("档案状态已变化，正在自动同步，请稍后重新生成预览。");
         }
 
         if (requireCurrentQuantitySnapshot)
@@ -180,9 +197,9 @@ public partial class MainWindow : Window
                     _catalogQuantitySaveSha256,
                     StringComparison.OrdinalIgnoreCase))
             {
-                InvalidateCatalog();
+                RequestProfileSync();
                 throw new InvalidOperationException(
-                    "当前档案的小镇/副本状态或物品数量已变化，请重新加载内容目录。");
+                    "当前档案的小镇/副本状态或物品数量已变化，正在自动同步。");
             }
         }
 
@@ -193,22 +210,22 @@ public partial class MainWindow : Window
                  _catalogEstateSaveSha256,
                  StringComparison.OrdinalIgnoreCase)))
         {
-            InvalidateCatalog();
-            throw new InvalidOperationException("当前档案的物品数量已变化，请重新加载内容目录后再修改。");
+            RequestProfileSync();
+            throw new InvalidOperationException("当前档案的物品数量已变化，正在自动同步，请稍后重新生成预览。");
         }
     }
 
     private bool CanPreviewCurrentTab()
     {
-        if (_catalogProfileDirectory is null)
+        if (_catalogProfileDirectory is null || !_syncReady || IsBusy)
         {
             return false;
         }
 
         return CatalogTabs.SelectedIndex switch
         {
-            0 => _allItems.Count > 0,
-            1 => _allTrinkets.Count > 0,
+            0 => ItemGrid.SelectedItem is ItemRow,
+            1 => TrinketGrid.SelectedItem is TrinketRow,
             2 => _heroCatalog is not null &&
                  SelectedHeroGenerationAvailability is { CanGenerate: true },
             _ => false
@@ -251,7 +268,7 @@ public partial class MainWindow : Window
             _heroCatalog is not null &&
             HeroGrid.SelectedItem is HeroRow;
         UpdateInitialQuirkSelectionSummary();
-        PreviewButton.IsEnabled = !isBattleTab && CanPreviewCurrentTab();
+        UpdateEnabledState();
         UpdateHeroGenerationAvailability();
     }
 

@@ -34,9 +34,8 @@ public partial class MainWindow : Window
 
     private void BattleMapPanel_ActiveContentChanged(ActiveContentSnapshot activeContent)
     {
-        _activeContentSnapshot = activeContent;
-        _catalogProfileDirectory = activeContent.Profile.ProfileDirectory;
-        _catalogGameSaveSha256 = activeContent.SourceGameSha256;
+        // A managed Bridge changes active sources. Publish all catalogs together after the write.
+        RequestProfileSync();
         CrashDiagnostics.RecordStatus(
             $"托管遭遇 Bridge 已同步活动内容：档案={activeContent.Profile.ProfileId}；" +
             CatalogLogDiagnostics.FormatSourceCounts(activeContent) + "；" +
@@ -46,7 +45,14 @@ public partial class MainWindow : Window
     private void BattleMapPanel_SaveEditApplied(string message) =>
         AppendStatusSafely(message, "BattleMap: applied save edit");
 
-    private void BattleMapPanel_SaveEditBusyChanged(bool isBusy) => SetBusy(isBusy);
+    private void BattleMapPanel_SaveEditBusyChanged(bool isBusy)
+    {
+        if (!isBusy)
+        {
+            RequestProfileSync(invalidatePreview: false);
+        }
+        SetBusy(isBusy);
+    }
 
     private void AppendStatus(
         string message,

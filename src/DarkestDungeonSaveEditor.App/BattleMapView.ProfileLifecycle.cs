@@ -156,10 +156,15 @@ public partial class BattleMapView : UserControl
                         _roomAttachmentCatalog = await Task.Run(
                             () => BattleRoomAttachmentCatalog.Load(activeContent),
                             cancellationToken);
-                        diagnosticBatch.Add("战斗附加内容", _roomAttachmentCatalog.Issues);
+                        diagnosticBatch.Add("地图内容", _roomAttachmentCatalog.Issues);
                         CrashDiagnostics.RecordStatus(
-                            $"战斗附加内容目录：奇物={_roomAttachmentCatalog.Curios.Count}；" +
-                            $"宝箱={_roomAttachmentCatalog.Treasures.Count}；诊断并入本轮目录日志。");
+                            $"地图内容目录：房间奇物={_roomAttachmentCatalog.Curios.Count}；" +
+                            $"房间宝箱={_roomAttachmentCatalog.Treasures.Count}；" +
+                            $"走廊奇物={_roomAttachmentCatalog.HallCurios.Count}；" +
+                            $"当前区域={snapshot.DungeonId}；" +
+                            $"陷阱={_roomAttachmentCatalog.GetCandidates(BattleRoomAttachmentKind.Trap, snapshot.DungeonId).Count}；" +
+                            $"障碍={_roomAttachmentCatalog.GetCandidates(BattleRoomAttachmentKind.Obstacle, snapshot.DungeonId).Count}；" +
+                            "诊断并入本轮目录日志。");
                     }
                     catch (OperationCanceledException)
                     {
@@ -220,7 +225,7 @@ public partial class BattleMapView : UserControl
 
         // Close the small initial-read/monitor-baseline race. If the game completed another
         // write between those operations, this hash comparison immediately adopts that state.
-        if (generation == _profileGeneration)
+        if (!UsesSharedProfileMonitor && generation == _profileGeneration)
         {
             await RefreshLiveSnapshotAsync(generation);
         }
@@ -234,6 +239,7 @@ public partial class BattleMapView : UserControl
     {
         _isRaidAvailable = true;
         MapCanvas.Visibility = Visibility.Visible;
+        MapCanvas.IsHitTestVisible = !_isApplyingEdit;
         EmptyStatePanel.Visibility = Visibility.Collapsed;
         PrototypeBadge.Visibility = Visibility.Visible;
         ZoomOutButton.IsEnabled = true;

@@ -167,10 +167,14 @@
                                        Text="当前要读取和修改的 profile_* 目录" />
                         </StackPanel>
                     </ScrollViewer>
-                    <Button x:Name="LoadCatalogButton" Grid.Row="2" Margin="18,12,18,18"
+                    <StackPanel Grid.Row="2" Margin="18,12,18,18">
+                        <TextBlock x:Name="ProfileSyncStatusTextBlock" Margin="0,0,0,8"
+                                   Style="{StaticResource MutedTextStyle}" Text="尚未加载档案" />
+                    <Button x:Name="LoadCatalogButton" Margin="0"
                             Style="{StaticResource PrimaryButtonStyle}"
                             Content="载入当前档案的内容目录"
                             Click="LoadCatalog_Click" />
+                    </StackPanel>
                 </Grid>
             </Border>
 
