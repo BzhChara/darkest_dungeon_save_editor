@@ -23,6 +23,7 @@ public static class TrinketCatalog
         var issues = new List<string>();
         var definitions = new Dictionary<string, List<TrinketDefinition>>(StringComparer.OrdinalIgnoreCase);
         var fileCandidates = new List<ContentFileCandidate>();
+        var heroIds = NativeContentFileResolver.DiscoverActorIds(activeContent.Sources, "heroes", issues);
         var enabledDlcPrefixes = ContentFileOverlay.GetEnabledDlcPrefixes(activeContent.Sources);
         foreach (var source in activeContent.Sources.OrderBy(item => item.LoadOrder))
         {
@@ -39,9 +40,9 @@ public static class TrinketCatalog
             }
         }
 
-        foreach (var file in ContentFileOverlay.Resolve(fileCandidates, "Trinket definition", issues))
+        foreach (var file in NativeContentFileResolver.Resolve(fileCandidates, activeContent.Sources, "Trinket definition", issues))
         {
-            ScanFile(file, definitions, issues);
+            ScanFile(file, heroIds, definitions, issues);
         }
 
         var localization = ContentLocalizationCatalog.Load(
@@ -49,8 +50,12 @@ public static class TrinketCatalog
             definitions.Keys.SelectMany(ContentLocalizationCatalog.GetTrinketKeys));
         issues.AddRange(localization.Issues);
 
+        var collisionIds = NativeResourceIdentity.FindCollisions(definitions.Values.SelectMany(group => group).Select(item => item.Id));
+        if (collisionIds.Count > 0) issues.Add("Trinket IDs share native hashes and cannot be selected safely: " + string.Join(", ", collisionIds));
         var merged = definitions.Values
             .Select(candidates => MergeDefinitions(candidates, issues))
+            .Select(definition => collisionIds.Contains(definition.Id)
+                ? definition with { HasProviderConflict = true, Source = "unresolved" } : definition)
             .Select(definition => definition with
             {
                 LocalizedName = localization.GetTrinketName(definition.Id),
@@ -71,6 +76,7 @@ public static class TrinketCatalog
 
     private static void ScanFile(
         EffectiveContentFile file,
+        IReadOnlySet<string> heroIds,
         Dictionary<string, List<TrinketDefinition>> definitions,
         List<string> issues)
     {
@@ -104,6 +110,17 @@ public static class TrinketCatalog
                 var id = idNode.GetString()?.Trim() ?? string.Empty;
                 if (string.IsNullOrWhiteSpace(id))
                 {
+                    continue;
+                }
+
+                // Native loader 0x1404F39A0 checks every required class and
+                // skips this entry when any class is absent from the actor table.
+                if (entry.TryGetProperty("hero_class_requirements", out var requirements) &&
+                    requirements.ValueKind == JsonValueKind.Array &&
+                    requirements.EnumerateArray().Any(value => value.ValueKind != JsonValueKind.String ||
+                        !heroIds.Contains(value.GetString()!)))
+                {
+                    issues.Add($"Trinket '{id}' requires an unloaded hero class and was ignored: {path}");
                     continue;
                 }
 
@@ -238,7 +255,7 @@ public static class TrinketCatalog
 
         if (!useModManifest)
         {
-            return Directory.EnumerateFiles(root, "*.entries.trinkets.json", SearchOption.AllDirectories)
+            return NativeDirectoryDiscovery.EnumerateFiles(root, "*.entries.trinkets.json", SearchOption.AllDirectories)
                 .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
                 .ToArray();
         }
@@ -250,7 +267,7 @@ public static class TrinketCatalog
             return ContentFileOverlay.GetFallbackContentRoots(root, enabledDlcPrefixes)
                 .Select(contentRoot => Path.Combine(contentRoot, "trinkets"))
                 .Where(Directory.Exists)
-                .SelectMany(directory => Directory.EnumerateFiles(
+                .SelectMany(directory => NativeDirectoryDiscovery.EnumerateFiles(
                     directory, "*.entries.trinkets.json", SearchOption.AllDirectories))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
@@ -297,52 +314,18 @@ public static class TrinketCatalog
         IReadOnlyList<TrinketDefinition> candidates,
         List<string> issues)
     {
-        var statefulFields = candidates
-            .SelectMany(candidate => candidate.StatefulFields)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
-            .ToArray();
-        var unsupportedStateFields = candidates
-            .SelectMany(candidate => candidate.UnsupportedStateFields)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
-            .ToArray();
-        var sources = candidates
-            .SelectMany(candidate => candidate.AllSources)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToArray();
-        var effectivePaths = candidates
-            .Select(candidate => candidate.SourcePath)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToArray();
-        if (effectivePaths.Length == 1)
+        // 0x1404F6480: lookup stops at the first ID hash in the loaded vector.
+        // Keep instance fields from that entry only; later definitions do not
+        // turn an ordinary trinket into a consumable/stateful one.
+        var winner = candidates[0];
+        var conflict = candidates.Any(candidate => candidate.Id != winner.Id);
+        if (conflict) issues.Add($"Trinket '{winner.Id}' has IDs differing only in case and cannot share a selection.");
+        return winner with
         {
-            return candidates[^1] with
-            {
-                IsStateful = statefulFields.Length > 0,
-                StatefulFields = statefulFields,
-                AllSources = sources,
-                UnsupportedStateFields = unsupportedStateFields
-            };
-        }
-
-        var id = candidates[0].Id;
-        issues.Add(
-            $"Trinket '{id}' has definitions at different effective content paths and was left unresolved: " +
-            string.Join(" | ", candidates.Select(candidate => $"{candidate.Source}:{candidate.SourcePath}")));
-        return new TrinketDefinition(
-            id,
-            string.Empty,
-            null,
-            null,
-            "unresolved",
-            string.Join(" | ", candidates.Select(candidate => candidate.SourcePath)),
-            statefulFields.Length > 0,
-            statefulFields,
-            true,
-            sources)
-        {
-            UnsupportedStateFields = unsupportedStateFields
+            HasProviderConflict = conflict,
+            Source = conflict ? "unresolved" : winner.Source,
+            AllSources = candidates.SelectMany(candidate => candidate.AllSources)
+                .Distinct(StringComparer.OrdinalIgnoreCase).ToArray()
         };
     }
 

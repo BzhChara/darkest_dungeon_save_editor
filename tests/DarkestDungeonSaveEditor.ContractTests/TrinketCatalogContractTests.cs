@@ -251,7 +251,7 @@ internal static partial class ContractSuite
             "A Mod should override an enabled DLC feature trinket through its full virtual path.");
         Assert(
             ambiguousTrinket.HasProviderConflict && ambiguousTrinket.Source == "unresolved",
-            "The same trinket id from different effective paths must remain unresolved.");
+            "Case-distinct trinket IDs must not be conflated by the current selection key.");
         Assert(
             activeCatalog.Issues.Any(issue => issue.Contains("Trinket 'ambiguous_trinket'", StringComparison.Ordinal)),
             "An unresolved semantic trinket duplicate should be reported.");

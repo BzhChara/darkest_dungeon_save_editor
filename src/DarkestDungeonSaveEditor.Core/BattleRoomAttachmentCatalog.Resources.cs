@@ -9,11 +9,11 @@ public static partial class BattleRoomAttachmentCatalog
         IReadOnlyList<ActiveContentSource> sources, List<string> issues)
     {
         var enabledDlcPrefixes = ContentFileOverlay.GetEnabledDlcPrefixes(sources);
-        return ContentFileOverlay.Resolve(sources.SelectMany(source =>
+        return NativeContentFileResolver.Resolve(sources.SelectMany(source =>
                 EnumeratePropFiles(source, enabledDlcPrefixes, issues, "props", "*.json", ".json")
                     .Where(path => Path.GetFileName(path).ToLowerInvariant() is
                         "prop_definitions.json" or "trap_definitions.json" or "obstacle_definitions.json")
-                    .Select(path => new ContentFileCandidate(source, path))),
+                    .Select(path => new ContentFileCandidate(source, path))).ToArray(), sources,
             "Map prop resource", issues);
     }
 

@@ -17,6 +17,7 @@ public static partial class BattleEncounterCatalog
             parts.Add($"{source.Id}|{source.Kind}|{source.LoadOrder}|{Path.GetFullPath(source.Directory)}|{source.VirtualPathPrefix}");
             var paths = EnumerateMashFiles(source, prefixes, issues)
                 .Concat(EnumerateMonsterInfoFiles(source, prefixes, issues))
+                .Concat(NativeContentFileResolver.EnumeratePhysicalActorFiles(source, prefixes, "monsters"))
                 .Concat(new[] { "modfiles.txt", "project.xml", ManagedBattleEncounterBridgeService.ManifestFileName }
                     .Select(name => Path.Combine(source.Directory, name)).Where(File.Exists));
             foreach (var path in paths.Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.OrdinalIgnoreCase))
@@ -26,12 +27,14 @@ public static partial class BattleEncounterCatalog
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(string.Join('\n', parts))));
     }
 
-    internal static IReadOnlyDictionary<string, int?> ReadMaintenanceMonsterSizes(IReadOnlyList<ActiveContentSource> sources)
+    internal static IReadOnlyDictionary<string, int?> ReadMaintenanceMonsterSizes(
+        IReadOnlyList<ActiveContentSource> sources, bool usableOnly = false)
     {
         var issues = new List<string>();
         var monsters = ResolveAvailableMonsterDefinitions(sources, issues);
         RequireCompleteMaintenanceScan(issues);
-        return monsters.Sizes;
+        return usableOnly ? monsters.Sizes.Where(pair => monsters.Ids.Contains(pair.Key))
+            .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal) : monsters.Sizes;
     }
 
     internal static IReadOnlyList<BattleEncounterDefinition> ReadMaintenanceTable(

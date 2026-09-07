@@ -177,7 +177,7 @@ public static partial class TrinketStorageCatalog
         {
             var inventoryRoot = Path.Combine(root, "inventory");
             return Directory.Exists(inventoryRoot)
-                ? Directory.EnumerateFiles(
+                ? NativeDirectoryDiscovery.EnumerateFiles(
                         inventoryRoot,
                         $"*{InventoryConfigSuffix}",
                         SearchOption.AllDirectories)
@@ -193,7 +193,7 @@ public static partial class TrinketStorageCatalog
             return ContentFileOverlay.GetFallbackContentRoots(root, enabledDlcPrefixes)
                 .Select(contentRoot => Path.Combine(contentRoot, "inventory"))
                 .Where(Directory.Exists)
-                .SelectMany(directory => Directory.EnumerateFiles(
+                .SelectMany(directory => NativeDirectoryDiscovery.EnumerateFiles(
                     directory, $"*{InventoryConfigSuffix}", SearchOption.AllDirectories))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)

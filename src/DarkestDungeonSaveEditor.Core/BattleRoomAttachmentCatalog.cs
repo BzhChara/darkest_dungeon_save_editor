@@ -370,7 +370,7 @@ public static partial class BattleRoomAttachmentCatalog
             }
         }
 
-        return ContentFileOverlay.Resolve(candidates, "Room prop", issues);
+        return NativeContentFileResolver.Resolve(candidates, sources, "Room prop", issues);
     }
 
     private static IReadOnlyList<string> EnumeratePropFiles(
@@ -406,7 +406,7 @@ public static partial class BattleRoomAttachmentCatalog
                     source.Directory, source.Kind is "workshop" or "local" ? enabledDlcPrefixes : [])
                 .Select(root => Path.Combine(root, contentDirectory))
                 .Where(Directory.Exists)
-                .SelectMany(directory => Directory.EnumerateFiles(
+                .SelectMany(directory => NativeDirectoryDiscovery.EnumerateFiles(
                     directory, pattern, SearchOption.AllDirectories))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)

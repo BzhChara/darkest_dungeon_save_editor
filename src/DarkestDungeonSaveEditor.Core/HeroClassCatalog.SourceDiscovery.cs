@@ -203,7 +203,7 @@ public static partial class HeroClassCatalog
         var upgradeRoot = Path.Combine(root, "upgrades");
         if (Directory.Exists(upgradeRoot))
         {
-            result.UnionWith(Directory.EnumerateFiles(
+            result.UnionWith(NativeDirectoryDiscovery.EnumerateFiles(
                 upgradeRoot,
                 $"*{HeroUpgradeSuffix}",
                 SearchOption.TopDirectoryOnly));
@@ -216,7 +216,7 @@ public static partial class HeroClassCatalog
     {
         var directory = Path.Combine(root, relativeDirectory);
         return Directory.Exists(directory)
-            ? Directory.EnumerateFiles(directory, pattern, SearchOption.AllDirectories)
+            ? NativeDirectoryDiscovery.EnumerateFiles(directory, pattern, SearchOption.AllDirectories)
                 .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
                 .ToArray()
             : [];

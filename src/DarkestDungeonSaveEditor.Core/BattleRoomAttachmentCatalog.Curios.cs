@@ -9,11 +9,11 @@ public static partial class BattleRoomAttachmentCatalog
         IReadOnlyList<ActiveContentSource> sources, List<string> issues)
     {
         var enabledDlcPrefixes = ContentFileOverlay.GetEnabledDlcPrefixes(sources);
-        return ContentFileOverlay.Resolve(sources.SelectMany(source =>
+        return NativeContentFileResolver.Resolve(sources.SelectMany(source =>
                 EnumeratePropFiles(source, enabledDlcPrefixes, issues, "curios", "*.csv", ".csv")
                     .Where(path => path.EndsWith("curio_props.csv", StringComparison.OrdinalIgnoreCase) ||
                         path.EndsWith("curio_type_library.csv", StringComparison.OrdinalIgnoreCase))
-                    .Select(path => new ContentFileCandidate(source, path))),
+                    .Select(path => new ContentFileCandidate(source, path))).ToArray(), sources,
             "Curio resource", issues);
     }
 

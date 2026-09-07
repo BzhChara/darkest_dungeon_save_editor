@@ -14,9 +14,10 @@ public static partial class HeroClassCatalog
         string contentLabel,
         List<string> issues)
     {
-        return ContentFileOverlay.Resolve(
+        return NativeContentFileResolver.Resolve(
             sourceFiles.SelectMany(item =>
-                selectFiles(item.Files).Select(path => new ContentFileCandidate(item.Source, path))),
+                selectFiles(item.Files).Select(path => new ContentFileCandidate(item.Source, path))).ToArray(),
+            sourceFiles.Select(item => item.Source).ToArray(),
             contentLabel,
             issues);
     }

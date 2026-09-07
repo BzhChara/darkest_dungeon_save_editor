@@ -45,7 +45,7 @@ internal static partial class ContractSuite
         Assert(hero.BaseHp == 33 && candidate.Preview.CurrentHp == 33 &&
                hero.RuntimeQuirkSignals.Any(signal => signal.QuirkId == "priority_top_quirk" && signal.EffectName == ".Grant // \"Quoted\""),
             "Inline comments must not override HP/effects; quoted leading dots, comment markers and escaped quotes must survive actual hero/effect discovery.");
-        foreach (var id in new[] { "missing_direct", "missing_chain", "conflicting_target", "broken_chain" })
+        foreach (var id in new[] { "missing_direct", "missing_chain", "broken_chain" })
         {
             var quirk = catalog.InitialQuirks.Single(row => row.Id == id);
             Assert(quirk.WriteStatus == HeroInitialQuirkWriteStatus.Unverified && !quirk.IsNaturalRandomEligible &&
@@ -53,7 +53,7 @@ internal static partial class ContractSuite
                 "Every unresolved or invalid downstream evolution target must exclude the source from direct and random candidate generation.");
             AssertHeroGenerationRejected(catalog, hero, [id], "当前不能显式写入");
         }
-        foreach (var id in new[] { "cycle_a", "cycle_b", "death_only" })
+        foreach (var id in new[] { "cycle_a", "cycle_b", "death_only", "conflicting_target" })
         {
             var quirk = catalog.InitialQuirks.Single(row => row.Id == id);
             Assert(quirk.WriteStatus == HeroInitialQuirkWriteStatus.Direct,

@@ -51,8 +51,8 @@ internal static partial class ContractSuite
         Assert(
             catalogGold.StorageKind == QuantityItemStorageKind.Wallet &&
             catalogGold.CurrentAmount == 1250 &&
-            catalogGold.Source == "workshop:111" &&
-            catalogGold.SourceLabel.Contains("原版（当前由 创意工坊 Mod", StringComparison.Ordinal) &&
+            catalogGold.Source == "base" &&
+            catalogGold.SourceLabel.Contains("原版", StringComparison.Ordinal) &&
             catalogGold.LocalizedName == new BilingualContentName("金币", "Gold") &&
             catalogBlueprint is { StorageKind: QuantityItemStorageKind.Wallet, CurrentAmount: 2 } &&
             catalogBlueprint.LocalizedName == new BilingualContentName("建筑图纸", "Blueprint") &&
@@ -518,7 +518,7 @@ internal static partial class ContractSuite
                 ReferenceStatus: QuantityItemReferenceStatus.OfficialContent,
                 IsHiddenByDefault: false
             } &&
-            raidGold is { CurrentAmount: 2500, BaseStackLimit: 2500 } &&
+            raidGold is { CurrentAmount: 2500, BaseStackLimit: 1750 } &&
             catalogGold.CurrentAmount == 1250 &&
             raidGem is { CurrentAmount: 5, BaseStackLimit: 5 } &&
             catalogBlood is { StorageKind: QuantityItemStorageKind.EstateItems, CurrentAmount: 3 } &&

@@ -30,16 +30,18 @@ public static partial class QuantityItemCatalog
             ScanFile(file, saveContext, definitions, issues, forceProviderConflict: true);
         }
 
-        foreach (var file in ContentFileOverlay.Resolve(candidates, "Inventory item definition", issues))
+        foreach (var file in NativeContentFileResolver.Resolve(candidates, activeContent.Sources, "Inventory item definition", issues))
         {
             ScanFile(file, saveContext, definitions, issues);
         }
 
-        var sourcesById = activeContent.Sources.ToDictionary(
-            source => source.Id,
-            StringComparer.OrdinalIgnoreCase);
+        var collisionKeys = NativeResourceIdentity.FindCollisions(definitions.Values.SelectMany(group => group),
+            item => item.CatalogKey, item => (Loc2LocalizationReader.HashName(item.InventoryType), Loc2LocalizationReader.HashName(item.ItemId)));
+        if (collisionKeys.Count > 0) issues.Add("Inventory keys share native hashes and cannot be selected safely: " + string.Join(", ", collisionKeys));
         return definitions.Values
-            .Select(group => MergeDefinitions(group, issues, sourcesById))
+            .Select(group => MergeDefinitions(group, issues))
+            .Select(definition => collisionKeys.Contains(definition.CatalogKey)
+                ? definition with { HasProviderConflict = true, Source = "unresolved" } : definition)
             .OrderBy(definition => definition.DisplayId, StringComparer.OrdinalIgnoreCase)
             .ToArray();
     }
@@ -195,26 +197,23 @@ public static partial class QuantityItemCatalog
         string path,
         QuantityItemSaveContext saveContext)
     {
-        var text = StripLineComments(File.ReadAllText(path, Encoding.UTF8));
         var result = new List<ParsedItemDefinition>();
-        foreach (Match entry in InventoryItemEntryRegex().Matches(text))
+        foreach (var (kind, body) in NativeDarkestReader.ReadRecords(path))
         {
-            var body = entry.Groups["body"].Value;
-            var typeMatch = InventoryTypeRegex().Match(body);
-            if (!typeMatch.Success)
+            if (kind != "inventory_item") continue;
+            var inventoryType = NativeDarkestReader.ReadString(body, ".type");
+            if (inventoryType is null)
             {
                 continue;
             }
 
-            var inventoryType = typeMatch.Groups["type"].Value.Trim();
             var storageKind = ResolveStorageKind(inventoryType, saveContext);
             if (storageKind is null)
             {
                 continue;
             }
 
-            var idMatch = InventoryIdRegex().Match(body);
-            var itemId = idMatch.Success ? idMatch.Groups["id"].Value.Trim() : string.Empty;
+            var itemId = NativeDarkestReader.ReadString(body, ".id") ?? string.Empty;
             if ((inventoryType.Equals("heirloom", StringComparison.OrdinalIgnoreCase) ||
                  storageKind == QuantityItemStorageKind.EstateItems) &&
                 string.IsNullOrWhiteSpace(itemId))
@@ -222,24 +221,12 @@ public static partial class QuantityItemCatalog
                 continue;
             }
 
-            var stackLimitMatch = BaseStackLimitRegex().Match(body);
-            int? stackLimit = stackLimitMatch.Success && int.TryParse(
-                stackLimitMatch.Groups["limit"].Value,
-                NumberStyles.Integer,
-                CultureInfo.InvariantCulture,
-                out var parsedLimit)
-                ? parsedLimit
-                : null;
-            var provisionMatch = EstateCanBeProvisionRegex().Match(body);
-            bool? estateCanBeProvision = provisionMatch.Success
-                ? provisionMatch.Groups["value"].Value.Equals("true", StringComparison.OrdinalIgnoreCase)
-                : null;
             result.Add(new ParsedItemDefinition(
                 inventoryType,
                 itemId,
                 storageKind.Value,
-                stackLimit,
-                estateCanBeProvision));
+                NativeDarkestReader.ReadInt(body, ".base_stack_limit"),
+                NativeDarkestReader.ReadBoolean(body, ".estate_can_be_provision")));
         }
 
         return result;
@@ -269,57 +256,21 @@ public static partial class QuantityItemCatalog
 
     private static QuantityItemDefinition MergeDefinitions(
         IReadOnlyList<QuantityItemDefinition> candidates,
-        List<string> issues,
-        IReadOnlyDictionary<string, ActiveContentSource> sourcesById)
+        List<string> issues)
     {
-        var highestPrioritySource = candidates[0];
-        foreach (var candidate in candidates.Skip(1))
-        {
-            if (ComparePriority(candidate, highestPrioritySource, sourcesById) > 0)
-            {
-                highestPrioritySource = candidate;
-            }
-        }
-
-        var winners = candidates
-            .Where(candidate => ComparePriority(candidate, highestPrioritySource, sourcesById) == 0)
-            .OrderBy(candidate => candidate.SourcePath, StringComparer.OrdinalIgnoreCase)
-            .ToArray();
-        var conflict = winners.Any(candidate => candidate.HasProviderConflict) || winners
-            .Select(candidate => (
-                candidate.InventoryType,
-                candidate.ItemId,
-                candidate.BaseStackLimit,
-                candidate.EstateCanBeProvision))
-            .Distinct()
-            .Skip(1)
-            .Any();
+        // InventorySystem appends declarations in native file/line order;
+        // GetItemInfo stops at the first matching type and ID hash (0x1404F1590).
+        // Mod priority replaces paths, not every same-ID declaration globally.
+        var winner = candidates[0];
+        var conflict = candidates.Any(candidate => candidate.HasProviderConflict ||
+            candidate.InventoryType != winner.InventoryType || candidate.ItemId != winner.ItemId);
         if (conflict)
-        {
-            issues.Add(
-                $"Quantity item '{candidates[0].DisplayId}' has conflicting definitions at the same priority; " +
-                $"the deterministic first provider is shown: {string.Join(" | ", winners.Select(item => item.SourcePath))}");
-        }
-
-        var winner = winners[0];
+            issues.Add($"Quantity item '{winner.DisplayId}' has an unverified file provider priority.");
         return winner with
         {
             HasProviderConflict = conflict,
-            AllSources = candidates
-                .SelectMany(candidate => candidate.AllSources)
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToArray()
+            AllSources = candidates.SelectMany(candidate => candidate.AllSources)
+                .Distinct(StringComparer.OrdinalIgnoreCase).ToArray()
         };
     }
-
-    private static int ComparePriority(
-        QuantityItemDefinition left,
-        QuantityItemDefinition right,
-        IReadOnlyDictionary<string, ActiveContentSource> sourcesById)
-    {
-        var leftSource = sourcesById[left.Source];
-        var rightSource = sourcesById[right.Source];
-        return ContentFileOverlay.ComparePriority(leftSource, rightSource);
-    }
-
 }

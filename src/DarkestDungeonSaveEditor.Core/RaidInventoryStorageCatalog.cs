@@ -229,7 +229,7 @@ public static partial class RaidInventoryStorageCatalog
         {
             var inventoryRoot = Path.Combine(source.Directory, "inventory");
             return Directory.Exists(inventoryRoot)
-                ? Directory.EnumerateFiles(inventoryRoot, $"*{InventoryConfigSuffix}", SearchOption.AllDirectories)
+                ? NativeDirectoryDiscovery.EnumerateFiles(inventoryRoot, $"*{InventoryConfigSuffix}", SearchOption.AllDirectories)
                     .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
                     .ToArray()
                 : [];
@@ -241,7 +241,7 @@ public static partial class RaidInventoryStorageCatalog
             var files = ContentFileOverlay.GetFallbackContentRoots(source.Directory, enabledDlcPrefixes)
                 .Select(root => Path.Combine(root, "inventory"))
                 .Where(Directory.Exists)
-                .SelectMany(directory => Directory.EnumerateFiles(
+                .SelectMany(directory => NativeDirectoryDiscovery.EnumerateFiles(
                     directory, $"*{InventoryConfigSuffix}", SearchOption.AllDirectories))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)

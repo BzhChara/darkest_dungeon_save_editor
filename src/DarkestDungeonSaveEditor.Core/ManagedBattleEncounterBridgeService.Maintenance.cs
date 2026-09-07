@@ -131,7 +131,7 @@ public sealed partial class ManagedBattleEncounterBridgeService
             CopyDirectory(package, stage);
             foreach (var path in Directory.EnumerateFiles(package, "*", SearchOption.AllDirectories))
                 originalFiles[path] = ComputeSha256(path);
-            var monsters = BattleEncounterCatalog.ReadMaintenanceMonsterSizes(content.Sources);
+            var monsters = BattleEncounterCatalog.ReadMaintenanceMonsterSizes(content.Sources, usableOnly: true);
             var sourceFingerprint = ComputeContentFingerprint(content.Sources);
             var metadataChanged = false;
             foreach (var table in manifest.Tables)

@@ -14,18 +14,12 @@ public static partial class BattleEncounterCatalog
         var sources = candidates.Select(candidate => candidate.Source)
             .DistinctBy(source => source.Id, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(source => source.Id, StringComparer.OrdinalIgnoreCase);
-        var sourceComparer = Comparer<ActiveContentSource>.Create(ContentFileOverlay.ComparePriority);
         var files = ContentFileOverlay.Resolve(candidates, "Encounter mash", issues);
         var dlcPrefixes = ContentFileOverlay.GetEnabledDlcPrefixes(activeSources);
         string? MountPrefix(string path) => dlcPrefixes.OrderByDescending(prefix => prefix.Length)
             .FirstOrDefault(prefix => path.StartsWith(prefix + "/", StringComparison.OrdinalIgnoreCase));
-        string MountedPath(string path) => MountPrefix(path) is { } prefix ? path[(prefix.Length + 1)..] : path;
         string ProviderPath(ContentFileProvider provider) => ContentFileOverlay.NormalizeRelativePath(
             sources[provider.SourceId], provider.Path)!;
-        string SlotPath(EffectiveContentFile file) => ProviderPath(file.Providers[0]);
-        ActiveContentSource MountSource(EffectiveContentFile file) => MountPrefix(file.RelativePath) is { } prefix
-            ? activeSources.First(source => source.VirtualPathPrefix.Equals(prefix, StringComparison.OrdinalIgnoreCase))
-            : sources[file.Providers[0].SourceId];
         var indexedFiles = files.Where(file => ClassifyFile(file.Path) == BattleEncounterSourceKind.Standard &&
             HasIndexedTableDeclarations(file.Path)).ToArray();
         foreach (var file in indexedFiles)
@@ -47,51 +41,7 @@ public static partial class BattleEncounterCatalog
                 .Distinct(StringComparer.OrdinalIgnoreCase).Skip(1).Any())
                 issues.Add($"同一地区/难度跨越多个 DLC 挂载目录，尚未验证这些挂载之间的顺序：{group.Key.dungeon}/{group.Key.difficulty}");
         }
-        // Root providers must replay at their own mount positions. Merely
-        // placing a root Mod's final bytes in the Base slot lets a later DLC
-        // alias incorrectly replace them before the root Mod is applied.
-        var ordered = files.SelectMany(file => MountPrefix(file.RelativePath) is not null
-                ? new[] { file }
-                : file.Providers.Select(provider => file with
-                {
-                    Source = sources[provider.SourceId],
-                    Path = provider.Path,
-                    RelativePath = ProviderPath(provider),
-                    Providers = [provider],
-                    ProviderSources = [provider.SourceId],
-                    ProviderPaths = [provider.Path]
-                }).ToArray())
-            .OrderBy(MountSource, sourceComparer)
-            .ThenByDescending(file => SlotPath(file).Count(character => character == '/'))
-            .ThenBy(SlotPath, StringComparer.Ordinal)
-            .ToArray();
-        // IO_FindFiles compares paths relative to the alternate mount. A root
-        // Mod's dungeons/x/file overrides DLC-prefix/dungeons/x/file in place.
-        // Preserve the authored winning path for Bridge output and provenance.
-        var slots = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-        var result = new List<EffectiveContentFile>();
-        foreach (var file in ordered)
-        {
-            var path = MountedPath(file.RelativePath);
-            if (!slots.TryGetValue(path, out var slot))
-            {
-                slots.Add(path, result.Count);
-                result.Add(file);
-                continue;
-            }
-            var prior = result[slot];
-            if (!MountedPath(prior.RelativePath).Equals(path, StringComparison.Ordinal))
-                issues.Add($"标准遭遇挂载路径的大小写不一致，尚未验证原生匹配规则：{path}");
-            var providers = prior.Providers.Concat(file.Providers)
-                .DistinctBy(provider => $"{provider.SourceId}\n{provider.Path}", StringComparer.OrdinalIgnoreCase).ToArray();
-            result[slot] = file with
-            {
-                Providers = providers,
-                ProviderSources = providers.Select(provider => provider.SourceId).Distinct(StringComparer.OrdinalIgnoreCase).ToArray(),
-                ProviderPaths = providers.Select(provider => provider.Path).Distinct(StringComparer.OrdinalIgnoreCase).ToArray()
-            };
-        }
-        return result;
+        return NativeContentFileResolver.Resolve(candidates, activeSources, "Encounter mash", issues);
     }
 
     private static bool HasIndexedTableDeclarations(string path) => File.ReadLines(path).Any(raw =>
