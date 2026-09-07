@@ -13,7 +13,7 @@ public sealed record BattleEncounterBridgePackage(
     int MashType,
     int ExpectedMashIndex,
     IReadOnlyList<string> MonsterIds,
-    string SourceMashSha256,
+    string SourceTableFingerprint,
     string GeneratedMashSha256)
 {
     public string OriginDungeonId { get; init; } = string.Empty;
@@ -49,50 +49,9 @@ public static class BattleEncounterBridgeBuilder
         }
 
         BattleEncounterCatalog.ValidateBridgeEncounter(encounter);
-        var currentRows = catalog.Encounters
-            .Where(candidate =>
-                candidate.SourceKind == BattleEncounterSourceKind.Standard &&
-                candidate.MashType == encounter.MashType)
-            .OrderBy(candidate => candidate.MashIndex)
-            .ToArray();
-        if (currentRows.Select(candidate => candidate.SourcePath)
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .Skip(1)
-                .Any())
-        {
-            throw new InvalidOperationException(
-                "当前类型由多个标准遭遇文件共同扩展，无法证明追加后的运行时索引顺序。" +
-                "本次不会生成 Bridge。");
-        }
-
-        string sourceMashPath;
-        var expectedMashIndex = currentRows.Length;
-        if (currentRows.Length > 0)
-        {
-            if (!currentRows.Select((candidate, index) =>
-                        candidate.CanPlaceDirectly && candidate.MashIndex == index)
-                    .All(matches => matches))
-            {
-                throw new InvalidOperationException(
-                    "当前类型没有连续且可证明的标准遭遇索引，不能生成 Bridge。");
-            }
-            sourceMashPath = currentRows[0].SourcePath;
-        }
-        else
-        {
-            sourceMashPath = ResolveEmptyTypeTargetMashPath(catalog);
-        }
-
-        var sourceMashSha256 = ComputeSha256(sourceMashPath);
-        var guardedSource = catalog.TableGuard.EffectiveFiles.SingleOrDefault(file =>
-            Path.GetFullPath(file.Path).Equals(
-                Path.GetFullPath(sourceMashPath),
-                StringComparison.OrdinalIgnoreCase));
-        if (guardedSource is null ||
-            !sourceMashSha256.Equals(guardedSource.Sha256, StringComparison.OrdinalIgnoreCase))
-        {
-            throw new InvalidOperationException("标准遭遇文件在桥接准备期间已经变化。");
-        }
+        var target = BattleEncounterCatalog.ResolveAppendTarget(catalog, encounter.MashType);
+        var expectedMashIndex = target.NextMashIndex;
+        var sourceTableFingerprint = catalog.TableGuard.Fingerprint;
 
         outputRoot ??= Path.Combine(
             SaveEditorLocations.CreateDefault().WorkspaceDirectory,
@@ -110,13 +69,11 @@ public static class BattleEncounterBridgeBuilder
             throw new IOException($"Bridge 输出目录已经存在：{packageDirectory}");
         }
 
-        var relativeMashPath = ResolveLocalModMashPath(catalog.TableGuard, sourceMashPath);
+        var relativeMashPath = target.RelativeMashPath;
         var mashFilePath = Path.Combine(
             packageDirectory,
             relativeMashPath.Replace('/', Path.DirectorySeparatorChar));
         Directory.CreateDirectory(Path.GetDirectoryName(mashFilePath)!);
-        var sourceBytes = File.ReadAllBytes(sourceMashPath);
-        var newline = EndsWithLineBreak(sourceBytes) ? string.Empty : Environment.NewLine;
         var kind = encounter.MashType switch
         {
             0 => "hall",
@@ -128,7 +85,7 @@ public static class BattleEncounterBridgeBuilder
             ? string.Empty
             : " .limit 1 .can_be_ambush false";
         var appendedLine =
-            $"{newline}{kind}: .chance 0 .types {string.Join(' ', encounter.MonsterIds)}" +
+            $"{kind}: .chance 0 .types {string.Join(' ', encounter.MonsterIds)}" +
             appendedOptions + Environment.NewLine;
         var appendedBytes = Utf8NoBom.GetBytes(appendedLine);
         using (var output = new FileStream(
@@ -137,19 +94,19 @@ public static class BattleEncounterBridgeBuilder
                    FileAccess.Write,
                    FileShare.None))
         {
-            output.Write(sourceBytes);
             output.Write(appendedBytes);
             output.Flush(flushToDisk: true);
         }
 
         var projectPath = Path.Combine(packageDirectory, "project.xml");
         var modDataPath = packageDirectory.Replace('\\', '/').TrimEnd('/') + "/";
+        EncounterBridgeBranding.WritePreview(packageDirectory);
         File.WriteAllText(
             projectPath,
             $"""
             <?xml version="1.0" encoding="utf-8"?>
             <project>
-              <PreviewIconFile/>
+              <PreviewIconFile>{SecurityElement.Escape(modDataPath + EncounterBridgeBranding.PreviewFileName)}</PreviewIconFile>
               <ItemDescriptionShort>Deterministic encounter carrier generated for one active expedition table.</ItemDescriptionShort>
               <ModDataPath>{SecurityElement.Escape(modDataPath)}</ModDataPath>
               <Title>{SecurityElement.Escape(projectTitle)}</Title>
@@ -173,7 +130,7 @@ public static class BattleEncounterBridgeBuilder
             JsonSerializer.Serialize(
                 new
                 {
-                    version = 2,
+                    version = 3,
                     generatedAtUtc = DateTime.UtcNow,
                     catalog.DungeonId,
                     catalog.Difficulty,
@@ -188,8 +145,7 @@ public static class BattleEncounterBridgeBuilder
                     sourcePath = encounter.SourcePath,
                     sourceRelativePath = encounter.SourceRelativePath,
                     sourceLine = encounter.SourceLine,
-                    sourceMashPath,
-                    sourceMashSha256,
+                    sourceTableFingerprint,
                     generatedMashPath = relativeMashPath,
                     generatedMashSha256,
                     tableFingerprint = catalog.TableGuard.Fingerprint,
@@ -199,7 +155,8 @@ public static class BattleEncounterBridgeBuilder
             Utf8NoBom);
         File.WriteAllText(
             Path.Combine(packageDirectory, "modfiles.txt"),
-            $"{relativeMashPath} {new FileInfo(mashFilePath).Length}" + Environment.NewLine,
+            $"{relativeMashPath} {new FileInfo(mashFilePath).Length}" + Environment.NewLine +
+            $"{EncounterBridgeBranding.PreviewFileName} {new FileInfo(Path.Combine(packageDirectory, EncounterBridgeBranding.PreviewFileName)).Length}" + Environment.NewLine,
             Utf8NoBom);
 
         return new BattleEncounterBridgePackage(
@@ -210,7 +167,7 @@ public static class BattleEncounterBridgeBuilder
             encounter.MashType,
             expectedMashIndex,
             encounter.MonsterIds,
-            sourceMashSha256,
+            sourceTableFingerprint,
             generatedMashSha256)
         {
             OriginDungeonId = encounter.OriginDungeonId,
@@ -223,61 +180,6 @@ public static class BattleEncounterBridgeBuilder
         source.DisplayName.StartsWith("DDSE Encounter Bridge", StringComparison.OrdinalIgnoreCase) ||
         File.Exists(Path.Combine(source.Directory, "ddse-encounter-bridge.json")) ||
         File.Exists(Path.Combine(source.Directory, "ddse-encounter-bridge-probe.json"));
-
-    private static string ResolveEmptyTypeTargetMashPath(BattleEncounterCatalogResult catalog)
-    {
-        var expectedFileName =
-            $"{catalog.DungeonId}.{catalog.Difficulty}.mash.darkest";
-        var exact = catalog.TableGuard.EffectiveFiles
-            .Where(file =>
-                BattleEncounterCatalog.ClassifyFile(file.Path) == BattleEncounterSourceKind.Standard &&
-                Path.GetFileName(file.RelativePath).Equals(
-                    expectedFileName,
-                    StringComparison.OrdinalIgnoreCase))
-            .OrderBy(file => file.RelativePath.Length)
-            .ThenBy(file => file.RelativePath, StringComparer.OrdinalIgnoreCase)
-            .ToArray();
-        if (exact.Length > 0)
-        {
-            return exact[0].Path;
-        }
-
-        var standardFiles = catalog.TableGuard.EffectiveFiles
-            .Where(file =>
-                BattleEncounterCatalog.ClassifyFile(file.Path) == BattleEncounterSourceKind.Standard)
-            .OrderBy(file => file.RelativePath, StringComparer.OrdinalIgnoreCase)
-            .ToArray();
-        if (standardFiles.Length > 0)
-        {
-            return standardFiles[0].Path;
-        }
-
-        throw new InvalidOperationException(
-            "当前副本没有可承载首个索引的标准遭遇文件。" +
-            "本次不会生成 Bridge。");
-    }
-
-    private static string ResolveLocalModMashPath(
-        BattleEncounterTableGuard guard,
-        string sourceMashPath)
-    {
-        var fingerprint = guard.EffectiveFiles.SingleOrDefault(file =>
-            Path.GetFullPath(file.Path).Equals(
-                Path.GetFullPath(sourceMashPath),
-                StringComparison.OrdinalIgnoreCase))
-            ?? throw new InvalidOperationException("无法在有效遭遇文件清单中定位标准表。");
-        var normalized = fingerprint.RelativePath.Replace('\\', '/');
-        var padded = $"/{normalized.TrimStart('/')}";
-        if (!padded.Contains("/dungeons/", StringComparison.OrdinalIgnoreCase))
-        {
-            throw new InvalidOperationException("标准遭遇文件不位于可桥接的 dungeons 目录。");
-        }
-
-        return normalized.TrimStart('/');
-    }
-
-    private static bool EndsWithLineBreak(byte[] bytes) =>
-        bytes.Length > 0 && bytes[^1] is (byte)'\r' or (byte)'\n';
 
     private static string CreateSlug(string value)
     {

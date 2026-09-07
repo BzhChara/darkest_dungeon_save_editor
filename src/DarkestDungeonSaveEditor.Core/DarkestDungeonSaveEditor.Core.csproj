@@ -5,4 +5,8 @@
     <Nullable>enable</Nullable>
     <LangVersion>latest</LangVersion>
   </PropertyGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="..\DarkestDungeonSaveEditor.App\Assets\save-editor-icon.png"
+                      LogicalName="DarkestDungeonSaveEditor.BridgePreview.png" />
+  </ItemGroup>
 </Project>

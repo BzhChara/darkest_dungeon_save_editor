@@ -10,12 +10,32 @@ public static partial class HeroClassCatalog
 {
     private static HeroInitialQuirkDefinition BuildInitialQuirk(
         QuirkDefinition quirk,
+        IReadOnlyDictionary<string, QuirkDefinition> effectiveQuirks,
         IReadOnlyDictionary<string, BuffDefinition> effectiveBuffs,
         IReadOnlyDictionary<string, List<BuffDefinition>> buffCandidates)
     {
         var contextReasons = new List<string>();
         var unverifiedReasons = new List<string>();
         var definitionLimits = new List<int>();
+        var visitedEvolutionIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { quirk.Id };
+        var evolutionStep = quirk;
+        while (evolutionStep.Evolution?.TargetQuirkId is { } targetId)
+        {
+            if (!effectiveQuirks.TryGetValue(targetId, out var target))
+            {
+                unverifiedReasons.Add($"进化目标 '{targetId}' 缺失或定义未能唯一解析（来自 '{evolutionStep.Id}'）");
+                break;
+            }
+            if (target.Evolution is { ValidationErrors.Count: > 0 })
+            {
+                unverifiedReasons.Add($"进化链目标 '{targetId}' 的进化配置无效：{string.Join("；", target.Evolution.ValidationErrors)}");
+                break;
+            }
+            // Some authored evolutions cycle; an existing, valid cycle is not a missing target.
+            if (!visitedEvolutionIds.Add(targetId))
+                break;
+            evolutionStep = target;
+        }
 
         if (quirk.IsPositive is null)
         {

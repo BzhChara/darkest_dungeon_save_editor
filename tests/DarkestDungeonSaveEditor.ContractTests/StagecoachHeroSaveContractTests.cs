@@ -449,6 +449,23 @@ internal static partial class ContractSuite
         var rollbackState = JsonNode.Parse(File.ReadAllText(Path.Combine(rollbackBackupDirectory!, "transaction-state.json"))) as JsonObject;
         Assert(rollbackState?["status"]?.GetValue<string>() == "restored", "Rollback transaction state should finish as restored.");
 
+        await VerifyServiceReplacementRacesAsync(townSavePath, async (before, after) =>
+        {
+            var raceRoot = Path.Combine(runRoot, "stagecoach-race-" + Guid.NewGuid().ToString("N"));
+            var raceService = new SaveEditService(codec, new SaveEditorLocations(raceRoot,
+                Path.Combine(raceRoot, "workspaces"), Path.Combine(raceRoot, "backups")))
+            {
+                BeforeTargetReplace = path => { if (path == townSavePath) before?.Invoke(path); },
+                AfterTargetReplace = path => { if (path == townSavePath) after?.Invoke(path); }
+            };
+            try { await raceService.CommitAsync(preparedStagecoach); }
+            finally
+            {
+                Assert(File.ReadAllBytes(rosterSavePath).SequenceEqual(File.ReadAllBytes(preparedStagecoach.RosterFile.SourceCopyPath)) &&
+                       File.ReadAllBytes(upgradesSavePath).SequenceEqual(File.ReadAllBytes(preparedStagecoach.UpgradesFile.SourceCopyPath)),
+                    "A final town-file conflict must still recover earlier GUID/upgrade writes without replacing the external town version.");
+            }
+        });
         var stagecoachCommit = await stagecoachService.CommitAsync(preparedStagecoach);
         Assert(File.Exists(Path.Combine(stagecoachCommit.BackupDirectory, "persist.town.json")), "Town backup is missing.");
         Assert(File.Exists(Path.Combine(stagecoachCommit.BackupDirectory, "persist.roster.json")), "Roster backup is missing.");

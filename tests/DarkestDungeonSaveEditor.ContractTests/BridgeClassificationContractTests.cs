@@ -26,16 +26,17 @@ internal static partial class ContractSuite
             """{"base_root":{"inraid":true,"raiddungeon":"cove","game_mode":"base","applied_ugcs_1_0":{}}}""",
             new UTF8Encoding(false));
         var mapPath = Path.Combine(profileRoot, "persist.map.json");
-        File.WriteAllText(mapPath, """{"sentinel":"unchanged-map"}""", new UTF8Encoding(false));
+        WriteBattleSafetyProfile(profileRoot);
         var mapHash = ComputeSha256(mapPath);
         var profile = new SaveProfile("profile_classification", profileRoot,
             Path.Combine(profileRoot, "persist.estate.json"), "contract-user", DateTime.UtcNow);
-        var snapshot = new BattleMapSnapshot(profileRoot, mapPath, profile.RaidSavePath,
-            mapHash, "", "cove", 2, 1, null, null, null, null, null, null, null, null, null, false, [], [], [], DateTime.UtcNow);
+        var snapshot = await new BattleMapSnapshotReader(codec).LoadAsync(profileRoot);
         var locations = new SaveEditorLocations(root, Path.Combine(root, "workspaces"), Path.Combine(root, "backups"));
         var content = await ActiveContentResolver.ResolveAsync(profile, game, null, localMods, codec, locations.WorkspaceDirectory);
         var catalog = BattleEncounterCatalog.Load(content, snapshot);
         var service = new ManagedBattleEncounterBridgeService(codec, locations, () => false);
+        await VerifyBridgePreflightContractsAsync(profile, snapshot, content, catalog, service, game, localMods, codec);
+        await VerifyBridgeReplacementContractsAsync(runRoot, game, codec);
         ManagedBattleEncounterBridgeResult? last = null;
         foreach (var (monsterId, expected) in new[]
         {
@@ -75,7 +76,7 @@ internal static partial class ContractSuite
                legacyCatalog.DirectEncounters.Single(row => row.MashIndex == 2).Classification == BattleEncounterClassification.ConditionalOrAdditional &&
                legacyCatalog.DirectEncounters.Single(row => row.MashIndex == 3).Classification == BattleEncounterClassification.RoamingBoss &&
                ComputeSha256(manifestPath) == legacyManifestHash && ComputeSha256(last.MashFilePath) == mashHash,
-            "Version 3 entries without classification metadata must recover from original rows/roaming metadata without rewriting the package.");
+            "Entries without optional classification metadata must recover from original rows/roaming metadata without rewriting the package or losing their separate local ordinal.");
 
         entries[0]!["SourceRelativePath"] = "missing-original.mash.darkest";
         File.WriteAllText(manifestPath, manifest.ToJsonString(), new UTF8Encoding(false));
@@ -90,7 +91,12 @@ internal static partial class ContractSuite
         badHashManifest["Tables"]![0]!["GeneratedMashSha256"] = new string('0', 64);
         var badIndexManifest = manifest.DeepClone().AsObject();
         badIndexManifest["Tables"]![0]!["Entries"]![0]!["MashIndex"] = 99;
-        foreach (var invalidManifest in new[] { "{", badHashManifest.ToJsonString(), badIndexManifest.ToJsonString() })
+        var missingLocalIndexManifest = manifest.DeepClone().AsObject();
+        missingLocalIndexManifest["Tables"]![0]!["Entries"]![0]!.AsObject().Remove("FileRowIndex");
+        var invalidRegionManifest = manifest.DeepClone().AsObject();
+        invalidRegionManifest["Tables"]![0]!["DungeonId"] = "../cove";
+        foreach (var invalidManifest in new[] { "{", badHashManifest.ToJsonString(), badIndexManifest.ToJsonString(),
+                     missingLocalIndexManifest.ToJsonString(), invalidRegionManifest.ToJsonString() })
         {
             File.WriteAllText(manifestPath, invalidManifest, new UTF8Encoding(false));
             var invalidManifestHash = ComputeSha256(manifestPath);

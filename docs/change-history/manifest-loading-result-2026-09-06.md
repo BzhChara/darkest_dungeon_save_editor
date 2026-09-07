@@ -95,4 +95,4 @@ Keep **discovering a file**, **observing its manifest relationship**, and **acce
 
 This experiment does not resolve manifest-free Mods, Workshop packages, new hero IDs, monster definitions, JSON, mash tables, DLC-conditional roots, textures, source XML or compiled LOC2. Do not remove existing localization compatibility rules or claim all unlisted files invalid based on this result. Expand behavior only with evidence for the relevant loader and a separately scoped implementation.
 
-Reproduction procedure: [manifest-loading-probe.md](manifest-loading-probe.md). Durable content policy: [content-save-rules.md](content-save-rules.md#25-observed-local-manifest-loading).
+Reproduction procedure: [manifest-loading-probe.md](manifest-loading-probe.md). Durable content policy: [content-save-rules.md](../content-save-rules.md#25-observed-local-manifest-loading).

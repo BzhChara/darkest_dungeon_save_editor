@@ -34,7 +34,7 @@
 - **影响：** 只提供已请求 ID 的名字，不会把清单外的英雄、怪癖或饰品定义变成可生成内容。同一来源有效 LOC2 的已提供名称优先于 XML。
 - **风险：** 作者遗留的 XML 可能与编译表或游戏实际显示不一致；没有 LOC2 对应条目时，旧 XML 可能填上游戏未提供的名称。
 - **当前结果：** 没有其他有效来源的语言显示 `—`；Ruler 已有清单内 LOC 名称，不需要此兼容。不能只归因于 Mod 不规范：此前编辑器缺少这种二进制格式的读取能力。定义和生成资格不因此自动消失。
-- **位置：** [ContentLocalizationCatalog.cs](../src/DarkestDungeonSaveEditor.Core/ContentLocalizationCatalog.cs)，`EnumerateLocalizationFiles`；`AddDirectAuthoringStringTables` 已删除。
+- **位置：** [ContentLocalizationCatalog.cs](../../src/DarkestDungeonSaveEditor.Core/ContentLocalizationCatalog.cs)，`EnumerateLocalizationFiles`；`AddDirectAuthoringStringTables` 已删除。
 
 ### A2. 不规范 XML 的两级恢复解析（已删除，以下为历史机制）
 
@@ -44,14 +44,14 @@
 - **影响：** 所有共享本地化目录的显示名，以及从 XML 读取的随机人物姓名池。
 - **风险：** 恢复出的文本不等于游戏必然能解析同一份 XML；损坏结构可能使文本边界或归属不可靠。
 - **当前结果：** 两级均删除。格式错误的 XML 产生读取提示，该文件不贡献任何译文或随机姓名；有效 XML、LOC、LOC2 不受影响。
-- **位置：** [ContentLocalizationCatalog.cs](../src/DarkestDungeonSaveEditor.Core/ContentLocalizationCatalog.cs)，`ReadLanguageEntries`；`LoadDocument`、`ReadSanitizedText` 已删除。`Contract Lenient` 等样本改为验证严格拒绝与正常文件隔离。
+- **位置：** [ContentLocalizationCatalog.cs](../../src/DarkestDungeonSaveEditor.Core/ContentLocalizationCatalog.cs)，`ReadLanguageEntries`；`LoadDocument`、`ReadSanitizedText` 已删除。`Contract Lenient` 等样本改为验证严格拒绝与正常文件隔离。
 
 ### A3. 名称键的下划线变体
 
 - **行为：** 饰品同时查询 `str_inventory_title_trinket<ID>` 和 `str_inventory_title_trinket_<ID>`；物品也查询类型和 ID 直接拼接或加下划线的两个键。每种语言先取主键，缺少时才取变体键。
 - **边界：** 只查已选文件里的精确候选键，不新增文件路径、不模糊匹配、不用另一种语言冒充缺失翻译。
 - **删除后：** 只使用另一种键写法的名称可能变空；资源定义仍然存在。
-- **位置：** [ContentLocalizationCatalog.cs](../src/DarkestDungeonSaveEditor.Core/ContentLocalizationCatalog.cs)，`GetTrinketName`、`GetInventoryItemKeys`。
+- **位置：** [ContentLocalizationCatalog.cs](../../src/DarkestDungeonSaveEditor.Core/ContentLocalizationCatalog.cs)，`GetTrinketName`、`GetInventoryItemKeys`。
 
 ### A4. 仅存档钱包条目的名称推断
 
@@ -59,14 +59,14 @@
 - **行为：** 除按钱包类型查询，还用 `heirloom` 类型和该持久化类型作为 ID 查询名称。
 - **理由：** 钱包持久化结构并不总保留普通物品定义中的完整 `(type, id)` 形态。
 - **删除后：** 这类已有货币可能只剩内部 ID/空名称；数量、场景和存档条目不会因此改变。
-- **位置：** [QuantityItemCatalog.Localization.cs](../src/DarkestDungeonSaveEditor.Core/QuantityItemCatalog.Localization.cs)。
+- **位置：** [QuantityItemCatalog.Localization.cs](../../src/DarkestDungeonSaveEditor.Core/QuantityItemCatalog.Localization.cs)。
 
 ### A5. 随机人物姓名池的语言选择
 
 - **行为：** XML 的 `hero_name_*` 按语言分组，优先英文，没有英文组时采用首个可用语言组。
 - **边界：** 只决定随机生成的个人姓名。人物职业、怪癖、饰品、物品的中英文字段仍不会跨语言强行填充。
 - **删除后：** 不含英文姓名组的姓名文件不再贡献随机姓名。
-- **位置：** [ContentLocalizationCatalog.cs](../src/DarkestDungeonSaveEditor.Core/ContentLocalizationCatalog.cs)，`ReadHeroNames`。
+- **位置：** [ContentLocalizationCatalog.cs](../../src/DarkestDungeonSaveEditor.Core/ContentLocalizationCatalog.cs)，`ReadHeroNames`。
 
 ## B. 不是“找旧文件”的格式和目录支持
 
@@ -77,7 +77,7 @@
 - Eos_Nyx 的十二件饰品名称来自 LOC2 支持；Rurutia 相关修复包括正确剥离编译色码。色码的开始/结束可能跨条目，不能要求每条字符串内成对出现。
 - LOC/LOC2 表偏移、记录长度、索引、所有值的 NUL 结尾与去掉色码后的 UTF-8 均校验。结构或边界损坏拒绝整表；边界有效但 UTF-8/编译色码无效时仅跳过该值，保留同表其他有效名称，按文件汇总计数与最多三个示例，不用宽松解码吞掉损坏。读取器只使用哈希记录查名称，不利用 bucket 索引；不声称能发现未使用的 bucket/metadata 字段错误或支持所有未知旧格式。
 - 移除此项会损失正常编译本地化，不只是停止兼容不规范 Mod。Rurutia 第九件饰品缺英文仍保持缺失，没有自动编译、翻译或跨语言填补。
-- **位置：** [LocLocalizationReader.cs](../src/DarkestDungeonSaveEditor.Core/LocLocalizationReader.cs)、[Loc2LocalizationReader.cs](../src/DarkestDungeonSaveEditor.Core/Loc2LocalizationReader.cs)、[RealModLocalizationContractTests.cs](../tests/DarkestDungeonSaveEditor.ContractTests/RealModLocalizationContractTests.cs)。格式与样本哈希见[规则文档 §3.1](content-save-rules.md#31-legacy-loc-evidence-and-implementation-boundary)。
+- **位置：** [LocLocalizationReader.cs](../../src/DarkestDungeonSaveEditor.Core/LocLocalizationReader.cs)、[Loc2LocalizationReader.cs](../../src/DarkestDungeonSaveEditor.Core/Loc2LocalizationReader.cs)、[RealModLocalizationContractTests.cs](../../tests/DarkestDungeonSaveEditor.ContractTests/RealModLocalizationContractTests.cs)。格式与样本哈希见[规则文档 §3.1](../content-save-rules.md#31-legacy-loc-evidence-and-implementation-boundary)。
 
 ### B2. 人物升级文件的两种目录位置
 
@@ -85,21 +85,21 @@
 - 有清单时仍须列在清单内，没有新增清单外升级文件搜索。
 - Ruler 的清单本身就列着 `upgrades/JoanofArc.upgrades.json`。这是目录布局支持，不是旧文件恢复。
 - 删除顶层支持可能使该类英雄丢失技能/装备升级规则；没有完整升级依据时会受现有等级或生成安全规则限制。
-- **位置：** [HeroClassCatalog.SourceDiscovery.cs](../src/DarkestDungeonSaveEditor.Core/HeroClassCatalog.SourceDiscovery.cs)，`IsHeroUpgradeManifestPath`、`EnumerateHeroUpgradeFiles`。
+- **位置：** [HeroClassCatalog.SourceDiscovery.cs](../../src/DarkestDungeonSaveEditor.Core/HeroClassCatalog.SourceDiscovery.cs)，`IsHeroUpgradeManifestPath`、`EnumerateHeroUpgradeFiles`。
 
 ### B3. 注释、尾逗号和清单省略长度
 
 - 多处游戏 JSON 读取允许注释和尾逗号；`.darkest` 使用对应文本语法解析。这是已有数据格式支持，不读取额外目录。
 - 清单解析保留纯路径行，同时接受末尾字节数。此次修复只解决扩展名片段误截断，不要求所有历史清单必须带长度。
 - 去掉这些语法支持可能拒绝现有文件，不能仅据其不符合严格 JSON/上传器完整行格式就认定为废弃内容。
-- **位置：** [HeroClassCatalog.Progression.cs](../src/DarkestDungeonSaveEditor.Core/HeroClassCatalog.Progression.cs)、[ModManifestPath.cs](../src/DarkestDungeonSaveEditor.Core/ModManifestPath.cs) 等相应解析入口。
+- **位置：** [HeroClassCatalog.Progression.cs](../../src/DarkestDungeonSaveEditor.Core/HeroClassCatalog.Progression.cs)、[ModManifestPath.cs](../../src/DarkestDungeonSaveEditor.Core/ModManifestPath.cs) 等相应解析入口。
 
 ### B4. 无清单、DLC、Mod 来源识别
 
 - 无清单标准目录递归、已启用 DLC 条件、Mod 优先级、按 `project.xml/Title` 匹配本地 Mod，是已经确认的主读取规则，不是某个 Mod 的特殊补丁。
 - 本地 Mod 的项目发现支持默认 mods、游戏 dlc 和用户额外目录，递归发现项目并避免把项目内部嵌套项目当成另一个独立来源。同名多候选不会随意选一个。
 - 不能因为删除 A1/A2 就顺带去掉这些规则。扫描盘点发现清单外业务文件，也不会自动将它们纳入生成目录。
-- **位置：** [ActiveContentResolver.cs](../src/DarkestDungeonSaveEditor.Core/ActiveContentResolver.cs)、[ContentFileOverlay.cs](../src/DarkestDungeonSaveEditor.Core/ContentFileOverlay.cs)。
+- **位置：** [ActiveContentResolver.cs](../../src/DarkestDungeonSaveEditor.Core/ActiveContentResolver.cs)、[ContentFileOverlay.cs](../../src/DarkestDungeonSaveEditor.Core/ContentFileOverlay.cs)。
 
 ## C. 会影响业务判断的回退，不应与翻译兼容一起删除
 
@@ -109,7 +109,7 @@
 - 对明确只有 level 0 的技能，允许其没有多级升级树，并生成已有规则验证的 code `0` 基础购买记录。不是为缺少任意升级树的技能臆造整套等级。
 - 若高等级资料缺失但 level 0 的基础 HP 等条件仍有效，可保留可证明的 0 级模板；高等级不会因此被强行放行。
 - 这些行为影响技能解锁和生成资格，不只是名称。删除需要单独审核人物功能，不能当作“删旧文件兼容”的顺带动作。
-- **位置：** [HeroClassCatalog.Progression.cs](../src/DarkestDungeonSaveEditor.Core/HeroClassCatalog.Progression.cs)、[StagecoachHeroCandidateFactory.Progression.cs](../src/DarkestDungeonSaveEditor.Core/StagecoachHeroCandidateFactory.Progression.cs)、[HeroCatalogContractTests.cs](../tests/DarkestDungeonSaveEditor.ContractTests/HeroCatalogContractTests.cs)。
+- **位置：** [HeroClassCatalog.Progression.cs](../../src/DarkestDungeonSaveEditor.Core/HeroClassCatalog.Progression.cs)、[StagecoachHeroCandidateFactory.Progression.cs](../../src/DarkestDungeonSaveEditor.Core/StagecoachHeroCandidateFactory.Progression.cs)、[HeroCatalogContractTests.cs](../../tests/DarkestDungeonSaveEditor.ContractTests/HeroCatalogContractTests.cs)。
 
 ### C2. 物品引用分析不完整时避免误隐藏
 
@@ -118,7 +118,7 @@
 - 存档中本来存在的数量条目即使来源缺失或数量为零，也继续显示。这是存档编辑与恢复能力，而不是找旧文件。
 - 删除这些回退可能重新误隐藏合法物品；写入仍须通过各自的场景、数量、容量及存档校验。
 - 本轮清单读取失败的处理不沿用这项可见性回退：清单决定有效文件范围，读取失败直接停止对应目录请求，不把不完整清单当成可写依据。
-- **位置：** [QuantityItemReferenceAnalyzer.cs](../src/DarkestDungeonSaveEditor.Core/QuantityItemReferenceAnalyzer.cs)、[QuantityItemReferenceAnalyzer.LootParsing.cs](../src/DarkestDungeonSaveEditor.Core/QuantityItemReferenceAnalyzer.LootParsing.cs)、[QuantityItemCatalog.SavedEntries.cs](../src/DarkestDungeonSaveEditor.Core/QuantityItemCatalog.SavedEntries.cs)。
+- **位置：** [QuantityItemReferenceAnalyzer.cs](../../src/DarkestDungeonSaveEditor.Core/QuantityItemReferenceAnalyzer.cs)、[QuantityItemReferenceAnalyzer.LootParsing.cs](../../src/DarkestDungeonSaveEditor.Core/QuantityItemReferenceAnalyzer.LootParsing.cs)、[QuantityItemCatalog.SavedEntries.cs](../../src/DarkestDungeonSaveEditor.Core/QuantityItemCatalog.SavedEntries.cs)。
 
 ## 已作决定与仍独立的边界
 

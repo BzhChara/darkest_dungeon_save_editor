@@ -32,8 +32,15 @@ internal static partial class ContractSuite
         var rosterHeroesSeed = fixture.RosterHeroesSeed;
         var codec = fixture.Codec;
 
+        RunSaveReplacementContracts(runRoot);
+        await RunEncounterMaintenanceContractsAsync(runRoot, codec);
+        await RunInheritedLegacyBridgeContractsAsync(runRoot, codec);
+        await RunBattleMapWriteSafetyContractsAsync(runRoot, codec);
         await RunBattleMapContractsAsync(runRoot, codec);
         await RunBridgeClassificationContractsAsync(runRoot, codec);
+        await RunMultiFileEncounterContractsAsync(runRoot, codec);
+        await RunDlcNativeEncounterContractsAsync(runRoot, codec);
+        await RunDedicatedBridgeContractsAsync(runRoot, codec, repositoryRoot);
         await codec.EncodeAsync(decodedSeedPath, estatePath, originalBinaryPath: null);
         await codec.EncodeAsync(decodedGameSeedPath, gameSavePath, originalBinaryPath: null);
         await codec.EncodeAsync(decodedTownSeedPath, townSavePath, originalBinaryPath: null);

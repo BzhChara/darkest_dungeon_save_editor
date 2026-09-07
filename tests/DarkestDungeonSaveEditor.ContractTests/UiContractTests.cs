@@ -44,6 +44,15 @@ internal static partial class ContractSuite
                 .OrderBy(path => path, StringComparer.Ordinal)
                 .Select(File.ReadAllText));
         var liveRefreshCode = File.ReadAllText(Path.Combine(appSourceDirectory, "BattleMapView.LiveRefresh.cs"));
+        foreach (var handler in new[] { "BattleMapView.Commands.cs", "BattleMapView.ForceTown.cs" })
+        {
+            var handlerCode = File.ReadAllText(Path.Combine(appSourceDirectory, handler));
+            Assert(handlerCode.Contains("CrashDiagnostics.RecordException", StringComparison.Ordinal) &&
+                   handlerCode.Contains("prepared?.SessionId", StringComparison.Ordinal) &&
+                   handlerCode.Contains("profile.ProfileDirectory", StringComparison.Ordinal) &&
+                   handlerCode.Contains("ex is AggregateException", StringComparison.Ordinal),
+                "Handled map/force-town failures must record the exception and operation context and disclose incomplete recovery.");
+        }
         var battleMapIntegrationCode = File.ReadAllText(Path.Combine(appSourceDirectory, "MainWindow.BattleMapIntegration.cs"));
         Assert(liveRefreshCode.Contains("if (UsesSharedProfileMonitor ||", StringComparison.Ordinal) &&
             battleMapIntegrationCode.Contains("RequestProfileSync(invalidatePreview: false);", StringComparison.Ordinal),
@@ -940,7 +949,7 @@ internal static partial class ContractSuite
             battleMapEditServiceCode.Contains("检测到《暗黑地牢》仍在运行", StringComparison.Ordinal) &&
             battleMapEditServiceCode.Contains("ValidateLivePair", StringComparison.Ordinal) &&
             battleMapEditServiceCode.Contains("CreateBackup", StringComparison.Ordinal) &&
-            battleMapEditServiceCode.Contains("RestoreTarget", StringComparison.Ordinal) &&
+            battleMapEditServiceCode.Contains("GuardedSaveReplacement", StringComparison.Ordinal) &&
             battleMapEditServiceCode.Contains("BattleEncounterCatalog.ValidateDirectEncounter", StringComparison.Ordinal) &&
             forceTownSaveServiceCode.Contains("baseRoot[\"inraid\"] = false", StringComparison.Ordinal) &&
             forceTownSaveServiceCode.Contains("baseRoot[\"raiddungeon\"] = \"none\"", StringComparison.Ordinal) &&

@@ -126,6 +126,7 @@ public static partial class BattleEncounterCatalog
             snapshot.DungeonId,
             snapshot.Difficulty,
             issues);
+        var fileOrderIssue = issues.FirstOrDefault();
         var gameSavePath = Path.Combine(snapshot.ProfileDirectory, "persist.game.json");
         if (!File.Exists(gameSavePath))
         {
@@ -145,9 +146,6 @@ public static partial class BattleEncounterCatalog
                 Path.GetFullPath(file.Path),
                 file.RelativePath,
                 ComputeSha256(file.Path)))
-            .OrderBy(file => file.RelativePath, StringComparer.OrdinalIgnoreCase)
-            .ThenBy(file => file.SourceId, StringComparer.OrdinalIgnoreCase)
-            .ThenBy(file => file.Path, StringComparer.OrdinalIgnoreCase)
             .ToArray();
         var guard = new BattleEncounterTableGuard(
             snapshot.DungeonId,
@@ -158,18 +156,26 @@ public static partial class BattleEncounterCatalog
             fingerprints,
             ComputeTableFingerprint(fingerprints));
 
+        var unparsedTypes = new HashSet<int>();
         var parsed = effectiveFiles
-            .SelectMany(file => ParseFile(file, activeContent.Sources, guard, issues))
+            .SelectMany(file => ParseFile(file, activeContent.Sources, guard, issues, unparsedTypes))
             .ToArray();
-        var directFileCounts = parsed
+        var globalIssues = new List<string>();
+        var availableMonsters = ResolveAvailableMonsterDefinitions(activeContent.Sources, globalIssues);
+        var unavailableTypeReasons = parsed
             .Where(entry => entry.SourceKind == BattleEncounterSourceKind.Standard)
             .GroupBy(entry => entry.MashType)
             .ToDictionary(
                 group => group.Key,
-                group => group.Select(entry => entry.SourcePath)
-                    .Distinct(StringComparer.OrdinalIgnoreCase)
-                    .Count());
+                group => fileOrderIssue is not null
+                    ? $"有效遭遇文件的顺序无法确认：{fileOrderIssue}"
+                    : unparsedTypes.Contains(group.Key)
+                    ? "该类型含无法解析的遭遇行，不能证明运行时索引"
+                    : HasProvenFileOrder(group.ToArray(), out var reason) &&
+                      HasProvenRowCounts(RuntimeRows(group, availableMonsters), availableMonsters, out reason) ? string.Empty : reason);
         var indexesByType = new Dictionary<int, int>();
+        issues.AddRange(unavailableTypeReasons.Where(pair => !string.IsNullOrEmpty(pair.Value))
+            .Select(pair => $"当前战斗类型 {pair.Key} 暂不可直写：{pair.Value}"));
         var encounters = new List<BattleEncounterDefinition>(parsed.Length);
         foreach (var entry in parsed)
         {
@@ -184,15 +190,22 @@ public static partial class BattleEncounterCatalog
                 continue;
             }
 
+            if (IsNativeSkippedRow(entry, availableMonsters))
+            {
+                encounters.Add(entry with { MashIndex = null, CanPlaceDirectly = false,
+                    UnavailableReason = "该组合体型超过四格，游戏会跳过此行，不占用运行时编号" });
+                issues.Add($"标准遭遇按原生规则跳过，不影响后续编号：{entry.SourcePath}:{entry.SourceLine}");
+                continue;
+            }
             var nextIndex = indexesByType.GetValueOrDefault(entry.MashType);
             indexesByType[entry.MashType] = nextIndex + 1;
-            if (directFileCounts.GetValueOrDefault(entry.MashType) != 1)
+            if (!string.IsNullOrEmpty(unavailableTypeReasons.GetValueOrDefault(entry.MashType)))
             {
                 encounters.Add(entry with
                 {
                     MashIndex = null,
                     CanPlaceDirectly = false,
-                    UnavailableReason = "该遭遇类型由多个文件共同扩展，尚不能证明运行时索引顺序"
+                    UnavailableReason = unavailableTypeReasons[entry.MashType]
                 });
                 continue;
             }
@@ -205,16 +218,12 @@ public static partial class BattleEncounterCatalog
             });
         }
 
-        var globalIssues = new List<string>();
         var globalRows = ResolveGlobalEffectiveMashFiles(
                 activeContent.Sources,
                 globalIssues)
             .SelectMany(file => ParseFile(file, activeContent.Sources, guard, globalIssues))
             .ToArray();
         var bridgeCandidateRows = globalRows.Where(IsBridgeCandidate).ToArray();
-        var availableMonsters = ResolveAvailableMonsterDefinitions(
-            activeContent.Sources,
-            globalIssues);
         var localization = ContentLocalizationCatalog.Load(
             activeContent,
             parsed
@@ -257,9 +266,15 @@ public static partial class BattleEncounterCatalog
         }
 
         AddUnresolvedEncounterIssues(bridgeCandidateRows, availableMonsters.Ids, globalIssues);
+        foreach (var row in bridgeCandidateRows)
+        {
+            if (!HasProvenRowCounts([row], availableMonsters, out var reason))
+                globalIssues.Add($"遭遇未加入 Bridge 选择列表：{reason}");
+        }
 
         var bridgeEncounters = bridgeCandidateRows
             .Where(encounter => encounter.MonsterIds.All(availableMonsters.Ids.Contains))
+            .Where(encounter => HasProvenRowCounts([encounter], availableMonsters, out _))
             .Select(encounter => LocalizeEncounter(
                 ClassifyWithOrigin(encounter) with
                 {
@@ -319,9 +334,6 @@ public static partial class BattleEncounterCatalog
                 Path.GetFullPath(file.Path),
                 file.RelativePath,
                 ComputeSha256(file.Path)))
-            .OrderBy(file => file.RelativePath, StringComparer.OrdinalIgnoreCase)
-            .ThenBy(file => file.SourceId, StringComparer.OrdinalIgnoreCase)
-            .ThenBy(file => file.Path, StringComparer.OrdinalIgnoreCase)
             .ToArray();
         if (issues.Count > 0 ||
             !currentFiles.SequenceEqual(guard.EffectiveFiles) ||
@@ -345,20 +357,17 @@ public static partial class BattleEncounterCatalog
         }
 
         ValidateGuard(encounter.TableGuard);
-        var parsed = ParseGuardedFiles(encounter.TableGuard);
-        var rows = parsed
+        var parsed = ParseGuardedFiles(encounter.TableGuard, BattleEncounterSourceKind.Standard, encounter.MashType);
+        var monsters = ResolveAvailableMonsterDefinitions(encounter.TableGuard.ActiveSources, []);
+        var rows = RuntimeRows(parsed
             .Where(candidate =>
                 candidate.SourceKind == BattleEncounterSourceKind.Standard &&
-                candidate.MashType == encounter.MashType)
-            .ToArray();
-        if (rows.Select(candidate => candidate.SourcePath)
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .Skip(1)
-                .Any() ||
+                candidate.MashType == encounter.MashType), monsters);
+        if (!HasProvenFileOrder(rows, out _) || !HasProvenRowCounts(rows, monsters, out _) ||
             encounter.MashIndex.Value >= rows.Length)
         {
             throw new InvalidOperationException(
-                "当前遭遇类型不再具有唯一且可证明的运行时索引。");
+                "当前遭遇类型不再具有可证明的运行时索引。");
         }
 
         var expected = rows[encounter.MashIndex.Value];
@@ -455,6 +464,8 @@ public static partial class BattleEncounterCatalog
             throw new InvalidOperationException(
                 "所选遭遇引用了当前启用内容中不存在的敌方定义：" + string.Join(", ", missingIds));
         }
+        if (!HasProvenRowCounts([encounter], availableMonsters, out var reason))
+            throw new InvalidOperationException(reason);
     }
 
     private static IReadOnlyList<EffectiveContentFile> ResolveEffectiveMashFiles(
@@ -484,11 +495,13 @@ public static partial class BattleEncounterCatalog
                 issue.StartsWith("Encounter Mod manifest could not be read:", StringComparison.Ordinal)));
         }
 
-        return ContentFileOverlay.Resolve(candidates, "Encounter mash", issues);
+        return ResolveRuntimeFileOrder(candidates, sources, issues);
     }
 
     private static IReadOnlyList<BattleEncounterDefinition> ParseGuardedFiles(
-        BattleEncounterTableGuard guard)
+        BattleEncounterTableGuard guard,
+        BattleEncounterSourceKind? sourceKind = null,
+        int? mashType = null)
     {
         var issues = new List<string>();
         var effectiveFiles = ResolveEffectiveMashFiles(
@@ -497,7 +510,9 @@ public static partial class BattleEncounterCatalog
             guard.Difficulty,
             issues);
         var parsed = effectiveFiles
-            .SelectMany(file => ParseFile(file, guard.ActiveSources, guard, issues))
+            .Where(file => sourceKind is null || ClassifyFile(file.Path) == sourceKind)
+            .SelectMany(file => ParseFile(file, guard.ActiveSources, guard, issues,
+                reportNativeAdjustments: false, onlyMashType: mashType))
             .ToArray();
         if (issues.Count > 0)
         {
@@ -581,14 +596,21 @@ public static partial class BattleEncounterCatalog
         return padded.Contains(dungeonSegment, StringComparison.OrdinalIgnoreCase) &&
                Path.GetFileName(normalized).EndsWith(
                    $".{difficulty.ToString(CultureInfo.InvariantCulture)}.mash.darkest",
-                   StringComparison.OrdinalIgnoreCase);
+                   StringComparison.OrdinalIgnoreCase) &&
+               (ClassifyFile(normalized) != BattleEncounterSourceKind.Standard ||
+                Path.GetFileName(normalized).EndsWith(
+                    $"{dungeonId.Trim()}.{difficulty.ToString(CultureInfo.InvariantCulture)}.mash.darkest",
+                    StringComparison.OrdinalIgnoreCase));
     }
 
     private static IEnumerable<BattleEncounterDefinition> ParseFile(
         EffectiveContentFile file,
         IReadOnlyList<ActiveContentSource> activeSources,
         BattleEncounterTableGuard guard,
-        List<string> issues)
+        List<string> issues,
+        HashSet<int>? unparsedTypes = null,
+        bool reportNativeAdjustments = true,
+        int? onlyMashType = null)
     {
         string[] lines;
         try
@@ -637,7 +659,7 @@ public static partial class BattleEncounterCatalog
                 "boss" => 2,
                 _ => -1
             };
-            if (mashType < 0)
+            if (mashType < 0 || onlyMashType is not null && mashType != onlyMashType)
             {
                 continue;
             }
@@ -645,36 +667,37 @@ public static partial class BattleEncounterCatalog
             var tokens = TokenPattern.Matches(line[(separator + 1)..])
                 .Select(match => Unquote(match.Value))
                 .ToArray();
-            var typesIndex = Array.FindIndex(tokens, token =>
-                token.Equals(".types", StringComparison.OrdinalIgnoreCase));
+            // Native FindLastSubstring returns the offset after the last .types,
+            // even if it is repeated or touches the preceding numeric field.
+            var typesIndex = line.LastIndexOf(".types", StringComparison.Ordinal);
             if (typesIndex < 0)
             {
+                if (sourceKind == BattleEncounterSourceKind.Standard) unparsedTypes?.Add(mashType);
                 issues.Add($"遭遇行缺少怪物列表（.types），已跳过：{file.Path}:{lineIndex + 1}");
                 continue;
             }
-            var monsters = tokens
-                .Skip(typesIndex + 1)
+            var actorSlots = TokenPattern.Matches(line[(typesIndex + 6)..])
+                .Select(match => Unquote(match.Value))
                 .TakeWhile(token => !token.StartsWith(".", StringComparison.Ordinal))
-                .Where(token => !string.IsNullOrWhiteSpace(token))
                 .ToArray();
+            // Empty quoted actors still occupy native slots. Limit the raw
+            // slots before removing empty actors from the displayed formation.
+            var monsters = actorSlots.Take(4).Where(token => !string.IsNullOrWhiteSpace(token)).ToArray();
             if (monsters.Length == 0)
             {
+                if (sourceKind == BattleEncounterSourceKind.Standard) unparsedTypes?.Add(mashType);
                 issues.Add($"遭遇行的怪物列表（.types）为空，已跳过：{file.Path}:{lineIndex + 1}");
                 continue;
             }
-
-            double? weight = null;
-            var chanceIndex = Array.FindIndex(tokens, token =>
-                token.Equals(".chance", StringComparison.OrdinalIgnoreCase));
-            if (chanceIndex >= 0 && chanceIndex + 1 < tokens.Length &&
-                double.TryParse(
-                    tokens[chanceIndex + 1],
-                    NumberStyles.Float,
-                    CultureInfo.InvariantCulture,
-                    out var parsedWeight))
+            // MashGuide's .types parser copies exactly four 32-byte slots;
+            // fifth and later IDs never reach AddMashEntry.
+            if (actorSlots.Length > 4)
             {
-                weight = parsedWeight;
+                if (reportNativeAdjustments)
+                    issues.Add($"遭遇行超过四个怪物，按游戏规则只读取前四个：{file.Path}:{lineIndex + 1}");
             }
+
+            double? weight = ReadNativeChance(line);
 
             string? roamingId = null;
             var roamingIdIndex = Array.FindIndex(tokens, token =>

@@ -61,7 +61,7 @@ For exact rollback, close the game and restore the affected source's `monsters-b
 
 ## Effect on the editor's discovery discussion
 
-Historical discussion as of this operation. The later 2026-09-06 policy removed unlisted XML supplementation and malformed-XML recovery, and added manifest-constrained legacy LOC support. The following observations and recommendations are not the current implementation contract; see [the current discovery and localization rules](content-save-rules.md#26-adopted-resource-discovery-policy).
+Historical discussion as of this operation. The later 2026-09-06 policy removed unlisted XML supplementation and malformed-XML recovery, and added manifest-constrained legacy LOC support. The following observations and recommendations are not the current implementation contract; see [the current discovery and localization rules](../content-save-rules.md#26-adopted-resource-discovery-policy).
 
 The script does not regenerate `modfiles.txt`. The 250 generated override files therefore remain outside Mod `3705402044`'s five-entry manifest. Regeneration fixes outdated generated content; it does not resolve the editor/game discovery boundary.
 

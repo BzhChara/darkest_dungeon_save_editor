@@ -23,7 +23,7 @@ public sealed partial class SaveEditService
         EnsureNoUnfinishedStagecoachTransaction(prepared.Profile);
 
         // Make the candidate visible in town only after its upgrade ownership and GUID advance
-        // have both been written. Any failure still rolls every replaced file back from backup.
+        // have both been written. Recovery preserves newer external versions of each target.
         var files = new[] { prepared.UpgradesFile, prepared.RosterFile, prepared.TownFile };
         foreach (var file in files)
         {
@@ -44,6 +44,7 @@ public sealed partial class SaveEditService
 
         var backupDirectory = CreateBackup(prepared.Profile, prepared);
         var replacedFiles = new List<PreparedSaveFile>();
+        var replacements = new List<GuardedSaveReplacement>();
         WriteStagecoachTransactionState(
             backupDirectory,
             prepared,
@@ -74,7 +75,18 @@ public sealed partial class SaveEditService
                     $"replacing_{Path.GetFileNameWithoutExtension(file.FileName).Replace("persist.", string.Empty, StringComparison.Ordinal)}",
                     replacedFiles,
                     error: null);
-                ReplacePreparedFile(file, () => replacedFiles.Add(file));
+                var replacement = new GuardedSaveReplacement(file.TargetPath, file.EncodedPath,
+                    file.OriginalSha256, file.EncodedSha256, BeforeTargetReplace, AfterTargetReplace);
+                replacements.Add(replacement);
+                try
+                {
+                    replacement.Replace();
+                }
+                finally
+                {
+                    if (replacement.HasReplaced)
+                        replacedFiles.Add(file);
+                }
                 WriteStagecoachTransactionState(
                     backupDirectory,
                     prepared,
@@ -93,12 +105,8 @@ public sealed partial class SaveEditService
                          prepared.UpgradesFile
                      })
             {
-                var finalHash = ComputeSha256(file.TargetPath);
-                if (!finalHash.Equals(file.EncodedSha256, StringComparison.OrdinalIgnoreCase))
-                {
-                    throw new IOException(
-                        $"The final paired-save check found that {file.FileName} changed after replacement.");
-                }
+                var finalHash = replacements.Single(replacement =>
+                    replacement.TargetPath.Equals(file.TargetPath, StringComparison.OrdinalIgnoreCase)).Verify();
 
                 results.Add(new SaveFileCommitResult(
                     file.FileName,
@@ -119,6 +127,8 @@ public sealed partial class SaveEditService
                 "committed",
                 replacedFiles,
                 error: null);
+            foreach (var replacement in replacements)
+                replacement.Complete();
             await Task.CompletedTask.ConfigureAwait(false);
             return result;
         }
@@ -133,7 +143,7 @@ public sealed partial class SaveEditService
                 commitError.Message);
             try
             {
-                RestoreReplacedStagecoachFiles(files, replacedFiles, backupDirectory);
+                RestoreReplacedStagecoachFiles(files, replacements);
                 TryWriteStagecoachTransactionState(
                     backupDirectory,
                     prepared,
@@ -141,7 +151,7 @@ public sealed partial class SaveEditService
                     replacedFiles,
                     commitError.Message);
                 throw new InvalidOperationException(
-                    $"Stagecoach save commit failed and every replaced file was restored from '{backupDirectory}'.",
+                    $"Stagecoach save commit failed and every replaced file was restored. Backup: '{backupDirectory}'.",
                     commitError);
             }
             catch (InvalidOperationException ex) when (ReferenceEquals(ex.InnerException, commitError))
@@ -161,6 +171,11 @@ public sealed partial class SaveEditService
                     commitError,
                     restoreError);
             }
+        }
+        finally
+        {
+            foreach (var replacement in replacements)
+                replacement.Dispose();
         }
     }
 
@@ -313,83 +328,25 @@ public sealed partial class SaveEditService
         }
     }
 
-    private static void ReplacePreparedFile(PreparedSaveFile file, Action replacementOccurred)
-    {
-        var targetDirectory = Path.GetDirectoryName(file.TargetPath)
-            ?? throw new InvalidOperationException($"Save target has no directory: {file.TargetPath}");
-        var temporaryTarget = Path.Combine(
-            targetDirectory,
-            $".{Path.GetFileName(file.TargetPath)}.ddse-{Guid.NewGuid():N}.tmp");
-        try
-        {
-            File.Copy(file.EncodedPath, temporaryTarget, overwrite: false);
-            var hashBeforeReplace = ComputeSha256(file.TargetPath);
-            if (!hashBeforeReplace.Equals(file.OriginalSha256, StringComparison.OrdinalIgnoreCase))
-            {
-                throw new InvalidOperationException(
-                    $"The live {file.FileName} save changed immediately before replacement.");
-            }
-
-            File.Replace(
-                temporaryTarget,
-                file.TargetPath,
-                destinationBackupFileName: null,
-                ignoreMetadataErrors: true);
-            replacementOccurred();
-            var finalHash = ComputeSha256(file.TargetPath);
-            if (!finalHash.Equals(file.EncodedSha256, StringComparison.OrdinalIgnoreCase))
-            {
-                throw new IOException(
-                    $"The committed {file.FileName} hash does not match the validated encoded save.");
-            }
-        }
-        finally
-        {
-            TryDeleteFile(temporaryTarget);
-        }
-    }
-
     private static void RestoreReplacedStagecoachFiles(
         IReadOnlyList<PreparedSaveFile> allFiles,
-        IReadOnlyList<PreparedSaveFile> replacedFiles,
-        string backupDirectory)
+        IReadOnlyList<GuardedSaveReplacement> replacements)
     {
         var restoreErrors = new List<Exception>();
-        foreach (var file in replacedFiles.Reverse())
+        foreach (var replacement in replacements.Reverse())
         {
-            var backupPath = Path.Combine(backupDirectory, file.FileName);
-            var targetDirectory = Path.GetDirectoryName(file.TargetPath)
-                ?? throw new InvalidOperationException($"Save target has no directory: {file.TargetPath}");
-            var temporaryTarget = Path.Combine(
-                targetDirectory,
-                $".{Path.GetFileName(file.TargetPath)}.ddse-restore-{Guid.NewGuid():N}.tmp");
             try
             {
-                if (!File.Exists(backupPath) ||
-                    !ComputeSha256(backupPath).Equals(file.OriginalSha256, StringComparison.OrdinalIgnoreCase))
-                {
-                    throw new InvalidDataException(
-                        $"Backup for {file.FileName} is missing or does not match the original hash.");
-                }
-
-                File.Copy(backupPath, temporaryTarget, overwrite: false);
-                File.Replace(
-                    temporaryTarget,
-                    file.TargetPath,
-                    destinationBackupFileName: null,
-                    ignoreMetadataErrors: true);
-                if (!ComputeSha256(file.TargetPath).Equals(file.OriginalSha256, StringComparison.OrdinalIgnoreCase))
-                {
-                    throw new IOException($"Restored {file.FileName} does not match its original hash.");
-                }
+                var recovery = replacement.Recover();
+                if (recovery is SaveFileRecovery.KeptExternal or SaveFileRecovery.RestoredExternal)
+                    throw new IOException(
+                        $"{replacement.TargetPath}：{GuardedSaveReplacement.DescribeRecovery(recovery)}；" +
+                        $"不能声明三个文件全部恢复原状。实际被替换版本：{replacement.DisplacedPath}");
             }
             catch (Exception error)
             {
-                restoreErrors.Add(error);
-            }
-            finally
-            {
-                TryDeleteFile(temporaryTarget);
+                restoreErrors.Add(new IOException(
+                    $"恢复 {replacement.TargetPath} 未完成；实际被替换版本：{replacement.DisplacedPath}", error));
             }
         }
 
@@ -397,7 +354,10 @@ public sealed partial class SaveEditService
         {
             try
             {
-                if (!ComputeSha256(file.TargetPath).Equals(file.OriginalSha256, StringComparison.OrdinalIgnoreCase))
+                var replacement = replacements.SingleOrDefault(item => item.HasReplaced &&
+                    item.TargetPath.Equals(file.TargetPath, StringComparison.OrdinalIgnoreCase));
+                var currentHash = replacement is null ? ComputeSha256(file.TargetPath) : replacement.CurrentHash();
+                if (!currentHash.Equals(file.OriginalSha256, StringComparison.OrdinalIgnoreCase))
                 {
                     restoreErrors.Add(new IOException(
                         $"After rollback, {file.FileName} does not match the file used for preview."));

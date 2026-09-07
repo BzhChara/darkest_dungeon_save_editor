@@ -24,13 +24,14 @@ public sealed record ManagedBattleEncounterBridgeResult(
     BattleEncounterDefinition DirectEncounter);
 
 /// <summary>
-/// Maintains one append-only encounter carrier per save profile. The game still consumes
+/// Maintains one package per save profile with dedicated files per region/difficulty. The game still consumes
 /// numeric mash indexes, but callers never have to install, reorder, or retire one-off Mods.
 /// </summary>
 public sealed partial class ManagedBattleEncounterBridgeService
 {
     public const string ManifestFileName = "ddse-managed-encounter-bridge.json";
-    public const int ManifestVersion = 3;
+    public const int ManifestVersion = 4;
+    private const string ProjectTitlePrefix = "DDSE_Managed_Encounter_Bridge";
 
     private static readonly UTF8Encoding Utf8NoBom = new(false);
     private static readonly JsonSerializerOptions ManifestJsonOptions = new()
@@ -42,6 +43,8 @@ public sealed partial class ManagedBattleEncounterBridgeService
     private readonly DsonSaveCodec _codec;
     private readonly SaveEditorLocations _locations;
     private readonly Func<bool> _gameRunningProbe;
+    internal Action<string>? BeforeGameReplace { get; set; }
+    internal Action<string>? AfterGameReplace { get; set; }
 
     public ManagedBattleEncounterBridgeService(
         DsonSaveCodec codec,
@@ -62,7 +65,8 @@ public sealed partial class ManagedBattleEncounterBridgeService
         string gameDirectory,
         string? workshopDirectory,
         string? localModDirectory,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        BattleMapPlacementTarget? placementTarget = null)
     {
         ArgumentNullException.ThrowIfNull(profile);
         ArgumentNullException.ThrowIfNull(snapshot);
@@ -88,6 +92,18 @@ public sealed partial class ManagedBattleEncounterBridgeService
         var projectTitle = GetProjectTitle(profile);
         var packageDirectory = Path.Combine(installRoot, GetPackageDirectoryName(profile));
         ValidateManagedPackagePath(installRoot, packageDirectory);
+        var oldPackageDirectory = Path.Combine(installRoot,
+            $"DDSE_Managed_Encounter_Bridge_{ShortHash($"{profile.SteamUserId}/{profile.ProfileId}")}");
+        if (Directory.Exists(oldPackageDirectory))
+            throw new InvalidOperationException("检测到旧版托管 Bridge。请先完成旧文件清理和地图引用处理，本次不会生成第二份 Bridge。");
+        foreach (var source in activeContent.Sources.Where(IsManagedBridgeSource))
+        {
+            if (!Path.GetFullPath(source.Directory).Equals(packageDirectory, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException(
+                    $"当前启用的托管 Bridge 不在本档案的专用位置：{source.DisplayName}。" +
+                    "请先清理旧版或其他档案的 Bridge 启用项及地图引用，本次不会生成第二份 Bridge。");
+            ValidateManifestIdentity(ReadManifest(Path.Combine(source.Directory, ManifestFileName)), profile, projectTitle);
+        }
 
         var sessionId = $"{DateTime.UtcNow:yyyyMMdd_HHmmss_fff}_{Guid.NewGuid():N}";
         var workspace = Path.Combine(
@@ -97,6 +113,13 @@ public sealed partial class ManagedBattleEncounterBridgeService
         var stagedPackage = Path.Combine(workspace, "package");
         var rollbackPackage = Path.Combine(workspace, "rollback-package");
         Directory.CreateDirectory(workspace);
+        using var writeGuard = await BattleMapWriteGuard.LoadAsync(
+            profile, snapshot, _codec, Path.Combine(workspace, "map-input"), cancellationToken).ConfigureAwait(false);
+        if (!writeGuard.GameSha256.Equals(activeContent.SourceGameSha256, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("档案状态在 Bridge 准备前发生变化，请重新加载地图。");
+        if (placementTarget is not null)
+            BattleMapSaveEditor.ValidateBattlePlacementTarget(writeGuard.MapDocument, writeGuard.Snapshot,
+                placementTarget.AreaId, placementTarget.TileId, encounter.MashType);
 
         var packageExisted = Directory.Exists(packageDirectory);
         ManagedBridgeManifest manifest;
@@ -123,7 +146,7 @@ public sealed partial class ManagedBattleEncounterBridgeService
         }
 
         var contentFingerprint = ComputeContentFingerprint(activeContent.Sources);
-        var tableTarget = ResolveTableTarget(catalog, encounter.MashType);
+        var tableTarget = BattleEncounterCatalog.ResolveAppendTarget(catalog, encounter.MashType, packageDirectory);
         var table = manifest.Tables.SingleOrDefault(candidate =>
             candidate.DungeonId.Equals(catalog.DungeonId, StringComparison.OrdinalIgnoreCase) &&
             candidate.Difficulty == catalog.Difficulty &&
@@ -138,15 +161,12 @@ public sealed partial class ManagedBattleEncounterBridgeService
         if (table is null)
         {
             Directory.CreateDirectory(Path.GetDirectoryName(stagedMashPath)!);
-            File.Copy(tableTarget.SourceMashPath, stagedMashPath, overwrite: false);
+            using (File.Open(stagedMashPath, FileMode.CreateNew, FileAccess.Write, FileShare.None)) { }
             table = new ManagedBridgeTableManifest
             {
                 DungeonId = catalog.DungeonId,
                 Difficulty = catalog.Difficulty,
                 RelativeMashPath = tableTarget.RelativeMashPath,
-                BaseSourcePath = Path.GetFullPath(tableTarget.SourceMashPath),
-                BaseSourceSha256 = ComputeSha256(tableTarget.SourceMashPath),
-                BaseLength = new FileInfo(tableTarget.SourceMashPath).Length,
                 ContentFingerprint = contentFingerprint,
                 GeneratedMashSha256 = ComputeSha256(stagedMashPath)
             };
@@ -172,7 +192,10 @@ public sealed partial class ManagedBattleEncounterBridgeService
         }
         else
         {
-            var expectedMashIndex = CountStandardRows(stagedMashPath, encounter.MashType);
+            var fileRowIndex = CountStandardRows(stagedMashPath, encounter.MashType);
+            // Authored ordinals include native-skipped oversized rows; runtime
+            // indexes do not. Keep the two counts independent in the manifest.
+            var expectedMashIndex = tableTarget.NextMashIndex;
             if (table.Entries.Any(candidate =>
                     candidate.MashType == encounter.MashType &&
                     candidate.MashIndex == expectedMashIndex))
@@ -186,6 +209,7 @@ public sealed partial class ManagedBattleEncounterBridgeService
             {
                 MashType = encounter.MashType,
                 MashIndex = expectedMashIndex,
+                FileRowIndex = fileRowIndex,
                 MonsterIds = encounter.MonsterIds.ToList(),
                 SourceKind = encounter.SourceKind.ToString(),
                 SourceLabel = encounter.SourceLabel,
@@ -203,6 +227,17 @@ public sealed partial class ManagedBattleEncounterBridgeService
         }
 
         WriteManagedPackage(stagedPackage, packageDirectory, manifest);
+        // Resolve the staged overlay before changing the installed package or
+        // activating it in the save. Local row ordinals and runtime indexes
+        // differ when another effective file contributes the same mash type.
+        var stagedSources = activeContent.Sources.Where(source => !Path.GetFullPath(source.Directory)
+                .Equals(packageDirectory, StringComparison.OrdinalIgnoreCase)).ToList();
+        var stagedOrder = checked(stagedSources.Where(source => source.Kind is "workshop" or "local")
+            .Select(source => source.LoadOrder).DefaultIfEmpty(1000).Min() - 1);
+        stagedSources.Add(new ActiveContentSource($"local:{projectTitle}", projectTitle, "local", stagedPackage, stagedOrder));
+        var stagedCatalog = BattleEncounterCatalog.Load(activeContent with { Sources = stagedSources }, snapshot);
+        BattleEncounterCatalog.ValidateExistingIndexes(catalog, stagedCatalog);
+        ValidateManifestIndexes(manifest, stagedPackage, stagedCatalog);
         var gameUpdate = await PrepareGameConfigurationAsync(
             profile,
             activeContent,
@@ -211,8 +246,11 @@ public sealed partial class ManagedBattleEncounterBridgeService
             cancellationToken).ConfigureAwait(false);
         var packageChanged = !packageExisted || !DirectoriesHaveSameFiles(packageDirectory, stagedPackage);
         var packageCommitted = false;
-        var gameCommitted = false;
+        using var gameReplacement = gameUpdate is null ? null : new GuardedSaveReplacement(
+            gameUpdate.TargetPath, gameUpdate.EncodedPath, gameUpdate.OriginalSha256,
+            gameUpdate.FinalSha256, BeforeGameReplace, AfterGameReplace);
         string? profileBackupDirectory = null;
+        FileStream? recoveryGameGuard = null;
 
         try
         {
@@ -223,6 +261,7 @@ public sealed partial class ManagedBattleEncounterBridgeService
             if (gameUpdate is not null)
             {
                 profileBackupDirectory = CreateProfileBackup(profile, sessionId, activeContent.SourceGameSha256);
+                writeGuard.ReleaseGameLock();
             }
 
             if (packageChanged)
@@ -233,8 +272,8 @@ public sealed partial class ManagedBattleEncounterBridgeService
 
             if (gameUpdate is not null)
             {
-                gameCommitted = true;
-                CommitGameConfiguration(gameUpdate);
+                EnsureGameIsNotRunning();
+                gameReplacement!.Replace();
             }
 
             var resolvedContent = await ActiveContentResolver.ResolveAsync(
@@ -247,6 +286,8 @@ public sealed partial class ManagedBattleEncounterBridgeService
                     cancellationToken)
                 .ConfigureAwait(false);
             var resolvedCatalog = BattleEncounterCatalog.Load(resolvedContent, snapshot);
+            BattleEncounterCatalog.ValidateExistingIndexes(catalog, resolvedCatalog);
+            ValidateManifestIndexes(manifest, packageDirectory, resolvedCatalog);
             var directEncounter = resolvedCatalog.DirectEncounters.SingleOrDefault(candidate =>
                 candidate.MashType == entry.MashType &&
                 candidate.MashIndex == entry.MashIndex &&
@@ -255,10 +296,11 @@ public sealed partial class ManagedBattleEncounterBridgeService
             if (directEncounter is null)
             {
                 throw new InvalidOperationException(
-                    "托管 Encounter Bridge 已生成，但重新解析后没有得到预期的稳定索引；所有更改将自动恢复。");
+                    "托管 Encounter Bridge 已生成，但重新解析后没有得到预期的稳定索引；程序将尝试恢复本次更改。");
             }
 
             BattleEncounterCatalog.ValidateDirectEncounter(directEncounter);
+            gameReplacement?.Complete();
             return new ManagedBattleEncounterBridgeResult(
                 packageDirectory,
                 projectTitle,
@@ -279,19 +321,31 @@ public sealed partial class ManagedBattleEncounterBridgeService
         catch (Exception primaryError)
         {
             var rollbackErrors = new List<Exception>();
-            if (gameCommitted && gameUpdate is not null)
+            var canRestorePackage = true;
+            if (gameUpdate is not null)
             {
                 try
                 {
-                    RestoreGameConfiguration(gameUpdate);
+                    if (gameReplacement is { HasReplaced: true })
+                    {
+                        var recovery = gameReplacement.Recover();
+                        canRestorePackage = recovery == SaveFileRecovery.RestoredOriginal;
+                    }
+                    else
+                    {
+                        recoveryGameGuard = new FileStream(gameUpdate.TargetPath, FileMode.Open, FileAccess.Read, FileShare.Read);
+                        canRestorePackage = Convert.ToHexString(SHA256.HashData(recoveryGameGuard))
+                            .Equals(gameUpdate.OriginalSha256, StringComparison.OrdinalIgnoreCase);
+                    }
                 }
                 catch (Exception rollbackError)
                 {
+                    canRestorePackage = false;
                     rollbackErrors.Add(rollbackError);
                 }
             }
 
-            if (packageCommitted)
+            if (packageCommitted && canRestorePackage)
             {
                 try
                 {
@@ -302,31 +356,47 @@ public sealed partial class ManagedBattleEncounterBridgeService
                     rollbackErrors.Add(rollbackError);
                 }
             }
+            else if (packageCommitted)
+            {
+                rollbackErrors.Add(new IOException(
+                    $"外部游戏配置或恢复状态尚未确认，已保留可能被引用的 Bridge：{packageDirectory}；" +
+                    $"原包副本：{rollbackPackage}；实际被替换存档：{gameReplacement?.DisplacedPath}"));
+            }
 
             if (rollbackErrors.Count > 0)
             {
                 throw new AggregateException(
-                    "托管 Encounter Bridge 更新失败，自动恢复也未能完整完成。请保留备份和工作目录。",
+                    $"托管 Encounter Bridge 更新失败，自动恢复也未能完整完成。备份：{profileBackupDirectory}；工作目录：{workspace}。",
                     [primaryError, .. rollbackErrors]);
             }
 
             throw;
+        }
+        finally
+        {
+            recoveryGameGuard?.Dispose();
         }
     }
 
     public static string GetProjectTitle(SaveProfile profile)
     {
         ArgumentNullException.ThrowIfNull(profile);
-        var identity = $"{profile.SteamUserId}/{profile.ProfileId}";
-        var readableProfile = SanitizeSegment(profile.ProfileId, 24);
-        var hash = ShortHash(identity);
-        return $"DDSE Managed Encounter Bridge - {readableProfile}-{hash}";
+        // Both fields remain readable and keep different Steam accounts' profile_1
+        // packages distinct. Reject lossy/overlong names instead of creating aliases.
+        if (SanitizeSegment(profile.ProfileId, 64) != profile.ProfileId ||
+            SanitizeSegment(profile.SteamUserId, 32) != profile.SteamUserId)
+            throw new InvalidOperationException("档案或 Steam 账户标识不能用于生成可区分的 Bridge 名称。");
+        var title = $"{ProjectTitlePrefix}（{profile.ProfileId} - {profile.SteamUserId}）";
+        if (Utf8NoBom.GetByteCount(title) >= 128)
+            throw new InvalidOperationException("Bridge 名称超过游戏支持的长度，无法安全启用。");
+        return title;
     }
 
     public static bool IsManagedBridgeSource(ActiveContentSource source)
     {
         ArgumentNullException.ThrowIfNull(source);
-        return source.DisplayName.StartsWith(
+        return source.DisplayName.StartsWith(ProjectTitlePrefix + "（", StringComparison.Ordinal) ||
+               source.DisplayName.StartsWith(
                    "DDSE Managed Encounter Bridge - ",
                    StringComparison.OrdinalIgnoreCase) ||
                File.Exists(Path.Combine(source.Directory, ManifestFileName));
@@ -369,81 +439,27 @@ public sealed partial class ManagedBattleEncounterBridgeService
         }
     }
 
-    private static ManagedBridgeTableTarget ResolveTableTarget(
-        BattleEncounterCatalogResult catalog,
-        int mashType)
+    private static void ValidateManifestIndexes(
+        ManagedBridgeManifest manifest,
+        string packageDirectory,
+        BattleEncounterCatalogResult catalog)
     {
-        var currentRows = catalog.Encounters
-            .Where(candidate =>
-                candidate.SourceKind == BattleEncounterSourceKind.Standard &&
-                candidate.MashType == mashType)
-            .OrderBy(candidate => candidate.MashIndex)
-            .ToArray();
-        if (currentRows.Select(candidate => candidate.SourcePath)
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .Skip(1)
-                .Any())
+        foreach (var table in manifest.Tables.Where(table =>
+                     table.DungeonId.Equals(catalog.DungeonId, StringComparison.OrdinalIgnoreCase) &&
+                     table.Difficulty == catalog.Difficulty))
         {
-            throw new InvalidOperationException(
-                "当前类型由多个标准遭遇文件共同扩展，无法证明追加后的运行时索引顺序。");
-        }
-
-        string sourceMashPath;
-        if (currentRows.Length > 0)
-        {
-            if (!currentRows.Select((candidate, index) =>
-                        candidate.CanPlaceDirectly && candidate.MashIndex == index)
-                    .All(matches => matches))
+            var path = Path.GetFullPath(Path.Combine(packageDirectory, table.RelativeMashPath));
+            foreach (var entry in table.Entries)
             {
-                throw new InvalidOperationException(
-                    "当前类型没有连续且可证明的标准遭遇索引，不能更新托管 Bridge。");
+                var row = catalog.Encounters.Where(row =>
+                        row.SourceKind == BattleEncounterSourceKind.Standard && row.MashType == entry.MashType &&
+                        row.SourcePath.Equals(path, StringComparison.OrdinalIgnoreCase))
+                    .OrderBy(row => row.SourceLine).ElementAtOrDefault(entry.FileRowIndex!.Value);
+                if (row is null || row.MashIndex != entry.MashIndex ||
+                    !row.MonsterIds.SequenceEqual(entry.MonsterIds, StringComparer.Ordinal))
+                    throw new InvalidOperationException("托管 Bridge 的已有索引与当前多文件遭遇表不一致，本次不会写入。");
             }
-            sourceMashPath = currentRows[0].SourcePath;
         }
-        else
-        {
-            var expectedFileName =
-                $"{catalog.DungeonId}.{catalog.Difficulty.ToString(CultureInfo.InvariantCulture)}.mash.darkest";
-            var exact = catalog.TableGuard.EffectiveFiles
-                .Where(file =>
-                    BattleEncounterCatalog.ClassifyFile(file.Path) == BattleEncounterSourceKind.Standard &&
-                    Path.GetFileName(file.RelativePath).Equals(
-                        expectedFileName,
-                        StringComparison.OrdinalIgnoreCase))
-                .OrderBy(file => file.RelativePath.Length)
-                .ThenBy(file => file.RelativePath, StringComparer.OrdinalIgnoreCase)
-                .FirstOrDefault();
-            var fallback = exact ?? catalog.TableGuard.EffectiveFiles
-                .Where(file =>
-                    BattleEncounterCatalog.ClassifyFile(file.Path) == BattleEncounterSourceKind.Standard)
-                .OrderBy(file => file.RelativePath, StringComparer.OrdinalIgnoreCase)
-                .FirstOrDefault();
-            sourceMashPath = fallback?.Path ?? throw new InvalidOperationException(
-                "当前副本没有可承载首个索引的标准遭遇文件。");
-        }
-
-        var sourceFingerprint = catalog.TableGuard.EffectiveFiles.SingleOrDefault(file =>
-            Path.GetFullPath(file.Path).Equals(
-                Path.GetFullPath(sourceMashPath),
-                StringComparison.OrdinalIgnoreCase));
-        if (sourceFingerprint is null ||
-            !File.Exists(sourceMashPath) ||
-            !ComputeSha256(sourceMashPath).Equals(
-                sourceFingerprint.Sha256,
-                StringComparison.OrdinalIgnoreCase))
-        {
-            throw new InvalidOperationException("标准遭遇文件在托管 Bridge 准备期间已经变化。");
-        }
-
-        var relativeMashPath = sourceFingerprint.RelativePath.Replace('\\', '/').TrimStart('/');
-        if (!$"/{relativeMashPath}".Contains("/dungeons/", StringComparison.OrdinalIgnoreCase))
-        {
-            throw new InvalidOperationException("标准遭遇文件不位于可桥接的 dungeons 目录。");
-        }
-
-        return new ManagedBridgeTableTarget(
-            Path.GetFullPath(sourceMashPath),
-            relativeMashPath);
     }
 
     private static void ValidateExistingTable(
@@ -517,8 +533,9 @@ public sealed partial class ManagedBattleEncounterBridgeService
             .OrderBy(entry => entry.Order)
             .Select(entry => entry.Value)
             .Where(entry =>
+                !JsonSupport.ReadString(entry, "name").Equals(projectTitle, StringComparison.OrdinalIgnoreCase) &&
                 !JsonSupport.ReadString(entry, "name").Equals(
-                    projectTitle,
+                    $"DDSE Managed Encounter Bridge - {SanitizeSegment(profile.ProfileId, 24)}-{ShortHash($"{profile.SteamUserId}/{profile.ProfileId}")}",
                     StringComparison.OrdinalIgnoreCase))
             .ToArray();
         var updatedApplied = new JsonObject
@@ -564,85 +581,6 @@ public sealed partial class ManagedBattleEncounterBridgeService
             encodedPath,
             originalHash,
             ComputeSha256(encodedPath));
-    }
-
-    private void CommitGameConfiguration(PreparedManagedGameUpdate update)
-    {
-        EnsureGameIsNotRunning();
-        if (!ComputeSha256(update.TargetPath).Equals(
-                update.OriginalSha256,
-                StringComparison.OrdinalIgnoreCase))
-        {
-            throw new InvalidOperationException(
-                "persist.game.json 在托管 Bridge 写入前发生了变化，本次操作未应用。");
-        }
-
-        var temporaryPath = Path.Combine(
-            Path.GetDirectoryName(update.TargetPath)!,
-            $".{Path.GetFileName(update.TargetPath)}.ddse-managed-{Guid.NewGuid():N}.tmp");
-        try
-        {
-            File.Copy(update.EncodedPath, temporaryPath, overwrite: false);
-            File.Replace(
-                temporaryPath,
-                update.TargetPath,
-                destinationBackupFileName: null,
-                ignoreMetadataErrors: true);
-            if (!ComputeSha256(update.TargetPath).Equals(
-                    update.FinalSha256,
-                    StringComparison.OrdinalIgnoreCase))
-            {
-                throw new IOException("托管 Bridge 的活动 Mod 配置写入后校验失败。");
-            }
-        }
-        finally
-        {
-            TryDeleteFile(temporaryPath);
-        }
-    }
-
-    private static void RestoreGameConfiguration(PreparedManagedGameUpdate update)
-    {
-        if (!File.Exists(update.SourcePath) ||
-            !ComputeSha256(update.SourcePath).Equals(
-                update.OriginalSha256,
-                StringComparison.OrdinalIgnoreCase))
-        {
-            throw new InvalidDataException("托管 Bridge 的 persist.game.json 恢复源丢失或损坏。");
-        }
-        var currentSha256 = ComputeSha256(update.TargetPath);
-        if (currentSha256.Equals(update.OriginalSha256, StringComparison.OrdinalIgnoreCase))
-        {
-            return;
-        }
-        if (!currentSha256.Equals(update.FinalSha256, StringComparison.OrdinalIgnoreCase))
-        {
-            throw new InvalidOperationException(
-                "persist.game.json 在托管 Bridge 写入后又发生了变化，程序不会覆盖较新的数据。");
-        }
-
-        var temporaryPath = Path.Combine(
-            Path.GetDirectoryName(update.TargetPath)!,
-            $".{Path.GetFileName(update.TargetPath)}.ddse-managed-restore-{Guid.NewGuid():N}.tmp");
-        try
-        {
-            File.Copy(update.SourcePath, temporaryPath, overwrite: false);
-            File.Replace(
-                temporaryPath,
-                update.TargetPath,
-                destinationBackupFileName: null,
-                ignoreMetadataErrors: true);
-            if (!ComputeSha256(update.TargetPath).Equals(
-                    update.OriginalSha256,
-                    StringComparison.OrdinalIgnoreCase))
-            {
-                throw new IOException("persist.game.json 自动恢复后的哈希不一致。");
-            }
-        }
-        finally
-        {
-            TryDeleteFile(temporaryPath);
-        }
     }
 
     private string CreateProfileBackup(
@@ -762,10 +700,7 @@ public sealed partial class ManagedBattleEncounterBridgeService
         }
 
         var body = line[(separator + 1)..];
-        var tokenIndex = body.IndexOf(".types", StringComparison.OrdinalIgnoreCase);
-        return tokenIndex >= 0 &&
-               (tokenIndex == 0 || char.IsWhiteSpace(body[tokenIndex - 1])) &&
-               (tokenIndex + 6 == body.Length || char.IsWhiteSpace(body[tokenIndex + 6]));
+        return body.LastIndexOf(".types", StringComparison.Ordinal) >= 0;
     }
 
     private static string StripLineComment(string line)
@@ -794,13 +729,14 @@ public sealed partial class ManagedBattleEncounterBridgeService
         var modDataPath = Path.GetFullPath(finalPackageDirectory)
             .Replace('\\', '/')
             .TrimEnd('/') + "/";
+        EncounterBridgeBranding.WritePreview(stagedPackage);
         File.WriteAllText(
             projectPath,
             $"""
             <?xml version="1.0" encoding="utf-8"?>
             <project>
-              <PreviewIconFile/>
-              <ItemDescriptionShort>Persistent encounter carrier managed by Darkest Dungeon Save Editor.</ItemDescriptionShort>
+              <PreviewIconFile>{SecurityElement.Escape(modDataPath + EncounterBridgeBranding.PreviewFileName)}</PreviewIconFile>
+              <ItemDescriptionShort>为存档编辑器添加的跨地区战斗提供支持。</ItemDescriptionShort>
               <ModDataPath>{SecurityElement.Escape(modDataPath)}</ModDataPath>
               <Title>{SecurityElement.Escape(manifest.ProjectTitle)}</Title>
               <Language>english</Language>
@@ -810,7 +746,7 @@ public sealed partial class ManagedBattleEncounterBridgeService
               <VersionMinor>0</VersionMinor>
               <TargetBuild>0</TargetBuild>
               <Tags><Tags>Gameplay Tweaks</Tags></Tags>
-              <ItemDescription>This local Mod is maintained automatically. Keep it enabled; existing mash indexes are append-only and are never reordered.</ItemDescription>
+              <ItemDescription>由暗黑地牢存档编辑器自动维护。地图仍包含编辑器添加的战斗时，请保持启用并置于 Mod 列表顶部。怪物资源仍由对应的来源 Mod 提供。</ItemDescription>
               <PublishedFileId>0</PublishedFileId>
             </project>
             """,
@@ -832,7 +768,8 @@ public sealed partial class ManagedBattleEncounterBridgeService
                         $"托管 Encounter Bridge 清单引用了不存在的文件：{table.RelativeMashPath}");
                 }
                 return $"{table.RelativeMashPath} {new FileInfo(path).Length}";
-            });
+            })
+            .Append($"{EncounterBridgeBranding.PreviewFileName} {new FileInfo(Path.Combine(stagedPackage, EncounterBridgeBranding.PreviewFileName)).Length}");
         File.WriteAllText(
             Path.Combine(stagedPackage, "modfiles.txt"),
             string.Join(Environment.NewLine, modFiles) + Environment.NewLine,
@@ -879,7 +816,10 @@ public sealed partial class ManagedBattleEncounterBridgeService
         foreach (var table in manifest.Tables)
         {
             if (string.IsNullOrWhiteSpace(table.DungeonId) ||
+                table.Difficulty < 0 ||
+                table.DungeonId.Any(character => !char.IsAsciiLetterOrDigit(character) && character is not '_' and not '-') ||
                 !IsSafeRelativePath(table.RelativeMashPath) ||
+                table.RelativeMashPath != BattleEncounterCatalog.DedicatedMashPath(table.DungeonId, table.Difficulty) ||
                 string.IsNullOrWhiteSpace(table.ContentFingerprint) ||
                 string.IsNullOrWhiteSpace(table.GeneratedMashSha256) ||
                 table.Entries is null ||
@@ -887,6 +827,7 @@ public sealed partial class ManagedBattleEncounterBridgeService
                     entry is null ||
                     entry.MashType is < 0 or > 2 ||
                     entry.MashIndex < 0 ||
+                    entry.FileRowIndex is null or < 0 ||
                     entry.MonsterIds is null ||
                     entry.MonsterIds.Count == 0 ||
                     entry.MonsterIds.Any(string.IsNullOrWhiteSpace)))
@@ -931,7 +872,7 @@ public sealed partial class ManagedBattleEncounterBridgeService
     }
 
     private static string GetPackageDirectoryName(SaveProfile profile) =>
-        $"DDSE_Managed_Encounter_Bridge_{ShortHash($"{profile.SteamUserId}/{profile.ProfileId}")}";
+        GetProjectTitle(profile);
 
     private static string ComputeContentFingerprint(IReadOnlyList<ActiveContentSource> sources)
     {
@@ -1186,10 +1127,6 @@ public sealed partial class ManagedBattleEncounterBridgeService
         }
     }
 
-    private sealed record ManagedBridgeTableTarget(
-        string SourceMashPath,
-        string RelativeMashPath);
-
     private sealed record PreparedManagedGameUpdate(
         string TargetPath,
         string SourcePath,
@@ -1213,9 +1150,6 @@ public sealed partial class ManagedBattleEncounterBridgeService
         public string DungeonId { get; set; } = string.Empty;
         public int Difficulty { get; set; }
         public string RelativeMashPath { get; set; } = string.Empty;
-        public string BaseSourcePath { get; set; } = string.Empty;
-        public string BaseSourceSha256 { get; set; } = string.Empty;
-        public long BaseLength { get; set; }
         public string ContentFingerprint { get; set; } = string.Empty;
         public string GeneratedMashSha256 { get; set; } = string.Empty;
         public List<ManagedBridgeEncounterManifest> Entries { get; set; } = [];
@@ -1225,6 +1159,7 @@ public sealed partial class ManagedBattleEncounterBridgeService
     {
         public int MashType { get; set; }
         public int MashIndex { get; set; }
+        public int? FileRowIndex { get; set; }
         public List<string> MonsterIds { get; set; } = [];
         public string SourceKind { get; set; } = string.Empty;
         public string SourceLabel { get; set; } = string.Empty;

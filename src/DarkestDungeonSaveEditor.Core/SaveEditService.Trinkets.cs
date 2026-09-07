@@ -185,11 +185,6 @@ public sealed partial class SaveEditService
 
         var backupDirectory = CreateBackup(prepared.Profile, prepared);
         var targetPath = prepared.Profile.EstateSavePath;
-        var targetDirectory = Path.GetDirectoryName(targetPath)!;
-        var temporaryTarget = Path.Combine(
-            targetDirectory,
-            $".{Path.GetFileName(targetPath)}.ddse-{Guid.NewGuid():N}.tmp");
-        var backupEstatePath = Path.Combine(backupDirectory, Path.GetFileName(targetPath));
         var hashAfterBackup = ComputeSha256(targetPath);
         if (!hashAfterBackup.Equals(prepared.OriginalSha256, StringComparison.OrdinalIgnoreCase))
         {
@@ -197,40 +192,17 @@ public sealed partial class SaveEditService
                 $"The live estate save changed while its backup was being created. A backup was kept at '{backupDirectory}', but no save edit was applied.");
         }
 
-        var replacementSucceeded = false;
+        using var replacement = new GuardedSaveReplacement(targetPath, prepared.EncodedPath,
+            prepared.OriginalSha256, prepared.EncodedSha256, BeforeTargetReplace, AfterTargetReplace);
         IReadOnlyList<FileStream> contentLocks = [];
 
         try
         {
             contentLocks = OpenTrinketContentLocks(prepared);
-            File.Copy(prepared.EncodedPath, temporaryTarget, overwrite: false);
             ValidateTrinketContentGuard(prepared);
-            using (var liveEstateLock = new FileStream(
-                       targetPath,
-                       FileMode.Open,
-                       FileAccess.Read,
-                       FileShare.Read | FileShare.Delete,
-                       bufferSize: 4096,
-                       FileOptions.SequentialScan))
-            {
-                var hashBeforeReplace = ComputeSha256(liveEstateLock);
-                if (!hashBeforeReplace.Equals(prepared.OriginalSha256, StringComparison.OrdinalIgnoreCase))
-                {
-                    throw new InvalidOperationException(
-                        "The live estate save changed immediately before replacement. No save edit was applied.");
-                }
-
-                ValidateTrinketContentGuard(prepared);
-                File.Replace(temporaryTarget, targetPath, destinationBackupFileName: null, ignoreMetadataErrors: true);
-                replacementSucceeded = true;
-                ValidateTrinketContentGuard(prepared);
-            }
-
-            var finalHash = ComputeSha256(targetPath);
-            if (!finalHash.Equals(prepared.EncodedSha256, StringComparison.OrdinalIgnoreCase))
-            {
-                throw new IOException("The committed save hash does not match the validated encoded save.");
-            }
+            replacement.Replace();
+            ValidateTrinketContentGuard(prepared);
+            var finalHash = replacement.Verify();
 
             var result = new SaveCommitResult(
                 prepared.Profile.ProfileDirectory,
@@ -240,32 +212,30 @@ public sealed partial class SaveEditService
                 finalHash,
                 DateTime.UtcNow);
             WriteJson(Path.Combine(backupDirectory, "commit-result.json"), result);
+            replacement.Complete();
             await Task.CompletedTask.ConfigureAwait(false);
             return result;
         }
         catch (Exception commitError)
         {
-            if (replacementSucceeded && File.Exists(backupEstatePath))
+            if (replacement.HasReplaced)
             {
                 try
                 {
-                    var restoreTemporary = Path.Combine(
-                        targetDirectory,
-                        $".{Path.GetFileName(targetPath)}.ddse-restore-{Guid.NewGuid():N}.tmp");
-                    File.Copy(backupEstatePath, restoreTemporary, overwrite: false);
-                    File.Replace(restoreTemporary, targetPath, destinationBackupFileName: null, ignoreMetadataErrors: true);
+                    var recovery = replacement.Recover();
                     throw new InvalidOperationException(
-                        $"Save commit failed and the original estate file was restored from '{backupEstatePath}'.",
+                        $"饰品写入失败；{GuardedSaveReplacement.DescribeRecovery(recovery)}。" +
+                        $"完整备份：{backupDirectory}；实际被替换版本：{replacement.DisplacedPath}",
                         commitError);
                 }
-                catch (InvalidOperationException)
+                catch (InvalidOperationException ex) when (ReferenceEquals(ex.InnerException, commitError))
                 {
                     throw;
                 }
                 catch (Exception restoreError)
                 {
                     throw new AggregateException(
-                        $"Save commit failed and automatic restore also failed. Backup: {backupEstatePath}",
+                        $"饰品写入失败，自动恢复未能完成。完整备份：{backupDirectory}；实际被替换版本：{replacement.DisplacedPath}",
                         commitError,
                         restoreError);
                 }
@@ -280,7 +250,6 @@ public sealed partial class SaveEditService
                 contentLock.Dispose();
             }
 
-            TryDeleteFile(temporaryTarget);
         }
     }
 
