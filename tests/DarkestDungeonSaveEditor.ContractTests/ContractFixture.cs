@@ -80,7 +80,7 @@ internal static partial class ContractSuite
         var activeRuntimeHeroDuplicateRoot = Path.Combine(activeWorkshopRoot, "heroes", "runtime_hero_patch");
         var activeOverrideHeroRoot = Path.Combine(activeWorkshopRoot, "heroes", "base_hero");
         var activeWorkshopLocalHeroRoot = Path.Combine(activeWorkshopRoot, "heroes", "local_hero");
-        var activeWorkshopPriorityHeroRoot = Path.Combine(activeWorkshopRoot, "heroes", "priority_hero_patch");
+        var activeWorkshopPriorityHeroRoot = Path.Combine(activeWorkshopRoot, "heroes", "priority_hero");
         var activeWorkshopUpgradeRoot = Path.Combine(activeWorkshopRoot, "upgrades");
         var activeWorkshopBuildingUpgradeRoot = Path.Combine(activeWorkshopUpgradeRoot, "building");
         var activeWorkshopBuffRoot = Path.Combine(activeWorkshopRoot, "shared", "buffs");
@@ -603,7 +603,7 @@ internal static partial class ContractSuite
     {
       "entries": [
         { "id": "active_workshop_trinket", "rarity": "rare", "price": 3000 },
-        { "id": "ambiguous_trinket", "rarity": "rare", "price": 9000 }
+        { "id": "AMBIGUOUS_TRINKET", "rarity": "rare", "price": 9000 }
       ]
     }
     """,
@@ -641,7 +641,7 @@ internal static partial class ContractSuite
     heroes/base_hero/base_hero.info.darkest 100
     heroes/base_hero/base_hero.override.darkest 100
     heroes/local_hero/local_hero.info.darkest 100
-    heroes/priority_hero_patch/priority_hero.info.darkest 100
+    heroes/priority_hero/priority_hero.info.darkest 100
     upgrades/runtime_hero.upgrades.json 100
     upgrades/building/runtime_hero.upgrades.json 100
     effects/runtime_hero.effects.darkest 100

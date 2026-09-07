@@ -37,6 +37,28 @@ internal static partial class ContractSuite
         File.Delete(hotUpdatePath);
         first = await reader.ReadAsync(refreshContent: true);
 
+        var itemUpdatePath = WriteMultiMash(fixture.GameRoot, "inventory/hot.inventory.items.darkest",
+            "inventory_item: .type estate .id hot_catalog_quantity .base_stack_limit 3\n");
+        var itemUpdate = await reader.ReadAsync(refreshContent: true);
+        var originalTime = File.GetLastWriteTimeUtc(itemUpdatePath);
+        File.WriteAllText(itemUpdatePath, "inventory_item: .type estate .id hot_catalog_quantity .base_stack_limit 4\n");
+        File.SetLastWriteTimeUtc(itemUpdatePath, originalTime);
+        var repeatedItemUpdate = await reader.ReadAsync(refreshContent: true);
+        Assert(itemUpdate.QuantityItems.Items.Single(item => item.ItemId == "hot_catalog_quantity").BaseStackLimit == 3 &&
+            repeatedItemUpdate.QuantityItems.Items.Single(item => item.ItemId == "hot_catalog_quantity").BaseStackLimit == 4 &&
+            repeatedItemUpdate.ContentFingerprint != itemUpdate.ContentFingerprint &&
+            ProfileCatalogSnapshotReader.HashesEqual(first.FileHashes, repeatedItemUpdate.FileHashes),
+            "Same-size, same-timestamp definition changes must refresh cached quantities without save or manifest edits.");
+        var quirkUpdatePath = WriteMultiMash(fixture.GameRoot, "shared/quirk/hot.quirk_library.json",
+            """{"quirks":[{"id":"hot_refresh_quirk","is_positive":true,"random_chance":0}]}""");
+        var quirkUpdate = await reader.ReadAsync(refreshContent: true);
+        Assert(quirkUpdate.ContentFingerprint != repeatedItemUpdate.ContentFingerprint &&
+            HeroClassCatalog.Load(quirkUpdate.Content).InitialQuirks.Any(quirk => quirk.Id == "hot_refresh_quirk"),
+            "Nonbattle definition edits must invalidate the shared page refresh signal.");
+        File.Delete(itemUpdatePath);
+        File.Delete(quirkUpdatePath);
+        first = await reader.ReadAsync(refreshContent: true);
+
         var game = (JsonObject)JsonNode.Parse(File.ReadAllText(fixture.DecodedGameSeedPath))!;
         var gameBase = (JsonObject)game["base_root"]!;
         gameBase["week"] = 88;

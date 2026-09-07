@@ -61,7 +61,7 @@ public static partial class BattleEncounterCatalog
                     source.Directory, source.Kind is "workshop" or "local" ? enabledDlcPrefixes : [])
                 .Select(root => Path.Combine(root, "dungeons"))
                 .Where(Directory.Exists)
-                .SelectMany(directory => Directory.EnumerateFiles(
+                .SelectMany(directory => NativeDirectoryDiscovery.EnumerateFiles(
                     directory, "*.mash.darkest", SearchOption.AllDirectories))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
@@ -129,85 +129,54 @@ public static partial class BattleEncounterCatalog
         IReadOnlyList<ActiveContentSource> sources,
         List<string> issues)
     {
-        var enabledDlcPrefixes = ContentFileOverlay.GetEnabledDlcPrefixes(sources);
-        var candidatesById = new Dictionary<string, List<MonsterDefinitionCandidate>>(
-            StringComparer.OrdinalIgnoreCase);
-        foreach (var source in sources)
+        var prefixes = ContentFileOverlay.GetEnabledDlcPrefixes(sources);
+        var candidates = sources.SelectMany(source => EnumerateMonsterInfoFiles(source, prefixes, issues)
+            .Select(path => new ContentFileCandidate(source, path))).ToArray();
+        var ids = candidates.Select(file => Path.GetFileName(file.Path)[..^".info.darkest".Length])
+            .ToHashSet(StringComparer.Ordinal);
+        var bossIds = new HashSet<string>(StringComparer.Ordinal);
+        var usableIds = new HashSet<string>(StringComparer.Ordinal);
+        var hashCollisions = NativeResourceIdentity.FindCollisions(ids);
+        var sizes = new Dictionary<string, int?>(StringComparer.Ordinal);
+        var actorFiles = NativeContentFileResolver.ResolveActorFiles(sources, "monsters", issues);
+        foreach (var id in ids)
         {
-            foreach (var path in EnumerateMonsterInfoFiles(
-                         source,
-                         enabledDlcPrefixes,
-                         issues))
+            // MonsterClass::Create copies the ID, removes its final TWO bytes
+            // for the family path, then opens canonical info followed by art.
+            // The discovery file's directory is not the definition directory.
+            if (hashCollisions.Contains(id) || id.Length < 2 || id.Length > 63 || id.Any(character => character > 127))
             {
-                var fileName = Path.GetFileName(path);
-                const string suffix = ".info.darkest";
-                if (fileName.EndsWith(suffix, StringComparison.OrdinalIgnoreCase))
-                {
-                    var monsterId = fileName[..^suffix.Length];
-                    if (!candidatesById.TryGetValue(monsterId, out var candidates))
-                    {
-                        candidates = [];
-                        candidatesById[monsterId] = candidates;
-                    }
-
-                    candidates.Add(new MonsterDefinitionCandidate(source, path));
-                }
+                sizes[id] = null; // Native byte truncation has not been reproduced here.
+                usableIds.Add(id); // Uncertainty must defer numbering/cleanup, not prove removal.
+                continue;
             }
+            var stem = $"monsters/{id[..^2]}/{id}/{id}";
+            var info = actorFiles.GetValueOrDefault(stem + ".info.darkest");
+            var art = actorFiles.GetValueOrDefault(stem + ".art.darkest");
+            // An allocated, zero-initialized native class still occupies table
+            // slots, but does not prove that a combat definition was loaded.
+            // Preserve its native size for numbering; reject only its placement.
+            if (info is not null || art is not null) usableIds.Add(id);
+            int? size = 0; // Zero-initialized ActorClass, also observed in the runtime table.
+            foreach (var file in new[] { info, art }.OfType<EffectiveContentFile>())
+            {
+                size = ReadMonsterSize(file.Path, size);
+                if (DeclaresBossTag(file.Path, issues)) bossIds.Add(id);
+            }
+            sizes[id] = size;
         }
-
-        var ids = candidatesById.Keys.ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var bossIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var sizes = new Dictionary<string, int?>(StringComparer.OrdinalIgnoreCase);
-        foreach (var pair in candidatesById)
-        {
-            var highestPriority = pair.Value[0].Source;
-            foreach (var candidate in pair.Value.Skip(1))
-            {
-                if (ContentFileOverlay.ComparePriority(candidate.Source, highestPriority) > 0)
-                {
-                    highestPriority = candidate.Source;
-                }
-            }
-
-            var winners = pair.Value
-                .Where(candidate =>
-                    ContentFileOverlay.ComparePriority(candidate.Source, highestPriority) == 0)
-                .ToArray();
-            if (winners.Length > 0 && winners.All(candidate => DeclaresBossTag(candidate.Path, issues)))
-            {
-                bossIds.Add(pair.Key);
-            }
-            var declaredSizes = winners.Select(candidate => ReadMonsterSize(candidate.Path)).Distinct().ToArray();
-            sizes[pair.Key] = declaredSizes.Length == 1 ? declaredSizes[0] : null;
-        }
-
-        return new AvailableMonsterDefinitions(ids, bossIds, sizes);
+        return new AvailableMonsterDefinitions(usableIds, bossIds, sizes);
     }
 
-    private static int? ReadMonsterSize(string path)
+    private static int? ReadMonsterSize(string path, int? size)
     {
-        int? size = null;
         try
         {
-            foreach (var rawLine in File.ReadLines(path))
+            foreach (var (kind, body) in NativeDarkestReader.ReadRecords(path))
             {
-                var line = StripComment(rawLine).Trim();
-                if (!line.StartsWith("display:", StringComparison.Ordinal))
-                    continue;
-                // Native display parsing searches the last .size substring.
-                // Until its full integer parsing is mirrored, duplicate fields
-                // are unknown; the first value cannot justify skipping a row.
-                if (line.IndexOf(".size", StringComparison.Ordinal) !=
-                    line.LastIndexOf(".size", StringComparison.Ordinal))
-                    return null;
-                // Keep numeric quotes intact: native integer conversion does
-                // not turn a quoted number into the corresponding size.
-                var tokens = TokenPattern.Matches(line[8..]).Select(match => match.Value).ToArray();
-                var index = Array.IndexOf(tokens, ".size");
-                if (index >= 0)
-                    size = index + 1 < tokens.Length && int.TryParse(tokens[index + 1],
-                        NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed) && parsed is >= 0 and <= 4
-                        ? parsed : null;
+                if (kind != "display" || !body.Contains(".size", StringComparison.Ordinal)) continue;
+                size = NativeDarkestReader.ReadInt(body, ".size");
+                if (size < 0) size = null;
             }
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException)
@@ -221,27 +190,8 @@ public static partial class BattleEncounterCatalog
     {
         try
         {
-            foreach (var rawLine in File.ReadLines(path))
-            {
-                var line = StripComment(rawLine).Trim();
-                var separator = line.IndexOf(':');
-                if (separator <= 0 ||
-                    !line[..separator].Trim().Equals("tag", StringComparison.OrdinalIgnoreCase))
-                {
-                    continue;
-                }
-
-                var tokens = TokenPattern.Matches(line[(separator + 1)..])
-                    .Select(match => Unquote(match.Value))
-                    .ToArray();
-                var idIndex = Array.FindIndex(tokens, token =>
-                    token.Equals(".id", StringComparison.OrdinalIgnoreCase));
-                if (idIndex >= 0 && idIndex + 1 < tokens.Length &&
-                    tokens[idIndex + 1].Equals("boss", StringComparison.OrdinalIgnoreCase))
-                {
-                    return true;
-                }
-            }
+            return NativeDarkestReader.ReadRecords(path).Any(record => record.Kind == "tag" &&
+                NativeDarkestReader.ReadString(record.Body, ".id") == "boss");
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
@@ -280,7 +230,7 @@ public static partial class BattleEncounterCatalog
                     source.Directory, source.Kind is "workshop" or "local" ? enabledDlcPrefixes : [])
                 .Select(root => Path.Combine(root, "monsters"))
                 .Where(Directory.Exists)
-                .SelectMany(directory => Directory.EnumerateFiles(
+                .SelectMany(directory => NativeDirectoryDiscovery.EnumerateFiles(
                     directory, "*.info.darkest", SearchOption.AllDirectories))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
@@ -375,10 +325,6 @@ public static partial class BattleEncounterCatalog
                    CultureInfo.InvariantCulture,
                out difficulty);
     }
-
-    private sealed record MonsterDefinitionCandidate(
-        ActiveContentSource Source,
-        string Path);
 
     private sealed record AvailableMonsterDefinitions(
         HashSet<string> Ids,

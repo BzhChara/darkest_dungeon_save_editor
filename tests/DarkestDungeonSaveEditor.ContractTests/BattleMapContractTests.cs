@@ -1105,7 +1105,7 @@ internal static partial class ContractSuite
             preparedBattlePlacement.TargetFile.FileName == "persist.map.json",
             "A proven current-table battle must prepare only the selected map tile for replacement.");
         await VerifyPendingEncounterDependencyContractAsync(battleEditService, preparedBattlePlacement,
-            Path.Combine(encounterGameRoot, "monsters", "shambler_B", "shambler_B.info.darkest"));
+            Path.Combine(encounterGameRoot, "monsters", "shambler", "shambler_B", "shambler_B.info.darkest"));
         _ = await battleEditService.CommitAsync(preparedBattlePlacement);
         var snapshotAfterBattlePlacement = await new BattleMapSnapshotReader(codec)
             .LoadAsync(battleMapProfileRoot);
@@ -1846,7 +1846,7 @@ internal static partial class ContractSuite
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
         foreach (var monsterId in monsterIds)
         {
-            var monsterDirectory = Path.Combine(contentRoot, "monsters", monsterId);
+            var monsterDirectory = Path.Combine(contentRoot, "monsters", monsterId[..^2], monsterId);
             Directory.CreateDirectory(monsterDirectory);
             var bossTag = bossIds.Contains(monsterId)
                 ? "tag: .id \"boss\"\n"

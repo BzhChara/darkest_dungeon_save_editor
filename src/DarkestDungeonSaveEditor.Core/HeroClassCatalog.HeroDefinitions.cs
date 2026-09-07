@@ -143,16 +143,15 @@ public static partial class HeroClassCatalog
         IReadOnlyList<EffectiveContentFile> overrideFiles,
         IReadOnlyDictionary<string, ActiveContentSource> sourcesById)
     {
-        if (overrideFiles.Count == 0 || !sourcesById.TryGetValue(selected.Source, out var selectedSource))
+        if (overrideFiles.Count == 0)
         {
             return selected;
         }
 
-        var applicationComparer = Comparer<ActiveContentSource>.Create(ContentFileOverlay.ComparePriority);
+        // Native HeroClass opens info, art, then override independently. An
+        // effective override still applies when its source is below the info Mod.
         var applicableOverrides = overrideFiles
-            .Where(file => ContentFileOverlay.ComparePriority(file.Source, selectedSource) >= 0)
-            .OrderBy(file => file.Source, applicationComparer)
-            .ThenBy(file => file.RelativePath, StringComparer.OrdinalIgnoreCase)
+            .OrderBy(file => file.Path.EndsWith(HeroOverrideSuffix, StringComparison.OrdinalIgnoreCase) ? 1 : 0)
             .ToArray();
         if (applicableOverrides.Length == 0)
         {

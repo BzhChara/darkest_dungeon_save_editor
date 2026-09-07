@@ -368,8 +368,8 @@ internal sealed class ContentLocalizationCatalog
             return [];
         }
 
-        return Directory.EnumerateFiles(directory, "*.string_table.xml", SearchOption.AllDirectories)
-            .Concat(Directory.EnumerateFiles(directory, "*", SearchOption.TopDirectoryOnly)
+        return NativeDirectoryDiscovery.EnumerateFiles(directory, "*.string_table.xml", SearchOption.AllDirectories)
+            .Concat(NativeDirectoryDiscovery.EnumerateFiles(directory, "*", SearchOption.TopDirectoryOnly)
                 .Where(path => IsCompiledFile(path) && TryGetCompiledLanguageId(path) is not null))
             .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
             .ToArray();

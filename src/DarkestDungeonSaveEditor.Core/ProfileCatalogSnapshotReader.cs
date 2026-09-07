@@ -43,7 +43,8 @@ public sealed class ProfileCatalogSnapshotReader
         string gameDirectory,
         string? workshopDirectory,
         string? localModDirectory,
-        string? workspaceRoot = null)
+        string? workspaceRoot = null,
+        string? initialContentFingerprint = null)
     {
         _content = initialContent;
         _profile = initialContent.Profile;
@@ -52,7 +53,7 @@ public sealed class ProfileCatalogSnapshotReader
         _workshopDirectory = workshopDirectory;
         _localModDirectory = localModDirectory;
         _configurationKey = ProfileContentConfiguration.GetKey(JsonSupport.ReadObject(initialContent.DecodedGamePath));
-        _contentFingerprint = BattleEncounterCatalog.CaptureContentFingerprint(initialContent.Sources);
+        _contentFingerprint = initialContentFingerprint ?? ProfileCatalogContentFingerprint.Capture(initialContent.Sources);
         _quantityCache = new() { [initialItems.SaveContext] = initialItems };
         _workspace = Path.Combine(workspaceRoot ?? SaveEditorLocations.CreateDefault().WorkspaceDirectory,
             "profile_sync", Guid.NewGuid().ToString("N"));
@@ -89,8 +90,8 @@ public sealed class ProfileCatalogSnapshotReader
                     DecodedGamePath = gamePath,
                     SourceGameSha256 = before["persist.game.json"]!
                 };
-            var contentFingerprint = BattleEncounterCatalog.CaptureContentFingerprint(content.Sources);
-            var contentChanged = key != _configurationKey || contentFingerprint != _contentFingerprint;
+            var contentFingerprint = ProfileCatalogContentFingerprint.Capture(content.Sources, cancellationToken);
+            var contentChanged = _lastSnapshot is null || key != _configurationKey || contentFingerprint != _contentFingerprint;
             if (!contentChanged && _lastSnapshot is not null && HashesEqual(before, _lastSnapshot.FileHashes))
                 return _lastSnapshot with { ReadAtUtc = DateTime.UtcNow };
             var scene = QuantityItemSaveScene.Read(content).Context;
@@ -131,6 +132,8 @@ public sealed class ProfileCatalogSnapshotReader
             {
                 throw new IOException("游戏仍在保存，等待完整存档后自动重试。");
             }
+            if (contentChanged && contentFingerprint != ProfileCatalogContentFingerprint.Capture(content.Sources, cancellationToken))
+                throw new IOException("资源文件仍在更新，等待完整内容后自动重试。");
             cache[scene] = quantities;
             _quantityCache = cache;
             _content = content;

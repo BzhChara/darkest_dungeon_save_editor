@@ -22,7 +22,7 @@ public static partial class QuantityItemCatalog
         {
             var inventoryRoot = Path.Combine(source.Directory, "inventory");
             return Directory.Exists(inventoryRoot)
-                ? Directory.EnumerateFiles(inventoryRoot, $"*{InventoryItemSuffix}", SearchOption.AllDirectories)
+                ? NativeDirectoryDiscovery.EnumerateFiles(inventoryRoot, $"*{InventoryItemSuffix}", SearchOption.AllDirectories)
                     .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
                     .ToArray()
                 : [];
@@ -34,7 +34,7 @@ public static partial class QuantityItemCatalog
             var files = ContentFileOverlay.GetFallbackContentRoots(source.Directory, enabledDlcPrefixes)
                 .Select(root => Path.Combine(root, "inventory"))
                 .Where(Directory.Exists)
-                .SelectMany(directory => Directory.EnumerateFiles(
+                .SelectMany(directory => NativeDirectoryDiscovery.EnumerateFiles(
                     directory, $"*{InventoryItemSuffix}", SearchOption.AllDirectories))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
@@ -79,55 +79,6 @@ public static partial class QuantityItemCatalog
         }
 
         return result.OrderBy(path => path, StringComparer.OrdinalIgnoreCase).ToArray();
-    }
-
-    private static string StripLineComments(string text)
-    {
-        var result = new StringBuilder(text.Length);
-        var inQuotes = false;
-        var escaped = false;
-        for (var index = 0; index < text.Length; index++)
-        {
-            var current = text[index];
-            if (!inQuotes && current == '/' && index + 1 < text.Length && text[index + 1] == '/')
-            {
-                index += 2;
-                while (index < text.Length && text[index] is not ('\r' or '\n'))
-                {
-                    index++;
-                }
-
-                if (index >= text.Length)
-                {
-                    break;
-                }
-
-                current = text[index];
-            }
-
-            result.Append(current);
-            if (current is '\r' or '\n')
-            {
-                inQuotes = false;
-                escaped = false;
-                continue;
-            }
-
-            if (inQuotes && current == '\\' && !escaped)
-            {
-                escaped = true;
-                continue;
-            }
-
-            if (current == '"' && !escaped)
-            {
-                inQuotes = !inQuotes;
-            }
-
-            escaped = false;
-        }
-
-        return result.ToString();
     }
 
     private static string ComputeSha256(string path)

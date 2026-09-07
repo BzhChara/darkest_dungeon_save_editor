@@ -319,8 +319,10 @@ internal static partial class ContractSuite
             localHero,
             ["light_hp_quirk", "rounding_weakness_a", "rounding_weakness_b", "rounding_weakness_c"],
             "可达条件");
-        AssertInitialQuirkSelectionRejected(heroCatalog, localHero, ["ambiguous_quirk"], "多个未解析定义");
-        AssertInitialQuirkSelectionRejected(heroCatalog, localHero, ["evolution_conflict_quirk"], "多个未解析定义");
+        _ = StagecoachHeroCandidateFactory.Generate(heroCatalog, localHero, seed: 1729,
+            selectedInitialQuirkIds: ["ambiguous_quirk"]);
+        AssertInitialQuirkSelectionRejected(heroCatalog, localHero,
+            ["evolution_conflict_quirk"], "进化目标 'evolution_target_b' 缺失");
         AssertInitialQuirkSelectionRejected(heroCatalog, localHero, ["max_hp_conflict_quirk"], "当前不能显式写入");
         AssertInitialQuirkSelectionRejected(heroCatalog, localHero, ["fatal_weakness"], "合计 HP 修正无效");
         Assert(

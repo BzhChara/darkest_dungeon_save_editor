@@ -10,6 +10,7 @@ public static partial class HeroClassCatalog
 {
     private const string HeroInfoSuffix = ".info.darkest";
     private const string HeroOverrideSuffix = ".override.darkest";
+    private const string HeroArtSuffix = ".art.darkest";
     private const string HeroUpgradeSuffix = ".upgrades.json";
 
     public static HeroClassCatalogResult Load(ActiveContentSnapshot activeContent)
@@ -35,10 +36,26 @@ public static partial class HeroClassCatalog
             sourceFiles.Add(new SourceFiles(source, EnumerateSourceFiles(source, enabledDlcPrefixes, issues)));
         }
 
-        var heroFiles = ResolveFiles(sourceFiles, files => files.HeroInfoFiles, "Hero definition", issues);
-        var heroOverrideFiles = ResolveFiles(sourceFiles, files => files.HeroOverrideFiles, "Hero override", issues);
+        var heroIds = sourceFiles.SelectMany(item => item.Files.HeroInfoFiles)
+            .Select(path => ReadHeroClassId(path, HeroInfoSuffix)).Distinct(StringComparer.Ordinal).ToArray();
+        var actorFiles = NativeContentFileResolver.ResolveActorFiles(activeContent.Sources, "heroes", issues);
+        var heroFiles = new List<EffectiveContentFile>();
+        var heroOverrideFiles = new List<EffectiveContentFile>();
+        foreach (var id in heroIds)
+        {
+            if (!actorFiles.TryGetValue($"heroes/{id}/{id}{HeroInfoSuffix}", out var info))
+            {
+                issues.Add($"Hero '{id}' has no canonical info file; no generation template is available.");
+                continue;
+            }
+            heroFiles.Add(info);
+            foreach (var suffix in new[] { HeroArtSuffix, HeroOverrideSuffix })
+                if (actorFiles.TryGetValue($"heroes/{id}/{id}{suffix}", out var file)) heroOverrideFiles.Add(file);
+        }
         var effectFiles = ResolveFiles(sourceFiles, files => files.EffectFiles, "Effect definition", issues);
-        var quirkFiles = ResolveFiles(sourceFiles, files => files.QuirkFiles, "Quirk definition", issues);
+        var quirkFiles = NativeContentFileResolver.Resolve(sourceFiles.SelectMany(item =>
+            item.Files.QuirkFiles.Select(path => new ContentFileCandidate(item.Source, path))).ToArray(),
+            activeContent.Sources, "Quirk definition", issues);
         var eventFiles = ResolveFiles(sourceFiles, files => files.TownEventFiles, "Town event definition", issues);
         var buffFiles = ResolveFiles(sourceFiles, files => files.BuffFiles, "Buff definition", issues);
         var campingFiles = ResolveFiles(sourceFiles, files => files.CampingSkillFiles, "Camping skill definition", issues);
@@ -67,7 +84,8 @@ public static partial class HeroClassCatalog
 
         var heroOverridesByClass = heroOverrideFiles
             .GroupBy(
-                file => ReadHeroClassId(file.Path, HeroOverrideSuffix),
+                file => ReadHeroClassId(file.Path, file.Path.EndsWith(HeroArtSuffix, StringComparison.OrdinalIgnoreCase)
+                    ? HeroArtSuffix : HeroOverrideSuffix),
                 StringComparer.OrdinalIgnoreCase)
             .ToDictionary(
                 group => group.Key,
@@ -223,14 +241,13 @@ public static partial class HeroClassCatalog
             definition => definition.QuirkId,
             "Effect",
             issues);
-        var effectiveQuirks = ResolveUniqueDefinitions(
-            quirkCandidates,
-            sourcesById,
-            definition => definition.Source,
-            definition => definition.SourcePath,
-            GetQuirkSignature,
-            "Quirk",
-            issues);
+        // Native quirk lookup (0x1404ABD00) walks the entire loaded vector and
+        // returns the last matching ID. Different filenames do not imply ambiguity.
+        var quirkHashCollisions = NativeResourceIdentity.FindCollisions(quirkCandidates.Values.SelectMany(group => group).Select(quirk => quirk.Id));
+        if (quirkHashCollisions.Count > 0) issues.Add("Quirk IDs share native hashes and remain unresolved: " + string.Join(", ", quirkHashCollisions));
+        var effectiveQuirks = quirkCandidates.Where(pair => !pair.Value.Any(quirk => quirkHashCollisions.Contains(quirk.Id)) && pair.Value.Select(value => value.Id)
+                .Distinct(StringComparer.Ordinal).Count() == 1).ToDictionary(pair => pair.Key,
+            pair => pair.Value[^1], StringComparer.OrdinalIgnoreCase);
         var effectiveBuffs = ResolveUniqueDefinitions(
             buffCandidates,
             sourcesById,
@@ -267,6 +284,8 @@ public static partial class HeroClassCatalog
                 group => (IReadOnlyList<HeroRecruitEventDefinition>)group.ToArray(),
                 StringComparer.OrdinalIgnoreCase);
 
+        var heroHashCollisions = NativeResourceIdentity.FindCollisions(heroIds);
+        if (heroHashCollisions.Count > 0) issues.Add("Hero IDs share native hashes and remain unresolved: " + string.Join(", ", heroHashCollisions));
         var heroClasses = candidates
             .Values
             .Select(classCandidates => MergeHeroClass(
@@ -282,6 +301,8 @@ public static partial class HeroClassCatalog
                 effectiveUpgrades,
                 resolveLevelThresholds,
                 issues))
+            .Select(heroClass => heroHashCollisions.Contains(heroClass.Id)
+                ? heroClass with { HasProviderConflict = true, Source = "unresolved" } : heroClass)
             .Select(heroClass => heroClass with
             {
                 LocalizedName = localization.GetHeroClassName(heroClass.Id),

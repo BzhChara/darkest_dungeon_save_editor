@@ -40,7 +40,7 @@ public static partial class BattleEncounterCatalog
 
         var gluedRows = rows.Count(row => row.GluedFieldTokens.Length > 0);
         var unresolvedTokenCount = rows.SelectMany(row => row.UnresolvedTokens)
-            .Distinct(StringComparer.OrdinalIgnoreCase).Count();
+            .Distinct(StringComparer.Ordinal).Count();
         issues.Add(
             $"遭遇排除汇总（全局 Bridge）：{rows.Length} 条遭遇行；" +
             $"疑似字段粘连 {gluedRows} 条，其他未找到活动怪物定义 {rows.Length - gluedRows} 条；" +

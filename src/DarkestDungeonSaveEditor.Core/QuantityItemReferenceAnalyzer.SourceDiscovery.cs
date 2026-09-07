@@ -126,7 +126,7 @@ internal static partial class QuantityItemReferenceAnalyzer
         }
         else if (source.Kind is "workshop" or "local")
         {
-            paths = Directory.EnumerateFiles(
+            paths = NativeDirectoryDiscovery.EnumerateFiles(
                 source.Directory,
                 "*",
                 new EnumerationOptions
@@ -141,7 +141,7 @@ internal static partial class QuantityItemReferenceAnalyzer
             paths = ContentDirectories
                 .Select(directory => Path.Combine(source.Directory, directory))
                 .Where(Directory.Exists)
-                .SelectMany(directory => Directory.EnumerateFiles(
+                .SelectMany(directory => NativeDirectoryDiscovery.EnumerateFiles(
                     directory,
                     "*",
                     new EnumerationOptions

@@ -29,12 +29,14 @@ public partial class MainWindow : Window
     private bool IsBusy => _busyDepth > 0;
 
     private void StartProfileSync(ActiveContentSnapshot content, QuantityItemCatalogResult items,
-        DsonSaveCodec codec, string gameDirectory, string? workshopDirectory, string? localModDirectory)
+        DsonSaveCodec codec, string gameDirectory, string? workshopDirectory, string? localModDirectory,
+        string contentFingerprint)
     {
         StopProfileSync();
         _catalogConfigurationKey = ProfileContentConfiguration.GetKey(content.DecodedGamePath);
-        _catalogContentFingerprint = BattleEncounterCatalog.CaptureContentFingerprint(content.Sources);
-        _catalogSnapshotReader = new(content, items, codec, gameDirectory, workshopDirectory, localModDirectory);
+        _catalogContentFingerprint = contentFingerprint;
+        _catalogSnapshotReader = new(content, items, codec, gameDirectory, workshopDirectory, localModDirectory,
+            initialContentFingerprint: contentFingerprint);
         _battleMaintenance = new ManagedBattleEncounterBridgeService(codec);
         _maintenanceGameDirectory = gameDirectory;
         _maintenanceLocalModDirectory = localModDirectory;
@@ -175,7 +177,7 @@ public partial class MainWindow : Window
                     _lastSyncError = null;
                     _syncReady = !_syncRequested;
                     ProfileSyncStatusTextBlock.Text = $"已同步 {snapshot.ReadAtUtc.ToLocalTime():HH:mm:ss}";
-                    ProfileSyncStatusTextBlock.ToolTip = "自动检测当前档案及战斗 Mod 文件变化；失效的编辑器战斗记录将在关闭游戏后自动清理。";
+                    ProfileSyncStatusTextBlock.ToolTip = "自动检测当前档案及资源定义变化；失效的编辑器战斗记录将在关闭游戏后自动清理。";
                     continue;
                 }
                 if (IsBusy) { _syncRequested = true; return; }
@@ -197,6 +199,9 @@ public partial class MainWindow : Window
                     snapshot.Content.Profile.ProfileDirectory), token);
                 if (!ProfileCatalogSnapshotReader.HashesEqual(snapshot.FileHashes, currentHashes))
                     throw new IOException("游戏仍在保存，等待完整存档后自动重试。");
+                if (contentChanged && snapshot.ContentFingerprint != await Task.Run(() =>
+                        ProfileCatalogContentFingerprint.Capture(snapshot.Content.Sources, token), token))
+                    throw new IOException("资源文件仍在更新，等待完整内容后自动重试。");
                 if (generation != _catalogGeneration || token.IsCancellationRequested) return;
                 if (IsBusy) { _syncRequested = true; return; }
 
@@ -222,7 +227,7 @@ public partial class MainWindow : Window
                     diagnostics.Add("饰品", trinkets.Issues);
                     diagnostics.Add("人物/怪癖/姓名", heroes.Issues);
                     CrashDiagnostics.RecordCatalogDiagnostics(diagnostics);
-                    AppendStatus("活动 Mod/DLC、战斗文件或模式配置已变化，内容目录已自动更新。");
+                    AppendStatus("活动 Mod/DLC、资源定义或模式配置已变化，内容目录已自动更新。");
                 }
                 ItemTab.Header = _quantitySaveContext == QuantityItemSaveContext.Raid
                     ? "副本背包  /  RAID ITEMS" : "小镇物品  /  ESTATE ITEMS";
@@ -245,7 +250,7 @@ public partial class MainWindow : Window
                 if (_lastSyncError is not null) AppendStatus("档案自动同步已恢复。");
                 _lastSyncError = null;
                 ProfileSyncStatusTextBlock.Text = $"已同步 {snapshot.ReadAtUtc.ToLocalTime():HH:mm:ss}";
-                ProfileSyncStatusTextBlock.ToolTip = "自动检测当前档案及战斗 Mod 文件变化；失效的编辑器战斗记录将在关闭游戏后自动清理。";
+                ProfileSyncStatusTextBlock.ToolTip = "自动检测当前档案及资源定义变化；失效的编辑器战斗记录将在关闭游戏后自动清理。";
                 UpdateCatalogMode();
             }
         }

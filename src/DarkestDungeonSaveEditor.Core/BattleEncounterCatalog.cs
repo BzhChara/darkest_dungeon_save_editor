@@ -229,7 +229,7 @@ public static partial class BattleEncounterCatalog
             parsed
                 .Concat(bridgeCandidateRows)
                 .SelectMany(encounter => encounter.MonsterIds)
-                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Distinct(StringComparer.Ordinal)
                 .Select(ContentLocalizationCatalog.GetMonsterNameKey));
         globalIssues.AddRange(localization.Issues);
         var classifiedRows = encounters.Concat(globalRows)
@@ -452,7 +452,7 @@ public static partial class BattleEncounterCatalog
         BattleEncounterDefinition encounter,
         IReadOnlySet<string> availableIds) => encounter.MonsterIds
         .Where(monsterId => !availableIds.Contains(monsterId))
-        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .Distinct(StringComparer.Ordinal)
         .ToArray();
 
     private static void ValidateMonsterDefinitions(BattleEncounterDefinition encounter)

@@ -11,5 +11,7 @@
 - [清单加载实测结果：2026-09-06](manifest-loading-result-2026-09-06.md)
 - [编辑器战斗自动维护与文档整理：2026-09-07](encounter-maintenance-2026-09-07.md)
 - [赞助入口：2026-09-07](support-dialog-2026-09-07.md)
+- [重新审查修复：怪物 ID 与物品字段，2026-09-07](review-fixes-2026-09-07.md)
+- [原生资源加载核对与接入：2026-09-07](native-loading-2026-09-07.md)
 
 历史报告中的问题描述、统计和限制只代表其记录时点。当前行为以 [内容与存档规则](../content-save-rules.md)、[战斗地图设计](../battle-map-editor-design.md) 和 [战斗编号规则](../encounter-runtime-order.md) 为准。

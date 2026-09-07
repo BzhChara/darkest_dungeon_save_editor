@@ -55,6 +55,7 @@ public partial class MainWindow : Window
             var inventory = await Task.Run(() => ScanContentFilesForDiagnostics(activeContent));
             await RecordContentFileDiagnosticsAsync(inventory);
             CrashDiagnostics.SetStage("LoadCatalog: building content catalogs");
+            var contentFingerprint = await Task.Run(() => ProfileCatalogContentFingerprint.Capture(activeContent.Sources));
             var staticCatalogTask = Task.Run(() => new
             {
                 Trinkets = diagnosticBatch.Capture("饰品", () => TrinketCatalog.Load(activeContent), catalog => catalog.Issues),
@@ -155,7 +156,7 @@ public partial class MainWindow : Window
 
             CrashDiagnostics.SetStage("LoadCatalog: synchronous UI update completed");
             StartProfileSync(activeContent, quantityItems, codec, gameDirectory,
-                workshopDirectory, additionalLocalModDirectory);
+                workshopDirectory, additionalLocalModDirectory, contentFingerprint);
         }
         catch (Exception ex)
         {

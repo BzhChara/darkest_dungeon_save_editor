@@ -32,6 +32,8 @@ internal static partial class ContractSuite
         var rosterHeroesSeed = fixture.RosterHeroesSeed;
         var codec = fixture.Codec;
 
+        await RunNativeResourceResolutionContractsAsync(runRoot, codec);
+        await RunNativeCatalogReadingContractsAsync(runRoot, codec);
         RunSaveReplacementContracts(runRoot);
         await RunEncounterMaintenanceContractsAsync(runRoot, codec);
         await RunInheritedLegacyBridgeContractsAsync(runRoot, codec);

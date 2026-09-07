@@ -171,19 +171,19 @@ internal static partial class ContractSuite
         Assert(heroCatalog.Issues.All(issue => !issue.Contains("Hero class 'runtime_hero'", StringComparison.Ordinal)), "Identical hero duplicates should not be reported as conflicts.");
         Assert(heroCatalog.Issues.Any(issue => issue.Contains("Effect 'Ambiguous Effect'", StringComparison.Ordinal)), "Semantic-only effect duplicates should be reported.");
         Assert(heroCatalog.Issues.All(issue => !issue.Contains("Ordinary Duplicate", StringComparison.Ordinal)), "Effects without disease assignments should not enter runtime-quirk conflict diagnostics.");
-        Assert(heroCatalog.Issues.Any(issue => issue.Contains("Quirk 'ambiguous_quirk'", StringComparison.Ordinal)), "Semantic-only quirk duplicates should be reported.");
+        Assert(heroCatalog.Issues.All(issue => !issue.Contains("Quirk 'ambiguous_quirk'", StringComparison.Ordinal)), "Known native duplicate resolution should not be reported as ambiguity.");
         Assert(
-            heroCatalog.InitialQuirks.Count(item => item.Id == "ambiguous_quirk") == 2,
-            "Semantic-only quirk duplicates should remain in the selection catalog for disabled display.");
+            heroCatalog.InitialQuirks.Single(item => item.Id == "ambiguous_quirk") is { IsPositive: false },
+            "The last loaded quirk definition supplies the effective properties.");
         var identicalCrossPathQuirk = heroCatalog.InitialQuirks.Single(item => item.Id == "identical_cross_path_quirk");
         Assert(
             identicalCrossPathQuirk is { IsPositive: true, WriteStatus: HeroInitialQuirkWriteStatus.Direct } &&
             heroCatalog.Issues.All(issue => !issue.Contains("identical_cross_path_quirk", StringComparison.Ordinal)),
             "Semantically identical quirk definitions at different paths should merge without a conflict.");
         Assert(
-            heroCatalog.InitialQuirks.Count(item => item.Id == "evolution_conflict_quirk") == 2 &&
-            heroCatalog.Issues.Any(issue => issue.Contains("Quirk 'evolution_conflict_quirk'", StringComparison.Ordinal)),
-            "Different evolution durations or targets at the same effective priority must remain unresolved.");
+            heroCatalog.InitialQuirks.Single(item => item.Id == "evolution_conflict_quirk").Evolution is
+                { DurationMin: 90, DurationMax: 120, TargetQuirkId: "evolution_target_b" },
+            "Evolution metadata must come entirely from the last native definition.");
         Assert(
             heroCatalog.InitialQuirks.Single(item => item.Id == "identical_evolution_quirk") is
             {

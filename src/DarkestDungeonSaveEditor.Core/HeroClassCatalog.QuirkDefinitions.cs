@@ -17,6 +17,8 @@ public static partial class HeroClassCatalog
         var contextReasons = new List<string>();
         var unverifiedReasons = new List<string>();
         var definitionLimits = new List<int>();
+        if (!effectiveQuirks.ContainsKey(quirk.Id))
+            unverifiedReasons.Add("怪癖 ID 或定义未能唯一解析，不能确定游戏实际采用的属性");
         var visitedEvolutionIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { quirk.Id };
         var evolutionStep = quirk;
         while (evolutionStep.Evolution?.TargetQuirkId is { } targetId)

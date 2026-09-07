@@ -203,9 +203,9 @@ internal static partial class ContractSuite
         BattleEncounterCatalog.ValidateDirectEncounter(skipped.DirectEncounters.Single(row => row.MashType == 0 && row.MashIndex == 6));
         File.WriteAllText(sizePath, "display: .size 3 .size 1\n");
         var ambiguousSize = BattleEncounterCatalog.Load(content, snapshot);
-        Assert(ambiguousSize.Encounters.Where(row => row.MashType == 0).All(row => row.MashIndex is null) &&
-               ambiguousSize.DirectEncounters.Any(row => row.MashType == 1),
-            "Repeated monster size fields must stay guarded instead of skipping a row using the first size and shifting later indexes.");
+        Assert(ambiguousSize.DirectEncounters.Single(row => row.MashType == 0 && row.MashIndex == 7)
+                   .MonsterIds.SequenceEqual(["low_a"]) && ambiguousSize.DirectEncounters.Any(row => row.MashType == 1),
+            "Native takes the last size (1), so the formerly oversized row now consumes index 6 and shifts the next row to 7.");
         var staleSize = await CaptureSaveFailureAsync(() =>
         {
             BattleEncounterCatalog.ValidateDirectEncounter(skipped.DirectEncounters.Single(row => row.MashType == 0 && row.MashIndex == 6));
@@ -214,8 +214,9 @@ internal static partial class ContractSuite
         Assert(staleSize is InvalidOperationException, "A repeated-size change must invalidate a previously proven later index.");
         File.WriteAllText(sizePath, "display: .size \"3\"\n");
         var quotedSize = BattleEncounterCatalog.Load(content, snapshot);
-        Assert(quotedSize.Encounters.Where(row => row.MashType == 0).All(row => row.MashIndex is null),
-            "Quoted numeric sizes must not become proven sizes through string-token unquoting and incorrectly skip a native row.");
+        Assert(quotedSize.DirectEncounters.Single(row => row.MashType == 0 && row.MashIndex == 7)
+                .MonsterIds.SequenceEqual(["low_a"]),
+            "Native atoi reads a quoted size as zero, retaining the row rather than skipping it as size 3.");
         File.WriteAllText(sizePath, "display: .size 3\n");
         File.WriteAllBytes(path, original);
         foreach (var suffix in new[] { "hall: .chance 1\n" })

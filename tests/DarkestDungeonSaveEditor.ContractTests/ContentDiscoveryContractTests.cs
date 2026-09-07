@@ -38,7 +38,7 @@ internal static partial class ContractSuite
             var id = prefix == enabled ? "enabled_probe" : "excluded_probe";
             WriteProbe($"{prefix}/inventory/probe.inventory.items.darkest",
                 $"inventory_item: .type \"estate\" .id \"{id}\" .base_stack_limit 6 .estate_can_be_provision true");
-            WriteProbe($"{prefix}/monsters/{id}/{id}.info.darkest", "display: .size 1\ntag: .id \"boss\"");
+            WriteProbe($"{prefix}/monsters/{id[..^2]}/{id}/{id}.info.darkest", "display: .size 1\ntag: .id \"boss\"");
             WriteProbe($"{prefix}/dungeons/probe/probe.1.mash.darkest",
                 $"hall: .chance 1 .types {id}\n");
             WriteProbe($"{prefix}/dungeons/probe/probe.props.darkest",

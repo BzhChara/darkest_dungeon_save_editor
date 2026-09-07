@@ -2,7 +2,7 @@
 
 This document is the durable record of the Darkest Dungeon Save Editor's confirmed content-resolution, hero-generation, quirk, trinket, and save-write rules. It separates behavior proven by the game or real saves from implementation conclusions and remaining live-test requirements, so later work does not turn one example Mod into a hard-coded special case.
 
-- Last updated: 2026-09-06
+- Last updated: 2026-09-07
 - Historical audit baseline: `profile_1` (the counts and hash below are a snapshot, not live state)
 - Baseline `persist.game.json` SHA-256: `f0f707d734a93b9e04c9792d47490acbc8bbc046edd51ee8b2c108ca712e6b17`
 - Active Mods in the baseline: 124
@@ -32,7 +32,7 @@ These files are read-only analysis snapshots. They do not automatically follow l
 
 - After one successful load, a shared monitor watches `persist.game.json`, `persist.estate.json`, `persist.roster.json`, `persist.town.json`, `persist.upgrades.json`, `persist.raid.json`, and `persist.map.json`. It reads disk saves only, including while the game runs; it never edits process memory or permits writes while the game is running.
 - Debounce save bursts; use polling as a missed-event fallback and activation as a catch-up probe. Compare the complete relevant file-hash vector before and after reading. Locked, partial, missing-required, or changing files retain the last complete display but suspend edits and retry. This detects concurrent writes, not an undocumented atomic transaction ID in the game's multi-file format.
-- Normal game progress updates the save guards and dynamic quantities, not the content-resolution rules. The content key contains game mode, DLC entries and numbered applied-Mod entries; JSON property order is not load order. An actual configuration change rebuilds all affected catalogs. An additional 10-second poll resolves sources and checks encounter files, monster info and Mod inventories, so those disk updates also invalidate content caches without a changed profile configuration. Other definition-only updates still use manual reload; write services retain source-file guards.
+- Normal game progress updates the save guards and dynamic quantities, not the content-resolution rules. The content key contains game mode, DLC entries and numbered applied-Mod entries; JSON property order is not load order. An additional 10-second poll resolves sources and hashes catalog definitions, references and localization, including actor info/art/override files. Definition-only updates rebuild affected catalogs even if the profile, manifest, file length and timestamps are unchanged. Hashing runs off the UI thread; changed content is checked again before publishing rebuilt catalogs. Write services retain their own source-file guards. This broad refresh fingerprint is separate from the encounter-maintenance fingerprint: unrelated item/quirk changes do not clear editor battles.
 - Town and raid quantity definitions/reference classifications are cached separately; visiting a scene for the first time builds its cache. Refresh only saved amounts, presence, residue entries and occupied slots. Existing unused entries remain visible under the established rules; an absent torch is not hidden. Honor `inraid`/`raiddungeon`, ignoring leftover raid files after force-town.
 - Preserve search, scroll, selected IDs, quantity input, hero level and valid selected quirks on same-scene refresh. A scene transition clears the item selection, requiring a new target even for overlapping resources. Missing selected definitions are not silently replaced with another row.
 - Relevant file changes invalidate prepared edits. Draft choices survive, but the user must generate a new preview. Recheck a modal confirmation's revision before committing; defer snapshot publication while any writer/preview operation is busy. Complete own writes with one catch-up refresh. Profile changes/close cancel old requests; old-profile results cannot publish into a new profile.
@@ -52,13 +52,15 @@ Validation (2026-09-06): Release build and the executable contract suite passed,
 
 ### 2.2 File and semantic-ID overlays
 
-- First apply `base → DLC → Mod` replacement by normalized relative path.
-- Hero, effect, buff, quirk, event, and upgrade definitions may merge by semantic ID across files; the highest-priority effective definition wins.
-- A hero `.info.darkest` file is the full template. An `.override.darkest` file only replaces fields it actually declares and must not erase untouched lower-layer fields.
+- Replay verified native file slots in `base → DLC → Mod` application order. A path replacement stays in its original slot; new paths append in descending path-depth order, then ordinal filename order within each source. File order and semantic-ID lookup are separate rules.
+- Inventory `(type,id)` and trinket ID lookup use the first loaded matching definition; quirk ID lookup uses the last loaded matching definition. A later filename does not automatically override an inventory/trinket ID, and later trinket state fields are not merged into the winner. Case-distinct IDs that collide in legacy case-insensitive editor keys remain unavailable.
+- Hero definitions use the constructed `heroes/<id>/<id>` path, opening `.info.darkest`, then `.art.darkest`, then `.override.darkest`. Each path resolves independently; a lower-priority art/override file still applies after an effective info file if its own path was not replaced. Discovery of an info filename in an unrelated directory is not permission to use that file as the class template.
+- Canonical actor lookups still respect a Mod's manifest. Native hash collisions between different inventory keys, trinket IDs, hero IDs or quirk IDs remain unavailable; evolution targets cannot resolve through such a collision. Monster collisions defer affected index calculations instead of guessing a string-specific size.
 - Hero info, override and effect attributes stop at `//` outside quoted strings, including comments immediately after a value. Quoted `//`, leading dots and escaped quotes remain literal values; commented attributes cannot replace live HP, skill or quirk assignments.
 - Trinket and quirk provenance is checked at entry-ID level. A new ID introduced by a Mod inside a path that also exists in base content is still Mod content, not base content.
-- If different definitions remain tied at the same highest priority, retain an unresolved conflict instead of guessing.
-- Duplicate trinket IDs from different effective paths remain display-only under the current conservative policy.
+- Effects, buffs, events, upgrades and map resource variants retain their existing semantic conflict policies where native duplicate lookup has not yet been established. Multiple unproven providers of the same file remain guarded. These policies must not be advertised as a fully reconstructed loader for every resource family.
+
+Physical discovery follows the verified Windows directory-device exclusions for dot names, `_template` path components, and C-locale path-conversion failures. Manifest discovery and canonical file opening are separate branches. The complete filesystem inventory still reports excluded files for diagnosis. See the versioned evidence and remaining limits in [native loading verification](change-history/native-loading-2026-09-07.md).
 
 ### 2.3 Provenance display
 
@@ -203,6 +205,7 @@ Real game loading after a deliberate raid edit remains a separate authorized smo
 ### 5.1 Catalog and ordinary inventory writes
 
 - Parse ID, Chinese name, English name, rarity, definition limit, origin, current override provider, and stateful shape.
+- All `hero_class_requirements` must resolve to discovered active classes, as in the native trinket loader. Entries referencing absent classes do not enter the usable catalog.
 - An ordinary trinket is added to the trinket inventory in `persist.estate.json`; it is not equipped onto a hero.
 - Inventory counts do not include copies equipped by heroes.
 - `limit=0` means unlimited, not a limit of zero.
