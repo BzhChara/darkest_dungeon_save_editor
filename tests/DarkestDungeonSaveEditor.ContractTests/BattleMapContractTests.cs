@@ -150,7 +150,7 @@ internal static partial class ContractSuite
         var battleGameFixturePath = Path.Combine(battleMapProfileRoot, "persist.game.json");
         File.WriteAllText(
             battleGameFixturePath,
-            "{\"base_root\":{\"game_mode\":\"base\",\"applied_ugcs_1_0\":{}}}",
+            "{\"base_root\":{\"inraid\":true,\"raiddungeon\":\"cove\",\"game_mode\":\"base\",\"applied_ugcs_1_0\":{}}}",
             new UTF8Encoding(false));
         var battleEditLocations = new SaveEditorLocations(
             Path.Combine(runRoot, "battle-map-appdata"),
@@ -842,12 +842,11 @@ internal static partial class ContractSuite
                 BattleEncounterClassification.ConditionalOrAdditional &&
             conditionalEncounter.ContainsBossMonster,
             "A boss-tagged conditional row without a roaming id must remain a conditional battle rather than being mislabeled as a roaming boss.");
+        var sourceMashBytes = File.ReadAllBytes(standardEncounterPath);
         var bridgePackage = BattleEncounterBridgeBuilder.Build(
             encounterCatalog,
             conditionalEncounter,
             Path.Combine(runRoot, "battle-encounter-bridge-packages"));
-        var sourceMashBytes = File.ReadAllBytes(standardEncounterPath);
-        var generatedMashBytes = File.ReadAllBytes(bridgePackage.MashFilePath);
         Assert(
             bridgePackage.ExpectedMashIndex == 2 &&
             bridgePackage.MashType == 0 &&
@@ -857,15 +856,14 @@ internal static partial class ContractSuite
                 StringComparison.Ordinal) &&
             bridgePackage.ProjectTitle.Contains("shambler_B", StringComparison.Ordinal) &&
             !bridgePackage.ProjectTitle.Contains("Probe", StringComparison.OrdinalIgnoreCase) &&
-            generatedMashBytes.AsSpan(0, sourceMashBytes.Length).SequenceEqual(sourceMashBytes) &&
-            File.ReadAllText(bridgePackage.MashFilePath).Contains(
-                "hall: .chance 0 .types shambler_B .limit 1 .can_be_ambush false",
-                StringComparison.Ordinal) &&
+            File.ReadAllBytes(standardEncounterPath).SequenceEqual(sourceMashBytes) &&
+            File.ReadAllText(bridgePackage.MashFilePath).Trim() ==
+                "hall: .chance 0 .types shambler_B .limit 1 .can_be_ambush false" &&
             Path.GetFileName(bridgePackage.ManifestPath) == "ddse-encounter-bridge.json" &&
             File.Exists(bridgePackage.ManifestPath) &&
             File.Exists(Path.Combine(bridgePackage.PackageDirectory, "project.xml")) &&
             File.Exists(Path.Combine(bridgePackage.PackageDirectory, "modfiles.txt")),
-            "The production Bridge package must preserve the effective standard table byte prefix, append one zero-weight ordinary row, and emit a self-describing local Mod package without touching the profile.");
+            "The production Bridge package must contain only the selected zero-weight encounter and leave the native table untouched while emitting a self-describing local Mod package.");
         var fixedBossBridgePackage = BattleEncounterBridgeBuilder.Build(
             encounterCatalog,
             globalModBoss,
@@ -955,8 +953,9 @@ internal static partial class ContractSuite
             bridgedEncounter.MonsterIds.SequenceEqual(["shambler_B"]) &&
             bridgedEncounter.Weight == 0 &&
             bridgedCatalog.HasActiveGeneratedBridge &&
-            bridgedEncounter.SourceLabel.Contains("当前由 本地 Mod", StringComparison.Ordinal),
-            "After the generated package wins the exact relative-path overlay, its appended row must resolve as the expected directly addressable index and preserve source provenance.");
+            bridgedEncounter.SourceLabel.Contains("本地 Mod", StringComparison.Ordinal) &&
+            bridgedEncounter.SourcePath == bridgePackage.MashFilePath,
+            "The separate Bridge file must append at the expected directly addressable index and preserve its own source provenance.");
         var rejectedStackedBridge = false;
         try
         {
@@ -1052,8 +1051,8 @@ internal static partial class ContractSuite
         Assert(
             Path.GetRelativePath(dlcTargetBridge.PackageDirectory, dlcTargetBridge.MashFilePath)
                 .Replace('\\', '/') ==
-            "dlc/123_pack/features/court/dungeons/courtyard/courtyard.2.mash.darkest",
-            "A Bridge targeting an enabled DLC table must preserve the complete virtual DLC prefix so the generated Mod overrides the exact runtime file rather than creating a second root-level table.");
+            "dungeons/courtyard/ddse_managed.courtyard.2.mash.darkest",
+            "A Bridge targeting an enabled DLC table must use a separate root-level file appended after the DLC files without copying or overriding them.");
 
         var rejectedForgedEncounter = false;
         try
@@ -1430,17 +1429,13 @@ internal static partial class ContractSuite
             encounterContent,
             snapshotAfterBattlePlacement);
         Assert(
-            ambiguousEncounterCatalog.DirectEncounters.All(encounter => encounter.MashType != 0) &&
-            ambiguousEncounterCatalog.Encounters
-                .Where(encounter => encounter.SourceKind == BattleEncounterSourceKind.Standard &&
-                                    encounter.MashType == 0)
-                .All(encounter =>
-                    !encounter.CanPlaceDirectly &&
-                    encounter.MashIndex is null &&
-                    encounter.UnavailableReason.Contains("多个文件", StringComparison.Ordinal)) &&
+            ambiguousEncounterCatalog.DirectEncounters.Any(encounter => encounter.MashType == 0 && encounter.MashIndex == 1) &&
+            ambiguousEncounterCatalog.Encounters.Single(encounter =>
+                encounter.SourceKind == BattleEncounterSourceKind.Standard &&
+                encounter.MonsterIds.SequenceEqual(["second_file_enemy_B"])) is { MashIndex: 0, CanPlaceDirectly: false } &&
             ambiguousEncounterCatalog.DirectEncounters.Any(encounter => encounter.MashType == 1) &&
             ambiguousEncounterCatalog.DirectEncounters.Any(encounter => encounter.MashType == 2),
-            "When multiple effective files contribute one mash type, only that type must be withheld; independently single-file room and boss indexes remain usable.");
+            "Multi-file types must follow native path order, retain unresolved-monster slots, and leave independent room/boss indexes usable.");
 
         var forwardMapDocument = JsonNode.Parse(File.ReadAllText(battleMapFixturePath))!.AsObject();
         forwardMapDocument["base_root"]!["map"]!["static_dynamic"]!["areas"]!["coAB"]!["reversed"] = false;
@@ -1858,7 +1853,7 @@ internal static partial class ContractSuite
                 : string.Empty;
             File.WriteAllText(
                 Path.Combine(monsterDirectory, $"{monsterId}.info.darkest"),
-                $"monster: .id {monsterId}\n{bossTag}",
+                $"display: .size 1\nmonster: .id {monsterId}\n{bossTag}",
                 new UTF8Encoding(false));
         }
     }

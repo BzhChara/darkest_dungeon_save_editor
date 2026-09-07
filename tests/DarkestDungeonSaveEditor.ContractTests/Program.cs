@@ -1,11 +1,12 @@
 try
 {
-    if (args.Length != 1)
+    if (args.Length is < 1 or > 2 || (args.Length == 2 && args[1] != "--maintenance"))
     {
-        throw new InvalidOperationException("Usage: DarkestDungeonSaveEditor.ContractTests <repository-root>");
+        throw new InvalidOperationException("Usage: DarkestDungeonSaveEditor.ContractTests <repository-root> [--maintenance]");
     }
 
-    await ContractSuite.RunAsync(Path.GetFullPath(args[0]));
+    if (args.Length == 2) await ContractSuite.RunMaintenanceOnlyAsync(Path.GetFullPath(args[0]));
+    else await ContractSuite.RunAsync(Path.GetFullPath(args[0]));
 }
 catch (Exception error)
 {

@@ -280,48 +280,13 @@ internal static partial class ContractSuite
         Assert(!Directory.Exists(locations.BackupDirectory), "A stale preview should be rejected before creating a backup.");
         File.Copy(prepared.SourceCopyPath, estatePath, overwrite: true);
 
-        var estateRaceWrite = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-        var estateRaceCommitBlocked = false;
-        using (var estateRaceWatcher = new FileSystemWatcher(profileRoot)
+        await VerifyServiceReplacementRacesAsync(estatePath, async (before, after) =>
         {
-            Filter = ".persist.estate.json.ddse-*.tmp",
-            NotifyFilter = NotifyFilters.FileName
-        })
-        {
-            estateRaceWatcher.Created += (_, _) =>
-            {
-                try
-                {
-                    var changedEstate = File.ReadAllBytes(estatePath);
-                    changedEstate[^1] ^= 0x01;
-                    File.WriteAllBytes(estatePath, changedEstate);
-                    estateRaceWrite.TrySetResult(true);
-                }
-                catch (Exception ex)
-                {
-                    estateRaceWrite.TrySetException(ex);
-                }
-            };
-            estateRaceWatcher.EnableRaisingEvents = true;
-            try
-            {
-                _ = await service.CommitAsync(prepared);
-            }
-            catch (InvalidOperationException ex) when (ex.Message.Contains(
-                "live estate save changed immediately before replacement",
-                StringComparison.OrdinalIgnoreCase))
-            {
-                estateRaceCommitBlocked = true;
-            }
-        }
-
-        Assert(
-            await estateRaceWrite.Task.WaitAsync(TimeSpan.FromSeconds(5)),
-            "The test writer should change the estate after the prepared temporary file appears.");
-        Assert(
-            estateRaceCommitBlocked,
-            "An estate change after the prepared temporary file appears must still block replacement.");
-        File.Copy(prepared.SourceCopyPath, estatePath, overwrite: true);
+            service.BeforeTargetReplace = before;
+            service.AfterTargetReplace = after;
+            try { await service.CommitAsync(prepared); }
+            finally { service.BeforeTargetReplace = service.AfterTargetReplace = null; }
+        });
 
         var preparedStateful = await service.PrepareTrinketEditAsync(
             profile,
@@ -416,6 +381,7 @@ internal static partial class ContractSuite
         var contentRaceWriteBlocked = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         SaveCommitResult? guardedCommit = null;
         var contentRaceWasBlocked = false;
+        var contentRaceEventHandled = 0;
         using (var contentRaceWatcher = new FileSystemWatcher(profileRoot)
         {
             Filter = ".persist.estate.json.ddse-*.tmp",
@@ -424,6 +390,8 @@ internal static partial class ContractSuite
         {
             contentRaceWatcher.Created += (_, _) =>
             {
+                if (Interlocked.Exchange(ref contentRaceEventHandled, 1) != 0)
+                    return;
                 try
                 {
                     File.WriteAllText(

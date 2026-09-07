@@ -41,6 +41,8 @@ public partial class BattleMapView : UserControl
         var generation = _profileGeneration;
         var gateTaken = false;
         var committed = false;
+        PreparedForceTownEdit? prepared = null;
+        string? backupDirectory = null;
         _isApplyingEdit = true;
         SaveEditBusyChanged?.Invoke(true);
         CloseActiveContextMenu();
@@ -61,8 +63,9 @@ public partial class BattleMapView : UserControl
                 throw new InvalidOperationException("地图已刷新；请在最新地图上重新执行强制返回城镇。");
             }
 
-            var prepared = await service.PrepareAsync(profile, snapshot);
+            prepared = await service.PrepareAsync(profile, snapshot);
             var result = await service.CommitAsync(prepared);
+            backupDirectory = result.BackupDirectory;
             committed = true;
             SaveEditApplied?.Invoke(
                 $"强制回城状态已写入：档案={profile.ProfileId}；" +
@@ -74,9 +77,14 @@ public partial class BattleMapView : UserControl
         }
         catch (Exception ex)
         {
+            CrashDiagnostics.RecordException("Force town: " + (committed ? "post-commit UI" : "edit"), ex,
+                $"操作编号={prepared?.SessionId ?? "尚未完成准备"}；档案={profile.ProfileId}；" +
+                $"目录={profile.ProfileDirectory}；已写入={committed}；备份={backupDirectory ?? "见异常详情"}");
             MapSelectionTextBlock.Text = committed
                 ? "回城状态已写入，但界面未能切换；请重新加载内容目录。"
-                : "强制回城未应用；存档保持原状或已自动恢复。";
+                : ex is AggregateException
+                    ? "强制回城失败，恢复未能完整完成；请查看错误详情及备份。"
+                    : "强制回城失败，错误已记录；请查看详情确认存档状态。";
             ThemedDialog.ShowMessage(
                 owner,
                 ex.Message,

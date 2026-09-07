@@ -28,7 +28,7 @@ public static partial class BattleEncounterCatalog
             }
         }
 
-        return ContentFileOverlay.Resolve(candidates, "Encounter mash", issues);
+        return ResolveRuntimeFileOrder(candidates, sources, issues);
     }
 
     private static IReadOnlyList<string> EnumerateMashFiles(
@@ -157,6 +157,7 @@ public static partial class BattleEncounterCatalog
 
         var ids = candidatesById.Keys.ToHashSet(StringComparer.OrdinalIgnoreCase);
         var bossIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var sizes = new Dictionary<string, int?>(StringComparer.OrdinalIgnoreCase);
         foreach (var pair in candidatesById)
         {
             var highestPriority = pair.Value[0].Source;
@@ -176,9 +177,44 @@ public static partial class BattleEncounterCatalog
             {
                 bossIds.Add(pair.Key);
             }
+            var declaredSizes = winners.Select(candidate => ReadMonsterSize(candidate.Path)).Distinct().ToArray();
+            sizes[pair.Key] = declaredSizes.Length == 1 ? declaredSizes[0] : null;
         }
 
-        return new AvailableMonsterDefinitions(ids, bossIds);
+        return new AvailableMonsterDefinitions(ids, bossIds, sizes);
+    }
+
+    private static int? ReadMonsterSize(string path)
+    {
+        int? size = null;
+        try
+        {
+            foreach (var rawLine in File.ReadLines(path))
+            {
+                var line = StripComment(rawLine).Trim();
+                if (!line.StartsWith("display:", StringComparison.Ordinal))
+                    continue;
+                // Native display parsing searches the last .size substring.
+                // Until its full integer parsing is mirrored, duplicate fields
+                // are unknown; the first value cannot justify skipping a row.
+                if (line.IndexOf(".size", StringComparison.Ordinal) !=
+                    line.LastIndexOf(".size", StringComparison.Ordinal))
+                    return null;
+                // Keep numeric quotes intact: native integer conversion does
+                // not turn a quoted number into the corresponding size.
+                var tokens = TokenPattern.Matches(line[8..]).Select(match => match.Value).ToArray();
+                var index = Array.IndexOf(tokens, ".size");
+                if (index >= 0)
+                    size = index + 1 < tokens.Length && int.TryParse(tokens[index + 1],
+                        NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed) && parsed is >= 0 and <= 4
+                        ? parsed : null;
+            }
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
+        return size;
     }
 
     private static bool DeclaresBossTag(string path, List<string> issues)
@@ -346,5 +382,6 @@ public static partial class BattleEncounterCatalog
 
     private sealed record AvailableMonsterDefinitions(
         HashSet<string> Ids,
-        HashSet<string> BossIds);
+        HashSet<string> BossIds,
+        IReadOnlyDictionary<string, int?> Sizes);
 }

@@ -38,6 +38,7 @@
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <Grid Grid.Column="0"
                       Width="320" Height="100"
@@ -52,7 +53,13 @@
                            SnapsToDevicePixels="True"
                            RenderOptions.BitmapScalingMode="HighQuality" />
                 </Grid>
-                <Border Grid.Column="1" Padding="17,9" VerticalAlignment="Center"
+                <Button x:Name="BuyCoffeeButton" Grid.Column="1"
+                        Width="100" Margin="0,0,16,0" VerticalAlignment="Center"
+                        Style="{StaticResource GhostButtonStyle}"
+                        Content="赞助" ToolTip="赞助支持"
+                        AutomationProperties.Name="赞助支持"
+                        Click="BuyCoffee_Click" />
+                <Border Grid.Column="2" Padding="17,9" VerticalAlignment="Center"
                         Background="{StaticResource RedBandBrush}"
                         BorderBrush="#8F2826"
                         BorderThickness="1" CornerRadius="0">

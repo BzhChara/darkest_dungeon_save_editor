@@ -6,6 +6,23 @@ internal static partial class BattleMapSaveEditor
 {
     private const int NoAreaHash = 1701736302;
 
+    internal static bool ClearRecordedBattle(JsonObject map, EditorBattlePlacement placement)
+    {
+        var tile = ResolveDynamicTile(map, placement.AreaId, placement.TileId);
+        var content = (BattleMapTileContent)ReadRequiredInt(tile, "content");
+        if (!EditorBattleHistory.IsBattle(content) || ReadRequiredInt(tile, "mash_type") != placement.MashType ||
+            ReadRequiredInt(tile, "mash_index") != placement.MashIndex) return false;
+        tile["content"] = content switch
+        {
+            BattleMapTileContent.GuardedCurio or BattleMapTileContent.AmbushCurio => 7,
+            BattleMapTileContent.GuardedTreasure or BattleMapTileContent.AmbushTreasure => 9,
+            _ => 0
+        };
+        tile["mash_index"] = -1;
+        tile["mash_type"] = 7;
+        return true;
+    }
+
     internal static BattleMapEditPreview DeleteContent(
         JsonObject mapDocument,
         JsonObject raidDocument,
@@ -162,43 +179,9 @@ internal static partial class BattleMapSaveEditor
         {
             throw new InvalidOperationException("所选遭遇的 mash 类型或索引无效。");
         }
-        if (area.Kind != encounter.TargetAreaKind ||
-            (area.Kind == BattleMapAreaKind.Corridor && encounter.MashType != 0) ||
-            (area.Kind == BattleMapAreaKind.Room && encounter.MashType is not (1 or 2)))
-        {
-            throw new InvalidOperationException(
-                encounter.MashType == 0
-                    ? "走廊遭遇只能写入普通可见走廊格。"
-                    : "房间或首领遭遇只能写入房间。");
-        }
-        if (string.Equals(area.AreaId, snapshot.EntranceAreaId, StringComparison.OrdinalIgnoreCase))
-        {
-            throw new InvalidOperationException("出生房间不能新建、替换或删除地图内容。");
-        }
-        if (string.Equals(area.AreaId, snapshot.FinalRoomId, StringComparison.OrdinalIgnoreCase) &&
-            encounter.MashType != 2)
-        {
-            throw new InvalidOperationException("最终房间目前只允许写入已验证的首领遭遇。");
-        }
-        if (tile.Content is
-            BattleMapTileContent.Hunger or
-            BattleMapTileContent.SecretDoor or
-            BattleMapTileContent.Ambush or
-            BattleMapTileContent.Happening or
-            BattleMapTileContent.AmbushCurio or
-            BattleMapTileContent.AmbushTreasure or
-            BattleMapTileContent.Unknown)
-        {
-            throw new InvalidOperationException("该格属于系统或脚本内容，不能作为普通遭遇替换目标。");
-        }
+        ValidateBattlePlacementTarget(mapDocument, snapshot, areaId, tileId, encounter.MashType);
 
         var dynamicTile = ResolveDynamicTile(mapDocument, area.AreaId, tile.TileId);
-        var persistedContent = ReadRequiredInt(dynamicTile, "content");
-        if (persistedContent != tile.RawContent)
-        {
-            throw new InvalidOperationException(
-                $"地图格 {area.AreaId}.{tile.TileId} 在显示后已经变化，请在刷新后的地图上重新操作。");
-        }
         var staticTile = ResolveStaticTile(mapDocument, area.AreaId, tile.TileId);
 
         // A tile stores one active content binding. Replacing it with a battle must clear
@@ -221,6 +204,50 @@ internal static partial class BattleMapSaveEditor
             tile.RawContent,
             null,
             null);
+    }
+
+    internal static void ValidateBattlePlacementTarget(
+        JsonObject mapDocument, BattleMapSnapshot snapshot, string areaId, string tileId, int mashType)
+    {
+        var (area, tile) = ResolveEditableTile(snapshot, areaId, tileId);
+        if (mashType is < 0 or > 2 ||
+            (area.Kind == BattleMapAreaKind.Corridor && mashType != 0) ||
+            (area.Kind == BattleMapAreaKind.Room && mashType is not (1 or 2)))
+        {
+            throw new InvalidOperationException(
+                mashType == 0
+                    ? "走廊遭遇只能写入普通可见走廊格。"
+                    : "房间或首领遭遇只能写入房间。");
+        }
+        if (string.Equals(area.AreaId, snapshot.EntranceAreaId, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("出生房间不能新建、替换或删除地图内容。");
+        }
+        if (string.Equals(area.AreaId, snapshot.FinalRoomId, StringComparison.OrdinalIgnoreCase) &&
+            mashType != 2)
+        {
+            throw new InvalidOperationException("最终房间目前只允许写入已验证的首领遭遇。");
+        }
+        if (tile.Content is
+            BattleMapTileContent.Hunger or
+            BattleMapTileContent.SecretDoor or
+            BattleMapTileContent.Ambush or
+            BattleMapTileContent.Happening or
+            BattleMapTileContent.AmbushCurio or
+            BattleMapTileContent.AmbushTreasure or
+            BattleMapTileContent.Unknown)
+        {
+            throw new InvalidOperationException("该格属于系统或脚本内容，不能作为普通遭遇替换目标。");
+        }
+        // Display snapshots tolerate a missing content field as empty; writes require
+        // the actual persisted integer before a Bridge can be installed or activated.
+        var dynamicTile = ResolveDynamicTile(mapDocument, area.AreaId, tile.TileId);
+        if (ReadRequiredInt(dynamicTile, "content") != tile.RawContent)
+        {
+            throw new InvalidOperationException(
+                $"地图格 {area.AreaId}.{tile.TileId} 在显示后已经变化，请在刷新后的地图上重新操作。");
+        }
+        _ = ResolveStaticTile(mapDocument, area.AreaId, tile.TileId);
     }
 
     internal static BattleMapEditPreview SetBattleAttachment(
@@ -478,7 +505,7 @@ internal static partial class BattleMapSaveEditor
         return roomHash;
     }
 
-    private static void ValidateStationaryRaidState(JsonObject raidDocument)
+    internal static void ValidateStationaryRaidState(JsonObject raidDocument)
     {
         var root = JsonSupport.RequireObject(raidDocument, "base_root");
         if (ReadRequiredBool(root, "inbattle"))

@@ -94,6 +94,8 @@ public sealed record BattleMapSnapshot(
     IReadOnlyList<string> Issues,
     DateTime ReadAtUtc)
 {
+    public string RaidIdentity { get; init; } = string.Empty;
+
     public int RoomCount => Areas.Count(area => area.Kind == BattleMapAreaKind.Room);
 
     public int CorridorCount => Areas.Count(area => area.Kind == BattleMapAreaKind.Corridor);
@@ -131,7 +133,13 @@ public sealed record PreparedBattleMapEdit(
     string RaidOriginalSha256,
     DateTime PreparedAtUtc)
 {
+    public string GameOriginalSha256 { get; init; } = string.Empty;
+
+    public string RaidIdentity { get; init; } = string.Empty;
+
     public BattleEncounterDefinition? Encounter { get; init; }
 
     public BattleRoomAttachmentDefinition? Attachment { get; init; }
 }
+
+public sealed record BattleMapPlacementTarget(string AreaId, string TileId);

@@ -38,7 +38,7 @@ internal static partial class ContractSuite
             var id = prefix == enabled ? "enabled_probe" : "excluded_probe";
             WriteProbe($"{prefix}/inventory/probe.inventory.items.darkest",
                 $"inventory_item: .type \"estate\" .id \"{id}\" .base_stack_limit 6 .estate_can_be_provision true");
-            WriteProbe($"{prefix}/monsters/{id}/{id}.info.darkest", "tag: .id \"boss\"");
+            WriteProbe($"{prefix}/monsters/{id}/{id}.info.darkest", "display: .size 1\ntag: .id \"boss\"");
             WriteProbe($"{prefix}/dungeons/probe/probe.1.mash.darkest",
                 $"hall: .chance 1 .types {id}\n");
             WriteProbe($"{prefix}/dungeons/probe/probe.props.darkest",
@@ -102,16 +102,18 @@ internal static partial class ContractSuite
                 attachments.Definitions.All(item => item.Id is not ("excluded_probe_curio" or "excluded_probe_chest")),
                 "Manifest-free room curios and treasures must include enabled DLC roots without enabling disabled DLC or backup roots.");
             Assert(
-                encounters.DirectEncounters.Single().MonsterIds.SequenceEqual(["enabled_probe"]) &&
+                encounters.DirectEncounters.Count == 0 &&
+                encounters.Encounters.Single().UnavailableReason.Contains("仅 Mod 提供") &&
                 encounters.BridgeEncounters.Any(encounter =>
                     encounter.MonsterIds.SequenceEqual(["enabled_probe"]) && encounter.ContainsBossMonster) &&
                 encounters.BridgeEncounters.All(encounter => !encounter.MonsterIds.Contains("excluded_probe")),
-                "Manifest-free DLC mash files and their monster metadata must be available without scanning disabled/backup encounters.");
+                "Manifest-free Mod-only DLC mash additions must remain Bridge sources while unverified target discovery and disabled/backup content stay guarded.");
             Assert(dlcHero.LocalizedName == localizedProbes["hero_class_name_dlc_shared_hero"] &&
                    heroes.InitialQuirks.Single(quirk => quirk.Id == "dlc_top_quirk").LocalizedName == localizedProbes["str_quirk_name_dlc_top_quirk"] &&
                    trinkets.Trinkets.Single(item => item.Id == "enabled_dlc_trinket").LocalizedName == localizedProbes["str_inventory_title_trinketenabled_dlc_trinket"] &&
                    items.Items.Single(item => item.ItemId == "enabled_probe").LocalizedName == localizedProbes["str_inventory_title_estateenabled_probe"] &&
-                   encounters.DirectEncounters.Single().MonsterNames.Single() == localizedProbes["str_monstername_enabled_probe"],
+                   encounters.BridgeEncounters.Single(encounter => encounter.MonsterIds.SequenceEqual(["enabled_probe"]))
+                       .MonsterNames.Single() == localizedProbes["str_monstername_enabled_probe"],
                 "Manifest-free enabled DLC XML/loc2 names must reach every catalog while disabled roots, nested loc2 backups, and other languages remain excluded.");
         }
 

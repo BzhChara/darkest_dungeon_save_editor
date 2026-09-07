@@ -418,7 +418,8 @@ public partial class BattleMapView : UserControl
                     encounter,
                     _gameDirectory,
                     _workshopDirectory,
-                    _localModDirectory);
+                    _localModDirectory,
+                    placementTarget: new BattleMapPlacementTarget(target.SourceAreaId!, target.SourceTileId!));
                 _activeContentSnapshot = result.ActiveContent;
                 _encounterCatalog = result.Catalog;
                 await ReloadRoomAttachmentCatalogAsync(result.ActiveContent);
@@ -708,6 +709,8 @@ public partial class BattleMapView : UserControl
         var committed = false;
         var managedEncounterResolved = false;
         var refreshedSuccessfully = false;
+        PreparedBattleMapEdit? prepared = null;
+        string? backupDirectory = null;
         _isApplyingEdit = true;
         SaveEditBusyChanged?.Invoke(true);
         CloseActiveContextMenu();
@@ -739,6 +742,28 @@ public partial class BattleMapView : UserControl
                     "地图已刷新；请在最新地图上重新选择目标。");
             }
 
+            if (_managedEncounterBridgeService is not null && _codec is not null && !string.IsNullOrWhiteSpace(_gameDirectory))
+            {
+                var currentContent = await ActiveContentResolver.ResolveAsync(profile, _gameDirectory,
+                    _workshopDirectory, _localModDirectory, _codec, SaveEditorLocations.CreateDefault().WorkspaceDirectory);
+                var maintenance = await _managedEncounterBridgeService.ReconcileAsync(currentContent, _gameDirectory, _localModDirectory);
+                if (maintenance.Changed)
+                {
+                    SaveEditApplied?.Invoke(maintenance.Message);
+                    ActiveContentChanged?.Invoke(currentContent);
+                    if (_snapshotReader is not null)
+                    {
+                        var updated = await _snapshotReader.LoadAsync(profile.ProfileDirectory);
+                        _encounterCatalog = await Task.Run(() => BattleEncounterCatalog.Load(currentContent, updated));
+                        _activeContentSnapshot = currentContent;
+                        RenderSnapshot(updated, fitToView: false);
+                    }
+                    MapSelectionTextBlock.Text = "已清理失效的旧战斗记录，请在更新后的地图上重新选择操作。";
+                    return;
+                }
+                if (maintenance.Deferred) throw new InvalidOperationException(maintenance.Message);
+            }
+
             if (encounterResolver is not null)
             {
                 if (kind != BattleMapEditKind.PlaceBattle || encounter is not null)
@@ -749,7 +774,7 @@ public partial class BattleMapView : UserControl
                 managedEncounterResolved = true;
             }
 
-            var prepared = kind switch
+            prepared = kind switch
             {
                 BattleMapEditKind.DeleteContent => await service.PrepareDeleteContentAsync(
                     profile,
@@ -787,6 +812,7 @@ public partial class BattleMapView : UserControl
                 _ => throw new InvalidOperationException("战斗地图操作缺少有效参数。")
             };
             var result = await service.CommitAsync(prepared);
+            backupDirectory = result.BackupDirectory;
             committed = true;
             var operationLabel = kind switch
             {
@@ -840,11 +866,17 @@ public partial class BattleMapView : UserControl
         }
         catch (Exception ex)
         {
+            CrashDiagnostics.RecordException("Battle map: " + (committed ? "post-commit UI" : "edit"), ex,
+                $"操作={kind}；操作编号={prepared?.SessionId ?? "尚未完成准备"}；档案={profile.ProfileId}；" +
+                $"目录={profile.ProfileDirectory}；目标={target.SourceAreaId}.{target.SourceTileId}；" +
+                $"已写入={committed}；Bridge已就绪={managedEncounterResolved}；备份={backupDirectory ?? "见异常详情"}");
             MapSelectionTextBlock.Text = committed
                 ? "操作已写入，但地图刷新失败；请重新加载内容目录。"
-                : managedEncounterResolved
-                    ? "托管遭遇表已就绪，但目标地图格未写入。可直接重试同一遭遇。"
-                    : "操作未应用；存档保持原状或已自动恢复。";
+                : ex is AggregateException
+                    ? "操作失败，恢复未能完整完成；请查看错误详情及备份。"
+                    : managedEncounterResolved
+                        ? "托管遭遇表已就绪，但地图操作失败；请查看详情确认存档状态。"
+                        : "操作失败，错误已记录；请查看详情确认存档状态。";
             if (Window.GetWindow(this) is { } owner)
             {
                 ThemedDialog.ShowMessage(

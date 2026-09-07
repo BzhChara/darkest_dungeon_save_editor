@@ -309,7 +309,7 @@ public static partial class HeroClassCatalog
                         ? providerSources
                         : quirk.AllSources
                 };
-                return BuildInitialQuirk(mergedQuirk, effectiveBuffs, buffCandidates) with
+                return BuildInitialQuirk(mergedQuirk, effectiveQuirks, effectiveBuffs, buffCandidates) with
                 {
                     LocalizedName = localization.GetQuirkName(mergedQuirk.Id),
                     SourceLabel = ContentSourceLabelFormatter.Format(

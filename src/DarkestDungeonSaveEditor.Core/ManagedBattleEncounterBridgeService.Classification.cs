@@ -36,8 +36,10 @@ public sealed partial class ManagedBattleEncounterBridgeService
                     {
                         var row = rows.Where(row => row.SourceKind == BattleEncounterSourceKind.Standard &&
                                                     row.MashType == entry.MashType)
-                            .ElementAtOrDefault(entry.MashIndex);
-                        if (row is null || !row.MonsterIds.SequenceEqual(entry.MonsterIds, StringComparer.Ordinal))
+                            .ElementAtOrDefault(entry.FileRowIndex!.Value);
+                        if (row is null ||
+                            (row.MashIndex is { } runtimeIndex && runtimeIndex != entry.MashIndex) ||
+                            !row.MonsterIds.SequenceEqual(entry.MonsterIds, StringComparer.Ordinal))
                         {
                             throw new InvalidDataException("追加索引或敌方组成与清单不一致");
                         }
@@ -76,8 +78,8 @@ public sealed partial class ManagedBattleEncounterBridgeService
             }
             else if (entry.Classification is null)
             {
-                // Version 3 packages predate the optional classification field. Recover
-                // from authored metadata/current original rows without rewriting a package.
+                // Recover optional classification metadata from the authored source
+                // without confusing its weight with the zero-weight carrier row.
                 if (row.MashType == 2)
                 {
                     classification = BattleEncounterClassification.FixedBoss;

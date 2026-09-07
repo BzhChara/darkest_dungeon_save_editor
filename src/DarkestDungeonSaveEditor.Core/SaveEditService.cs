@@ -11,6 +11,8 @@ public sealed partial class SaveEditService
     private static readonly UTF8Encoding Utf8NoBom = new(false);
     private readonly DsonSaveCodec _codec;
     private readonly SaveEditorLocations _locations;
+    internal Action<string>? BeforeTargetReplace { get; set; }
+    internal Action<string>? AfterTargetReplace { get; set; }
 
     public SaveEditService(DsonSaveCodec codec, SaveEditorLocations? locations = null)
     {

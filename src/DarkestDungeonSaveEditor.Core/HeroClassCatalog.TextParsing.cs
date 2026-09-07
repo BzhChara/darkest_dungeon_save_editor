@@ -15,17 +15,17 @@ public static partial class HeroClassCatalog
         for (var index = 0; index < tokens.Count; index++)
         {
             var token = tokens[index];
-            if (!token.StartsWith(".", StringComparison.Ordinal) || token.Length <= 1)
+            if (!token.IsAttribute)
             {
                 continue;
             }
 
-            var key = token[1..];
+            var key = token.Value[1..];
             var values = new List<string>();
-            while (index + 1 < tokens.Count && !tokens[index + 1].StartsWith(".", StringComparison.Ordinal))
+            while (index + 1 < tokens.Count && !tokens[index + 1].IsAttribute)
             {
                 index++;
-                values.Add(tokens[index]);
+                values.Add(tokens[index].Value);
             }
 
             result[key] = values;
@@ -34,9 +34,14 @@ public static partial class HeroClassCatalog
         return result;
     }
 
-    private static IReadOnlyList<string> Tokenize(string value)
+    private sealed record DefinitionToken(string Value, bool Quoted)
     {
-        var tokens = new List<string>();
+        public bool IsAttribute => !Quoted && Value.Length > 1 && Value[0] == '.';
+    }
+
+    private static IReadOnlyList<DefinitionToken> Tokenize(string value)
+    {
+        var tokens = new List<DefinitionToken>();
         for (var index = 0; index < value.Length;)
         {
             while (index < value.Length && char.IsWhiteSpace(value[index]))
@@ -44,7 +49,7 @@ public static partial class HeroClassCatalog
                 index++;
             }
 
-            if (index >= value.Length)
+            if (index >= value.Length || (value[index] == '/' && index + 1 < value.Length && value[index + 1] == '/'))
             {
                 break;
             }
@@ -52,13 +57,15 @@ public static partial class HeroClassCatalog
             if (value[index] == '"')
             {
                 index++;
-                var start = index;
+                var quoted = new StringBuilder();
                 while (index < value.Length && value[index] != '"')
                 {
-                    index++;
+                    if (value[index] == '\\' && index + 1 < value.Length && value[index + 1] is '\\' or '"')
+                        index++;
+                    quoted.Append(value[index++]);
                 }
 
-                tokens.Add(value[start..Math.Min(index, value.Length)]);
+                tokens.Add(new DefinitionToken(quoted.ToString(), true));
                 if (index < value.Length)
                 {
                     index++;
@@ -68,12 +75,13 @@ public static partial class HeroClassCatalog
             }
 
             var tokenStart = index;
-            while (index < value.Length && !char.IsWhiteSpace(value[index]) && value[index] != '"')
+            while (index < value.Length && !char.IsWhiteSpace(value[index]) && value[index] != '"' &&
+                   !(value[index] == '/' && index + 1 < value.Length && value[index + 1] == '/'))
             {
                 index++;
             }
 
-            tokens.Add(value[tokenStart..index]);
+            tokens.Add(new DefinitionToken(value[tokenStart..index], false));
         }
 
         return tokens;

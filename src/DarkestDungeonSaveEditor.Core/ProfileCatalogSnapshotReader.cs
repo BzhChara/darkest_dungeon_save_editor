@@ -8,7 +8,10 @@ public sealed record ProfileCatalogSnapshot(
     string ConfigurationKey,
     QuantityItemCatalogResult QuantityItems,
     IReadOnlyDictionary<string, string?> FileHashes,
-    DateTime ReadAtUtc);
+    DateTime ReadAtUtc)
+{
+    public string ContentFingerprint { get; init; } = string.Empty;
+}
 
 /// <summary>One read-only, stable disk snapshot shared by the catalog pages.</summary>
 public sealed class ProfileCatalogSnapshotReader
@@ -28,6 +31,7 @@ public sealed class ProfileCatalogSnapshotReader
     private readonly SemaphoreSlim _gate = new(1, 1);
     private ActiveContentSnapshot _content;
     private string _configurationKey;
+    private string _contentFingerprint;
     private Dictionary<QuantityItemSaveContext, QuantityItemCatalogResult> _quantityCache;
     private ProfileCatalogSnapshot? _lastSnapshot;
     private int _slot;
@@ -48,18 +52,19 @@ public sealed class ProfileCatalogSnapshotReader
         _workshopDirectory = workshopDirectory;
         _localModDirectory = localModDirectory;
         _configurationKey = ProfileContentConfiguration.GetKey(JsonSupport.ReadObject(initialContent.DecodedGamePath));
+        _contentFingerprint = BattleEncounterCatalog.CaptureContentFingerprint(initialContent.Sources);
         _quantityCache = new() { [initialItems.SaveContext] = initialItems };
         _workspace = Path.Combine(workspaceRoot ?? SaveEditorLocations.CreateDefault().WorkspaceDirectory,
             "profile_sync", Guid.NewGuid().ToString("N"));
     }
 
-    public async Task<ProfileCatalogSnapshot> ReadAsync(CancellationToken cancellationToken = default)
+    public async Task<ProfileCatalogSnapshot> ReadAsync(CancellationToken cancellationToken = default, bool refreshContent = false)
     {
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
             var before = CaptureHashes(_profile.ProfileDirectory);
-            if (_lastSnapshot is not null && HashesEqual(before, _lastSnapshot.FileHashes))
+            if (!refreshContent && _lastSnapshot is not null && HashesEqual(before, _lastSnapshot.FileHashes))
             {
                 return _lastSnapshot with { ReadAtUtc = DateTime.UtcNow };
             }
@@ -75,8 +80,7 @@ public sealed class ProfileCatalogSnapshotReader
             var gamePath = await DecodeCopyAsync(workspace, "persist.game.json", before, cancellationToken)
                 .ConfigureAwait(false);
             var key = ProfileContentConfiguration.GetKey(JsonSupport.ReadObject(gamePath));
-            var contentChanged = key != _configurationKey;
-            var content = contentChanged
+            var content = key != _configurationKey || refreshContent
                 ? ActiveContentResolver.ResolveDecoded(_profile, _gameDirectory, _workshopDirectory,
                     _localModDirectory, workspace, gamePath, before["persist.game.json"]!, cancellationToken)
                 : _content with
@@ -85,6 +89,10 @@ public sealed class ProfileCatalogSnapshotReader
                     DecodedGamePath = gamePath,
                     SourceGameSha256 = before["persist.game.json"]!
                 };
+            var contentFingerprint = BattleEncounterCatalog.CaptureContentFingerprint(content.Sources);
+            var contentChanged = key != _configurationKey || contentFingerprint != _contentFingerprint;
+            if (!contentChanged && _lastSnapshot is not null && HashesEqual(before, _lastSnapshot.FileHashes))
+                return _lastSnapshot with { ReadAtUtc = DateTime.UtcNow };
             var scene = QuantityItemSaveScene.Read(content).Context;
             if (scene == QuantityItemSaveContext.Raid)
             {
@@ -127,8 +135,12 @@ public sealed class ProfileCatalogSnapshotReader
             _quantityCache = cache;
             _content = content;
             _configurationKey = key;
+            _contentFingerprint = contentFingerprint;
             _slot = nextSlot;
-            return _lastSnapshot = new(content, key, quantities, before, DateTime.UtcNow);
+            return _lastSnapshot = new(content, key, quantities, before, DateTime.UtcNow)
+            {
+                ContentFingerprint = contentFingerprint
+            };
         }
         finally
         {

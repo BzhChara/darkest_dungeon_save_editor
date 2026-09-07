@@ -11,6 +11,8 @@ public sealed class BattleMapEditService
     private static readonly UTF8Encoding Utf8NoBom = new(false);
     private readonly DsonSaveCodec _codec;
     private readonly SaveEditorLocations _locations;
+    internal Action<string>? BeforeTargetReplace { get; set; }
+    internal Action<string>? AfterTargetReplace { get; set; }
 
     public BattleMapEditService(DsonSaveCodec codec, SaveEditorLocations? locations = null)
     {
@@ -122,6 +124,7 @@ public sealed class BattleMapEditService
         ValidatePreparedTarget(prepared, mapPath, raidPath);
         ValidateContentGuards(prepared);
         ValidateLivePair(prepared, mapPath, raidPath, "准备完成后");
+        using var gameGuard = OpenGameGuard(prepared);
 
         if (!File.Exists(prepared.TargetFile.EncodedPath) ||
             !ComputeSha256(prepared.TargetFile.EncodedPath).Equals(
@@ -138,17 +141,12 @@ public sealed class BattleMapEditService
 
         var targetPath = prepared.TargetFile.TargetPath;
         var guardPath = EditsMap(prepared.Preview.Kind) ? raidPath : mapPath;
-        var targetDirectory = Path.GetDirectoryName(targetPath)
-            ?? throw new InvalidOperationException($"无法确定存档目标目录：{targetPath}");
-        var temporaryTarget = Path.Combine(
-            targetDirectory,
-            $".{Path.GetFileName(targetPath)}.ddse-{Guid.NewGuid():N}.tmp");
-        var backupTargetPath = Path.Combine(backupDirectory, prepared.TargetFile.FileName);
-        var replacementSucceeded = false;
+        using var replacement = new GuardedSaveReplacement(targetPath, prepared.TargetFile.EncodedPath,
+            prepared.TargetFile.OriginalSha256, prepared.TargetFile.EncodedSha256,
+            BeforeTargetReplace, AfterTargetReplace);
 
         try
         {
-            File.Copy(prepared.TargetFile.EncodedPath, temporaryTarget, overwrite: false);
             using var guardLock = new FileStream(
                 guardPath,
                 FileMode.Open,
@@ -156,34 +154,18 @@ public sealed class BattleMapEditService
                 FileShare.Read,
                 bufferSize: 4096,
                 FileOptions.SequentialScan);
-            using var targetLock = new FileStream(
-                targetPath,
-                FileMode.Open,
-                FileAccess.Read,
-                FileShare.Read | FileShare.Delete,
-                bufferSize: 4096,
-                FileOptions.SequentialScan);
             var expectedGuardHash = EditsMap(prepared.Preview.Kind)
                 ? prepared.RaidOriginalSha256
                 : prepared.MapOriginalSha256;
-            if (!ComputeSha256(guardLock).Equals(expectedGuardHash, StringComparison.OrdinalIgnoreCase) ||
-                !ComputeSha256(targetLock).Equals(
-                    prepared.TargetFile.OriginalSha256,
-                    StringComparison.OrdinalIgnoreCase))
+            if (!ComputeSha256(guardLock).Equals(expectedGuardHash, StringComparison.OrdinalIgnoreCase))
             {
                 throw new InvalidOperationException(
                     "地图或副本存档在写入前发生了变化，本次修改未应用。请等待地图刷新后重试。");
             }
             ValidateContentGuards(prepared);
 
-            File.Replace(
-                temporaryTarget,
-                targetPath,
-                destinationBackupFileName: null,
-                ignoreMetadataErrors: true);
-            replacementSucceeded = true;
-
-            var finalHash = ComputeSha256(targetPath);
+            replacement.Replace();
+            var finalHash = replacement.Verify();
             if (!finalHash.Equals(prepared.TargetFile.EncodedSha256, StringComparison.OrdinalIgnoreCase) ||
                 !ComputeSha256(guardLock).Equals(expectedGuardHash, StringComparison.OrdinalIgnoreCase))
             {
@@ -199,19 +181,21 @@ public sealed class BattleMapEditService
                 prepared.TargetFile.OriginalSha256,
                 finalHash,
                 DateTime.UtcNow);
-            WriteJson(Path.Combine(backupDirectory, "commit-result.json"), result);
+            SaveCommitMarker.Publish(Path.Combine(backupDirectory, "commit-result.json"), result);
+            replacement.Complete();
             await Task.CompletedTask.ConfigureAwait(false);
             return result;
         }
         catch (Exception commitError)
         {
-            if (replacementSucceeded)
+            if (replacement.HasReplaced)
             {
                 try
                 {
-                    RestoreTarget(backupTargetPath, prepared.TargetFile);
+                    var recovery = replacement.Recover();
                     throw new InvalidOperationException(
-                        $"地图存档写入失败，已从备份恢复修改文件：{backupTargetPath}",
+                        $"地图存档写入失败；{GuardedSaveReplacement.DescribeRecovery(recovery)}。" +
+                        $"完整备份：{backupDirectory}；实际被替换版本：{replacement.DisplacedPath}",
                         commitError);
                 }
                 catch (InvalidOperationException ex) when (ReferenceEquals(ex.InnerException, commitError))
@@ -221,17 +205,13 @@ public sealed class BattleMapEditService
                 catch (Exception restoreError)
                 {
                     throw new AggregateException(
-                        $"地图存档写入失败，自动恢复也未能完成。请保留并使用备份：{backupDirectory}",
+                        $"地图存档写入失败，自动恢复也未能完成。完整备份：{backupDirectory}；实际被替换版本：{replacement.DisplacedPath}",
                         commitError,
                         restoreError);
                 }
             }
 
             throw;
-        }
-        finally
-        {
-            TryDeleteFile(temporaryTarget);
         }
     }
 
@@ -309,24 +289,12 @@ public sealed class BattleMapEditService
 
         var mapSourceCopy = Path.Combine(sourceDirectory, "persist.map.json");
         var raidSourceCopy = Path.Combine(sourceDirectory, "persist.raid.json");
-        var decodedMapPath = Path.Combine(decodedDirectory, "persist.map.json");
-        var decodedRaidPath = Path.Combine(decodedDirectory, "persist.raid.json");
-        File.Copy(mapPath, mapSourceCopy, overwrite: false);
-        File.Copy(raidPath, raidSourceCopy, overwrite: false);
+        using var writeGuard = await BattleMapWriteGuard.LoadAsync(
+            profile, expectedSnapshot, _codec, workspace, cancellationToken).ConfigureAwait(false);
         ValidateCapturedPair(mapPath, raidPath, mapSourceCopy, raidSourceCopy, mapHash, raidHash);
-
-        await _codec.DecodeAsync(mapSourceCopy, decodedMapPath, cancellationToken).ConfigureAwait(false);
-        await _codec.DecodeAsync(raidSourceCopy, decodedRaidPath, cancellationToken).ConfigureAwait(false);
-        var mapDocument = JsonSupport.ReadObject(decodedMapPath);
-        var raidDocument = JsonSupport.ReadObject(decodedRaidPath);
-        var capturedSnapshot = BattleMapSnapshotReader.Parse(
-            profile.ProfileDirectory,
-            mapPath,
-            raidPath,
-            mapHash,
-            raidHash,
-            mapDocument,
-            raidDocument);
+        var mapDocument = writeGuard.MapDocument;
+        var raidDocument = writeGuard.RaidDocument;
+        var capturedSnapshot = writeGuard.Snapshot;
 
         var preview = kind switch
         {
@@ -427,6 +395,8 @@ public sealed class BattleMapEditService
             raidHash,
             DateTime.UtcNow)
         {
+            GameOriginalSha256 = writeGuard.GameSha256,
+            RaidIdentity = capturedSnapshot.RaidIdentity,
             Encounter = encounter,
             Attachment = attachment
         };
@@ -460,6 +430,25 @@ public sealed class BattleMapEditService
         }
 
         return (mapPath, raidPath);
+    }
+
+    private static FileStream OpenGameGuard(PreparedBattleMapEdit prepared)
+    {
+        if (string.IsNullOrWhiteSpace(prepared.GameOriginalSha256))
+            throw new InvalidDataException("地图修改缺少游戏状态校验，请重新准备操作。");
+        var stream = new FileStream(Path.Combine(prepared.Profile.ProfileDirectory, "persist.game.json"),
+            FileMode.Open, FileAccess.Read, FileShare.Read);
+        try
+        {
+            if (!ComputeSha256(stream).Equals(prepared.GameOriginalSha256, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("档案的小镇／副本状态或活动配置在准备后已变化，请重新加载地图。");
+            return stream;
+        }
+        catch
+        {
+            stream.Dispose();
+            throw;
+        }
     }
 
     private static void ValidateExpectedSnapshot(
@@ -623,6 +612,7 @@ public sealed class BattleMapEditService
             profile.SteamUserId,
             profile.ProfileDirectory,
             prepared.SessionId,
+            prepared.RaidIdentity,
             prepared.Preview.AreaId,
             prepared.Preview.TileId,
             prepared.MapOriginalSha256,
@@ -651,41 +641,6 @@ public sealed class BattleMapEditService
             files
         });
         return backupDirectory;
-    }
-
-    private static void RestoreTarget(string backupPath, PreparedSaveFile targetFile)
-    {
-        if (!File.Exists(backupPath) ||
-            !ComputeSha256(backupPath).Equals(targetFile.OriginalSha256, StringComparison.OrdinalIgnoreCase))
-        {
-            throw new InvalidDataException(
-                $"{targetFile.FileName} 的备份丢失或与原始存档不一致。");
-        }
-
-        var targetDirectory = Path.GetDirectoryName(targetFile.TargetPath)
-            ?? throw new InvalidOperationException($"无法确定存档目标目录：{targetFile.TargetPath}");
-        var temporaryTarget = Path.Combine(
-            targetDirectory,
-            $".{targetFile.FileName}.ddse-restore-{Guid.NewGuid():N}.tmp");
-        try
-        {
-            File.Copy(backupPath, temporaryTarget, overwrite: false);
-            File.Replace(
-                temporaryTarget,
-                targetFile.TargetPath,
-                destinationBackupFileName: null,
-                ignoreMetadataErrors: true);
-            if (!ComputeSha256(targetFile.TargetPath).Equals(
-                    targetFile.OriginalSha256,
-                    StringComparison.OrdinalIgnoreCase))
-            {
-                throw new IOException($"恢复后的 {targetFile.FileName} 与原始存档哈希不一致。");
-            }
-        }
-        finally
-        {
-            TryDeleteFile(temporaryTarget);
-        }
     }
 
     private static void EnsureGameIsNotRunning()
@@ -767,18 +722,4 @@ public sealed class BattleMapEditService
         File.WriteAllText(path, JsonSerializer.Serialize(value, JsonSupport.SerializerOptions), Utf8NoBom);
     }
 
-    private static void TryDeleteFile(string path)
-    {
-        try
-        {
-            if (File.Exists(path))
-            {
-                File.Delete(path);
-            }
-        }
-        catch
-        {
-            // The primary commit/restore result is more important than a temporary file.
-        }
-    }
 }

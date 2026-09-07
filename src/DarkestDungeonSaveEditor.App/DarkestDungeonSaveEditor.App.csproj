@@ -19,6 +19,7 @@
     <Resource Include="Assets\darkest-dungeon-title-atlas.png" />
     <Resource Include="Assets\dd-title-logo-loop.png" />
     <Resource Include="Assets\save-editor.ico" />
+    <Resource Include="Assets\support-alipay.jpg" />
   </ItemGroup>
 
   <ItemGroup>

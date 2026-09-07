@@ -251,7 +251,10 @@ public sealed class BattleMapSnapshotReader(DsonSaveCodec codec)
             ReadDoubleArray(mapRoot, "bounds"),
             areas,
             issues,
-            DateTime.UtcNow);
+            DateTime.UtcNow)
+        {
+            RaidIdentity = EditorBattleHistory.RaidIdentity(mapDocument, raidDocument)
+        };
     }
 
     private static int? ResolvePartyTileIndex(

@@ -78,6 +78,13 @@ internal static partial class ContractSuite
             catalogModEssence,
             11,
             quantityActiveContent);
+        await VerifyServiceReplacementRacesAsync(quantityEstatePath, async (before, after) =>
+        {
+            quantityService.BeforeTargetReplace = before;
+            quantityService.AfterTargetReplace = after;
+            try { await quantityService.CommitAsync(preparedQuantity); }
+            finally { quantityService.BeforeTargetReplace = quantityService.AfterTargetReplace = null; }
+        });
         var quantityCommit = await quantityService.CommitAsync(preparedQuantity);
         Assert(
             File.Exists(Path.Combine(quantityCommit.BackupDirectory, "persist.estate.json")) &&

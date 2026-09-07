@@ -27,6 +27,15 @@ internal static partial class ContractSuite
         var unchanged = await reader.ReadAsync();
         Assert(ReferenceEquals(first.Content, unchanged.Content) && ReferenceEquals(first.QuantityItems, unchanged.QuantityItems),
             "A catch-up poll with unchanged hashes must reuse the complete snapshot and definitions.");
+        var hotUpdatePath = WriteMultiMash(fixture.GameRoot, "dungeons/cove/maintenance_hot_update.1.mash.darkest",
+            "hall: .chance 1 .types hot_updated_monster\n");
+        var hotUpdated = await reader.ReadAsync(refreshContent: true);
+        Assert(hotUpdated.ContentFingerprint != first.ContentFingerprint &&
+            ProfileCatalogSnapshotReader.HashesEqual(first.FileHashes, hotUpdated.FileHashes) &&
+            !ReferenceEquals(hotUpdated.QuantityItems, first.QuantityItems),
+            "An in-place encounter update with no save writes must refresh the shared content snapshot.");
+        File.Delete(hotUpdatePath);
+        first = await reader.ReadAsync(refreshContent: true);
 
         var game = (JsonObject)JsonNode.Parse(File.ReadAllText(fixture.DecodedGameSeedPath))!;
         var gameBase = (JsonObject)game["base_root"]!;
