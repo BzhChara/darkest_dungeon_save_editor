@@ -28,8 +28,8 @@ public static partial class HeroClassCatalog
             new(StringComparer.Ordinal);
         private readonly List<string> _guaranteedCombatSkillIds = [];
         private readonly HashSet<string> _guaranteedCombatSkillSet = new(StringComparer.Ordinal);
-        private readonly Dictionary<int, HeroEquipmentRank> _weaponRanks = [];
-        private readonly Dictionary<int, HeroEquipmentRank> _armourRanks = [];
+        private readonly Dictionary<string, HeroEquipmentRank> _weaponRanks = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, HeroEquipmentRank> _armourRanks = new(StringComparer.Ordinal);
         private readonly Dictionary<string, Dictionary<string, List<string>>> _skillEffects =
             new(StringComparer.Ordinal);
 
@@ -85,12 +85,12 @@ public static partial class HeroClassCatalog
 
             foreach (var rank in candidate.WeaponRanks)
             {
-                _weaponRanks[rank.Rank] = rank;
+                _weaponRanks[EquipmentNameKey(rank.Name)] = rank;
             }
 
             foreach (var rank in candidate.ArmourRanks)
             {
-                _armourRanks[rank.Rank] = rank;
+                _armourRanks[EquipmentNameKey(rank.Name)] = rank;
             }
 
             AddIncompatibleInitialQuirks(candidate.IncompatibleInitialQuirkIds);
@@ -148,23 +148,6 @@ public static partial class HeroClassCatalog
             }
         }
 
-        public void ReplaceSkillEffects(
-            string skillId,
-            string attributeKey,
-            IEnumerable<string> effectNames)
-        {
-            if (!_skillEffects.TryGetValue(skillId, out var effectsByAttribute))
-            {
-                effectsByAttribute = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
-                _skillEffects[skillId] = effectsByAttribute;
-            }
-
-            effectsByAttribute[attributeKey] = effectNames
-                .Where(value => !string.IsNullOrWhiteSpace(value))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToList();
-        }
-
         public void AppendSkillEffects(string skillId, string attributeKey, IEnumerable<string> effectNames)
         {
             foreach (var effectName in effectNames.Where(value => !string.IsNullOrWhiteSpace(value)))
@@ -175,7 +158,7 @@ public static partial class HeroClassCatalog
         {
             if (!_skillEffects.TryGetValue(skillId, out var effectsByAttribute))
             {
-                effectsByAttribute = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+                effectsByAttribute = new Dictionary<string, List<string>>(StringComparer.Ordinal);
                 _skillEffects[skillId] = effectsByAttribute;
             }
 
@@ -200,67 +183,57 @@ public static partial class HeroClassCatalog
 
         public void UpdateEquipmentRank(
             string equipmentKind,
-            IReadOnlyDictionary<string, IReadOnlyList<string>> attributes)
+            string body)
         {
-            var name = ReadString(attributes, "name");
-            var rank = TryReadEquipmentRank(name, equipmentKind);
-            if (rank is null)
+            var name = NativeDarkestReader.ReadString(body, ".name");
+            if (string.IsNullOrWhiteSpace(name))
             {
                 return;
             }
 
-            var target = equipmentKind.Equals("weapon", StringComparison.OrdinalIgnoreCase)
+            var target = equipmentKind == "weapon"
                 ? _weaponRanks
                 : _armourRanks;
-            target.TryGetValue(rank.Value, out var inherited);
+            var nameKey = EquipmentNameKey(name);
+            target.TryGetValue(nameKey, out var inherited);
+            // Native equipment lookup compares names and keeps the first
+            // insertion slot. Numeric suffixes are only authoring convention.
+            var rank = inherited?.Rank ?? target.Count;
             var equipment = new HeroEquipmentRank(
-                rank.Value,
-                attributes.ContainsKey("upgradeRequirementCode")
-                    ? ReadString(attributes, "upgradeRequirementCode") ?? string.Empty
-                    : inherited?.RequirementCode ?? string.Empty,
-                attributes.ContainsKey("hp")
-                    ? ReadDouble(attributes, "hp")
-                    : inherited?.Hp);
-            target[rank.Value] = equipment;
-            if (equipmentKind.Equals("armour", StringComparison.OrdinalIgnoreCase) &&
-                rank.Value == 0 &&
-                attributes.ContainsKey("hp"))
+                rank,
+                NativeDarkestReader.ReadString(body, ".upgradeRequirementCode") ?? inherited?.RequirementCode ?? string.Empty,
+                NativeDarkestReader.ReadFloat(body, ".hp") ?? inherited?.Hp,
+                name);
+            target[nameKey] = equipment;
+            if (equipmentKind == "armour" && rank == 0)
             {
                 BaseHp = equipment.Hp;
             }
         }
 
-        private static int? TryReadEquipmentRank(string? name, string equipmentKind)
+        private static string EquipmentNameKey(string name)
         {
-            if (string.IsNullOrWhiteSpace(name))
-            {
-                return null;
-            }
-
-            var marker = $"_{equipmentKind}_";
-            var markerIndex = name.LastIndexOf(marker, StringComparison.OrdinalIgnoreCase);
-            var rankText = markerIndex >= 0
-                ? name[(markerIndex + marker.Length)..]
-                : name[(name.LastIndexOf('_') + 1)..];
-            return int.TryParse(rankText, NumberStyles.None, CultureInfo.InvariantCulture, out var rank) && rank >= 0
-                ? rank
-                : null;
+            // GetString writes at most 63 bytes plus NUL before the native
+            // name comparison. Keep byte identity even if truncation splits
+            // UTF-8; decoding replacement characters would conflate names.
+            var bytes = Encoding.UTF8.GetBytes(name);
+            return Convert.ToHexString(bytes.AsSpan(0, Math.Min(bytes.Length, 63)));
         }
 
-        public void UpdateGeneration(IReadOnlyDictionary<string, IReadOnlyList<string>> attributes)
+        public void UpdateGeneration(string body)
         {
             _hasGeneration = true;
-            _isGenerationEnabled = ReadBooleanFlag(attributes, "is_generation_enabled") ?? _isGenerationEnabled;
-            _positiveQuirksMin = ReadInt(attributes, "number_of_positive_quirks_min") ?? _positiveQuirksMin;
-            _positiveQuirksMax = ReadInt(attributes, "number_of_positive_quirks_max") ?? _positiveQuirksMax;
-            _negativeQuirksMin = ReadInt(attributes, "number_of_negative_quirks_min") ?? _negativeQuirksMin;
-            _negativeQuirksMax = ReadInt(attributes, "number_of_negative_quirks_max") ?? _negativeQuirksMax;
-            _classCampingSkills = ReadInt(attributes, "number_of_class_specific_camping_skills") ?? _classCampingSkills;
-            _sharedCampingSkills = ReadInt(attributes, "number_of_shared_camping_skills") ?? _sharedCampingSkills;
-            _randomCombatSkills = ReadInt(attributes, "number_of_random_combat_skills") ?? _randomCombatSkills;
-            _cardsInDeck = ReadInt(attributes, "number_of_cards_in_deck") ?? _cardsInDeck;
-            _cardChance = ReadDouble(attributes, "card_chance") ?? _cardChance;
-            _townEventDependency = ReadString(attributes, "town_event_dependency") ?? _townEventDependency;
+            _isGenerationEnabled = NativeDarkestReader.ReadBoolean(body, ".is_generation_enabled") ?? _isGenerationEnabled;
+            _positiveQuirksMin = NativeDarkestReader.ReadInt(body, ".number_of_positive_quirks_min") ?? _positiveQuirksMin;
+            _positiveQuirksMax = NativeDarkestReader.ReadInt(body, ".number_of_positive_quirks_max") ?? _positiveQuirksMax;
+            _negativeQuirksMin = NativeDarkestReader.ReadInt(body, ".number_of_negative_quirks_min") ?? _negativeQuirksMin;
+            _negativeQuirksMax = NativeDarkestReader.ReadInt(body, ".number_of_negative_quirks_max") ?? _negativeQuirksMax;
+            _classCampingSkills = NativeDarkestReader.ReadInt(body, ".number_of_class_specific_camping_skills") ?? _classCampingSkills;
+            _sharedCampingSkills = NativeDarkestReader.ReadInt(body, ".number_of_shared_camping_skills") ?? _sharedCampingSkills;
+            _randomCombatSkills = NativeDarkestReader.ReadInt(body, ".number_of_random_combat_skills") ?? _randomCombatSkills;
+            _cardsInDeck = NativeDarkestReader.ReadInt(body, ".number_of_cards_in_deck") ?? _cardsInDeck;
+            _cardChance = NativeDarkestReader.ReadFloat(body, ".card_chance") ?? _cardChance;
+            _townEventDependency = NativeDarkestReader.ReadString(body, ".town_event_dependency") ?? _townEventDependency;
         }
 
         public HeroCandidate Build()
@@ -371,16 +344,17 @@ public static partial class HeroClassCatalog
     private sealed record CampingSkillDefinition(
         string Id,
         IReadOnlyList<string> HeroClasses,
-        bool IsShared);
-    private sealed class CampingSkillBuilder(string id)
+        bool? IsShared);
+    private sealed class CampingSkillBuilder(string id, bool? isShared)
     {
         public string Id { get; } = id;
-        public bool IsShared { get; private set; }
-        public HashSet<string> HeroClasses { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public bool? IsShared { get; } = isShared;
+        public HashSet<string> HeroClasses { get; } = new(StringComparer.Ordinal);
 
         public void Add(CampingSkillDefinition definition)
         {
-            IsShared |= definition.IsShared;
+            // Every declaration grants class access, but generation looks up
+            // the first stored skill record for its class-specific flag.
             foreach (var heroClass in definition.HeroClasses)
             {
                 HeroClasses.Add(heroClass);
@@ -410,7 +384,8 @@ public static partial class HeroClassCatalog
     private sealed record HeroEquipmentRank(
         int Rank,
         string RequirementCode,
-        double? Hp);
+        double? Hp,
+        string Name = "");
 
     private sealed record HeroUpgradeDefinition(
         IReadOnlyDictionary<string, int> WeaponRequirements,

@@ -16,6 +16,10 @@ internal static partial class NativeDarkestReader
 
     internal static IEnumerable<(string Kind, string Body)> ReadRecordsFromText(string content)
     {
+        // LineReader::ReadNextLine stops at the first NUL. In particular,
+        // definitions after it cannot override a preceding usable value.
+        var nul = content.IndexOf('\0');
+        if (nul >= 0) content = content[..nul];
         var text = StripComments(content);
         foreach (Match entry in EntryRegex().Matches(MaskHashComments(text)))
         {
@@ -108,6 +112,76 @@ internal static partial class NativeDarkestReader
         // Out-of-range native conversion is not a proven usable stack limit.
         return int.TryParse(body.AsSpan(start, end - start), NumberStyles.AllowLeadingSign,
             CultureInfo.InvariantCulture, out var value) ? value : null;
+    }
+
+    [GeneratedRegex(@"^[\t\n\v\f\r ]*(?<number>[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?)(?<percent>%)?",
+        RegexOptions.CultureInvariant)]
+    private static partial Regex FloatPrefixRegex();
+
+    internal static double? ReadFloat(string body, string field)
+    {
+        // GetFloat has a different field boundary from GetString/GetInt:
+        // only NUL, TAB, SPACE or '=' immediately after the key qualifies.
+        var start = -1;
+        for (var offset = 0; offset < body.Length;)
+        {
+            var found = body.IndexOf(field, offset, StringComparison.Ordinal);
+            if (found < 0) break;
+            var end = found + field.Length;
+            if (end == body.Length || body[end] is '\t' or ' ' or '=') start = end;
+            offset = found + 1;
+        }
+        if (start < 0) return null;
+        var number = FloatPrefixRegex().Match(body[start..]);
+        if (!number.Success) return 0;
+        if (!double.TryParse(number.Groups["number"].Value, NumberStyles.Float,
+                CultureInfo.InvariantCulture, out var value)) return double.NaN;
+        var result = (float)value;
+        return number.Groups["percent"].Success ? result * 0.01f : result;
+    }
+
+    internal static IReadOnlyList<string> ReadStringList(string body, string field, int maximumCount,
+        bool skipEmptyOrFieldTokens = false)
+    {
+        var start = FindValue(body, field);
+        var values = new List<string>();
+        // Effects and quirk exclusions stop at empty/dot-prefixed tokens;
+        // valid_modes skips those slots but continues within its fixed limit.
+        // Neither policy is the encounter raw-position policy.
+        for (var count = 0; start >= 0 && start < body.Length && count < maximumCount; count++)
+        {
+            while (start < body.Length && IsWhitespace(body[start])) start++;
+            if (start == body.Length) break;
+            int end;
+            int next;
+            if (body[start] == '"')
+            {
+                start++;
+                end = body.IndexOf('"', start);
+                // Native fixed-list helper uses strlen(body)-1 on an
+                // unmatched quote, unlike the scalar-string helper.
+                if (end < 0) end = Math.Max(start, body.Length - 1);
+                next = end + 1;
+            }
+            else
+            {
+                end = start;
+                while (end < body.Length && !IsWhitespace(body[end])) end++;
+                next = end;
+            }
+            var value = body[start..end];
+            if (value.Length == 0 || value[0] == '.')
+            {
+                if (!skipEmptyOrFieldTokens) break;
+                start = next;
+                continue;
+            }
+            // These callers use 64-byte native token buffers (63 plus NUL).
+            var bytes = Encoding.UTF8.GetBytes(value);
+            values.Add(bytes.Length < 64 ? value : Encoding.UTF8.GetString(bytes, 0, 63));
+            start = next;
+        }
+        return values;
     }
 
     internal static bool? ReadBoolean(string body, string field)

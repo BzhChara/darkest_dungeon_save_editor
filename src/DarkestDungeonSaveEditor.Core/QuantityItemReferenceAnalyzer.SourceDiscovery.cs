@@ -90,6 +90,7 @@ internal static partial class QuantityItemReferenceAnalyzer
 
             var normalized = ContentFileOverlay.NormalizeRelativePath(source, path);
             if (normalized is null ||
+                !IsEligibleActorReferencePath(normalized, enabledDlcPrefixes) ||
                 !ContentDirectories.Any(directory =>
                     ContentFileOverlay.IsRootOrEnabledDlcPath(normalized, directory, enabledDlcPrefixes)) ||
                 IsDefinitionOnlyPath(normalized) ||
@@ -151,6 +152,7 @@ internal static partial class QuantityItemReferenceAnalyzer
 
             var relativePath = ContentFileOverlay.NormalizeRelativePath(source, path);
             if (relativePath is null ||
+                !IsEligibleActorReferencePath(relativePath, enabledDlcPrefixes) ||
                 !ContentDirectories.Any(directory =>
                     ContentFileOverlay.IsRootOrEnabledDlcPath(relativePath, directory, enabledDlcPrefixes)) ||
                 IsDefinitionOnlyPath(relativePath))
@@ -160,6 +162,23 @@ internal static partial class QuantityItemReferenceAnalyzer
 
             yield return path;
         }
+    }
+
+    private static bool IsEligibleActorReferencePath(string path, IReadOnlyList<string> enabledDlcPrefixes)
+    {
+        var prefix = enabledDlcPrefixes.OrderByDescending(value => value.Length)
+            .FirstOrDefault(value => path.StartsWith(value + "/", StringComparison.OrdinalIgnoreCase));
+        var mounted = prefix is null ? path : path[(prefix.Length + 1)..];
+        var suffix = new[] { ".info.darkest", ".art.darkest", ".override.darkest" }
+            .FirstOrDefault(value => mounted.EndsWith(value, StringComparison.OrdinalIgnoreCase));
+        if (suffix is null) return true; // Provision JSON and other independently loaded resources keep their own rules.
+        var id = Path.GetFileName(mounted)[..^suffix.Length];
+        if (mounted.StartsWith("heroes/", StringComparison.OrdinalIgnoreCase))
+            return mounted.Equals($"heroes/{id}/{id}{suffix}", StringComparison.OrdinalIgnoreCase);
+        if (mounted.StartsWith("monsters/", StringComparison.OrdinalIgnoreCase))
+            return id.Length >= 2 && suffix != ".override.darkest" &&
+                mounted.Equals($"monsters/{id[..^2]}/{id}/{id}{suffix}", StringComparison.OrdinalIgnoreCase);
+        return true;
     }
 
     private static bool IsInsideSource(string sourceDirectory, string path)

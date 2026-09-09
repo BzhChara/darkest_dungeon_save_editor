@@ -11,6 +11,8 @@ internal static partial class ContractSuite
         var content = await ActiveContentResolver.ResolveAsync(profile, fixture.GameRoot, fixture.WorkshopRoot,
             fixture.AdditionalLocalModDirectory, fixture.Codec, Path.Combine(fixture.RunRoot, "workspace"));
         var hero = HeroClassCatalog.Load(content).HeroClasses.Single(row => row.Id == "local_hero");
+        VerifyHeroNativeSemantics(content, hero, fixture.RunRoot);
+        VerifyNativeItemReferences(content, fixture.RunRoot);
         VerifyResourceDuplicateSemantics(content, hero, fixture.RunRoot);
         await RunEmptyEncounterSlotContractsAsync(fixture.RunRoot, fixture.Codec);
         Console.WriteLine($"Artifacts: {fixture.RunRoot}");

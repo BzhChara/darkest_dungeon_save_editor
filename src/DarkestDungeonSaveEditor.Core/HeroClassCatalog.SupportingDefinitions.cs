@@ -17,10 +17,10 @@ public static partial class HeroClassCatalog
                 AllowTrailingCommas = true,
                 CommentHandling = JsonCommentHandling.Skip
             });
-        var threshold = int.MaxValue;
-        if (document.RootElement.TryGetProperty("configuration", out var configuration))
+        uint threshold = 0;
+        if (document.RootElement.TryGetProperty("configuration", out var configuration) && configuration.ValueKind == JsonValueKind.Object)
         {
-            threshold = ReadJsonInt(configuration, "class_specific_number_of_classes_threshold") ?? threshold;
+            threshold = unchecked((uint)(ReadJsonInt(configuration, "class_specific_number_of_classes_threshold") ?? 0));
         }
 
         if (!document.RootElement.TryGetProperty("skills", out var skills) ||
@@ -31,18 +31,20 @@ public static partial class HeroClassCatalog
 
         foreach (var item in skills.EnumerateArray())
         {
-            var id = ReadJsonString(item, "id");
-            var heroClasses = ReadJsonStringArray(item, "hero_classes");
-            if (string.IsNullOrWhiteSpace(id) || heroClasses.Count == 0)
+            if (item.ValueKind != JsonValueKind.Object || !item.TryGetProperty("id", out var idNode) ||
+                idNode.ValueKind != JsonValueKind.String || string.IsNullOrEmpty(idNode.GetString()))
             {
                 continue;
             }
-
-            var isCanonicalShared = id is "encourage" or "first_aid" or "pep_talk";
+            var id = idNode.GetString()!;
+            var hasClasses = item.TryGetProperty("hero_classes", out var classNodes) && classNodes.ValueKind == JsonValueKind.Array;
+            var heroClasses = hasClasses ? classNodes.EnumerateArray()
+                .Where(node => node.ValueKind == JsonValueKind.String)
+                .Select(node => node.GetString()!).ToArray() : [];
             yield return new CampingSkillDefinition(
                 id,
                 heroClasses,
-                isCanonicalShared || heroClasses.Count > threshold);
+                hasClasses ? (uint)classNodes.GetArrayLength() > threshold : null);
         }
     }
 

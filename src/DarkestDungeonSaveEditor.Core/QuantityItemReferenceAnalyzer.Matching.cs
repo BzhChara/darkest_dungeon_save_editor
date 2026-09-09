@@ -69,55 +69,6 @@ internal static partial class QuantityItemReferenceAnalyzer
         }
     }
 
-    private static string StripLineComments(string text)
-    {
-        var result = new StringBuilder(text.Length);
-        var inQuotes = false;
-        var escaped = false;
-        for (var index = 0; index < text.Length; index++)
-        {
-            var current = text[index];
-            if (!inQuotes && current == '/' && index + 1 < text.Length && text[index + 1] == '/')
-            {
-                index += 2;
-                while (index < text.Length && text[index] is not ('\r' or '\n'))
-                {
-                    index++;
-                }
-
-                if (index >= text.Length)
-                {
-                    break;
-                }
-
-                current = text[index];
-            }
-
-            result.Append(current);
-            if (current is '\r' or '\n')
-            {
-                inQuotes = false;
-                escaped = false;
-                continue;
-            }
-
-            if (inQuotes && current == '\\' && !escaped)
-            {
-                escaped = true;
-                continue;
-            }
-
-            if (current == '"' && !escaped)
-            {
-                inQuotes = !inQuotes;
-            }
-
-            escaped = false;
-        }
-
-        return result.ToString();
-    }
-
     private static bool TryGetProperty(JsonElement item, string name, out JsonElement value)
     {
         foreach (var property in item.EnumerateObject())

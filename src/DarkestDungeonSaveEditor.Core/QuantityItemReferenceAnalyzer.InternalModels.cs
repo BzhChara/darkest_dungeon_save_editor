@@ -6,24 +6,6 @@ namespace DarkestDungeonSaveEditor.Core;
 
 internal static partial class QuantityItemReferenceAnalyzer
 {
-    [GeneratedRegex(
-        "(?:^|\\r?\\n)\\s*(?:loot|extra_battle_loot|extra_curio_loot):\\s*\\.code\\s+\"(?<code>[^\"]+)\"",
-        RegexOptions.IgnoreCase)]
-    private static partial Regex DarkestLootCodeRegex();
-
-    [GeneratedRegex(
-        "\\.type\\s+\"(?<type>[^\"]+)\"[^\\r\\n]{0,320}?\\.id\\s+\"(?<id>[^\"]*)\"",
-        RegexOptions.IgnoreCase)]
-    private static partial Regex DarkestTypeThenIdRegex();
-
-    [GeneratedRegex(
-        "\\.id\\s+\"(?<id>[^\"]*)\"[^\\r\\n]{0,320}?\\.type\\s+\"(?<type>[^\"]+)\"",
-        RegexOptions.IgnoreCase)]
-    private static partial Regex DarkestIdThenTypeRegex();
-
-    [GeneratedRegex("\\.(?:use_item_id|item_id)\\s+\"(?<id>[^\"]+)\"", RegexOptions.IgnoreCase)]
-    private static partial Regex DarkestItemIdRegex();
-
     [GeneratedRegex(@"(?<id>[A-Za-z0-9_.-]+)#(?<type>[A-Za-z0-9_.-]+)", RegexOptions.IgnoreCase)]
     private static partial Regex CsvTypedItemRegex();
 

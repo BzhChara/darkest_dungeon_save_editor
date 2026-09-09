@@ -229,31 +229,17 @@ internal static partial class QuantityItemReferenceAnalyzer
         Dictionary<string, List<string>> activeEvidence,
         Dictionary<string, List<string>> rootLootEvidence)
     {
-        var text = StripLineComments(file.Text);
-        foreach (Match match in DarkestLootCodeRegex().Matches(text))
+        foreach (var (kind, body) in NativeDarkestReader.ReadRecordsFromText(file.Text))
         {
-            AddEvidence(rootLootEvidence, match.Groups["code"].Value, file.File.RelativePath);
-        }
-
-        foreach (Match match in DarkestTypeThenIdRegex().Matches(text))
-        {
-            MarkResolved(
-                index.Resolve(match.Groups["type"].Value, match.Groups["id"].Value),
-                activeEvidence,
-                file.File.RelativePath);
-        }
-
-        foreach (Match match in DarkestIdThenTypeRegex().Matches(text))
-        {
-            MarkResolved(
-                index.Resolve(match.Groups["type"].Value, match.Groups["id"].Value),
-                activeEvidence,
-                file.File.RelativePath);
-        }
-
-        foreach (Match match in DarkestItemIdRegex().Matches(text))
-        {
-            MarkResolved(index.ResolveIdentity(match.Groups["id"].Value), activeEvidence, file.File.RelativePath);
+            if (kind is "loot" or "extra_battle_loot" or "extra_curio_loot" &&
+                NativeDarkestReader.ReadString(body, ".code") is { Length: > 0 } code)
+                AddEvidence(rootLootEvidence, code, file.File.RelativePath);
+            if (NativeDarkestReader.ReadString(body, ".type") is { } type &&
+                NativeDarkestReader.ReadString(body, ".id") is { } id)
+                MarkResolved(index.Resolve(type, id), activeEvidence, file.File.RelativePath);
+            foreach (var field in new[] { ".use_item_id", ".item_id" })
+                if (NativeDarkestReader.ReadString(body, field) is { Length: > 0 } itemId)
+                    MarkResolved(index.ResolveIdentity(itemId), activeEvidence, file.File.RelativePath);
         }
     }
 
