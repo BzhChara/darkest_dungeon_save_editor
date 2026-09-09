@@ -16,7 +16,8 @@ The suite is split by responsibility:
 - `HeroAvailabilityContractTests.cs`: per-level catalog preflight agreement with generation, missing skill/camping dependencies, and partially available levels;
 - `BridgeClassificationContractTests.cs`: original classification preservation, authored zero-weight special rows, legacy metadata recovery, and read-only unknown-origin/corrupt-manifest handling;
 - `BattleMapContractTests.cs`: map reading/monitoring, movement, hard deletion, battle placement, room attachments, global encounter catalogs, managed Bridge append/reuse, and force-town transactions;
-- `RegionalMapContentContractTests.cs`: current-region trap/obstacle weighted selection, zero/invalid weights, rejected resources, duplicate rows, file/ID overlays, numeric boundaries, and refreshed catalog guard rebinding;
+- `RegionalMapContentContractTests.cs`: current-region trap/obstacle selection, full per-type weights and duplicate contributions, zero/invalid weights, rejected resources, canonical file overlays, native float boundaries, and refreshed catalog guard rebinding;
+- `MapPropNativeContractTests.cs`: canonical pool paths and direct-open discovery exclusions, manifest/DLC/priority boundaries, multiline and same-line records, prefix dispatch, comments, last fields, raw list limits, exact IDs/names/hashes, physical source lines, stale-content checks, and missing winning files;
 - `QuantityItemCatalogContractTests.cs`: town/raid item discovery and direct mutations;
 - `QuantityItemSaveContractTests.cs`: guarded quantity preview and commit transactions;
 - `TrinketCatalogContractTests.cs`: trinket overlays, localization, limits, and state definitions;
@@ -39,4 +40,4 @@ Run the complete suite from the repository root:
 dotnet run --project tests\DarkestDungeonSaveEditor.ContractTests\DarkestDungeonSaveEditor.ContractTests.csproj -c Release -- "<repository-root>"
 ```
 
-Close Darkest Dungeon before the suite: save transaction contracts exercise the real process guard even with isolated fixtures. `--catalogs` selects the catalog/save group, `--maintenance` selects encounter maintenance, `--manifests` selects manifest preparation, and `--semantics` selects duplicate Buff/Effect/skill/event rules plus empty encounter slots; these partial runs do not replace the complete suite. Set `DDSE_TEST_GAME_DIRECTORY` to the installed game root to additionally exercise the verified official uploader against isolated samples.
+Close Darkest Dungeon before the suite: save transaction contracts exercise the real process guard even with isolated fixtures. `--catalogs` selects the catalog/save group, `--maintenance` selects encounter maintenance, `--manifests` selects manifest preparation, `--semantics` selects duplicate Buff/Effect/skill/event rules plus empty encounter slots, and `--map-content` selects the battle-map group including standalone JSON/DSON placements and native prop pools; these partial runs do not replace the complete suite. Set `DDSE_TEST_GAME_DIRECTORY` to the installed game root to additionally exercise the verified official uploader against isolated samples.

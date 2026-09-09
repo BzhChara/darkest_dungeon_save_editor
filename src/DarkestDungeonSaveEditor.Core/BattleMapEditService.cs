@@ -636,6 +636,7 @@ public sealed class BattleMapEditService
                 prepared.Attachment.PropHash,
                 prepared.Attachment.SourcePath,
                 prepared.Attachment.SourceLine,
+                prepared.Attachment.SourceRecordIndex,
                 catalogFingerprint = prepared.Attachment.CatalogGuard.Fingerprint
             },
             files

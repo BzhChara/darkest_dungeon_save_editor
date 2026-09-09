@@ -1,5 +1,12 @@
 internal static partial class ContractSuite
 {
+    public static async Task RunMapContentOnlyAsync(string repositoryRoot)
+    {
+        var fixture = BuildContractFixture(repositoryRoot);
+        await RunBattleMapContractsAsync(fixture.RunRoot, fixture.Codec);
+        Console.WriteLine($"Artifacts: {fixture.RunRoot}");
+    }
+
     public static async Task RunAsync(string repositoryRoot, bool includeBattle = true)
     {
         RunUiContracts(repositoryRoot);
