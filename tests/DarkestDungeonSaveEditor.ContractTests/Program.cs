@@ -1,11 +1,12 @@
 try
 {
-    if (args.Length is < 1 or > 2 || (args.Length == 2 && args[1] is not ("--maintenance" or "--manifests" or "--catalogs" or "--semantics" or "--capacities")))
+    if (args.Length is < 1 or > 2 || (args.Length == 2 && args[1] is not ("--maintenance" or "--manifests" or "--catalogs" or "--semantics" or "--capacities" or "--map-content")))
     {
-        throw new InvalidOperationException("Usage: DarkestDungeonSaveEditor.ContractTests <repository-root> [--maintenance|--manifests|--catalogs|--semantics|--capacities]");
+        throw new InvalidOperationException("Usage: DarkestDungeonSaveEditor.ContractTests <repository-root> [--maintenance|--manifests|--catalogs|--semantics|--capacities|--map-content]");
     }
 
     if (args.Length == 2 && args[1] == "--capacities") ContractSuite.RunInventoryCapacitiesOnly(Path.GetFullPath(args[0]));
+    else if (args.Length == 2 && args[1] == "--map-content") await ContractSuite.RunMapContentOnlyAsync(Path.GetFullPath(args[0]));
     else if (args.Length == 2 && args[1] == "--manifests") await ContractSuite.RunManifestsOnlyAsync(Path.GetFullPath(args[0]));
     else if (args.Length == 2 && args[1] == "--semantics") await ContractSuite.RunResourceSemanticsOnlyAsync(Path.GetFullPath(args[0]));
     else if (args.Length == 2 && args[1] == "--catalogs") await ContractSuite.RunAsync(Path.GetFullPath(args[0]), includeBattle: false);

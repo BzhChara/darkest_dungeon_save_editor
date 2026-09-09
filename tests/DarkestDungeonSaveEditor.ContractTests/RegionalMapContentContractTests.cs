@@ -5,7 +5,7 @@ internal static partial class ContractSuite
         var root = Path.Combine(runRoot, "regional-weights");
         var baseRoot = Path.Combine(root, "base");
         var modRoot = Path.Combine(root, "mod");
-        WriteMapContentFixture(baseRoot, "dungeons/weald/weights.props.darkest", """
+        WriteMapContentFixture(baseRoot, "dungeons/weald/weald.props.darkest", """
             traps: .chance 1 .types alpha
             traps: .chance 4 .types beta
             traps: .chance 3 .types alpha
@@ -28,20 +28,22 @@ internal static partial class ContractSuite
             traps: .chance 4 .types gamma
             """);
         WriteMapContentFixture(baseRoot, "dungeons/large/large.props.darkest", """
-            traps: .chance 1e308 .types alpha
-            traps: .chance 1e308 .types beta
+            traps: .chance 1e38 .types alpha
+            traps: .chance 1e38 .types beta
             """);
         WriteMapContentFixture(baseRoot, "dungeons/decimal/decimal.props.darkest", """
             traps: .chance 0.5 .types alpha
             traps: .chance 1.5 .types beta
             """);
-        WriteMapContentFixture(baseRoot, "dungeons/override/base.props.darkest", """
+        WriteMapContentFixture(baseRoot, "dungeons/override/override.props.darkest", """
             traps: .chance 100 .types alpha
             traps: .chance 2 .types beta
             """);
         WriteMapContentFixture(modRoot, "dungeons/override/extra.props.darkest", "traps: .chance 2 .types alpha");
-        WriteMapContentFixture(baseRoot, "dungeons/overlay/same.props.darkest", "traps: .chance 100 .types alpha");
-        WriteMapContentFixture(modRoot, "dungeons/overlay/same.props.darkest", "traps: .chance 1 .types beta");
+        WriteMapContentFixture(baseRoot, "dungeons/overlay/overlay.props.darkest", "traps: .chance 100 .types alpha");
+        WriteMapContentFixture(modRoot, "dungeons/overlay/overlay.props.darkest", "traps: .chance 1 .types beta");
+        WriteMapContentFixture(baseRoot, "dungeons/repeated/repeated.props.darkest", "traps: .chance 4 .types alpha alpha beta");
+        WriteMapContentFixture(baseRoot, "dungeons/overflow/overflow.props.darkest", "traps: .chance 1e40 .types alpha");
         WriteMapContentFixture(baseRoot, "dungeons/disabled/disabled.props.darkest", "traps: .chance 0 .types zero");
         WriteMapContentFixture(baseRoot, "props/prop_definitions.json", """
             { "props": [ { "name": "trap", "default_data": {} }, { "name": "obstacle", "default_data": {} } ] }
@@ -68,19 +70,21 @@ internal static partial class ContractSuite
             SourceGameSha256 = ComputeSha256(Path.Combine(template.Profile.ProfileDirectory, "persist.game.json"))
         });
         Assert(catalog.GetRegionalCandidates(BattleRoomAttachmentKind.Trap, "WEALD")
-                   .Select(item => item.Id).ToHashSet().SetEquals(["alpha", "beta"]) &&
-               catalog.Issues.Count(issue => issue.StartsWith("地图区域资源未参与自动选择：", StringComparison.Ordinal)) == 5,
+                   .Select(item => item.Id).ToHashSet().SetEquals(["alpha", "beta", "duplicate"]) &&
+               catalog.Issues.Count(issue => issue.StartsWith("地图区域资源未参与自动选择：", StringComparison.Ordinal)) == 3,
             "Automatic regional choices must reject zero/invalid weights and missing/scripted resources, without guessing another region.");
-        AssertRegionalDistribution(catalog, "weald", new() { ["alpha"] = 500, ["beta"] = 500 });
-        AssertRegionalDistribution(catalog, "multiple", new() { ["alpha"] = 250, ["beta"] = 250, ["gamma"] = 500 });
+        AssertRegionalDistribution(catalog, "weald", new() { ["alpha"] = 400, ["beta"] = 400, ["duplicate"] = 200 });
+        AssertRegionalDistribution(catalog, "multiple", new() { ["alpha"] = 400, ["beta"] = 400, ["gamma"] = 400 });
         AssertRegionalDistribution(catalog, "large", new() { ["alpha"] = 500, ["beta"] = 500 });
         AssertRegionalDistribution(catalog, "decimal", new() { ["alpha"] = 250, ["beta"] = 750 });
-        AssertRegionalDistribution(catalog, "override", new() { ["alpha"] = 500, ["beta"] = 500 });
+        AssertRegionalDistribution(catalog, "override", new() { ["alpha"] = 1000, ["beta"] = 20 });
+        AssertRegionalDistribution(catalog, "repeated", new() { ["alpha"] = 800, ["beta"] = 400 });
         AssertRegionalDistribution(catalog, "overlay", new() { ["beta"] = 1000 });
         Assert(catalog.SelectRegionalContent(BattleRoomAttachmentKind.Obstacle, "weald", 0)!.Id == "thorny_thicket" &&
                catalog.SelectRegionalContent(BattleRoomAttachmentKind.Obstacle, "cove", 0.999)!.Id == "shipwreck" &&
                catalog.SelectRegionalContent(BattleRoomAttachmentKind.Trap, "cove", 0.7)!.Id == "alpha" &&
                catalog.SelectRegionalContent(BattleRoomAttachmentKind.Trap, "disabled", 0.5) is null &&
+               catalog.SelectRegionalContent(BattleRoomAttachmentKind.Trap, "overflow", 0.5) is null &&
                catalog.SelectRegionalContent(BattleRoomAttachmentKind.Obstacle, "missing", 0.5) is null &&
                catalog.GetRegionalCandidates(BattleRoomAttachmentKind.Trap, "").Count == 0,
             "Single-resource regions select their own resource; zero-weight, missing and blank regions never fall back across regions.");
@@ -107,8 +111,9 @@ internal static partial class ContractSuite
     private static void AssertRegionalDistribution(
         BattleRoomAttachmentCatalogResult catalog, string region, Dictionary<string, int> expected)
     {
-        var counts = Enumerable.Range(0, 1000)
-            .Select(index => catalog.SelectRegionalContent(BattleRoomAttachmentKind.Trap, region, (index + 0.5) / 1000)!.Id)
+        var sampleCount = expected.Values.Sum();
+        var counts = Enumerable.Range(0, sampleCount)
+            .Select(index => catalog.SelectRegionalContent(BattleRoomAttachmentKind.Trap, region, (index + 0.5) / sampleCount)!.Id)
             .GroupBy(id => id).ToDictionary(group => group.Key, group => group.Count());
         Assert(counts.Count == expected.Count && expected.All(pair => counts.GetValueOrDefault(pair.Key) == pair.Value),
             $"Regional weights must preserve exact relative proportions for {region}.");

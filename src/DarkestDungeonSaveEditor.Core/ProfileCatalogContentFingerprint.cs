@@ -31,6 +31,7 @@ public static class ProfileCatalogContentFingerprint
             var paths = ContentFileDiscovery.Enumerate(source, prefixes, issues, "Catalog refresh", Rules)
                 .Concat(NativeContentFileResolver.EnumerateActorOpenFiles(source, prefixes, "monsters", issues))
                 .Concat(NativeContentFileResolver.EnumerateActorOpenFiles(source, prefixes, "heroes", issues))
+                .Concat(BattleRoomAttachmentCatalog.EnumerateCanonicalPropFiles(source, prefixes, issues).Where(File.Exists))
                 .Concat(new[] { "modfiles.txt", "project.xml", ManagedBattleEncounterBridgeService.ManifestFileName }
                     .Select(name => Path.Combine(source.Directory, name)).Where(File.Exists));
             foreach (var path in paths.Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.Ordinal))

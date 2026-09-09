@@ -15,22 +15,32 @@ internal static partial class NativeDarkestReader
         => ReadRecordsFromText(File.ReadAllText(path, Encoding.UTF8));
 
     internal static IEnumerable<(string Kind, string Body)> ReadRecordsFromText(string content)
+        => ReadRecordsCore(content, includeSourceLines: false).Select(record => (record.Kind, record.Body));
+
+    internal static IEnumerable<(string Kind, string Body, int SourceLine)> ReadRecordsWithSourceLinesFromText(string content)
+        => ReadRecordsCore(content, includeSourceLines: true);
+
+    private static IEnumerable<(string Kind, string Body, int SourceLine)> ReadRecordsCore(
+        string content, bool includeSourceLines)
     {
         // LineReader::ReadNextLine stops at the first NUL. In particular,
         // definitions after it cannot override a preceding usable value.
         var nul = content.IndexOf('\0');
         if (nul >= 0) content = content[..nul];
-        var text = StripComments(content);
+        var sourceLines = includeSourceLines ? new List<int>(content.Length) : null;
+        var text = StripComments(content, sourceLines);
         foreach (Match entry in EntryRegex().Matches(MaskHashComments(text)))
         {
             var body = entry.Groups["body"];
-            yield return (entry.Groups["kind"].Value, text.Substring(body.Index, body.Length));
+            yield return (entry.Groups["kind"].Value, text.Substring(body.Index, body.Length),
+                sourceLines?[entry.Index] ?? 0);
         }
     }
 
-    private static string StripComments(string text)
+    private static string StripComments(string text, List<int>? sourceLines)
     {
         var result = new StringBuilder(text.Length);
+        var sourceLine = 1;
         for (var index = 0; index < text.Length; index++)
         {
             var current = text[index];
@@ -42,6 +52,7 @@ internal static partial class NativeDarkestReader
                 {
                     var end = text.IndexOf('\n', index + 2);
                     if (end < 0) break;
+                    sourceLine++;
                     index = end;
                     continue;
                 }
@@ -49,11 +60,15 @@ internal static partial class NativeDarkestReader
                 {
                     var end = text.IndexOf("*/", index + 2, StringComparison.Ordinal);
                     if (end < 0) break;
+                    for (var skipped = index; skipped <= end + 1; skipped++)
+                        if (text[skipped] == '\n') sourceLine++;
                     index = end + 1;
                     continue;
                 }
             }
             result.Append(current);
+            sourceLines?.Add(sourceLine);
+            if (current == '\n') sourceLine++;
         }
         return result.ToString();
     }
@@ -143,11 +158,29 @@ internal static partial class NativeDarkestReader
     internal static IReadOnlyList<string> ReadStringList(string body, string field, int maximumCount,
         bool skipEmptyOrFieldTokens = false)
     {
-        var start = FindValue(body, field);
         var values = new List<string>();
         // Effects and quirk exclusions stop at empty/dot-prefixed tokens;
         // valid_modes skips those slots but continues within its fixed limit.
         // Neither policy is the encounter raw-position policy.
+        foreach (var value in ReadRawStringSlots(body, field, maximumCount))
+        {
+            if (value.Length == 0 || value[0] == '.')
+            {
+                if (!skipEmptyOrFieldTokens) break;
+                continue;
+            }
+            // These callers use 64-byte native token buffers (63 plus NUL).
+            var bytes = Encoding.UTF8.GetBytes(value);
+            values.Add(bytes.Length < 64 ? value : Encoding.UTF8.GetString(bytes, 0, 63));
+        }
+        return values;
+    }
+
+    // Leave each consumer's empty/dot policy and native buffer handling separate.
+    // Prop pools stop at an empty slot, but dot-prefixed strings are ordinary IDs.
+    internal static IEnumerable<string> ReadRawStringSlots(string body, string field, int maximumCount)
+    {
+        var start = FindValue(body, field);
         for (var count = 0; start >= 0 && start < body.Length && count < maximumCount; count++)
         {
             while (start < body.Length && IsWhitespace(body[start])) start++;
@@ -169,19 +202,9 @@ internal static partial class NativeDarkestReader
                 while (end < body.Length && !IsWhitespace(body[end])) end++;
                 next = end;
             }
-            var value = body[start..end];
-            if (value.Length == 0 || value[0] == '.')
-            {
-                if (!skipEmptyOrFieldTokens) break;
-                start = next;
-                continue;
-            }
-            // These callers use 64-byte native token buffers (63 plus NUL).
-            var bytes = Encoding.UTF8.GetBytes(value);
-            values.Add(bytes.Length < 64 ? value : Encoding.UTF8.GetString(bytes, 0, 63));
+            yield return body[start..end];
             start = next;
         }
-        return values;
     }
 
     internal static bool? ReadBoolean(string body, string field)

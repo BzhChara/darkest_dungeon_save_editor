@@ -26,7 +26,7 @@ internal static partial class ContractSuite
             room_curios: .chance 0 .types fish_idol shared_curio missing_prop_curio missing_type_curio ambiguous_curio CASE_ONLY_CURIO case_type_curio case_twin CASE_TWIN
             room_treasures: .chance 1 .types unlocked_strongbox
             hall_curios: .chance 1 .types shared_curio crate valid_after_malformed
-            traps: .chance 1 .types lurker shared_trap missing_trap scripted_trap cycle_one ambiguous_trap ignored_json_trap CASE_ONLY_TRAP
+            traps: .chance 1 .types lurker shared_trap missing_trap scripted_trap cycle_one ambiguous_trap ignored_json_trap CASE_ONLY_TRAP " spaced_trap "
             obstacles: .chance 1 .types shipwreck
             secret_room_treasures: .chance 1 .types secret_stash
             prison_doors: .chance 1 .types cove_door
@@ -58,6 +58,7 @@ internal static partial class ContractSuite
         var resourcePath = WriteMapContentFixture(baseRoot, "props/trap_definitions.json", """
             { "props": [
               { "name": "lurker", "default_data": { "inherits_from": { "prop_type_name": "trap" } } },
+              { "name": " spaced_trap ", "default_data": { "inherits_from": { "prop_type_name": "trap" } } },
               { "name": "shared_trap", "default_data": { "inherits_from": { "prop_type_name": "trap" } } },
               { "name": "poison_cloud", "default_data": { "inherits_from": { "prop_type_name": "trap" } } },
               { "name": "case_only_trap", "default_data": { "inherits_from": { "prop_type_name": "trap" } } },
@@ -80,7 +81,8 @@ internal static partial class ContractSuite
         WriteMapContentFixture(baseRoot, "props/unused_data.json", """
             { "props": [ { "name": "ignored_json_trap", "default_data": { "inherits_from": { "prop_type_name": "trap" } } } ] }
             """);
-        WriteMapContentFixture(modRoot, "dlc/enabled/dungeons/cove/extra.props.darkest", """
+        // A canonical override supplies the complete pool; an extra basename cannot extend it.
+        poolPath = WriteMapContentFixture(modRoot, "dlc/enabled/dungeons/cove/cove.props.darkest", File.ReadAllText(poolPath) + "\n" + """
             hall_curios: .chance 1 .types enabled_dlc_curio
             traps: .chance 1 .types dlc_trap
             """);
@@ -93,7 +95,7 @@ internal static partial class ContractSuite
             .Replace(",,enabled_dlc_curio,,Nothing", ",,enabled_dlc_curio,,", StringComparison.Ordinal));
         WriteMapCurioFixtures(Path.Combine(modRoot, "dlc/disabled"), "disabled", "disabled_dlc_curio");
         WriteMapCurioFixtures(modRoot, "unlisted", "unlisted_curio");
-        WriteMapContentFixture(modRoot, "dlc/disabled/dungeons/cove/extra.props.darkest",
+        WriteMapContentFixture(modRoot, "dlc/disabled/dungeons/cove/cove.props.darkest",
             "hall_curios: .chance 1 .types disabled_dlc_curio");
         WriteMapContentFixture(modRoot, "dungeons/cove/residue.props.darkest",
             "hall_curios: .chance 1 .types unlisted_curio");
@@ -115,11 +117,11 @@ internal static partial class ContractSuite
         catch (InvalidDataException error) when (error.Message.Contains("modfiles.txt", StringComparison.Ordinal)) { missingRejected = true; }
         Assert(missingRejected, "Missing manifests must prevent room attachment discovery before preparation.");
         WriteMapContentFixture(modRoot, "modfiles.txt", """
-            dlc/enabled/dungeons/cove/extra.props.darkest 1
+            dlc/enabled/dungeons/cove/cove.props.darkest 1
             dlc/enabled/props/cove/trap_definitions.json 1
             dlc/enabled/curios/enabled_curio_props.csv 1
             dlc/enabled/curios/enabled_curio_type_library.csv 1
-            dlc/disabled/dungeons/cove/extra.props.darkest 1
+            dlc/disabled/dungeons/cove/cove.props.darkest 1
             dlc/disabled/curios/disabled_curio_props.csv 1
             dlc/disabled/curios/disabled_curio_type_library.csv 1
             """);
@@ -134,7 +136,7 @@ internal static partial class ContractSuite
                    new BilingualContentName("异地奇物", "Foreign Curio"),
             "Manifest authority, room/hall membership, per-region trap membership and genuine missing translations must remain distinct.");
         Assert(catalog.GetCandidates(BattleRoomAttachmentKind.Trap, "cove")
-                   .Select(item => item.Id).ToHashSet().SetEquals(["lurker", "shared_trap", "dlc_trap"]) &&
+                   .Select(item => item.Id).ToHashSet().SetEquals(["lurker", "shared_trap", "dlc_trap", " spaced_trap "]) &&
                catalog.GetCandidates(BattleRoomAttachmentKind.Obstacle, "cove").Single().Id == "shipwreck" &&
                catalog.GetCandidates(BattleRoomAttachmentKind.Trap, "").Count == 0 &&
                catalog.Issues.Count(issue => issue.StartsWith("地图内容候选未纳入：", StringComparison.Ordinal)) == 11 &&
@@ -152,6 +154,10 @@ internal static partial class ContractSuite
         var hallCurio = catalog.HallCurios.Single(item => item.Id == "foreign_hall_curio");
         var treasure = catalog.Treasures.Single();
         var trap = catalog.Traps.Single(item => item.Id == "lurker");
+        var spacedTrap = catalog.Traps.Single(item => item.Id == " spaced_trap ");
+        Assert(spacedTrap.PropHash == unchecked((int)Loc2LocalizationReader.HashName(" spaced_trap ")) &&
+               spacedTrap.PropHash != unchecked((int)Loc2LocalizationReader.HashName("spaced_trap")),
+            "Map writes must preserve the authored trap ID without trimming its native hash.");
         var obstacle = catalog.Obstacles.Single(item => item.Id == "shipwreck");
         var originalMap = File.ReadAllText(mapPath);
         var originalRaid = File.ReadAllText(raidPath);
@@ -160,7 +166,7 @@ internal static partial class ContractSuite
             .ToDictionary(path => path, ComputeSha256);
 
         // Exercise both a battle replacement and a completed/empty tile with old scenery.
-        foreach (var definition in new[] { roomCurio, treasure, hallCurio, trap, obstacle, hallCurio })
+        foreach (var definition in new[] { roomCurio, treasure, hallCurio, trap, obstacle, hallCurio, spacedTrap })
         {
             var areaId = definition.TargetAreaKind == BattleMapAreaKind.Room ? "rooC" : "coAB";
             var tileId = areaId == "rooC" ? "tile0" : "tile2";
@@ -339,7 +345,19 @@ internal static partial class ContractSuite
                ReadRevision(binaryMap).SequenceEqual(new byte[] { 0x00, 0x00, 0x61, 0x45 }) &&
                ComputeSha256(binaryRaid).Equals(binaryBefore.RaidSha256, StringComparison.OrdinalIgnoreCase),
             "Standalone treasure must round-trip signed hashes through DSON, preserve revision and paired raid bytes, and clear battle bindings.");
+        var binaryTrap = binaryCatalog.Traps.Single(item => item.Id == " spaced_trap ");
+        var binaryTrapPrepared = await service.PreparePlaceContentAsync(binaryProfile, binaryAfter, "coAB", "tile2", binaryTrap);
+        _ = await service.CommitAsync(binaryTrapPrepared);
+        var binaryTrapAfter = await reader.LoadAsync(binaryRoot);
+        var binaryTrapTile = binaryTrapAfter.Areas.Single(area => area.AreaId == "coAB").Tiles.Single(tile => tile.TileId == "tile2");
+        Assert(binaryTrapPrepared.TargetFile.SourceWasDson && binaryTrapTile.TrapHash ==
+                   unchecked((int)Loc2LocalizationReader.HashName(" spaced_trap ")) &&
+               binaryTrapTile.RawContent == 3 && binaryTrapTile.MashIndex == -1 && binaryTrapTile.MashType == 7 &&
+               ReadRevision(binaryMap).SequenceEqual(new byte[] { 0x00, 0x00, 0x61, 0x45 }) &&
+               ComputeSha256(binaryRaid).Equals(binaryBefore.RaidSha256, StringComparison.OrdinalIgnoreCase),
+            "Spaced trap identities must round-trip through DSON without trimming or changing paired raid bytes.");
         RunRegionalMapContentContracts(root, content);
+        RunMapPropNativeContracts(root, content);
         Console.WriteLine("Battle standalone content contracts passed.");
     }
 

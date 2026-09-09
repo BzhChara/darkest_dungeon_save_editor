@@ -1,5 +1,3 @@
-using System.Globalization;
-
 namespace DarkestDungeonSaveEditor.Core;
 
 internal sealed record RegionalMapContentChoice(
@@ -69,18 +67,17 @@ public static partial class BattleRoomAttachmentCatalog
 
     private static IReadOnlyList<RegionalMapContentChoice> BuildRegionalPool(
         IReadOnlyList<ParsedAttachment> parsed,
-        IReadOnlyList<ParsedAttachment> selected,
         IReadOnlyList<BattleRoomAttachmentDefinition> definitions)
     {
-        var selectedByKey = selected.ToDictionary(item => DefinitionKey(item.Definition), StringComparer.Ordinal);
         var acceptedByKey = definitions.Where(item => item.IsRegionBound)
             .ToDictionary(DefinitionKey, StringComparer.Ordinal);
         var pool = new List<RegionalMapContentChoice>();
         foreach (var row in parsed.Where(item => item.RegionalWeight > 0))
         {
             var key = DefinitionKey(row.Definition);
-            if (acceptedByKey.TryGetValue(key, out var definition) &&
-                ContentFileOverlay.ComparePriority(row.Source, selectedByKey[key].Source) == 0)
+            // The canonical file has already been resolved by path. Do not apply
+            // an additional Mod/ID override to the native weighted entries.
+            if (acceptedByKey.TryGetValue(key, out var definition))
             {
                 pool.Add(new RegionalMapContentChoice(
                     definition.Kind, definition.OriginDungeonId, definition.Id, row.RegionalWeight));
@@ -89,17 +86,14 @@ public static partial class BattleRoomAttachmentCatalog
         return pool;
     }
 
-    private static double ReadRegionalWeight(string[] tokens, string path, int line, List<string> issues)
+    private static double ReadRegionalWeight(string body, string path, int line, List<string> issues)
     {
-        var indexes = Enumerable.Range(0, tokens.Length)
-            .Where(index => tokens[index].Equals(".chance", StringComparison.OrdinalIgnoreCase)).ToArray();
-        if (indexes.Length == 1 && indexes[0] + 1 < tokens.Length &&
-            double.TryParse(tokens[indexes[0] + 1], NumberStyles.Float, CultureInfo.InvariantCulture, out var weight) &&
-            double.IsFinite(weight) && weight >= 0)
+        var weight = NativeDarkestReader.ReadFloat(body, ".chance");
+        if (weight is { } value && double.IsFinite(value) && value >= 0)
         {
-            return weight;
+            return value;
         }
-        issues.Add($"地图区域资源未参与自动选择：.chance 权重缺失、重复或无效；文件={path}:{line}");
+        issues.Add($"地图区域资源未参与自动选择：.chance 权重缺失或无效；文件={path}:{line}");
         return 0;
     }
 }
