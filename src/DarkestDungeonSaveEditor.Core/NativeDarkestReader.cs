@@ -12,8 +12,11 @@ internal static partial class NativeDarkestReader
     private static partial Regex EntryRegex();
 
     internal static IEnumerable<(string Kind, string Body)> ReadRecords(string path)
+        => ReadRecordsFromText(File.ReadAllText(path, Encoding.UTF8));
+
+    internal static IEnumerable<(string Kind, string Body)> ReadRecordsFromText(string content)
     {
-        var text = StripComments(File.ReadAllText(path, Encoding.UTF8));
+        var text = StripComments(content);
         foreach (Match entry in EntryRegex().Matches(MaskHashComments(text)))
         {
             var body = entry.Groups["body"];

@@ -13,6 +13,7 @@ Throughout this document, "first" and "last" refer to the actual load sequence a
 | Resource layer | Behavior established by this experiment and prior evidence | Conclusions this does not establish |
 | --- | --- | --- |
 | Quantity item `(type,id)` | Query the first matching effective definition | Every related Effect/Buff also uses the first match |
+| Inventory config type (`raid`, `trinket_storage`) | Reuse the hash-keyed config; later `.max_slots` assignments replace earlier values, omission retains them | Pick the highest-priority Mod again across different file paths, or assume all inventory fields replace the complete object |
 | Trinket ID | Use the first matching complete effective entry; state fields from later entries are not merged into it | A referenced Buff with duplicate definitions also uses the first match |
 | Quirk ID | Use the last matching definition; see the existing quirk rules | All hero and monster attributes use the last complete declaration |
 | Hero class files | Resolve standard `.info`, `.art`, and `.override` paths independently; read the effective override after info | Arbitrarily named hero files are merged by class ID |
@@ -149,3 +150,19 @@ The 2026-09-08 task was research-only. The 2026-09-09 implementation integrates 
 The earlier upgrade-tree fix remains integrated. Manifest/file overrides, collision, monster-size and save-identity guards are retained. A single global first/last switch cannot replace these rules.
 
 Unverified coverage still includes every Effect/skill list and condition field, all AI desires/cooldowns/action mechanics, actual death branches, all special recruitment scripts, every duplicate variant in curio interactions, and combat resolution with missing resources. These findings disprove a universal "last complete declaration wins" rule; they do not establish that the editor fully reproduces all game resource semantics.
+
+## 7. Inventory System Capacity
+
+The 2026-09-09 obsolete-rule audit traced the inventory config loader in the same executable identified above. This addition is static native-code evidence plus executable editor contracts, not a new in-game capacity A/B experiment.
+
+- `0x1404C7EC0` calls `StorageManager::IO_FindFiles` with flags 0 for `.*inventory/.*\.inventory.system_configs.darkest`, then calls `0x1404C81C0` for every returned file in sequence (`0x1404C803D`). Existing native file-slot and overlay rules therefore apply.
+- `0x1404C8297` reads the last `.type` string into a 64-byte NUL-terminated buffer. The key at `0x1404C82B0` is the polynomial-53 hash of the case-sensitive bytes. `raid` and `RAID` do not name the same inventory config.
+- The tree-map lookup reuses an existing config when the hash exists (`0x1404C8303` to `0x1404C839F`). Only a new node is zero-initialized. This is neither first complete definition wins nor last complete definition replaces everything.
+- `0x1404C83EF` calls the last-field helper for `.max_slots`. An absent field skips the assignment. A present field goes through `atoi` at `0x1404C8401` and overwrites the config's slot count at `node+0x64`.
+- Within one record, `.max_slots 3 .max_slots 1` therefore assigns 1. `.max_slots +3suffix` assigns 3; `.max_slots invalid`, a quoted number, or an explicit empty value assigns 0. The editor rejects final non-positive capacities and unproven integer-overflow results. It does not revert to a preceding positive value. If no line assigns a capacity, the native default is 0 and editing is disabled.
+
+For example, Base file `inventory/a.inventory.system_configs.darkest` sets 4. A high-priority Mod replaces that same file with 9, while a lower-priority Mod adds a distinct later file `inventory/z.inventory.system_configs.darkest` setting 3. The effective native sequence is `a=9`, then `z=3`; the capacity is 3. Mod priority selects the bytes at `a`, but does not move that slot after `z`. If `z` omits `.max_slots`, the capacity remains 9.
+
+Both editor capacity catalogs use `InventorySystemConfigCatalog` and the shared `NativeDarkestReader`. The selected definition records the source path and SHA-256 of the same captured bytes that last assigned the field. Preview/commit still re-resolve and validate that result. Missing listed files remain overlay candidates so a missing winning file cannot expose lower-priority contents; a fully shadowed missing lower file does not invalidate readable winning bytes. Effective read failures, unresolved mount/path order, and type-hash collisions remain guarded. Config files containing a NUL byte are rejected: native LineReader stops at NUL (`0x14028E1F5` / `0x14028E1F7`), so managed text after it must not supply a larger capacity. This is a conservative rejection, not emulation of partial binary/corrupt config files.
+
+This correction does not implement every inventory setting or runtime stack modifier. In particular, reading `.use_stack_limits` and `inventory.extra_stack_limits` as a complete gameplay system is separate from resolving the maximum slot count. The existing conservative base-stack allocation policy is unchanged. Audit decisions and validation are recorded in [obsolete-rule audit](change-history/obsolete-rule-audit-2026-09-09.md).
