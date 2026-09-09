@@ -94,7 +94,7 @@ internal static partial class ContractSuite
         var localRulesRoot = Path.Combine(localModRoot, "rules");
         var localProvisionRoot = Path.Combine(localModRoot, "campaign", "provision");
         var localTownEventsRoot = Path.Combine(localModRoot, "campaign", "town_events");
-        var localMonsterRoot = Path.Combine(localModRoot, "monsters", "quantity_reference_probe");
+        var localMonsterRoot = Path.Combine(localModRoot, "monsters", "quantity_reference_probe", "quantity_reference_probe_A");
         var localRaidCampingRoot = Path.Combine(localModRoot, "raid", "camping");
         var activeWorkshopDlcRoot = Path.Combine(activeWorkshopRoot, "dlc", "100_feature_pack");
         var activeWorkshopDlcTrinketRoot = Path.Combine(activeWorkshopDlcRoot, "trinkets");
@@ -576,7 +576,7 @@ internal static partial class ContractSuite
     """,
             new UTF8Encoding(false));
         File.WriteAllText(
-            Path.Combine(localMonsterRoot, "quantity_reference_probe.info.darkest"),
+            Path.Combine(localMonsterRoot, "quantity_reference_probe_A.info.darkest"),
             """
     monster: .id "quantity_reference_probe"
     loot: .code "LOCAL_RAID_LOOT" .count 1
@@ -711,7 +711,7 @@ internal static partial class ContractSuite
         File.WriteAllText(
             Path.Combine(activeWorkshopDlcRoot, "heroes", "dlc_shared_hero", "dlc_shared_hero.info.darkest"),
             """
-    combat_skill: .id "modded_dlc_skill" .level 0 .effect "DLC Priority Effect" .generation_guaranteed
+    combat_skill: .id "modded_dlc_skill" .level 0 .effect "DLC Priority Effect" .generation_guaranteed true
     generation: .is_generation_enabled true .number_of_random_combat_skills 1
     """,
             new UTF8Encoding(false));
@@ -929,8 +929,8 @@ internal static partial class ContractSuite
     weapon: .name "runtime_hero_weapon_1" .dmg 5 9 .upgradeRequirementCode 0
     armour: .name "runtime_hero_armour_0" .def 0% .prot 0 .hp 18 .spd 0
     armour: .name "runtime_hero_armour_1" .def 5% .prot 0 .hp 22 .spd 0 .upgradeRequirementCode 0
-    combat_skill: .id "runtime_strike" .level 0 .effect "Grant Runtime Quirk" .generation_guaranteed
-    combat_skill: .id "runtime_guard" .level 0 .effect "Grant Runtime Quirk" .target_effects "Priority Effect" .generation_guaranteed
+    combat_skill: .id "runtime_strike" .level 0 .effect "Grant Runtime Quirk" .generation_guaranteed true
+    combat_skill: .id "runtime_guard" .level 0 .effect "Grant Runtime Quirk" .valid_modes target .target_effects "Priority Effect" .generation_guaranteed true
     quirk_modifier: .incompatible_class_ids runtime_excluded_a runtime_excluded_b
     skill_selection: .can_select_combat_skills true .number_of_selected_combat_skills_max 2
     generation: .is_generation_enabled true .number_of_positive_quirks_min 0 .number_of_positive_quirks_max 0 .number_of_negative_quirks_min 0 .number_of_negative_quirks_max 0 .number_of_random_combat_skills 2
@@ -952,8 +952,8 @@ internal static partial class ContractSuite
     weapon: .name "runtime_hero_weapon_1" .dmg 5 9 .upgradeRequirementCode 0
     armour: .name "runtime_hero_armour_0" .def 0% .prot 0 .hp 18 .spd 0
     armour: .name "runtime_hero_armour_1" .def 5% .prot 0 .hp 22 .spd 0 .upgradeRequirementCode 0
-    combat_skill: .id "runtime_guard" .level 0 .effect "Grant Runtime Quirk" .target_effects "Priority Effect" .generation_guaranteed
-    combat_skill: .id "runtime_strike" .level 0 .effect "Grant Runtime Quirk" .generation_guaranteed
+    combat_skill: .id "runtime_guard" .level 0 .effect "Grant Runtime Quirk" .valid_modes target .target_effects "Priority Effect" .generation_guaranteed true
+    combat_skill: .id "runtime_strike" .level 0 .effect "Grant Runtime Quirk" .generation_guaranteed true
     quirk_modifier: .incompatible_class_ids runtime_excluded_b runtime_excluded_a
     skill_selection: .can_select_combat_skills true .number_of_selected_combat_skills_max 2
     generation: .is_generation_enabled true .number_of_positive_quirks_min 0 .number_of_positive_quirks_max 0 .number_of_negative_quirks_min 0 .number_of_negative_quirks_max 0 .number_of_random_combat_skills 2
@@ -1031,7 +1031,7 @@ internal static partial class ContractSuite
         File.WriteAllText(
             Path.Combine(activeWorkshopLocalHeroRoot, "local_hero.info.darkest"),
             """
-    combat_skill: .id "workshop_lower_priority_skill" .level 0 .effect "Priority Effect" .generation_guaranteed
+    combat_skill: .id "workshop_lower_priority_skill" .level 0 .effect "Priority Effect" .generation_guaranteed true
     skill_selection: .can_select_combat_skills true .number_of_selected_combat_skills_max 1
     generation: .is_generation_enabled true .number_of_positive_quirks_min 0 .number_of_positive_quirks_max 0 .number_of_negative_quirks_min 0 .number_of_negative_quirks_max 0 .number_of_random_combat_skills 1
     """,
@@ -1293,7 +1293,7 @@ internal static partial class ContractSuite
     armour: .name "local_hero_armour_2" .def 10% .prot 0 .hp 28 .spd 0 .upgradeRequirementCode 1
     armour: .name "local_hero_armour_3" .def 15% .prot 0 .hp 32 .spd 0 .upgradeRequirementCode 2
     armour: .name "local_hero_armour_4" .def 20% .prot 0 .hp 36 .spd 0 .upgradeRequirementCode 3
-    combat_skill: .id "local_skill" .level 0 .effect "Priority Effect" .generation_guaranteed
+    combat_skill: .id "local_skill" .level 0 .effect "Priority Effect" .generation_guaranteed true
     combat_skill: .id "local_skill" .level 1
     combat_skill: .id "local_skill_two" .level 0
     combat_skill: .id "local_skill_two" .level 1
@@ -1676,7 +1676,7 @@ internal static partial class ContractSuite
         File.WriteAllText(
             Path.Combine(dlcPackageRoot, "heroes", "dlc_shared_hero", "dlc_shared_hero.info.darkest"),
             """
-    combat_skill: .id "shared_dlc_skill" .level 0 .effect "DLC Priority Effect" .generation_guaranteed
+    combat_skill: .id "shared_dlc_skill" .level 0 .effect "DLC Priority Effect" .generation_guaranteed true
     generation: .is_generation_enabled true .number_of_random_combat_skills 1
     """,
             new UTF8Encoding(false));

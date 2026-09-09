@@ -22,7 +22,7 @@ public static partial class HeroClassCatalog
         var effectCandidates = new Dictionary<string, List<EffectQuirkAssignment>>(StringComparer.OrdinalIgnoreCase);
         var quirkCandidates = new Dictionary<string, List<QuirkDefinition>>(StringComparer.OrdinalIgnoreCase);
         var buffCandidates = new Dictionary<string, List<BuffDefinition>>(StringComparer.OrdinalIgnoreCase);
-        var campingSkills = new Dictionary<string, CampingSkillBuilder>(StringComparer.OrdinalIgnoreCase);
+        var campingSkills = new Dictionary<string, CampingSkillBuilder>(StringComparer.Ordinal);
         var heroNames = new HashSet<string>(StringComparer.Ordinal);
         var sourceFiles = new List<SourceFiles>();
         var enabledDlcPrefixes = ContentFileOverlay.GetEnabledDlcPrefixes(activeContent.Sources);
@@ -162,7 +162,7 @@ public static partial class HeroClassCatalog
                 {
                     if (!campingSkills.TryGetValue(skill.Id, out var builder))
                     {
-                        builder = new CampingSkillBuilder(skill.Id);
+                        builder = new CampingSkillBuilder(skill.Id, skill.IsShared);
                         campingSkills[skill.Id] = builder;
                     }
 
@@ -174,6 +174,14 @@ public static partial class HeroClassCatalog
                 issues.Add($"Failed to read camping skill definitions '{file.Path}': {ex.Message}");
             }
         }
+
+        foreach (var id in NativeResourceIdentity.FindCollisions(campingSkills.Keys))
+        {
+            campingSkills.Remove(id);
+            issues.Add($"Camping skill '{id}' has conflicting native identities and was left unresolved.");
+        }
+        foreach (var skill in campingSkills.Values.Where(skill => skill.IsShared is null))
+            issues.Add($"Camping skill '{skill.Id}' has no valid hero_classes array in its first record; generation classification is unavailable.");
 
         foreach (var file in nameFiles)
         {

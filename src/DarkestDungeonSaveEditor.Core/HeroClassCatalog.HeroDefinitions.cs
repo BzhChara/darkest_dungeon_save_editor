@@ -108,12 +108,12 @@ public static partial class HeroClassCatalog
                 .ToArray(),
             selected.GuaranteedCombatSkillIds.ToArray(),
             availableCampingSkills
-                .Where(skill => !skill.IsShared)
+                .Where(skill => skill.IsShared == false)
                 .Select(skill => skill.Id)
                 .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
                 .ToArray(),
             availableCampingSkills
-                .Where(skill => skill.IsShared)
+                .Where(skill => skill.IsShared == true)
                 .Select(skill => skill.Id)
                 .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
                 .ToArray(),
@@ -200,26 +200,12 @@ public static partial class HeroClassCatalog
 
     private static void ApplyHeroDefinitionFile(HeroCandidateBuilder builder, string path)
     {
-        foreach (var rawLine in File.ReadLines(path, Encoding.UTF8))
+        foreach (var (kind, body) in NativeDarkestReader.ReadRecords(path))
         {
-            var line = rawLine.Trim();
-            if (line.Length == 0 || line.StartsWith("//", StringComparison.Ordinal))
+            if (kind == "combat_skill")
             {
-                continue;
-            }
-
-            var separator = line.IndexOf(':');
-            if (separator <= 0)
-            {
-                continue;
-            }
-
-            var kind = line[..separator].Trim();
-            var attributes = ParseAttributes(line[(separator + 1)..]);
-            if (kind.Equals("combat_skill", StringComparison.OrdinalIgnoreCase))
-            {
-                var level = ReadInt(attributes, "level");
-                var skillId = ReadString(attributes, "id");
+                var level = NativeDarkestReader.ReadInt(body, ".level");
+                var skillId = NativeDarkestReader.ReadString(body, ".id");
                 if (string.IsNullOrWhiteSpace(skillId))
                 {
                     continue;
@@ -231,44 +217,43 @@ public static partial class HeroClassCatalog
                     continue;
                 }
 
-                if (ReadBooleanFlag(attributes, "generation_guaranteed") is { } generationGuaranteed)
+                if (NativeDarkestReader.ReadBoolean(body, ".generation_guaranteed") is { } generationGuaranteed)
                 {
                     builder.SetGuaranteedCombatSkill(skillId, generationGuaranteed);
                 }
 
-                foreach (var pair in attributes.Where(pair =>
-                             pair.Key.Equals("effect", StringComparison.OrdinalIgnoreCase) ||
-                             pair.Key.EndsWith("_effects", StringComparison.OrdinalIgnoreCase)))
+                builder.AppendSkillEffects(skillId, "effect", NativeDarkestReader.ReadStringList(body, ".effect", 16));
+                foreach (var mode in NativeDarkestReader.ReadStringList(body, ".valid_modes", 8, skipEmptyOrFieldTokens: true))
                 {
-                    if (pair.Key.Equals("effect", StringComparison.OrdinalIgnoreCase))
-                        builder.AppendSkillEffects(skillId, pair.Key, pair.Value);
-                    else
-                        builder.ReplaceSkillEffects(skillId, pair.Key, pair.Value);
+                    // Native mode lists append too, but only modes named by
+                    // this declaration are visited; arbitrary *_effects keys
+                    // are not independently loaded.
+                    var key = $"{mode}_effects";
+                    builder.AppendSkillEffects(skillId, key, NativeDarkestReader.ReadStringList(body, $".{key}", 12));
                 }
             }
-            else if (kind.Equals("skill_selection", StringComparison.OrdinalIgnoreCase))
+            else if (kind == "skill_selection")
             {
                 builder.CanSelectCombatSkills =
-                    ReadBooleanFlag(attributes, "can_select_combat_skills") ?? builder.CanSelectCombatSkills;
+                    NativeDarkestReader.ReadBoolean(body, ".can_select_combat_skills") ?? builder.CanSelectCombatSkills;
                 builder.SelectedCombatSkillsMax =
-                    ReadInt(attributes, "number_of_selected_combat_skills_max") ?? builder.SelectedCombatSkillsMax;
+                    NativeDarkestReader.ReadInt(body, ".number_of_selected_combat_skills_max") ?? builder.SelectedCombatSkillsMax;
             }
-            else if (kind.Equals("generation", StringComparison.OrdinalIgnoreCase))
+            else if (kind == "generation")
             {
-                builder.UpdateGeneration(attributes);
+                builder.UpdateGeneration(body);
             }
-            else if (kind.Equals("armour", StringComparison.OrdinalIgnoreCase))
+            else if (kind == "armour")
             {
-                builder.UpdateEquipmentRank("armour", attributes);
+                builder.UpdateEquipmentRank("armour", body);
             }
-            else if (kind.Equals("weapon", StringComparison.OrdinalIgnoreCase))
+            else if (kind == "weapon")
             {
-                builder.UpdateEquipmentRank("weapon", attributes);
+                builder.UpdateEquipmentRank("weapon", body);
             }
-            else if (kind.Equals("quirk_modifier", StringComparison.OrdinalIgnoreCase) &&
-                     attributes.TryGetValue("incompatible_class_ids", out var incompatibleIds))
+            else if (kind == "quirk_modifier")
             {
-                builder.AddIncompatibleInitialQuirks(incompatibleIds);
+                builder.AddIncompatibleInitialQuirks(NativeDarkestReader.ReadStringList(body, ".incompatible_class_ids", 32));
             }
         }
     }

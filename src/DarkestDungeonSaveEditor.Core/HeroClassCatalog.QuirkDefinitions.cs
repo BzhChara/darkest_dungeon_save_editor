@@ -193,23 +193,11 @@ public static partial class HeroClassCatalog
 
     private static IEnumerable<EffectQuirkAssignment> ReadEffectAssignments(string path, string source)
     {
-        foreach (var rawLine in File.ReadLines(path, Encoding.UTF8))
+        foreach (var (kind, body) in NativeDarkestReader.ReadRecords(path))
         {
-            var line = rawLine.Trim();
-            if (line.Length == 0 || line.StartsWith("//", StringComparison.Ordinal))
-            {
-                continue;
-            }
-
-            var separator = line.IndexOf(':');
-            if (separator <= 0 || !line[..separator].Trim().Equals("effect", StringComparison.OrdinalIgnoreCase))
-            {
-                continue;
-            }
-
-            var attributes = ParseAttributes(line[(separator + 1)..]);
-            var name = ReadString(attributes, "name");
-            var quirkId = ReadString(attributes, "disease");
+            if (kind != "effect") continue;
+            var name = NativeDarkestReader.ReadString(body, ".name");
+            var quirkId = NativeDarkestReader.ReadString(body, ".disease");
             // The native Effect object survives duplicate declarations:
             // omitted disease retains the old string; explicit "" clears it.
             // Keep even non-disease entries for native identity validation.

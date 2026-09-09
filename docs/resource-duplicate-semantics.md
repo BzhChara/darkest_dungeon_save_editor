@@ -142,7 +142,7 @@ This experiment establishes that the game loader accepts missing/empty rows and 
 The 2026-09-08 task was research-only. The 2026-09-09 implementation integrates these bounded rules:
 
 - Hero HP analysis takes the last complete Buff definition in effective native file order. A later non-HP Buff removes the earlier HP contribution; missing/malformed HP fields and unknown conditions remain guarded.
-- Hero level-0 `.effect` references append across repeated skills and info/override files, preserve duplicates, and survive explicit empty lists. UI quirk clues still deduplicate their display. Other `*_effects` lists retain their existing policy and are not claimed to share the tested append rule.
+- Hero level-0 `.effect` references append across repeated skills and info/override files, preserve duplicates, and survive explicit empty lists. UI quirk clues still deduplicate their display. The later static audit also traced the bounded mode-effect lists; see section 8 for their entry conditions and append behavior.
 - Runtime quirk clues use the effective `.disease` field state, including omission and explicit clearing. They describe possible later gameplay grants; they do not automatically add those quirks to generated heroes. This is not a complete Effect interpreter or a general Effect-to-item dependency graph.
 - Hero recruitment sources use the first same-ID event result, including an empty first result. Quantity-item analysis likewise ignores later same-ID `data` results while retaining other candidate fields; it does not simulate random event selection. Ordinary generation labels do not rule out event/script acquisition.
 - Explicit empty encounters retain indexes across catalog, direct/Bridge preflight and maintenance, without becoming placeable.
@@ -166,3 +166,48 @@ For example, Base file `inventory/a.inventory.system_configs.darkest` sets 4. A 
 Both editor capacity catalogs use `InventorySystemConfigCatalog` and the shared `NativeDarkestReader`. The selected definition records the source path and SHA-256 of the same captured bytes that last assigned the field. Preview/commit still re-resolve and validate that result. Missing listed files remain overlay candidates so a missing winning file cannot expose lower-priority contents; a fully shadowed missing lower file does not invalidate readable winning bytes. Effective read failures, unresolved mount/path order, and type-hash collisions remain guarded. Config files containing a NUL byte are rejected: native LineReader stops at NUL (`0x14028E1F5` / `0x14028E1F7`), so managed text after it must not supply a larger capacity. This is a conservative rejection, not emulation of partial binary/corrupt config files.
 
 This correction does not implement every inventory setting or runtime stack modifier. In particular, reading `.use_stack_limits` and `inventory.extra_stack_limits` as a complete gameplay system is separate from resolving the maximum slot count. The existing conservative base-stack allocation policy is unchanged. Audit decisions and validation are recorded in [obsolete-rule audit](change-history/obsolete-rule-audit-2026-09-09.md).
+
+## 8. Hero Text, Equipment Slots, Camping Pools and Item References
+
+The second 2026-09-09 audit uses static disassembly of the same x64 build 27890 executable identified above, plus executable editor contracts. It is not another live-game A/B experiment. The complete audit, provenance and retained policies are in [legacy compatibility audit](change-history/legacy-compatibility-audit-2026-09-09.md).
+
+### 8.1 Text fields are not a permissive dictionary language
+
+Hero info/art/override and Effect records use the shared native record reader. Records can span physical lines or share one line. Slash and block comments are removed before strings are parsed, without quote protection or escape decoding. NUL terminates the readable text; text after it does not supply later records. Hash comments suppress record boundaries but remain in copied record bodies, as documented by the earlier reader research. Definition kinds and field searches are case-sensitive.
+
+- Hero record dispatch is `0x1404C3860`. Generation integers call the last-field helper `0x14036B300` and `atoi`, for example class camping count at `0x1404C3F72`–`0x1404C3F91`. Skill-selection count follows the same pattern at `0x1404C40C9`–`0x1404C40EC`.
+- Generation/selection booleans use `0x14036C950` followed by `0x14036B0B0`; skill `.generation_guaranteed` uses `0x14036C400` with its whitespace-check option disabled, then the same bool conversion. An absent field retains the prior value. An empty field is false, not an implied true. Accepted true strings are `t/T`, `true/True/TRUE`, `1`, `y/Y`, `yes/Yes/YES`, and `on/On/ON`; arbitrary mixed case such as `TrUe` is false.
+- Integer prefixes are accepted: `2suffix` gives 2; quoted or nonnumeric values give 0. Integer overflow is outside the established supported range.
+- Armor HP (`0x140486956`–`0x14048695D`) and generation card chance (`0x1404C401B`) call float reader `0x14036C270`. It selects the last field occurrence followed immediately by TAB, SPACE, `=` or NUL, parses a numeric prefix, stores a float, and multiplies by `0.01f` only when `%` immediately follows the consumed number. Thus `3100%` is HP 31, while `33suffix` is HP 33. Omitting HP retains its existing value; assigning nonnumeric HP overwrites with zero and makes that armor unusable for generation.
+
+These are separate field helpers, not a universal instruction to take the last full resource definition. Buff, Effect, skill, item and tree object-merging rules remain distinct.
+
+### 8.2 Skill lists have limits and explicit entry conditions
+
+`0x140480CA0` reads ordinary `.effect` into sixteen 64-byte buffers. The consumer at `0x140481550`–`0x1404815FA` stops at the first empty or dot-prefixed token, including a quoted token. Each nonempty matching Effect appends to the existing skill list. An empty list does not clear previous declarations. This differs from the encounter parser, whose empty raw monster positions must remain counted.
+
+Mode effects are not every field whose name ends in `_effects`. The same native function first reads up to eight `.valid_modes` (`0x140481651` onward), then looks for `.<mode>_effects` for each mode named in that declaration (`0x1404817A3`). Empty/dot-prefixed mode slots are skipped, not terminal: the branch at `0x140481753` / `0x14048175B` reaches the increment at `0x140481AAB`. They still consume slots in the eight-token limit. In contrast, each mode's effect list reads at most twelve tokens, stops on empty/dot-prefixed tokens, and appends (`0x140481A36`–`0x140481A60`). A standalone `.orphan_effects` without that mode in the current declaration does not enter this branch. Missing/empty later mode-effect lists retain prior references.
+
+The hero's `quirk_modifier .incompatible_class_ids` uses the corresponding bounded list reader with a maximum of 32 (`0x1404C463E`, wrapper `0x14028FEB0`, stop checks `0x14029002E`–`0x140290037`). These lexical/list corrections affect potential runtime quirk clues and generation constraints; they do not automatically assign skill-granted quirks to a new hero or simulate the effects in combat.
+
+### 8.3 Equipment rank is a vector position, not a name suffix
+
+Native weapon/armor lookup compares the authored `.name` strings and reuses the matching object. A new name appends to the class vector: weapon lookup/append is `0x1404C3956`–`0x1404C3A91`, armor lookup/append is `0x1404C3AEB`–`0x1404C3C1F`. Vector strides are respectively `0x130` and `0x128`.
+
+The native name buffer is 64 bytes (`0x1404C3AC8`–`0x1404C3AD8`), including NUL. The editor retains authored names and keys slots by their first 63 UTF-8 bytes, without case folding or decoding a truncated byte sequence into replacement characters. Two longer names with the same 63-byte prefix update one slot. Rank follows first insertion order of these native names. `worn_coat`, `replacement_armour_0`, `Coat` and `coat` can identify four distinct slots in that order; suffix `0` does not move the second slot to the front. Later updates to `worn_coat` keep rank 0. Upgrade requirement codes still bind those slots to the effective `<class>.weapon` / `<class>.armour` trees. Numeric-name inference and its nonnumeric-name omission were removed. This is not a claim that every malformed equipment declaration or native override-only mode is fully modeled.
+
+### 8.4 Camping classification comes from the first stored record
+
+The camping loader `0x1404A4AF0` enumerates effective `raid/camping/.*camping_skills.json` files. Every file starts with threshold 0. An assigned `configuration.class_specific_number_of_classes_threshold` changes that file's threshold; omission does not inherit another file's value.
+
+The raw JSON `hero_classes` array length is compared to the threshold at `0x1404A5F23`–`0x1404A5F3B`, using an unsigned comparison. Length at most the threshold means class-specific; greater length means shared. Duplicate/unknown class names still occupy raw array positions. The names `encourage`, `first_aid` and `pep_talk` receive no special exemption.
+
+Every record adds its applicable classes' skill-ID access. Same-hash skill records are appended to a group, rather than merged into one classification. During generation, `0x1405C7F76` reads the hero's available skill IDs; `0x1405C7FC0`–`0x1405C7FD4` selects the first record in the matching group, then `0x1405C7FE8` reads its classification flag. Thus later records can grant the same skill to another hero without changing the first record's classification. The editor keeps that first flag and unions exact class access; it does not OR flags across all declarations. Native-hash collisions and a first record missing a valid class array remain unavailable with diagnostics.
+
+### 8.5 Manifest eligibility and actor definition lookup are separate
+
+`modfiles.txt` still controls eligible Mod files; same-path content still follows native Mod/file-overlay order. It does not mean every listed actor definition is used from the path where its name was discovered. Hero definitions open `heroes/<id>/<id>.info.darkest`, with art/override resolved independently. Supported ASCII monster IDs open `monsters/<id minus final two characters>/<id>/<id>.info.darkest`, followed by art. Monster override files are not part of that observed branch.
+
+Quantity-item reachability applies these canonical-path checks to actor info/art/override files too. A listed classification-folder copy can no longer prove an item/loot-table reference. Independent provision JSON and other resource classes retain their own loading rules; this check is not a universal ban on nested directories. `.darkest` reference analysis shares native comment/record/scalar reading, so block-commented references do not become roots, and quoted-only, physical-line regexes no longer omit valid bare/multiline references.
+
+Reachability remains evidence of a potential path, not a full simulator of quest/event conditions, every Effect dependency, or runtime drop probabilities. It still preserves saved items and marks incomplete relevant scans as incomplete rather than claiming an absent reference proves universal nonuse.

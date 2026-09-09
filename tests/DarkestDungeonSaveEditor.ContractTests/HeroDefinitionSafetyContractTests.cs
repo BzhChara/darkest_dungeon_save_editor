@@ -44,8 +44,8 @@ internal static partial class ContractSuite
         var hero = catalog.HeroClasses.Single(row => row.Id == originalHero.Id);
         var candidate = StagecoachHeroCandidateFactory.Generate(catalog, hero, seed: 1729);
         Assert(hero.BaseHp == 33 && candidate.Preview.CurrentHp == 33 &&
-               hero.RuntimeQuirkSignals.Any(signal => signal.QuirkId == "priority_top_quirk" && signal.EffectName == ".Grant // \"Quoted\""),
-            "Inline comments must not override HP/effects; quoted leading dots, comment markers and escaped quotes must survive actual hero/effect discovery.");
+               !hero.RuntimeQuirkSignals.Any(signal => signal.EffectName.StartsWith(".Grant", StringComparison.Ordinal)),
+            "Slash comments are stripped before native strings; a quoted dot-prefixed effect is not a runtime quirk signal.");
         foreach (var id in new[] { "missing_direct", "missing_chain", "broken_chain" })
         {
             var quirk = catalog.InitialQuirks.Single(row => row.Id == id);
