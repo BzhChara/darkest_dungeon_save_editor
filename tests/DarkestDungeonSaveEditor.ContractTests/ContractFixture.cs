@@ -426,7 +426,7 @@ internal static partial class ContractSuite
           "on_quest_complete_additional_effects": ["contract_effect"]
         },
         { "id": "invalid_counter_probe", "rarity": "rare", "quest_uses": 0 },
-        { "id": "ambiguous_trinket", "rarity": "common", "price": 100 }
+        { "id": "ambiguous_trinketAz", "rarity": "common", "price": 100 }
       ]
     }
     """,
@@ -608,7 +608,7 @@ internal static partial class ContractSuite
     {
       "entries": [
         { "id": "active_workshop_trinket", "rarity": "rare", "price": 3000 },
-        { "id": "AMBIGUOUS_TRINKET", "rarity": "rare", "price": 9000 }
+        { "id": "ambiguous_trinketBE", "rarity": "rare", "price": 9000 }
       ]
     }
     """,

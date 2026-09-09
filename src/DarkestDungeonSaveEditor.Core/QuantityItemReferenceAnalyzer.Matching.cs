@@ -46,7 +46,7 @@ internal static partial class QuantityItemReferenceAnalyzer
 
     private static bool ContainsQuotedToken(string text, string token)
     {
-        return text.Contains($"\"{token}\"", StringComparison.OrdinalIgnoreCase);
+        return text.Contains($"\"{token}\"", StringComparison.Ordinal);
     }
 
     private static bool TryParseJson(string text, out JsonDocument? document)
@@ -73,7 +73,7 @@ internal static partial class QuantityItemReferenceAnalyzer
     {
         foreach (var property in item.EnumerateObject())
         {
-            if (property.Name.Equals(name, StringComparison.OrdinalIgnoreCase))
+            if (property.Name.Equals(name, StringComparison.Ordinal))
             {
                 value = property.Value;
                 return true;
@@ -107,7 +107,6 @@ internal static partial class QuantityItemReferenceAnalyzer
         string key,
         string message)
     {
-        key = key.Trim();
         if (string.IsNullOrWhiteSpace(key))
         {
             return;

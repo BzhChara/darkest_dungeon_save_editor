@@ -99,15 +99,15 @@ public static class QuantityItemSaveEditor
         foreach (var pair in items)
         {
             if (pair.Value is not JsonObject item ||
-                !JsonSupport.ReadString(item, "type")
-                    .Equals(definition.PersistedType, StringComparison.OrdinalIgnoreCase))
+                !JsonSupport.ReadRawString(item, "type")
+                    .Equals(definition.PersistedType, StringComparison.Ordinal))
             {
                 continue;
             }
 
             if (definition.StorageKind == QuantityItemStorageKind.EstateItems &&
-                !JsonSupport.ReadString(item, "id")
-                    .Equals(definition.PersistedId, StringComparison.OrdinalIgnoreCase))
+                !JsonSupport.ReadRawString(item, "id")
+                    .Equals(definition.PersistedId, StringComparison.Ordinal))
             {
                 continue;
             }

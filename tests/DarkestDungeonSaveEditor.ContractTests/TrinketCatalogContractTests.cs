@@ -30,7 +30,7 @@ internal static partial class ContractSuite
         Assert(
             catalogWithEmptyDlc.Trinkets.Count == activeCatalog.Trinkets.Count,
             "An enabled DLC source without a trinkets directory should be ignored without failing the catalog.");
-        Assert(activeCatalog.Trinkets.Count == 15, "Active catalog should contain base, stateful fixtures, enabled DLC package/feature, active Workshop, default/extra local Mods, provenance probes, and one unresolved duplicate trinket.");
+        Assert(activeCatalog.Trinkets.Count == 16, "Active catalog should contain base, stateful fixtures, enabled DLC package/feature, active Workshop, default/extra local Mods, provenance probes, and two unresolved native-hash collisions.");
         var activeWorkshopTrinket = activeCatalog.Trinkets.Single(item => item.Id == "active_workshop_trinket");
         Assert(
             activeWorkshopTrinket.LocalizedName == new BilingualContentName("编译工坊饰品", "Compiled Workshop Trinket"),
@@ -162,7 +162,7 @@ internal static partial class ContractSuite
             item.Id == "mod_only_in_overridden_trinket_file");
         var overriddenDlcTrinket = activeCatalog.Trinkets.Single(item => item.Id == "dlc_shared_trinket");
         var overriddenDlcFeatureTrinket = activeCatalog.Trinkets.Single(item => item.Id == "enabled_dlc_trinket");
-        var ambiguousTrinket = activeCatalog.Trinkets.Single(item => item.Id == "ambiguous_trinket");
+        var ambiguousTrinket = activeCatalog.Trinkets.Single(item => item.Id == "ambiguous_trinketAz");
         Assert(!ordinary.IsStateful, "focus_ring should be writable.");
         Assert(ordinary.Limit == 1, "focus_ring should retain its per-id definition limit independently of storage capacity.");
         Assert(ordinary.SourceLabel == "原版", "An untouched base trinket should display its original-game provenance.");
@@ -254,10 +254,10 @@ internal static partial class ContractSuite
             "A Mod should override an enabled DLC feature trinket through its full virtual path.");
         Assert(
             ambiguousTrinket.HasProviderConflict && ambiguousTrinket.Source == "unresolved",
-            "Case-distinct trinket IDs must not be conflated by the current selection key.");
+            "Trinket IDs sharing a native hash must remain unavailable.");
         Assert(
-            activeCatalog.Issues.Any(issue => issue.Contains("Trinket 'ambiguous_trinket'", StringComparison.Ordinal)),
-            "An unresolved semantic trinket duplicate should be reported.");
+            activeCatalog.Issues.Any(issue => issue.Contains("Trinket IDs share native hashes", StringComparison.Ordinal)),
+            "An unresolved native trinket identity should be reported.");
 
 
         return new TrinketCatalogContractState(

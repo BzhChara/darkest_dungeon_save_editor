@@ -20,7 +20,7 @@ public static partial class QuantityItemCatalog
                 continue;
             }
 
-            var persistedType = JsonSupport.ReadString(item, "type");
+            var persistedType = JsonSupport.ReadRawString(item, "type");
             var amount = JsonSupport.ReadInt(item, "amount");
             if (string.IsNullOrWhiteSpace(persistedType) || amount is null or < 0)
             {
@@ -43,8 +43,8 @@ public static partial class QuantityItemCatalog
                 continue;
             }
 
-            var persistedType = JsonSupport.ReadString(item, "type");
-            var persistedId = JsonSupport.ReadString(item, "id");
+            var persistedType = JsonSupport.ReadRawString(item, "type");
+            var persistedId = JsonSupport.ReadRawString(item, "id");
             var amount = JsonSupport.ReadInt(item, "amount");
             if (string.IsNullOrWhiteSpace(persistedType) || string.IsNullOrWhiteSpace(persistedId) ||
                 amount is null or < 0)
@@ -77,8 +77,8 @@ public static partial class QuantityItemCatalog
                 continue;
             }
 
-            var persistedType = JsonSupport.ReadString(item, "type");
-            var persistedId = JsonSupport.ReadString(item, "id");
+            var persistedType = JsonSupport.ReadRawString(item, "type");
+            var persistedId = JsonSupport.ReadRawString(item, "id");
             var amount = JsonSupport.ReadInt(item, "amount");
             if (string.IsNullOrWhiteSpace(persistedType) || amount is null or < 0)
             {
@@ -86,7 +86,7 @@ public static partial class QuantityItemCatalog
                 continue;
             }
 
-            if (persistedType.Equals("trinket", StringComparison.OrdinalIgnoreCase))
+            if (persistedType.Equals("trinket", StringComparison.Ordinal))
             {
                 // Trinkets remain instance-based content even when carried in the raid bag.
                 // They belong to the dedicated trinket workflow and must never be exposed as

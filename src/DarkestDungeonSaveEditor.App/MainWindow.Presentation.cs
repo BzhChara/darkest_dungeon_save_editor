@@ -161,7 +161,7 @@ public partial class MainWindow : Window
     {
         if (definition.StorageKind == QuantityItemStorageKind.RaidInventory)
         {
-            return definition.InventoryType.Equals("quest_item", StringComparison.OrdinalIgnoreCase)
+            return definition.InventoryType.Equals("quest_item", StringComparison.Ordinal)
                 ? "任务物品可能影响当前任务目标，请确认所选 ID 与当前副本相符。"
                 : string.Empty;
         }

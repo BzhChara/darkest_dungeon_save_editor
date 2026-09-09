@@ -53,7 +53,7 @@ public sealed partial class SaveEditService
             manifestFingerprints,
             "after the quantity-item catalog was loaded; reload the content catalog");
         var currentItem = currentDefinitions.SingleOrDefault(definition =>
-            definition.CatalogKey.Equals(item.CatalogKey, StringComparison.OrdinalIgnoreCase));
+            definition.CatalogKey.Equals(item.CatalogKey, StringComparison.Ordinal));
         if (item.IsSaveOnly)
         {
             if (currentItem is not null)
@@ -386,7 +386,7 @@ public sealed partial class SaveEditService
         }
 
         var currentItem = currentDefinitions.SingleOrDefault(definition =>
-            definition.CatalogKey.Equals(prepared.Item.CatalogKey, StringComparison.OrdinalIgnoreCase));
+            definition.CatalogKey.Equals(prepared.Item.CatalogKey, StringComparison.Ordinal));
         if (prepared.Item.IsSaveOnly)
         {
             if (currentItem is not null)
@@ -418,9 +418,9 @@ public sealed partial class SaveEditService
         QuantityItemDefinition left,
         QuantityItemDefinition right)
     {
-        return left.CatalogKey.Equals(right.CatalogKey, StringComparison.OrdinalIgnoreCase) &&
-               left.InventoryType.Equals(right.InventoryType, StringComparison.OrdinalIgnoreCase) &&
-               left.ItemId.Equals(right.ItemId, StringComparison.OrdinalIgnoreCase) &&
+        return left.CatalogKey.Equals(right.CatalogKey, StringComparison.Ordinal) &&
+               left.InventoryType.Equals(right.InventoryType, StringComparison.Ordinal) &&
+               left.ItemId.Equals(right.ItemId, StringComparison.Ordinal) &&
                left.StorageKind == right.StorageKind &&
                left.BaseStackLimit == right.BaseStackLimit &&
                left.EstateCanBeProvision == right.EstateCanBeProvision &&

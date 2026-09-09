@@ -356,7 +356,7 @@ public partial class MainWindow : Window
                 var targetAmount = _preparedQuantityItemEdit.Preview.TargetAmount;
                 var resultingEntryCount = _preparedQuantityItemEdit.Preview.ResultingMatchingEntries;
                 _allItems = _allItems
-                    .Select(item => item.CatalogKey.Equals(editedKey, StringComparison.OrdinalIgnoreCase)
+                    .Select(item => item.CatalogKey.Equals(editedKey, StringComparison.Ordinal)
                         ? item with
                         {
                             CurrentAmount = targetAmount,

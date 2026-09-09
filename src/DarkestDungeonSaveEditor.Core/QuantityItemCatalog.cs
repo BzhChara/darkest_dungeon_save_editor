@@ -10,9 +10,9 @@ public static partial class QuantityItemCatalog
 {
     private const string InventoryItemSuffix = ".inventory.items.darkest";
     private static readonly HashSet<string> WalletInventoryTypes =
-        new(StringComparer.OrdinalIgnoreCase) { "gold", "heirloom", "shard" };
+        new(StringComparer.Ordinal) { "gold", "heirloom", "shard" };
     private static readonly HashSet<string> EstateInventoryTypes =
-        new(StringComparer.OrdinalIgnoreCase) { "estate", "estate_currency" };
+        new(StringComparer.Ordinal) { "estate", "estate_currency" };
 
     public static async Task<QuantityItemCatalogResult> LoadAsync(
         ActiveContentSnapshot activeContent,
@@ -105,17 +105,17 @@ public static partial class QuantityItemCatalog
         var definitions = LoadDefinitions(activeContent, QuantityItemSaveContext.Town, issues);
         var savedEntries = ReadSavedEntries(estateRoot, issues);
         var savedEntryCounts = savedEntries
-            .GroupBy(entry => entry.CatalogKey, StringComparer.OrdinalIgnoreCase)
+            .GroupBy(entry => entry.CatalogKey, StringComparer.Ordinal)
             .ToDictionary(
                 group => group.Key,
                 group => group.Count(),
-                StringComparer.OrdinalIgnoreCase);
+                StringComparer.Ordinal);
         var amounts = savedEntries
-            .GroupBy(entry => entry.CatalogKey, StringComparer.OrdinalIgnoreCase)
+            .GroupBy(entry => entry.CatalogKey, StringComparer.Ordinal)
             .ToDictionary(
                 group => group.Key,
                 group => SumAmounts(group.Select(entry => entry.Amount), group.Key),
-                StringComparer.OrdinalIgnoreCase);
+                StringComparer.Ordinal);
 
         var referenceAnalysis = QuantityItemReferenceAnalyzer.Analyze(
             activeContent,
@@ -140,7 +140,7 @@ public static partial class QuantityItemCatalog
 
         foreach (var entry in savedEntries
                      .Where(entry => amounts.ContainsKey(entry.CatalogKey))
-                     .DistinctBy(entry => entry.CatalogKey, StringComparer.OrdinalIgnoreCase))
+                     .DistinctBy(entry => entry.CatalogKey, StringComparer.Ordinal))
         {
             merged.Add(new QuantityItemDefinition(
                 entry.PersistedType,
@@ -162,7 +162,7 @@ public static partial class QuantityItemCatalog
             });
         }
 
-        var requestedKeys = merged.SelectMany(GetLocalizationKeys).Distinct(StringComparer.OrdinalIgnoreCase);
+        var requestedKeys = merged.SelectMany(GetLocalizationKeys).Distinct(StringComparer.Ordinal);
         var localization = ContentLocalizationCatalog.Load(activeContent, requestedKeys);
         issues.AddRange(localization.Issues);
         var localized = merged
@@ -206,14 +206,14 @@ public static partial class QuantityItemCatalog
         var definitions = LoadDefinitions(activeContent, QuantityItemSaveContext.Raid, issues);
         var savedEntries = ReadSavedRaidEntries(raidRoot, issues);
         var savedEntryCounts = savedEntries
-            .GroupBy(entry => entry.CatalogKey, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(group => group.Key, group => group.Count(), StringComparer.OrdinalIgnoreCase);
+            .GroupBy(entry => entry.CatalogKey, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.Count(), StringComparer.Ordinal);
         var amounts = savedEntries
-            .GroupBy(entry => entry.CatalogKey, StringComparer.OrdinalIgnoreCase)
+            .GroupBy(entry => entry.CatalogKey, StringComparer.Ordinal)
             .ToDictionary(
                 group => group.Key,
                 group => SumAmounts(group.Select(entry => entry.Amount), group.Key),
-                StringComparer.OrdinalIgnoreCase);
+                StringComparer.Ordinal);
         var referenceAnalysis = QuantityItemReferenceAnalyzer.Analyze(
             activeContent,
             definitions,
@@ -237,7 +237,7 @@ public static partial class QuantityItemCatalog
 
         foreach (var entry in savedEntries
                      .Where(entry => amounts.ContainsKey(entry.CatalogKey))
-                     .DistinctBy(entry => entry.CatalogKey, StringComparer.OrdinalIgnoreCase))
+                     .DistinctBy(entry => entry.CatalogKey, StringComparer.Ordinal))
         {
             merged.Add(new QuantityItemDefinition(
                 entry.PersistedType,
@@ -259,7 +259,7 @@ public static partial class QuantityItemCatalog
             });
         }
 
-        var requestedKeys = merged.SelectMany(GetLocalizationKeys).Distinct(StringComparer.OrdinalIgnoreCase);
+        var requestedKeys = merged.SelectMany(GetLocalizationKeys).Distinct(StringComparer.Ordinal);
         var localization = ContentLocalizationCatalog.Load(activeContent, requestedKeys);
         issues.AddRange(localization.Issues);
         var localized = merged

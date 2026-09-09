@@ -87,7 +87,7 @@ internal sealed class ContentLocalizationCatalog
             .Where(key => !string.IsNullOrWhiteSpace(key) && IsSupportedKey(key))
             .Distinct(StringComparer.Ordinal)
             .ToArray();
-        var requestedKeySet = requestedKeyArray.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var requestedKeySet = requestedKeyArray.ToHashSet(StringComparer.Ordinal);
         var candidates = new List<ContentFileCandidate>();
         var enabledDlcPrefixes = ContentFileOverlay.GetEnabledDlcPrefixes(activeContent.Sources);
         foreach (var source in activeContent.Sources.OrderBy(item => item.LoadOrder))
@@ -98,7 +98,7 @@ internal sealed class ContentLocalizationCatalog
             }
         }
 
-        var builders = new Dictionary<string, BilingualNameBuilder>(StringComparer.OrdinalIgnoreCase);
+        var builders = new Dictionary<string, BilingualNameBuilder>(StringComparer.Ordinal);
         var files = NativeContentFileResolver.Resolve(candidates, activeContent.Sources, "Localization", issues)
             .OrderBy(file => GetLayer(file.Source.Kind))
             .ThenBy(file => file.Source.Kind is "workshop" or "local"
@@ -187,7 +187,7 @@ internal sealed class ContentLocalizationCatalog
             builders.ToDictionary(
                 pair => pair.Key,
                 pair => new BilingualContentName(pair.Value.Chinese, pair.Value.English),
-                StringComparer.OrdinalIgnoreCase),
+                StringComparer.Ordinal),
             issues);
     }
 
@@ -249,7 +249,7 @@ internal sealed class ContentLocalizationCatalog
             foreach (var entry in language.Descendants("entry"))
             {
                 entryIndex++;
-                var key = ((string?)entry.Attribute("id"))?.Trim() ?? string.Empty;
+                var key = (string?)entry.Attribute("id") ?? string.Empty;
                 if (string.IsNullOrWhiteSpace(key) || string.IsNullOrWhiteSpace(languageId))
                 {
                     diagnostics.Skip($"XML 条目 {entryIndex}", string.IsNullOrWhiteSpace(key) ? "缺少 ID" : "缺少语言 ID");

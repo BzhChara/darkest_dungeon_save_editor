@@ -165,10 +165,10 @@ public static class RaidInventorySaveEditor
     {
         return items
             .Where(pair => pair.Value is JsonObject item &&
-                           JsonSupport.ReadString(item, "type")
-                               .Equals(definition.PersistedType, StringComparison.OrdinalIgnoreCase) &&
-                           JsonSupport.ReadString(item, "id")
-                               .Equals(definition.PersistedId, StringComparison.OrdinalIgnoreCase))
+                           JsonSupport.ReadRawString(item, "type")
+                               .Equals(definition.PersistedType, StringComparison.Ordinal) &&
+                           JsonSupport.ReadRawString(item, "id")
+                               .Equals(definition.PersistedId, StringComparison.Ordinal))
             .Select(pair => new SavedRaidItem(pair.Key, (JsonObject)pair.Value!))
             .OrderBy(match => TryParseSlot(match.Key, out var slot) ? slot : int.MaxValue)
             .ThenBy(match => match.Key, StringComparer.OrdinalIgnoreCase);

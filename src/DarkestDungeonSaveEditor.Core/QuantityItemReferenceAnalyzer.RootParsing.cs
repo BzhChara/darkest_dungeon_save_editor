@@ -250,7 +250,7 @@ internal static partial class QuantityItemReferenceAnalyzer
         Dictionary<string, List<string>> activeEvidence,
         Dictionary<string, List<string>> rootLootEvidence)
     {
-        var tableSet = knownLootTables.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var tableSet = knownLootTables.ToHashSet(StringComparer.Ordinal);
         foreach (var line in file.Text.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries))
         {
             if (line.Contains("Loot", StringComparison.OrdinalIgnoreCase))
