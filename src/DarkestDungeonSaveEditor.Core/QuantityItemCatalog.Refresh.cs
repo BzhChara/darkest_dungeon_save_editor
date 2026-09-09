@@ -14,8 +14,8 @@ public static partial class QuantityItemCatalog
         var issues = new List<string>();
         var entries = cached.SaveContext == QuantityItemSaveContext.Raid
             ? ReadSavedRaidEntries(saveRoot, issues) : ReadSavedEntries(saveRoot, issues);
-        var saved = entries.GroupBy(entry => entry.CatalogKey, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(group => group.Key, group => group.ToArray(), StringComparer.OrdinalIgnoreCase);
+        var saved = entries.GroupBy(entry => entry.CatalogKey, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.ToArray(), StringComparer.Ordinal);
         var merged = new List<QuantityItemDefinition>();
         foreach (var definition in cached.Items)
         {

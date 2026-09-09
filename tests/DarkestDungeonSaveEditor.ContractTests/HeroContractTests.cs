@@ -18,6 +18,7 @@ internal static partial class ContractSuite
         VerifyHeroDefinitionSafetyContracts(activeContent, catalog.LocalHero, runRoot);
         VerifyHeroNativeSemantics(activeContent, catalog.LocalHero, runRoot);
         VerifyNativeItemReferences(activeContent, runRoot);
+        await VerifyInventoryIdentitiesAsync(activeContent, runRoot, codec);
         VerifyResourceDuplicateSemantics(activeContent, catalog.LocalHero, runRoot);
         VerifyHeroAvailabilityContracts(catalog.HeroCatalog, catalog.LocalHero);
         await VerifyImplicitSkillProgressionContractsAsync(catalog.HeroCatalog, catalog.LocalHero, codec, runRoot);

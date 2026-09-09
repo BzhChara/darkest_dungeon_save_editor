@@ -8,17 +8,17 @@ public static class TrinketSaveEditor
     {
         var baseRoot = JsonSupport.RequireObject(estateRoot, "base_root");
         var items = JsonSupport.RequireObject(baseRoot, "trinkets", "items");
-        var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var ids = new HashSet<string>(StringComparer.Ordinal);
         var copies = 0;
         foreach (var pair in items)
         {
             if (pair.Value is not JsonObject item ||
-                !JsonSupport.ReadString(item, "type").Equals("trinket", StringComparison.OrdinalIgnoreCase))
+                !JsonSupport.ReadRawString(item, "type").Equals("trinket", StringComparison.Ordinal))
             {
                 continue;
             }
 
-            var id = JsonSupport.ReadString(item, "id");
+            var id = JsonSupport.ReadRawString(item, "id");
             if (!string.IsNullOrWhiteSpace(id))
             {
                 ids.Add(id);
@@ -102,8 +102,8 @@ public static class TrinketSaveEditor
     {
         return items.Count(pair =>
             pair.Value is JsonObject item &&
-            JsonSupport.ReadString(item, "type").Equals("trinket", StringComparison.OrdinalIgnoreCase) &&
-            JsonSupport.ReadString(item, "id").Equals(trinketId, StringComparison.OrdinalIgnoreCase));
+            JsonSupport.ReadRawString(item, "type").Equals("trinket", StringComparison.Ordinal) &&
+            JsonSupport.ReadRawString(item, "id").Equals(trinketId, StringComparison.Ordinal));
     }
 
     private static int FindHighestNumericKey(JsonObject items)

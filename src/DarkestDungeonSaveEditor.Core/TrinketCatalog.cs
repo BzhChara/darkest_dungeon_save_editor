@@ -21,7 +21,7 @@ public static class TrinketCatalog
     {
         ArgumentNullException.ThrowIfNull(activeContent);
         var issues = new List<string>();
-        var definitions = new Dictionary<string, List<TrinketDefinition>>(StringComparer.OrdinalIgnoreCase);
+        var definitions = new Dictionary<string, List<TrinketDefinition>>(StringComparer.Ordinal);
         var fileCandidates = new List<ContentFileCandidate>();
         var heroIds = NativeContentFileResolver.DiscoverActorIds(activeContent.Sources, "heroes", issues);
         var enabledDlcPrefixes = ContentFileOverlay.GetEnabledDlcPrefixes(activeContent.Sources);
@@ -53,7 +53,7 @@ public static class TrinketCatalog
         var collisionIds = NativeResourceIdentity.FindCollisions(definitions.Values.SelectMany(group => group).Select(item => item.Id));
         if (collisionIds.Count > 0) issues.Add("Trinket IDs share native hashes and cannot be selected safely: " + string.Join(", ", collisionIds));
         var merged = definitions.Values
-            .Select(candidates => MergeDefinitions(candidates, issues))
+            .Select(MergeDefinitions)
             .Select(definition => collisionIds.Contains(definition.Id)
                 ? definition with { HasProviderConflict = true, Source = "unresolved" } : definition)
             .Select(definition => definition with
@@ -107,7 +107,7 @@ public static class TrinketCatalog
                     continue;
                 }
 
-                var id = idNode.GetString()?.Trim() ?? string.Empty;
+                var id = idNode.GetString() ?? string.Empty;
                 if (string.IsNullOrWhiteSpace(id))
                 {
                     continue;
@@ -182,7 +182,7 @@ public static class TrinketCatalog
     private static IReadOnlyDictionary<string, IReadOnlyList<string>> ReadProviderSourcesByTrinketId(
         EffectiveContentFile file)
     {
-        var sourcesById = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+        var sourcesById = new Dictionary<string, List<string>>(StringComparer.Ordinal);
         foreach (var provider in file.Providers)
         {
             try
@@ -212,7 +212,7 @@ public static class TrinketCatalog
         return sourcesById.ToDictionary(
             pair => pair.Key,
             pair => (IReadOnlyList<string>)pair.Value.ToArray(),
-            StringComparer.OrdinalIgnoreCase);
+            StringComparer.Ordinal);
     }
 
     private static IEnumerable<string> ReadTrinketIds(string path)
@@ -237,7 +237,7 @@ public static class TrinketCatalog
                 idNode.ValueKind == JsonValueKind.String &&
                 !string.IsNullOrWhiteSpace(idNode.GetString()))
             {
-                yield return idNode.GetString()!.Trim();
+                yield return idNode.GetString()!;
             }
         }
     }
@@ -299,20 +299,14 @@ public static class TrinketCatalog
         return result.OrderBy(path => path, StringComparer.OrdinalIgnoreCase).ToArray();
     }
 
-    private static TrinketDefinition MergeDefinitions(
-        IReadOnlyList<TrinketDefinition> candidates,
-        List<string> issues)
+    private static TrinketDefinition MergeDefinitions(IReadOnlyList<TrinketDefinition> candidates)
     {
         // 0x1404F6480: lookup stops at the first ID hash in the loaded vector.
         // Keep instance fields from that entry only; later definitions do not
         // turn an ordinary trinket into a consumable/stateful one.
         var winner = candidates[0];
-        var conflict = candidates.Any(candidate => candidate.Id != winner.Id);
-        if (conflict) issues.Add($"Trinket '{winner.Id}' has IDs differing only in case and cannot share a selection.");
         return winner with
         {
-            HasProviderConflict = conflict,
-            Source = conflict ? "unresolved" : winner.Source,
             AllSources = candidates.SelectMany(candidate => candidate.AllSources)
                 .Distinct(StringComparer.OrdinalIgnoreCase).ToArray()
         };

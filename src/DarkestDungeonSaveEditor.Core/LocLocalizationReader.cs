@@ -20,7 +20,7 @@ internal static class LocLocalizationReader
             .Distinct(StringComparer.Ordinal)
             .GroupBy(Loc2LocalizationReader.HashName)
             .ToDictionary(group => group.Key, group => group.ToArray());
-        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var result = new Dictionary<string, string>(StringComparer.Ordinal);
         if (keysByHash.Count == 0)
         {
             return result;

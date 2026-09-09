@@ -16,7 +16,7 @@ public static partial class QuantityItemCatalog
         bool? EstateCanBeProvision)
     {
         public string PersistedType => StorageKind == QuantityItemStorageKind.Wallet &&
-                                       InventoryType.Equals("heirloom", StringComparison.OrdinalIgnoreCase)
+                                       InventoryType.Equals("heirloom", StringComparison.Ordinal)
             ? ItemId
             : InventoryType;
         public string PersistedId => StorageKind is QuantityItemStorageKind.EstateItems or
@@ -24,7 +24,7 @@ public static partial class QuantityItemCatalog
             ? ItemId
             : string.Empty;
         public string CatalogKey =>
-            $"{StorageKind}:{PersistedType}:{PersistedId}".ToUpperInvariant();
+            QuantityItemDefinition.CreateCatalogKey(StorageKind, PersistedType, PersistedId);
     }
 
     private sealed record SavedQuantityEntry(
@@ -34,6 +34,6 @@ public static partial class QuantityItemCatalog
         int Amount)
     {
         public string CatalogKey =>
-            $"{StorageKind}:{PersistedType}:{PersistedId}".ToUpperInvariant();
+            QuantityItemDefinition.CreateCatalogKey(StorageKind, PersistedType, PersistedId);
     }
 }

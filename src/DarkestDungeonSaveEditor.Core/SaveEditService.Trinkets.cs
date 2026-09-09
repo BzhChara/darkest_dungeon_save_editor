@@ -59,7 +59,7 @@ public sealed partial class SaveEditService
         }
 
         var currentTrinket = currentCatalog.Trinkets.SingleOrDefault(item =>
-            item.Id.Equals(trinket.Id, StringComparison.OrdinalIgnoreCase));
+            item.Id.Equals(trinket.Id, StringComparison.Ordinal));
         if (currentTrinket is null ||
             currentTrinket.UnsupportedStateFields.Count > 0 ||
             currentTrinket.HasProviderConflict ||
@@ -345,7 +345,7 @@ public sealed partial class SaveEditService
 
 
         var currentTrinket = currentCatalog.Trinkets.SingleOrDefault(item =>
-            item.Id.Equals(prepared.Trinket.Id, StringComparison.OrdinalIgnoreCase));
+            item.Id.Equals(prepared.Trinket.Id, StringComparison.Ordinal));
         if (currentTrinket is null ||
             currentTrinket.UnsupportedStateFields.Count > 0 ||
             currentTrinket.HasProviderConflict ||
@@ -379,8 +379,8 @@ public sealed partial class SaveEditService
         TrinketDefinition left,
         TrinketDefinition right)
     {
-        return left.Id.Equals(right.Id, StringComparison.OrdinalIgnoreCase) &&
-               left.Rarity.Equals(right.Rarity, StringComparison.OrdinalIgnoreCase) &&
+        return left.Id.Equals(right.Id, StringComparison.Ordinal) &&
+               left.Rarity.Equals(right.Rarity, StringComparison.Ordinal) &&
                left.Limit == right.Limit &&
                left.Price == right.Price &&
                left.Source.Equals(right.Source, StringComparison.OrdinalIgnoreCase) &&

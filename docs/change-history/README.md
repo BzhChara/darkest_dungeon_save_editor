@@ -2,6 +2,7 @@
 
 此目录集中保存带有时间和任务范围的修复记录、审查报告、实验过程与结果。后续同类记录继续放在这里；当前有效规则与设计说明保留在上一级 `docs/`。
 
+- [历史修改第三轮审核：物品、饰品身份，2026-09-09](inventory-identity-audit-2026-09-09.md)
 - [旧兼容与补丁规则的第二轮细查：2026-09-09](legacy-compatibility-audit-2026-09-09.md)
 
 - [Obsolete-rule audit and inventory capacity corrections: 2026-09-09](obsolete-rule-audit-2026-09-09.md)

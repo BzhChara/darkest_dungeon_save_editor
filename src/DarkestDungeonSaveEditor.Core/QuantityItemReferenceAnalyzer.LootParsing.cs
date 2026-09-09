@@ -41,7 +41,7 @@ internal static partial class QuantityItemReferenceAnalyzer
                     continue;
                 }
 
-                var tableId = ReadString(tableNode, "id").Trim();
+                var tableId = ReadString(tableNode, "id");
                 if (string.IsNullOrWhiteSpace(tableId))
                 {
                     continue;
@@ -73,7 +73,7 @@ internal static partial class QuantityItemReferenceAnalyzer
                         continue;
                     }
 
-                    if (entryType.Equals("item", StringComparison.OrdinalIgnoreCase))
+                    if (entryType.Equals("item", StringComparison.Ordinal))
                     {
                         var itemType = ReadString(data, "type");
                         var itemId = ReadString(data, "id");
@@ -82,9 +82,9 @@ internal static partial class QuantityItemReferenceAnalyzer
                             table.ItemKeys.Add(key);
                         }
                     }
-                    else if (entryType.Equals("table", StringComparison.OrdinalIgnoreCase))
+                    else if (entryType.Equals("table", StringComparison.Ordinal))
                     {
-                        var nested = ReadString(data, "table").Trim();
+                        var nested = ReadString(data, "table");
                         if (!string.IsNullOrWhiteSpace(nested))
                         {
                             table.NestedTables.Add(nested);
@@ -125,7 +125,7 @@ internal static partial class QuantityItemReferenceAnalyzer
             }
         }
 
-        var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var visited = new HashSet<string>(StringComparer.Ordinal);
         while (queue.Count > 0)
         {
             var (tableId, evidence) = queue.Dequeue();

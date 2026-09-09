@@ -29,7 +29,7 @@ internal static class Loc2LocalizationReader
             .ToDictionary(group => group.Key, group => group.ToArray());
         if (keysByHash.Count == 0)
         {
-            return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            return new Dictionary<string, string>(StringComparer.Ordinal);
         }
 
         var bytes = File.ReadAllBytes(path);
@@ -38,7 +38,7 @@ internal static class Loc2LocalizationReader
         var diagnostics = new LocalizationEntryDiagnostics(path);
         var decodedValues = CompiledLocalizationValueReader.Read(bytes, path, "LOC2",
             layout.ValueTableOffset, layout.StringDataOffset, layout.ValueRecordCount, diagnostics);
-        var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var values = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (var pair in keysByHash)
         {
             if (!index.GroupByHash.TryGetValue(pair.Key, out var groupIndex))

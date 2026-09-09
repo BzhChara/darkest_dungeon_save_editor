@@ -41,10 +41,10 @@ internal static partial class QuantityItemReferenceAnalyzer
         ArgumentNullException.ThrowIfNull(issues);
 
         var index = new QuantityItemIndex(definitions);
-        var activeEvidence = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
-        var incompleteEvidence = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
-        var lootTables = new Dictionary<string, LootTableNode>(StringComparer.OrdinalIgnoreCase);
-        var rootLootEvidence = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+        var activeEvidence = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+        var incompleteEvidence = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+        var lootTables = new Dictionary<string, LootTableNode>(StringComparer.Ordinal);
+        var rootLootEvidence = new Dictionary<string, List<string>>(StringComparer.Ordinal);
         var scanComplete = true;
         var files = LoadEffectiveFiles(activeContent, saveContext, issues, ref scanComplete);
         var eventIds = new Dictionary<uint, string>();
@@ -86,7 +86,7 @@ internal static partial class QuantityItemReferenceAnalyzer
         var sourcesById = activeContent.Sources.ToDictionary(
             source => source.Id,
             StringComparer.OrdinalIgnoreCase);
-        var result = new Dictionary<string, QuantityItemReferenceAnalysis>(StringComparer.OrdinalIgnoreCase);
+        var result = new Dictionary<string, QuantityItemReferenceAnalysis>(StringComparer.Ordinal);
         foreach (var definition in definitions)
         {
             var hasOfficialOrigin = definition.AllSources.Any(sourceId =>

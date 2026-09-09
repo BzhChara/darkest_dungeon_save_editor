@@ -276,7 +276,7 @@ public sealed record QuantityItemDefinition(
     public int SavedEntryCount { get; init; }
     public string DisplayId => string.IsNullOrWhiteSpace(ItemId) ? InventoryType : ItemId;
     public string PersistedType => StorageKind == QuantityItemStorageKind.Wallet
-        ? InventoryType.Equals("heirloom", StringComparison.OrdinalIgnoreCase) &&
+        ? InventoryType.Equals("heirloom", StringComparison.Ordinal) &&
           !string.IsNullOrWhiteSpace(ItemId)
             ? ItemId
             : InventoryType
@@ -285,8 +285,11 @@ public sealed record QuantityItemDefinition(
         QuantityItemStorageKind.RaidInventory
         ? ItemId
         : string.Empty;
-    public string CatalogKey =>
-        $"{StorageKind}:{PersistedType}:{PersistedId}".ToUpperInvariant();
+    public string CatalogKey => CreateCatalogKey(StorageKind, PersistedType, PersistedId);
+    // This is an editor key, not a game hash. Length-prefix the type so ':' in
+    // an authored type or ID cannot make two different storage entries alias.
+    internal static string CreateCatalogKey(QuantityItemStorageKind kind, string type, string id) =>
+        $"{kind}:{type.Length}:{type}:{id}";
     public bool IsSaveOnly => string.IsNullOrWhiteSpace(SourcePath);
     public bool IsHiddenByDefault =>
         !IsPresentInSave && ReferenceStatus == QuantityItemReferenceStatus.SuspectedUnused;

@@ -48,8 +48,12 @@ internal static class JsonSupport
 
     internal static string ReadString(JsonObject value, string name)
     {
-        return value[name]?.GetValue<string>()?.Trim() ?? string.Empty;
+        return ReadRawString(value, name).Trim();
     }
+
+    // Resource IDs are hashed as authored; whitespace is not display padding.
+    internal static string ReadRawString(JsonObject value, string name) =>
+        value[name]?.GetValue<string>() ?? string.Empty;
 
     internal static int? ReadInt(JsonObject value, string name)
     {

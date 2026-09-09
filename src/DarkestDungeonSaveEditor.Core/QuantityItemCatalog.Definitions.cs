@@ -24,7 +24,7 @@ public static partial class QuantityItemCatalog
             }
         }
 
-        var definitions = new Dictionary<string, List<QuantityItemDefinition>>(StringComparer.OrdinalIgnoreCase);
+        var definitions = new Dictionary<string, List<QuantityItemDefinition>>(StringComparer.Ordinal);
         foreach (var file in ResolveSamePriorityFileConflicts(candidates))
         {
             ScanFile(file, saveContext, definitions, issues, forceProviderConflict: true);
@@ -162,7 +162,7 @@ public static partial class QuantityItemCatalog
         EffectiveContentFile file,
         QuantityItemSaveContext saveContext)
     {
-        var result = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+        var result = new Dictionary<string, List<string>>(StringComparer.Ordinal);
         foreach (var provider in file.Providers)
         {
             try
@@ -190,7 +190,7 @@ public static partial class QuantityItemCatalog
         return result.ToDictionary(
             pair => pair.Key,
             pair => (IReadOnlyList<string>)pair.Value.ToArray(),
-            StringComparer.OrdinalIgnoreCase);
+            StringComparer.Ordinal);
     }
 
     private static IReadOnlyList<ParsedItemDefinition> ReadDefinitions(
@@ -214,7 +214,7 @@ public static partial class QuantityItemCatalog
             }
 
             var itemId = NativeDarkestReader.ReadString(body, ".id") ?? string.Empty;
-            if ((inventoryType.Equals("heirloom", StringComparison.OrdinalIgnoreCase) ||
+            if ((inventoryType.Equals("heirloom", StringComparison.Ordinal) ||
                  storageKind == QuantityItemStorageKind.EstateItems) &&
                 string.IsNullOrWhiteSpace(itemId))
             {
@@ -239,7 +239,7 @@ public static partial class QuantityItemCatalog
         if (saveContext == QuantityItemSaveContext.Raid)
         {
             return string.IsNullOrWhiteSpace(inventoryType) ||
-                   inventoryType.Equals("trinket", StringComparison.OrdinalIgnoreCase)
+                   inventoryType.Equals("trinket", StringComparison.Ordinal)
                 ? null
                 : QuantityItemStorageKind.RaidInventory;
         }
