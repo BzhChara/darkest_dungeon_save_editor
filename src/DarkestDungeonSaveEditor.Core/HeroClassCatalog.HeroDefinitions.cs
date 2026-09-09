@@ -16,7 +16,7 @@ public static partial class HeroClassCatalog
         IReadOnlyDictionary<string, EffectQuirkAssignment> effectiveEffects,
         IReadOnlyDictionary<string, QuirkDefinition> effectiveQuirks,
         IReadOnlyDictionary<string, CampingSkillBuilder> campingSkills,
-        IReadOnlyDictionary<string, HeroUpgradeDefinition> effectiveUpgrades,
+        IReadOnlyDictionary<string, HeroUpgradeTreeCandidate> effectiveUpgrades,
         IReadOnlyList<int> resolveLevelThresholds,
         List<string> issues)
     {
@@ -88,7 +88,7 @@ public static partial class HeroClassCatalog
         var availableCampingSkills = campingSkills.Values
             .Where(skill => skill.HeroClasses.Contains(selected.Id))
             .ToArray();
-        effectiveUpgrades.TryGetValue(selected.Id, out var upgrade);
+        var upgrade = BindHeroUpgradeTrees(selected, effectiveUpgrades, issues);
         var progression = BuildHeroProgression(selected, upgrade, resolveLevelThresholds);
         if (!string.IsNullOrWhiteSpace(progression.UnsupportedReason))
         {
@@ -104,7 +104,7 @@ public static partial class HeroClassCatalog
             selected.Generation,
             selected.BaseHp,
             progression.LevelProfiles,
-            upgrade?.Trees ?? [],
+            upgrade.Trees,
             progression.UnsupportedReason,
             selected.ColourVariationCount,
             selected.CombatSkillIds.ToArray(),
@@ -171,14 +171,15 @@ public static partial class HeroClassCatalog
         builder.ColourVariationCount = Math.Max(
             builder.ColourVariationCount,
             applicableOverrides
-                .SelectMany(file => file.ProviderPaths)
-                .Select(providerPath => CountColourVariations(providerPath, selected.Id))
+                .SelectMany(file => file.Providers)
+                .Select(provider => CountColourVariations(provider.Path, selected.Id, sourcesById[provider.SourceId]))
                 .DefaultIfEmpty(0)
                 .Max());
         return builder.Build();
     }
 
-    private static HeroCandidate ReadHeroInfo(EffectiveContentFile file)
+    private static HeroCandidate ReadHeroInfo(EffectiveContentFile file,
+        IReadOnlyDictionary<string, ActiveContentSource> sourcesById)
     {
         var path = file.Path;
         var id = ReadHeroClassId(path, HeroInfoSuffix);
@@ -188,8 +189,8 @@ public static partial class HeroClassCatalog
             Path.GetFullPath(path),
             file.ProviderSources);
         ApplyHeroDefinitionFile(builder, path);
-        builder.ColourVariationCount = file.ProviderPaths
-            .Select(providerPath => CountColourVariations(providerPath, id))
+        builder.ColourVariationCount = file.Providers
+            .Select(provider => CountColourVariations(provider.Path, id, sourcesById[provider.SourceId]))
             .DefaultIfEmpty(0)
             .Max();
         return builder.Build();
@@ -245,7 +246,10 @@ public static partial class HeroClassCatalog
                              pair.Key.Equals("effect", StringComparison.OrdinalIgnoreCase) ||
                              pair.Key.EndsWith("_effects", StringComparison.OrdinalIgnoreCase)))
                 {
-                    builder.ReplaceSkillEffects(skillId, pair.Key, pair.Value);
+                    if (pair.Key.Equals("effect", StringComparison.OrdinalIgnoreCase))
+                        builder.AppendSkillEffects(skillId, pair.Key, pair.Value);
+                    else
+                        builder.ReplaceSkillEffects(skillId, pair.Key, pair.Value);
                 }
             }
             else if (kind.Equals("skill_selection", StringComparison.OrdinalIgnoreCase))
@@ -275,7 +279,7 @@ public static partial class HeroClassCatalog
         }
     }
 
-    private static int CountColourVariations(string heroInfoPath, string heroClass)
+    private static int CountColourVariations(string heroInfoPath, string heroClass, ActiveContentSource source)
     {
         var directory = Path.GetDirectoryName(heroInfoPath);
         if (directory is null || !Directory.Exists(directory))
@@ -283,8 +287,26 @@ public static partial class HeroClassCatalog
             return 0;
         }
 
-        var suffixes = Directory.EnumerateDirectories(directory, $"{heroClass}_*", SearchOption.TopDirectoryOnly)
-            .Select(Path.GetFileName)
+        IEnumerable<string?> names;
+        if (source.Kind is "local" or "workshop")
+        {
+            // A physical skin folder alone is not an active Mod resource. Keep
+            // only folders containing an existing texture listed in its manifest.
+            var manifestPath = Path.Combine(source.Directory, "modfiles.txt");
+            ModManifestFile.Require(manifestPath);
+            names = ModManifestFile.ReadEntries(manifestPath, ".png")
+                .Select(entry => Path.GetFullPath(Path.Combine(source.Directory, entry.RelativePath)))
+                .Where(File.Exists)
+                .Select(path => Path.GetRelativePath(directory, path).Replace('\\', '/'))
+                .Where(path => !Path.IsPathRooted(path) && !path.StartsWith("../", StringComparison.Ordinal) && path.Contains('/'))
+                .Select(path => path.Split('/')[0]);
+        }
+        else
+        {
+            names = Directory.EnumerateDirectories(directory, $"{heroClass}_*", SearchOption.TopDirectoryOnly)
+                .Select(Path.GetFileName);
+        }
+        var suffixes = names
             .Where(name => name is not null &&
                            name.Length == heroClass.Length + 2 &&
                            name.StartsWith($"{heroClass}_", StringComparison.OrdinalIgnoreCase))

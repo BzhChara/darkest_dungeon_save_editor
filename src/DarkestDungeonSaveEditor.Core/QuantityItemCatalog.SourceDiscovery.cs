@@ -29,24 +29,7 @@ public static partial class QuantityItemCatalog
         }
 
         var manifestPath = Path.Combine(source.Directory, "modfiles.txt");
-        if (!ModManifestFile.Exists(manifestPath))
-        {
-            var files = ContentFileOverlay.GetFallbackContentRoots(source.Directory, enabledDlcPrefixes)
-                .Select(root => Path.Combine(root, "inventory"))
-                .Where(Directory.Exists)
-                .SelectMany(directory => NativeDirectoryDiscovery.EnumerateFiles(
-                    directory, $"*{InventoryItemSuffix}", SearchOption.AllDirectories))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
-                .ToArray();
-            if (files.Length > 0)
-            {
-                issues.Add(
-                    $"Mod has no modfiles.txt; quantity-item scan used standard inventory directories including enabled DLC paths: {source.Directory}");
-            }
-
-            return files;
-        }
+        ModManifestFile.Require(manifestPath);
 
         var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var entry in ModManifestFile.ReadEntries(manifestPath, InventoryItemSuffix))

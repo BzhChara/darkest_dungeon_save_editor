@@ -17,7 +17,7 @@ public static partial class BattleEncounterCatalog
             parts.Add($"{source.Id}|{source.Kind}|{source.LoadOrder}|{Path.GetFullPath(source.Directory)}|{source.VirtualPathPrefix}");
             var paths = EnumerateMashFiles(source, prefixes, issues)
                 .Concat(EnumerateMonsterInfoFiles(source, prefixes, issues))
-                .Concat(NativeContentFileResolver.EnumeratePhysicalActorFiles(source, prefixes, "monsters"))
+                .Concat(NativeContentFileResolver.EnumerateActorOpenFiles(source, prefixes, "monsters", issues))
                 .Concat(new[] { "modfiles.txt", "project.xml", ManagedBattleEncounterBridgeService.ManifestFileName }
                     .Select(name => Path.Combine(source.Directory, name)).Where(File.Exists));
             foreach (var path in paths.Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.OrdinalIgnoreCase))
@@ -67,7 +67,8 @@ public static partial class BattleEncounterCatalog
         return runtimeRows.Select((row, index) => row with
         {
             MashIndex = index,
-            CanPlaceDirectly = row.MonsterIds.All(monsters.Ids.Contains)
+            CanPlaceDirectly = row.MonsterIds.Count > 0 && row.MonsterIds.All(monsters.Ids.Contains),
+            UnavailableReason = row.MonsterIds.Count == 0 ? "空遭遇占用运行时编号，但不能放置" : row.UnavailableReason
         }).ToArray();
     }
 

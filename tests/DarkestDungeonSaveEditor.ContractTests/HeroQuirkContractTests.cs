@@ -59,17 +59,17 @@ internal static partial class ContractSuite
         var nonHpConflictQuirk = heroCatalog.InitialQuirks.Single(item => item.Id == "non_hp_conflict_quirk");
         Assert(
             nonHpConflictQuirk.WriteStatus == HeroInitialQuirkWriteStatus.Direct,
-            "An unresolved non-HP Buff should be left to the game runtime instead of blocking explicit quirk selection.");
+            "A later non-HP Buff definition must not block explicit quirk selection.");
         var maxHpConflictQuirk = heroCatalog.InitialQuirks.Single(item => item.Id == "max_hp_conflict_quirk");
         Assert(
-            maxHpConflictQuirk.WriteStatus == HeroInitialQuirkWriteStatus.Unverified &&
-            maxHpConflictQuirk.WriteStatusReason.Contains("max_hp", StringComparison.OrdinalIgnoreCase),
-            "An unresolved max-HP Buff must still block explicit quirk selection because current_hp cannot be derived safely.");
+            maxHpConflictQuirk.WriteStatus == HeroInitialQuirkWriteStatus.Direct &&
+            maxHpConflictQuirk.MaxHpModifiers is [{ Amount: 0.2 }],
+            "Duplicate max-HP Buffs use the last complete native definition rather than becoming ambiguous.");
         Assert(
             heroCatalog.Issues.All(issue =>
                 !issue.Contains("Buff 'CONFLICT_ACC'", StringComparison.Ordinal) &&
                 !issue.Contains("Buff 'CONFLICT_MAXHP'", StringComparison.Ordinal)),
-            "Raw Buff conflicts should not pollute the catalog log: only a referenced max-HP conflict belongs to the affected quirk's write status.");
+            "Resolved same-ID Buff replacements must not produce the former ambiguity diagnostic.");
         var contextualQuirk = heroCatalog.InitialQuirks.Single(item => item.Id == "context_special");
         Assert(
             contextualQuirk is
@@ -323,7 +323,10 @@ internal static partial class ContractSuite
             selectedInitialQuirkIds: ["ambiguous_quirk"]);
         AssertInitialQuirkSelectionRejected(heroCatalog, localHero,
             ["evolution_conflict_quirk"], "进化目标 'evolution_target_b' 缺失");
-        AssertInitialQuirkSelectionRejected(heroCatalog, localHero, ["max_hp_conflict_quirk"], "当前不能显式写入");
+        var lastBuffCandidate = StagecoachHeroCandidateFactory.Generate(heroCatalog, localHero, seed: 1729,
+            selectedInitialQuirkIds: ["max_hp_conflict_quirk"]);
+        Assert(Math.Abs(lastBuffCandidate.Preview.CurrentHp - localHero.BaseHp!.Value * 1.2) < 1e-9,
+            "Explicit quirk selection and generated current_hp must use the winning Buff amount.");
         AssertInitialQuirkSelectionRejected(heroCatalog, localHero, ["fatal_weakness"], "合计 HP 修正无效");
         Assert(
             heroCatalog.InitialQuirks.Single(item => item.Id == "unknown_hp_rule").WriteStatus == HeroInitialQuirkWriteStatus.Unverified,

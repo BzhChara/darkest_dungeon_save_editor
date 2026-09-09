@@ -99,7 +99,7 @@ The relevant assertions live in [UiContractTests.cs](../tests/DarkestDungeonSave
 - Empty quirk validation messages take no layout space. Non-empty messages must remain visible above the dialog actions.
 - Item-filter and quirk checkboxes share fixed-size dark chrome, a clear checked mark, and visible disabled/keyboard-focus states without click scaling.
 - `自然怪癖范围` is rendered as `正面 n–m / 负面 n–m`, not the ambiguous `+1-2 -1-2` shorthand.
-- Hero generation status uses `游戏自然 / 编辑器手动`, `仅编辑器手动`, or `自然状态未知 / 编辑器手动`; an absent flag is not treated as proof of natural generation.
+- Hero generation status uses `普通招募开启 / 编辑器手动`, `普通招募关闭 / 编辑器手动`, or `自然状态未知 / 编辑器手动`; an absent flag is not treated as proof of natural generation. A disabled ordinary generation flag does not rule out explicit-class events or other special acquisition paths.
 - If no level passes the candidate-factory preflight, the hero instead shows `暂不可生成` and `不可生成`. Partial support lists only available levels; selecting a failed level disables preview and shows its actual failure in the existing warning area, without adding a new panel or weakening generation checks.
 
 ### 3.4 Application dialogs

@@ -10,6 +10,16 @@ public static partial class StagecoachHeroCandidateFactory
         int resolveLevel,
         List<string>? warnings = null)
     {
+        var unsupportedTree = heroClass.UpgradeTrees.FirstOrDefault(tree =>
+            !string.IsNullOrWhiteSpace(tree.UnsupportedReason));
+        if (unsupportedTree is not null)
+        {
+            // An authored but unreadable winner is not a missing implicit tree.
+            throw new InvalidOperationException(
+                $"职业 '{heroClass.Id}' 的升级树 '{unsupportedTree.Id}' 无法用于生成：" +
+                $"{unsupportedTree.UnsupportedReason}（{unsupportedTree.SourcePath}）。");
+        }
+
         var combatTrees = heroClass.UpgradeTrees
             .Where(tree => tree.Kind == HeroUpgradeTreeKind.CombatSkill)
             .ToDictionary(tree => tree.Id, StringComparer.Ordinal);

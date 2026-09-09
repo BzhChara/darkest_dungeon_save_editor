@@ -164,6 +164,8 @@ internal static partial class ContractSuite
         Directory.CreateDirectory(activeWorkshopPriorityHeroRoot);
         Directory.CreateDirectory(Path.Combine(activeWorkshopPriorityHeroRoot, "priority_hero_A"));
         Directory.CreateDirectory(Path.Combine(activeWorkshopPriorityHeroRoot, "priority_hero_B"));
+        File.WriteAllBytes(Path.Combine(activeWorkshopPriorityHeroRoot, "priority_hero_A", "skin.png"), [1]);
+        File.WriteAllBytes(Path.Combine(activeWorkshopPriorityHeroRoot, "priority_hero_B", "skin.png"), [2]);
         Directory.CreateDirectory(activeWorkshopUpgradeRoot);
         Directory.CreateDirectory(activeWorkshopBuildingUpgradeRoot);
         Directory.CreateDirectory(activeWorkshopBuffRoot);
@@ -198,6 +200,7 @@ internal static partial class ContractSuite
         Directory.CreateDirectory(localHeroRoot);
         Directory.CreateDirectory(compatibleUpgradeHeroRoot);
         Directory.CreateDirectory(Path.Combine(compatibleUpgradeHeroRoot, "compatible_upgrade_hero_A"));
+        File.WriteAllBytes(Path.Combine(compatibleUpgradeHeroRoot, "compatible_upgrade_hero_A", "skin.png"), [1]);
         Directory.CreateDirectory(localPriorityHeroRoot);
         Directory.CreateDirectory(localHeroUpgradeRoot);
         Directory.CreateDirectory(localNestedHeroUpgradeRoot);
@@ -205,6 +208,8 @@ internal static partial class ContractSuite
         Directory.CreateDirectory(localLocalizationRoot);
         Directory.CreateDirectory(Path.Combine(localHeroRoot, "local_hero_A"));
         Directory.CreateDirectory(Path.Combine(localHeroRoot, "local_hero_B"));
+        File.WriteAllBytes(Path.Combine(localHeroRoot, "local_hero_A", "skin.png"), [1]);
+        File.WriteAllBytes(Path.Combine(localHeroRoot, "local_hero_B", "skin.png"), [2]);
         Directory.CreateDirectory(baseBuffRoot);
         Directory.CreateDirectory(baseQuirkRoot);
         Directory.CreateDirectory(baseCampingRoot);
@@ -642,6 +647,8 @@ internal static partial class ContractSuite
     heroes/base_hero/base_hero.override.darkest 100
     heroes/local_hero/local_hero.info.darkest 100
     heroes/priority_hero/priority_hero.info.darkest 100
+    heroes/priority_hero/priority_hero_A/skin.png 1
+    heroes/priority_hero/priority_hero_B/skin.png 1
     upgrades/runtime_hero.upgrades.json 100
     upgrades/building/runtime_hero.upgrades.json 100
     effects/runtime_hero.effects.darkest 100
@@ -1900,6 +1907,9 @@ internal static partial class ContractSuite
             new UTF8Encoding(false));
 
         var codec = new DsonSaveCodec(jarPath);
+
+        WriteFixtureManifest(localModRoot);
+        WriteFixtureManifest(externalLocalModRoot);
 
         return new ContractFixture(
             runRoot,

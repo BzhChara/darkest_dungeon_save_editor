@@ -16,7 +16,7 @@ internal sealed record ContentFileRule(string Directory, string Pattern, bool Re
 }
 
 // Discovery and ordering are separate operations. A present manifest is
-// authoritative even when empty; only a missing manifest uses the directory device.
+// authoritative even when empty. Missing Mod manifests must be prepared before loading.
 internal static class ContentFileDiscovery
 {
     public static IReadOnlyList<string> Enumerate(ActiveContentSource source,
@@ -32,8 +32,9 @@ internal static class ContentFileDiscovery
         var prefixes = isMod ? enabledDlcPrefixes : [];
         var manifestPath = Path.Combine(source.Directory, "modfiles.txt");
         var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        if (isMod && ModManifestFile.Exists(manifestPath))
+        if (isMod)
         {
+            ModManifestFile.Require(manifestPath);
             foreach (var entry in ModManifestFile.ReadEntries(manifestPath,
                          rules.Select(rule => rule.Pattern.TrimStart('*')).Distinct().ToArray()))
             {
@@ -55,11 +56,9 @@ internal static class ContentFileDiscovery
         }
         else
         {
-            if (isMod) issues.Add($"Mod has no modfiles.txt; standard fallback scan used: {source.Directory}");
-            foreach (var root in ContentFileOverlay.GetFallbackContentRoots(source.Directory, prefixes))
             foreach (var rule in rules)
             {
-                var directory = Path.Combine(root, rule.Directory.Replace('/', Path.DirectorySeparatorChar));
+                var directory = Path.Combine(source.Directory, rule.Directory.Replace('/', Path.DirectorySeparatorChar));
                 if (!Directory.Exists(directory)) continue;
                 foreach (var path in NativeDirectoryDiscovery.EnumerateFiles(directory, rule.Pattern,
                              rule.Recursive ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly))

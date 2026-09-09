@@ -36,41 +36,26 @@ public static partial class HeroClassCatalog
         matches.Add(candidate);
     }
 
-    private static IReadOnlyDictionary<string, T> ResolveUniqueDefinitions<T>(
+    private static IReadOnlyDictionary<string, T> ResolveOrderedDefinitions<T>(
         Dictionary<string, List<T>> candidates,
-        IReadOnlyDictionary<string, ActiveContentSource> sourcesById,
-        Func<T, string> getSource,
-        Func<T, string> getSourcePath,
-        Func<T, string> getSemanticSignature,
+        Func<T, string> getId,
+        Func<IReadOnlyList<T>, T> select,
         string contentLabel,
-        List<string> issues,
-        bool reportConflicts = true)
+        List<string> issues)
     {
-        var result = new Dictionary<string, T>(StringComparer.OrdinalIgnoreCase);
+        // Files have already been overlaid in native enumeration order. Do not
+        // choose a source again here: each resource has its own duplicate rule.
+        var collisions = NativeResourceIdentity.FindCollisions(candidates.Values.SelectMany(group => group).Select(getId));
+        var result = new Dictionary<string, T>(StringComparer.Ordinal);
         foreach (var pair in candidates)
         {
-            var effective = SelectEffectiveDefinitions(
-                pair.Value,
-                sourcesById,
-                getSource,
-                getSourcePath,
-                getSemanticSignature);
-            pair.Value.Clear();
-            pair.Value.AddRange(effective);
-            if (effective.Count == 1)
+            if (pair.Value.Any(value => collisions.Contains(getId(value))) ||
+                pair.Value.Select(getId).Distinct(StringComparer.Ordinal).Skip(1).Any())
             {
-                result[pair.Key] = effective[0];
+                issues.Add($"{contentLabel} '{pair.Key}' has conflicting native identities and was left unresolved.");
                 continue;
             }
-
-            if (reportConflicts)
-            {
-                issues.Add(
-                    $"{contentLabel} '{pair.Key}' has conflicting definitions at the same effective priority and was left unresolved: " +
-                    string.Join(
-                        " | ",
-                        effective.Select(candidate => $"{getSource(candidate)}:{getSourcePath(candidate)}")));
-            }
+            result[pair.Key] = select(pair.Value);
         }
 
         return result;
@@ -126,39 +111,6 @@ public static partial class HeroClassCatalog
         definition.RosterLimit,
         EvolutionSignature = definition.Evolution?.Signature
     });
-
-    private static string GetBuffSignature(BuffDefinition definition) => JsonSerializer.Serialize(new
-    {
-        definition.StatType,
-        definition.StatSubType,
-        definition.Amount,
-        definition.RuleType,
-        definition.IsFalseRule,
-        definition.RuleFloat,
-        definition.RuleString
-    });
-
-    private static string GetHeroUpgradeSignature(HeroUpgradeDefinition definition) => JsonSerializer.Serialize(new
-    {
-        Weapon = definition.WeaponRequirements.OrderBy(pair => pair.Key, StringComparer.Ordinal),
-        Armour = definition.ArmourRequirements.OrderBy(pair => pair.Key, StringComparer.Ordinal),
-        Trees = definition.Trees
-            .OrderBy(tree => tree.Id, StringComparer.Ordinal)
-            .Select(tree => new
-            {
-                tree.Id,
-                tree.Kind,
-                Requirements = tree.Requirements
-                    .OrderBy(requirement => requirement.PrerequisiteResolveLevel)
-                    .ThenBy(requirement => requirement.Code, StringComparer.Ordinal)
-            })
-    });
-
-    private static string GetRecruitEventSignature(RecruitEventGroup definition) => JsonSerializer.Serialize(
-        definition.Recruits
-            .OrderBy(recruit => recruit.HeroClass, StringComparer.OrdinalIgnoreCase)
-            .ThenBy(recruit => recruit.Count)
-            .Select(recruit => new { recruit.HeroClass, recruit.Count }));
 
     private static string GetHeroCandidateSignature(HeroCandidate candidate) => JsonSerializer.Serialize(new
     {

@@ -2,7 +2,7 @@ internal static partial class ContractSuite
 {
     private static void RunContentDiscoveryContracts(ActiveContentSnapshot activeContent, ContractFixture fixture)
     {
-        var root = Path.Combine(fixture.RunRoot, "no-manifest-dlc-mod");
+        var root = Path.Combine(fixture.RunRoot, "manifest-dlc-mod");
         foreach (var file in Directory.EnumerateFiles(fixture.ActiveWorkshopRoot, "*", SearchOption.AllDirectories))
         {
             if (Path.GetFileName(file).Equals("modfiles.txt", StringComparison.OrdinalIgnoreCase) ||
@@ -62,6 +62,7 @@ internal static partial class ContractSuite
         WriteLoc2(Path.Combine(nestedLocalization, "probe_english.loc2"), excludedNames);
         WriteLoc2(Path.Combine(root, enabled, "localization", "probe_french.loc2"), excludedNames);
 
+        WriteFixtureManifest(root);
         foreach (var kind in new[] { "workshop", "local" })
         {
             var content = activeContent with
@@ -76,7 +77,7 @@ internal static partial class ContractSuite
                 trinkets.Trinkets.Single(item => item.Id == "enabled_dlc_trinket").Price == 8200 &&
                 trinkets.Trinkets.All(item => item.Id is not ("disabled_mod_trinket" or "backup_trinket")) &&
                 trinkets.Storage?.MaxSlots == 18 && RaidInventoryStorageCatalog.Load(content).Storage?.MaxSlots == 20,
-                "Manifest-free Mods must discover enabled DLC trinkets and inventory capacities without enabling disabled DLC or backup roots.");
+                "Manifest-listed Mods must discover enabled DLC trinkets and inventory capacities without enabling disabled DLC or backup roots.");
             var heroes = HeroClassCatalog.Load(content);
             var dlcHero = heroes.HeroClasses.Single(hero => hero.Id == "dlc_shared_hero");
             Assert(
@@ -86,11 +87,11 @@ internal static partial class ContractSuite
                 heroes.HeroClasses.Single(hero => hero.Id == "enabled_dlc_hero")
                     .CombatSkillIds.SequenceEqual(["modded_enabled_dlc_skill"]) &&
                 heroes.HeroClasses.All(hero => hero.Id is not ("disabled_mod_hero" or "backup_hero")),
-                "Manifest-free DLC roots must preserve hero, effect, quirk, and town-event overlays.");
+                "Manifest-listed DLC roots must preserve hero, effect, quirk, and town-event overlays.");
             var items = QuantityItemCatalog.Load(content, JsonNode.Parse(File.ReadAllText(fixture.DecodedSeedPath))!.AsObject());
             Assert(items.Items.Any(item => item.ItemId == "enabled_probe") &&
                    items.Items.All(item => item.ItemId != "excluded_probe"),
-                "Manifest-free item discovery must scan only root and enabled DLC content directories.");
+                "Manifest-listed item discovery must scan only root and enabled DLC content directories.");
             var snapshot = new BattleMapSnapshot(
                 content.Profile.ProfileDirectory, "", "", "", "", "probe", 1, 1,
                 null, null, null, null, null, null, null, null, null, false, [], [], [], DateTime.UtcNow);
@@ -100,21 +101,21 @@ internal static partial class ContractSuite
                 attachments.Curios.Any(item => item.Id == "enabled_probe_curio") &&
                 attachments.Treasures.Any(item => item.Id == "enabled_probe_chest") &&
                 attachments.Definitions.All(item => item.Id is not ("excluded_probe_curio" or "excluded_probe_chest")),
-                "Manifest-free room curios and treasures must include enabled DLC roots without enabling disabled DLC or backup roots.");
+                "Manifest-listed room curios and treasures must include enabled DLC roots without enabling disabled DLC or backup roots.");
             Assert(
                 encounters.DirectEncounters.Count == 0 &&
                 encounters.Encounters.Single().UnavailableReason.Contains("仅 Mod 提供") &&
                 encounters.BridgeEncounters.Any(encounter =>
                     encounter.MonsterIds.SequenceEqual(["enabled_probe"]) && encounter.ContainsBossMonster) &&
                 encounters.BridgeEncounters.All(encounter => !encounter.MonsterIds.Contains("excluded_probe")),
-                "Manifest-free Mod-only DLC mash additions must remain Bridge sources while unverified target discovery and disabled/backup content stay guarded.");
+                "Manifest-listed Mod-only DLC mash additions must remain Bridge sources while unverified target discovery and disabled/backup content stay guarded.");
             Assert(dlcHero.LocalizedName == localizedProbes["hero_class_name_dlc_shared_hero"] &&
                    heroes.InitialQuirks.Single(quirk => quirk.Id == "dlc_top_quirk").LocalizedName == localizedProbes["str_quirk_name_dlc_top_quirk"] &&
                    trinkets.Trinkets.Single(item => item.Id == "enabled_dlc_trinket").LocalizedName == localizedProbes["str_inventory_title_trinketenabled_dlc_trinket"] &&
                    items.Items.Single(item => item.ItemId == "enabled_probe").LocalizedName == localizedProbes["str_inventory_title_estateenabled_probe"] &&
                    encounters.BridgeEncounters.Single(encounter => encounter.MonsterIds.SequenceEqual(["enabled_probe"]))
                        .MonsterNames.Single() == localizedProbes["str_monstername_enabled_probe"],
-                "Manifest-free enabled DLC XML/loc2 names must reach every catalog while disabled roots, nested loc2 backups, and other languages remain excluded.");
+                "Manifest-listed enabled DLC XML/loc2 names must reach every catalog while disabled roots, nested loc2 backups, and other languages remain excluded.");
         }
 
         RunDlcRoomAttachmentOverlayContracts(activeContent, fixture);
@@ -146,16 +147,17 @@ internal static partial class ContractSuite
                 new ActiveContentSource("local:prop-probe", "Prop Probe", "local", modRoot, 1)
             ]
         };
-        var withoutManifest = BattleRoomAttachmentCatalog.Load(content);
+        var rejected = false;
+        try { BattleRoomAttachmentCatalog.Load(content); }
+        catch (InvalidDataException error) when (error.Message.Contains("modfiles.txt", StringComparison.Ordinal)) { rejected = true; }
+        Assert(rejected, "Room attachment discovery must reject a selected Mod without a manifest.");
         File.WriteAllText(Path.Combine(modRoot, "modfiles.txt"), $"{prefix}/{relativePath} {new FileInfo(modPath).Length}\n" +
             $"{prefix}/curios/probe_curio_props.csv 1\n{prefix}/curios/probe_curio_type_library.csv 1\n");
         var withManifest = BattleRoomAttachmentCatalog.Load(content);
         Assert(
-            withoutManifest.Definitions.Select(item => item.Id).Order().SequenceEqual(["mod_dlc_chest", "mod_dlc_curio"]) &&
-            withoutManifest.Definitions.Select(item => item.Id).SequenceEqual(withManifest.Definitions.Select(item => item.Id)) &&
-            withoutManifest.Guard.EffectiveFiles.Count == 3 &&
-            withoutManifest.Guard.EffectiveFiles.All(file => file.SourceId == "local:prop-probe") &&
-            withoutManifest.Guard.Fingerprint == withManifest.Guard.Fingerprint,
-            "The same enabled-DLC room prop overlay must replace its builtin provider with or without a manifest, including its write-guard fingerprint.");
+            withManifest.Definitions.Select(item => item.Id).Order().SequenceEqual(["mod_dlc_chest", "mod_dlc_curio"]) &&
+            withManifest.Guard.EffectiveFiles.Count == 3 &&
+            withManifest.Guard.EffectiveFiles.All(file => file.SourceId == "local:prop-probe"),
+            "The manifest-listed enabled-DLC room prop overlay must replace its builtin provider, including its write-guard provenance.");
     }
 }

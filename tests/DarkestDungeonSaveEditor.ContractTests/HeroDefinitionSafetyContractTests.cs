@@ -35,6 +35,7 @@ internal static partial class ContractSuite
         deathOnly.Remove("evolution_class_id");
         quirks.Add(deathOnly);
         File.WriteAllText(Path.Combine(quirkRoot, "safety.quirk_library.json"), new JsonObject { ["quirks"] = quirks }.ToJsonString());
+        WriteFixtureManifest(root);
         var safetyContent = content with
         {
             Sources = content.Sources.Append(new ActiveContentSource("local:definition-safety", "Safety", "local", root, 900)).ToArray()
@@ -62,6 +63,7 @@ internal static partial class ContractSuite
         }
         File.WriteAllText(Path.Combine(heroRoot, "local_hero.override.darkest"),
             "armour: .name \"local_hero_armour_0\" .hp 37 // old .hp 777\n");
+        WriteFixtureManifest(root);
         var overrideCatalog = HeroClassCatalog.Load(safetyContent);
         var overrideHero = overrideCatalog.HeroClasses.Single(row => row.Id == originalHero.Id);
         Assert(overrideHero.BaseHp == 37 && StagecoachHeroCandidateFactory.Generate(overrideCatalog, overrideHero, seed: 1729).Preview.CurrentHp == 37,

@@ -115,6 +115,7 @@ internal static partial class ContractSuite
         File.WriteAllText(Path.Combine(root, "campaign", "provision", "hero.provision.json"),
             """{"raid_starting_hero_class_item_lists":[{"hero_class":"test","item_lists":[{"type":"estate","id":"hero_starter","amount":3}]}]}""",
             new UTF8Encoding(false));
+        WriteFixtureManifest(root);
         var isolated = content with { Sources = [new ActiveContentSource("local:quest-items", "quest-items", "local", root, 0)] };
         var townDocument = JsonNode.Parse("""{"base_root":{"wallet":{},"estate_items":{"items":{}}}}""")!.AsObject();
         var raidDocument = JsonNode.Parse("""{"base_root":{"party":{"inventory":{"items":{}}}}}""")!.AsObject();

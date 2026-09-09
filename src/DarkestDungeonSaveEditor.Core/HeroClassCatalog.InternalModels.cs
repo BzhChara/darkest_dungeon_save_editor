@@ -165,6 +165,12 @@ public static partial class HeroClassCatalog
                 .ToList();
         }
 
+        public void AppendSkillEffects(string skillId, string attributeKey, IEnumerable<string> effectNames)
+        {
+            foreach (var effectName in effectNames.Where(value => !string.IsNullOrWhiteSpace(value)))
+                AddSkillEffect(skillId, attributeKey, effectName);
+        }
+
         private void AddSkillEffect(string skillId, string attributeKey, string effectName)
         {
             if (!_skillEffects.TryGetValue(skillId, out var effectsByAttribute))
@@ -179,10 +185,9 @@ public static partial class HeroClassCatalog
                 effectsByAttribute[attributeKey] = effectNames;
             }
 
-            if (!effectNames.Contains(effectName, StringComparer.OrdinalIgnoreCase))
-            {
-                effectNames.Add(effectName);
-            }
+            // Repeated .effect references are retained by the native skill
+            // parser, including when info is followed by an override file.
+            effectNames.Add(effectName);
         }
 
         public void AddIncompatibleInitialQuirks(IEnumerable<string> ids)
@@ -325,7 +330,7 @@ public static partial class HeroClassCatalog
     private sealed record SkillEffectReference(string SkillId, string AttributeKey, string EffectName);
     private sealed record EffectQuirkAssignment(
         string Name,
-        string QuirkId,
+        string? QuirkId,
         string Source,
         string SourcePath);
     private sealed record QuirkDefinition(
@@ -408,18 +413,16 @@ public static partial class HeroClassCatalog
         double? Hp);
 
     private sealed record HeroUpgradeDefinition(
-        string HeroClassId,
         IReadOnlyDictionary<string, int> WeaponRequirements,
         IReadOnlyDictionary<string, int> ArmourRequirements,
-        IReadOnlyList<HeroUpgradeTreeDefinition> Trees,
-        string Source,
-        string SourcePath);
+        IReadOnlyList<HeroUpgradeTreeDefinition> Trees);
 
-    private sealed record HeroUpgradeCompatibility(
-        HeroUpgradeDefinition Definition,
-        int HardFailureCount,
-        int MatchedCombatTreeCount,
-        int UnexpectedCombatTreeCount);
+    private sealed record HeroUpgradeTreeCandidate(
+        string Id,
+        IReadOnlyList<HeroUpgradeRequirementDefinition> Requirements,
+        string Source,
+        string SourcePath,
+        string UnsupportedReason);
 
     private sealed record ResolvedEquipmentRank(
         int Rank,

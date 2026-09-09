@@ -508,6 +508,7 @@ internal static partial class ContractSuite
                 "mod_roamer_B"
             ],
             ["collector_B", "shambler_B", "thing_B"]);
+        WriteFixtureManifest(noManifestPropModRoot);
         var encounterContent = new ActiveContentSnapshot(
             battleEditProfile,
             "base",
@@ -1176,6 +1177,8 @@ internal static partial class ContractSuite
             Path.Combine(existingManagedModB, "project.xml"),
             "<project><Title>Existing Managed Test B</Title></project>",
             new UTF8Encoding(false));
+        WriteFixtureManifest(existingManagedModA);
+        WriteFixtureManifest(existingManagedModB);
         var managedGamePath = Path.Combine(managedProfileRoot, "persist.game.json");
         var managedGameBefore = JsonNode.Parse(File.ReadAllText(managedGamePath))!.AsObject();
         managedGameBefore["base_root"]!["applied_ugcs_1_0"] = new JsonObject

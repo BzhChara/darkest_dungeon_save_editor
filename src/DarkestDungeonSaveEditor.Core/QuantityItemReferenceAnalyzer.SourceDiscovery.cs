@@ -37,7 +37,7 @@ internal static partial class QuantityItemReferenceAnalyzer
         }
 
         var result = new List<ScannedContentFile>();
-        foreach (var file in ContentFileOverlay.Resolve(candidates, "Quantity-item reference", issues))
+        foreach (var file in NativeContentFileResolver.Resolve(candidates, activeContent.Sources, "Quantity-item reference", issues))
         {
             try
             {
@@ -72,7 +72,7 @@ internal static partial class QuantityItemReferenceAnalyzer
         ref bool scanComplete)
     {
         var manifestPath = Path.Combine(source.Directory, "modfiles.txt");
-        if (source.Kind is not ("workshop" or "local") || !ModManifestFile.Exists(manifestPath))
+        if (source.Kind is not ("workshop" or "local"))
         {
             return;
         }
@@ -116,26 +116,16 @@ internal static partial class QuantityItemReferenceAnalyzer
 
         IEnumerable<string> paths;
         var manifestPath = Path.Combine(source.Directory, "modfiles.txt");
-        if ((source.Kind is "workshop" or "local") && ModManifestFile.Exists(manifestPath))
+        if (source.Kind is "workshop" or "local")
         {
+            ModManifestFile.Require(manifestPath);
             paths = ModManifestFile.ReadEntries(manifestPath, ".json", ".darkest", ".csv")
                 .Select(entry => Path.GetFullPath(Path.Combine(source.Directory, entry.RelativePath)))
                 .Where(path => IsInsideSource(source.Directory, path) && File.Exists(path))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToArray();
         }
-        else if (source.Kind is "workshop" or "local")
-        {
-            paths = NativeDirectoryDiscovery.EnumerateFiles(
-                source.Directory,
-                "*",
-                new EnumerationOptions
-                {
-                    RecurseSubdirectories = true,
-                    IgnoreInaccessible = true,
-                    AttributesToSkip = FileAttributes.ReparsePoint
-                });
-        }
+
         else
         {
             paths = ContentDirectories

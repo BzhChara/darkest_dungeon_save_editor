@@ -10,6 +10,9 @@ public partial class MainWindow : Window
     private ProfileSaveMonitor? _catalogMonitor;
     private ProfileCatalogSnapshotReader? _catalogSnapshotReader;
     private CancellationTokenSource? _catalogSyncCancellation;
+    private CancellationTokenSource? _catalogLoadCancellation;
+    private Task? _catalogLoadTask;
+    private bool _catalogCloseRequested;
     private DispatcherTimer? _catalogSyncRetry;
     private DispatcherTimer? _contentPoll;
     private ManagedBattleEncounterBridgeService? _battleMaintenance;
@@ -55,6 +58,7 @@ public partial class MainWindow : Window
 
     private void StopProfileSync()
     {
+        _catalogLoadCancellation?.Cancel();
         unchecked { _catalogGeneration++; }
         _catalogSyncCancellation?.Cancel();
         _catalogSyncCancellation?.Dispose();

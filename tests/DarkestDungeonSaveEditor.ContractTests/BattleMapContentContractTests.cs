@@ -110,11 +110,10 @@ internal static partial class ContractSuite
             SourceGameSha256 = ComputeSha256(gamePath),
             WorkspaceDirectory = Path.Combine(root, "catalog")
         };
-        var fallbackCatalog = BattleRoomAttachmentCatalog.Load(content);
-        Assert(fallbackCatalog.HallCurios.Any(item => item.Id == "enabled_dlc_curio") &&
-               fallbackCatalog.Traps.Any(item => item.Id == "dlc_trap") &&
-               fallbackCatalog.Definitions.All(item => item.Id != "disabled_dlc_curio"),
-            "No-manifest map content must include both enabled DLC pools and their prop resources, never disabled DLC.");
+        var missingRejected = false;
+        try { BattleRoomAttachmentCatalog.Load(content); }
+        catch (InvalidDataException error) when (error.Message.Contains("modfiles.txt", StringComparison.Ordinal)) { missingRejected = true; }
+        Assert(missingRejected, "Missing manifests must prevent room attachment discovery before preparation.");
         WriteMapContentFixture(modRoot, "modfiles.txt", """
             dlc/enabled/dungeons/cove/extra.props.darkest 1
             dlc/enabled/props/cove/trap_definitions.json 1

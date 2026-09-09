@@ -88,8 +88,8 @@ public partial class MainWindow : Window
             : Definition.Generation switch
             {
                 null => "生成模板缺失",
-                { IsEnabled: true } => "游戏自然 / 编辑器手动",
-                { IsEnabled: false } => "仅编辑器手动",
+                { IsEnabled: true } => "普通招募开启 / 编辑器手动",
+                { IsEnabled: false } => "普通招募关闭 / 编辑器手动",
                 _ => "自然状态未知 / 编辑器手动"
             };
         public bool HasProviderConflict => Definition.HasProviderConflict;

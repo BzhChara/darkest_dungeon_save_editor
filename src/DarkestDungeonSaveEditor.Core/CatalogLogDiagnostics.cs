@@ -97,17 +97,6 @@ public static class CatalogLogDiagnostics
             }
         }
 
-        if (raw.StartsWith("Mod has no modfiles.txt;", StringComparison.Ordinal) &&
-            raw.Contains("scan used", StringComparison.Ordinal))
-        {
-            var separator = raw.IndexOf(": ", StringComparison.Ordinal);
-            if (separator >= 0)
-            {
-                var path = raw[(separator + 2)..];
-                return ("fallback\0" + path.ToUpperInvariant(), DiagnosticLogLevel.Information,
-                    $"无清单 Mod，按标准目录及已启用 DLC 子目录扫描（正常读取方式）；目录={Clean(path)}", null);
-            }
-        }
         if (raw.StartsWith("当前为小镇状态；残留副本文件已忽略", StringComparison.Ordinal) ||
             raw.StartsWith("Enabled content directory appears more than once and was scanned once:", StringComparison.Ordinal))
         {

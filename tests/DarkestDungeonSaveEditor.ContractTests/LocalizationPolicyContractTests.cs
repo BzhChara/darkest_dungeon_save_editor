@@ -130,6 +130,7 @@ internal static partial class ContractSuite
             File.Copy(pair.Key, target);
         }
 
+        WriteFixtureManifest(fallbackRoot);
         foreach (var kind in new[] { "local", "workshop" })
         {
             var fallback = ReadLocalizationProbe(content with
@@ -141,7 +142,7 @@ internal static partial class ContractSuite
                    fallback.Names[excludedKey] == BilingualContentName.Empty &&
                    fallback.Names[nestedKey].English == "Listed Nested XML" &&
                    fallback.Names[malformedKey] == BilingualContentName.Empty,
-                "Without a manifest, both Mod channels must scan normal XML plus direct LOC/LOC2 files at eligible roots only.");
+                "After explicitly listing the additional files, both Mod channels must include eligible XML/LOC/LOC2 and still reject disabled roots and malformed XML.");
         }
 
         var higherRoot = Path.Combine(root, "higher");

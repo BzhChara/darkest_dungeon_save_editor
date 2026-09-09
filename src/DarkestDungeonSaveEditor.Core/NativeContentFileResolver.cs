@@ -7,11 +7,9 @@ namespace DarkestDungeonSaveEditor.Core;
 // explicitly guarded multi-DLC cases in BattleEncounterCatalog.RuntimeOrder.
 internal static class NativeContentFileResolver
 {
-    internal static IReadOnlyList<string> EnumeratePhysicalActorFiles(ActiveContentSource source,
-        IReadOnlyList<string> prefixes, string directory)
+    private static IReadOnlyList<string> EnumeratePhysicalActorFiles(ActiveContentSource source, string directory)
     {
-        return ContentFileOverlay.GetFallbackContentRoots(source.Directory,
-                source.Kind is "local" or "workshop" ? prefixes : [])
+        return new[] { source.Directory }
             .Select(root => Path.Combine(root, directory)).Where(Directory.Exists)
             .SelectMany(root => Directory.EnumerateFiles(root, "*.darkest", SearchOption.AllDirectories))
             .Where(path => path.EndsWith(".info.darkest", StringComparison.OrdinalIgnoreCase) ||
@@ -37,16 +35,16 @@ internal static class NativeContentFileResolver
         }, StringComparer.OrdinalIgnoreCase);
     }
 
-    private static IReadOnlyList<string> EnumerateActorOpenFiles(ActiveContentSource source,
+    internal static IReadOnlyList<string> EnumerateActorOpenFiles(ActiveContentSource source,
         IReadOnlyList<string> prefixes, string directory, List<string> issues)
     {
-        if (source.Kind is "local" or "workshop" && ModManifestFile.Exists(Path.Combine(source.Directory, "modfiles.txt")))
+        if (source.Kind is "local" or "workshop")
             return ContentFileDiscovery.Enumerate(source, prefixes, issues, "Actor definition",
                 new ContentFileRule(directory, "*.info.darkest"),
                 new ContentFileRule(directory, "*.art.darkest"),
                 new ContentFileRule(directory, "*.override.darkest"));
         // A direct open on a directory device need not have been enumerated.
-        return EnumeratePhysicalActorFiles(source, prefixes, directory);
+        return EnumeratePhysicalActorFiles(source, directory);
     }
 
     internal static IReadOnlySet<string> DiscoverActorIds(IReadOnlyList<ActiveContentSource> sources,

@@ -19,6 +19,7 @@ internal static partial class ContractSuite
         File.WriteAllBytes(Path.Combine(localization, "valid_english.loc"), valid);
         WriteLegacyLoc(Path.Combine(localization, "valid_schinese.loc"),
             new Dictionary<string, string> { [key] = "旧格式名称" });
+        WriteFixtureManifest(root);
         var probe = ReadLocalizationProbe(content, [key]);
         Assert(probe.Names[key] == new BilingualContentName("旧格式名称", "Legacy Name") && probe.Issues.Count == 0,
             "Legacy LOC must support multiple values per hash, first non-empty names, UTF-8, and cross-string compiled colour controls.");
@@ -92,6 +93,7 @@ internal static partial class ContractSuite
         WriteLoc2(Path.Combine(localization, "broken_loc2_layout_english.loc"),
             new Dictionary<string, string> { [key] = "Wrong Format" });
         rejectedNames.Add("broken_loc2_layout_english.loc");
+        WriteFixtureManifest(root);
         probe = ReadLocalizationProbe(content, [key]);
         Assert(probe.Names[key] == new BilingualContentName("旧格式名称", "Legacy Name") &&
                rejectedNames.All(name => probe.Issues.Any(issue =>
@@ -111,6 +113,7 @@ internal static partial class ContractSuite
             (0u, [Encoding.UTF8.GetBytes("")]),
             (HashLoc2Key(key), [Encoding.UTF8.GetBytes("Sentinel Probe")])
         ]));
+        WriteFixtureManifest(root);
         var zeroProbe = ReadLocalizationProbe(content, [key]);
         Assert(zeroProbe.Names[key].English == "Sentinel Probe" &&
                zeroProbe.Issues.All(issue => !issue.Contains("zero_sentinels", StringComparison.Ordinal)),

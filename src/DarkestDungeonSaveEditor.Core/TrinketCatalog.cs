@@ -261,18 +261,7 @@ public static class TrinketCatalog
         }
 
         var manifestPath = Path.Combine(root, "modfiles.txt");
-        if (!ModManifestFile.Exists(manifestPath))
-        {
-            issues.Add($"Mod has no modfiles.txt; standard fallback scan used: {root}");
-            return ContentFileOverlay.GetFallbackContentRoots(root, enabledDlcPrefixes)
-                .Select(contentRoot => Path.Combine(contentRoot, "trinkets"))
-                .Where(Directory.Exists)
-                .SelectMany(directory => NativeDirectoryDiscovery.EnumerateFiles(
-                    directory, "*.entries.trinkets.json", SearchOption.AllDirectories))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
-                .ToArray();
-        }
+        ModManifestFile.Require(manifestPath);
 
         var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var entry in ModManifestFile.ReadEntries(manifestPath, ".entries.trinkets.json"))

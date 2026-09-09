@@ -77,17 +77,17 @@ internal static partial class ContractSuite
         const string path = @"E:\fixture\localization\bad.string_table.xml";
         const string reason = "Invalid XML at line 5.";
         var raw = new[] { $"Failed to read localization '{path}': {reason}",
-            "Mod has no modfiles.txt; quantity-item scan used standard inventory directories including enabled DLC paths: E:\\fixture" };
+            "Enabled content directory appears more than once and was scanned once: E:\\fixture" };
         var rawBefore = raw.ToArray();
         var entries = CatalogLogDiagnostics.Summarize([
             ("物品", raw),
             ("人物/怪癖/姓名", new[] { $"Failed to read hero names '{path.ToLowerInvariant()}': {reason}",
-                "Mod has no modfiles.txt; standard fallback scan used: e:\\fixture" }),
+                raw[1] }),
             ("饰品", new[] { raw[0], $"Failed to read localization '{path}': Different failure.", "An unknown warning must survive." })
         ]);
         Assert(entries.Count == 4 && entries.Count(entry => entry.Level == DiagnosticLogLevel.Information) == 1 &&
                entries.Count(entry => entry.Level == DiagnosticLogLevel.Warning) == 3 && raw.SequenceEqual(rawBefore),
-            "Catalog logging must merge equivalent fallback and XML failures without changing raw issues or swallowing distinct/unknown failures.");
+            "Catalog logging must merge equivalent directory notices and XML failures without changing raw issues or swallowing distinct/unknown failures.");
         var failure = entries.Single(entry => entry.Message.Contains(reason, StringComparison.Ordinal));
         Assert(failure.Message.Contains("人物/怪癖/姓名", StringComparison.Ordinal) &&
                failure.Message.Contains("物品", StringComparison.Ordinal) && failure.Message.Contains("饰品", StringComparison.Ordinal) &&
@@ -142,6 +142,7 @@ internal static partial class ContractSuite
         var binary = Path.Combine(localization, "valid_english.loc2");
         File.WriteAllText(xml, "<root>", new UTF8Encoding(false));
         WriteLoc2(binary, new Dictionary<string, string> { [key] = "Compiled name" });
+        WriteFixtureManifest(root);
         var isolated = content with { Sources = [new ActiveContentSource("local:logging", "logging", "local", root, 0)] };
         var originalHash = ComputeSha256(binary);
         var read = ReadLocalizationProbe(isolated, [key]);

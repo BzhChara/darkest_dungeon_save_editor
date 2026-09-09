@@ -11,7 +11,7 @@ internal static partial class ContractSuite
             heroCatalog.ResolveLevelThresholds.SequenceEqual([0, 2, 8, 14, 24, 36, 48]),
             "Base resolve XP thresholds were not loaded from the effective roster variables.");
         Assert(heroCatalog.HeroClasses.Count == 8, "Hero catalog should contain base replacement/patch, enabled DLC package/feature, active Workshop, and local classes.");
-        Assert(heroCatalog.RecruitEvents.Count == 4, "Resolved Workshop, DLC-overlay, local, and identical duplicate bonus_recruit events should be active.");
+        Assert(heroCatalog.RecruitEvents.Count == 5, "Resolved Workshop, DLC-overlay, local, and first-matching duplicate bonus_recruit events should be active.");
         Assert(heroCatalog.HeroClasses.All(item => item.Id != "disabled_hero"), "Persistent history must not enable a disabled hero class.");
         Assert(heroCatalog.HeroClasses.Any(item => item.Id == "dlc_shared_hero"), "Enabled DLC package root hero is missing.");
         var officialOverrideHero = heroCatalog.HeroClasses.Single(item => item.Id == "official_override_hero");
@@ -72,13 +72,15 @@ internal static partial class ContractSuite
         Assert(
             runtimeHero.LocalizedName == BilingualContentName.Empty,
             "An unlisted XML authoring table must not supply hero names when a Mod has a manifest.");
-        Assert(runtimeHero.RecruitEvents.Single().Id == "recruit_runtime_hero", "Workshop bonus_recruit event was not linked to its hero class.");
+        Assert(runtimeHero.RecruitEvents.Count == 2 && runtimeHero.RecruitEvents.Any(row => row.Id == "recruit_runtime_hero"),
+            "Workshop recruitment and the first same-ID result must both link to their hero class.");
         Assert(
-            runtimeHero.RuntimeQuirkSignals.Count == 2 &&
+            runtimeHero.RuntimeQuirkSignals.Count == 3 &&
             runtimeHero.RuntimeQuirkSignals.Single(signal => signal.SkillId == "runtime_strike").QuirkId == "runtime_fixed_quirk" &&
-            runtimeHero.RuntimeQuirkSignals.Single(signal => signal.SkillId == "runtime_guard").QuirkId == "priority_top_quirk" &&
-            runtimeHero.RuntimeQuirkSignals.All(signal => signal.EffectName != "Grant Runtime Quirk" || signal.SkillId != "runtime_guard"),
-            "A skill override must replace only the named effect field, clear an explicitly empty field, and retain untouched *_effects fields.");
+            runtimeHero.RuntimeQuirkSignals.Where(signal => signal.SkillId == "runtime_guard")
+                .Select(signal => signal.QuirkId).ToHashSet(StringComparer.Ordinal)
+                .SetEquals(["runtime_fixed_quirk", "priority_top_quirk"]),
+            "An empty skill .effect override must retain earlier effect references and leave untouched *_effects fields intact.");
         Assert(
             string.IsNullOrWhiteSpace(runtimeHero.ProgressionUnsupportedReason) &&
             runtimeHero.LevelProfiles.Select(profile => profile.WeaponRank).SequenceEqual([0, 0, 1, 1, 1, 1, 1]) &&
@@ -122,10 +124,9 @@ internal static partial class ContractSuite
                 .SequenceEqual(["a", "A", "b", "B", "c"]),
             "The active hero upgrade template should retain exact, case-sensitive tree ids and custom requirement codes for save purchases.");
         Assert(
-            heroCatalog.Issues.Any(issue =>
-                issue.Contains("Hero upgrade 'case_probe_hero'", StringComparison.Ordinal) &&
-                issue.Contains("conflicting definitions", StringComparison.Ordinal)),
-            "Same-priority hero upgrade templates that differ only by requirement-code case must remain an explicit conflict.");
+            heroCatalog.Issues.All(issue =>
+                !issue.Contains("Hero upgrade 'case_probe_hero'", StringComparison.Ordinal)),
+            "Ordered repeated upgrade trees must not produce the former whole-file compatibility conflict.");
         var compatibleUpgradeHero = heroCatalog.HeroClasses.Single(item => item.Id == "compatible_upgrade_hero");
         Assert(
             string.IsNullOrWhiteSpace(compatibleUpgradeHero.ProgressionUnsupportedReason) &&
@@ -136,7 +137,7 @@ internal static partial class ContractSuite
             compatibleUpgradeHero.SingleLevelCombatSkillIds.SequenceEqual(["fixed_command"]) &&
             heroCatalog.Issues.All(issue =>
                 !issue.Contains("Hero upgrade 'compatible_upgrade_hero'", StringComparison.Ordinal)),
-            "A selectable class with an implicit multilevel skill must still resolve a uniquely compatible upgrade template, preserving exact ID ranking and the single-level distinction.");
+            "A class must bind its actual skill IDs across ordered files, ignoring unreferenced legacy trees and preserving the single-level distinction.");
         var compatibleLevelZeroCandidate = StagecoachHeroCandidateFactory.Generate(
             heroCatalog,
             compatibleUpgradeHero,
@@ -159,17 +160,19 @@ internal static partial class ContractSuite
                    .Select(purchase => purchase.RequirementCode).SequenceEqual(["0", "1"]),
             "Real catalog resolution, availability, and generation must agree on selectable tree-less skill progression.");
         Assert(localHero.ColourVariationCount == 2, "Only the continuous A/B skin directories should be available for random colour selection.");
+        VerifyManifestSkinSelection(activeContent, localModRoot);
         Assert(localHero.ClassCampingSkillIds.Count == 2 && localHero.SharedCampingSkillIds.Count == 2, "Class and shared camping skills were not separated by the camping configuration.");
         Assert(localHero.IncompatibleInitialQuirkIds.Contains("excluded_quirk"), "Class-level incompatible initial quirks were not parsed.");
         Assert(localHero.RecruitEvents.Single().Count == 2.0, "Local bonus_recruit count was not parsed.");
         Assert(localHero.RuntimeQuirkSignals.Single().QuirkId == "priority_top_quirk", "Top-priority same-path effect and quirk files should supply the non-initial runtime signal.");
-        Assert(heroCatalog.RecruitEvents.All(item => item.Id != "ambiguous_recruit"), "A same-priority town event conflict must not select a winner.");
+        Assert(heroCatalog.RecruitEvents.Single(item => item.Id == "ambiguous_recruit") is { HeroClass: "runtime_hero", Count: 1.0 },
+            "Event result lookup must choose the first native record across effective files.");
         Assert(heroCatalog.RecruitEvents.Single(item => item.Id == "identical_recruit").HeroClass == "event_only_hero", "Identical town event definitions should merge.");
-        var fallbackMessage = $"Mod has no modfiles.txt; standard fallback scan used: {Path.GetFullPath(localModRoot)}";
-        Assert(heroCatalog.Issues.Contains(fallbackMessage, StringComparer.OrdinalIgnoreCase), "A local hero Mod without a manifest should report its standard fallback scan once.");
-        Assert(activeCatalog.Issues.Contains(fallbackMessage, StringComparer.OrdinalIgnoreCase), "The trinket and hero fallback reports should use the same deduplicatable message.");
+        Assert(heroCatalog.Issues.Concat(activeCatalog.Issues).All(issue => !issue.Contains("fallback scan", StringComparison.Ordinal)),
+            "Prepared local Mods must use their manifests without directory fallback diagnostics.");
         Assert(heroCatalog.Issues.All(issue => !issue.Contains("Hero class 'runtime_hero'", StringComparison.Ordinal)), "Identical hero duplicates should not be reported as conflicts.");
-        Assert(heroCatalog.Issues.Any(issue => issue.Contains("Effect 'Ambiguous Effect'", StringComparison.Ordinal)), "Semantic-only effect duplicates should be reported.");
+        Assert(heroCatalog.Issues.All(issue => !issue.Contains("Effect 'Ambiguous Effect'", StringComparison.Ordinal)),
+            "Ordered disease assignments in same-name Effects must no longer be reported as ambiguous.");
         Assert(heroCatalog.Issues.All(issue => !issue.Contains("Ordinary Duplicate", StringComparison.Ordinal)), "Effects without disease assignments should not enter runtime-quirk conflict diagnostics.");
         Assert(heroCatalog.Issues.All(issue => !issue.Contains("Quirk 'ambiguous_quirk'", StringComparison.Ordinal)), "Known native duplicate resolution should not be reported as ambiguity.");
         Assert(
@@ -204,7 +207,8 @@ internal static partial class ContractSuite
         Assert(
             samePathDuplicateQuirk is { IsPositive: true, RandomChance: 1 },
             "Repeated quirk declarations at one effective path should expose only the last resolved definition.");
-        Assert(heroCatalog.Issues.Any(issue => issue.Contains("Town event 'ambiguous_recruit'", StringComparison.Ordinal)), "Semantic-only town event duplicates should be reported.");
+        Assert(heroCatalog.Issues.All(issue => !issue.Contains("Town event 'ambiguous_recruit'", StringComparison.Ordinal)),
+            "A known first-match event result must not produce the former cross-file ambiguity diagnostic.");
         Assert(heroCatalog.Issues.All(issue => !issue.Contains("identical_recruit", StringComparison.Ordinal)), "Identical town event definitions should not be reported as conflicts.");
 
         Assert(

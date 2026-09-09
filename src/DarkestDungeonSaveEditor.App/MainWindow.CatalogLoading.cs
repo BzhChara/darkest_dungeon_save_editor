@@ -16,11 +16,25 @@ public partial class MainWindow : Window
 {
     private async void LoadCatalog_Click(object sender, RoutedEventArgs e)
     {
+        if (_catalogCloseRequested || _catalogLoadTask is { IsCompleted: false }) return;
+        var loadTask = LoadCatalogAsync();
+        _catalogLoadTask = loadTask;
+        try { await loadTask; }
+        finally
+        {
+            if (ReferenceEquals(_catalogLoadTask, loadTask)) _catalogLoadTask = null;
+        }
+    }
+
+    private async Task LoadCatalogAsync()
+    {
         var diagnosticBatch = new CatalogDiagnosticBatch();
+        using var loadCancellation = new CancellationTokenSource();
         try
         {
             CrashDiagnostics.SetStage("LoadCatalog: invalidating previous catalog");
             InvalidateCatalog();
+            _catalogLoadCancellation = loadCancellation;
             var generation = _catalogGeneration;
             CrashDiagnostics.SetStage("LoadCatalog: entering busy state");
             SetBusy(true);
@@ -45,7 +59,16 @@ public partial class MainWindow : Window
                 gameDirectory,
                 workshopDirectory,
                 additionalLocalModDirectory,
-                codec);
+                codec, cancellationToken: loadCancellation.Token);
+            if (generation != _catalogGeneration) return;
+            CrashDiagnostics.SetStage("LoadCatalog: preparing missing Mod manifests");
+            var manifestProgress = new Progress<string>(message =>
+            {
+                if (generation == _catalogGeneration) AppendStatus(message);
+            });
+            await Task.Run(() => new ModManifestPreparationService().EnsureAsync(activeContent,
+                gameDirectory, manifestProgress, loadCancellation.Token), loadCancellation.Token);
+            if (generation != _catalogGeneration) return;
             diagnosticBatch.Add("活动来源", activeContent.Issues);
             CrashDiagnostics.RecordStatus(
                 $"内容目录档案：ID={activeContent.Profile.ProfileId}；" +
@@ -158,6 +181,7 @@ public partial class MainWindow : Window
             StartProfileSync(activeContent, quantityItems, codec, gameDirectory,
                 workshopDirectory, additionalLocalModDirectory, contentFingerprint);
         }
+        catch (OperationCanceledException) when (loadCancellation.IsCancellationRequested) { }
         catch (Exception ex)
         {
             CrashDiagnostics.RecordException("LoadCatalog handled exception", ex);
@@ -167,6 +191,7 @@ public partial class MainWindow : Window
         {
             // Flush partial results even if another catalog or UI update failed.
             CrashDiagnostics.RecordCatalogDiagnostics(diagnosticBatch);
+            if (ReferenceEquals(_catalogLoadCancellation, loadCancellation)) _catalogLoadCancellation = null;
             try
             {
                 CrashDiagnostics.SetStage("LoadCatalog: leaving busy state");
