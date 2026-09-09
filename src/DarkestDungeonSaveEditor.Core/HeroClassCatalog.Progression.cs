@@ -8,122 +8,107 @@ namespace DarkestDungeonSaveEditor.Core;
 
 public static partial class HeroClassCatalog
 {
-    private static IReadOnlyDictionary<string, HeroUpgradeDefinition> ResolveHeroUpgradeDefinitions(
-        Dictionary<string, List<HeroUpgradeDefinition>> candidates,
-        IReadOnlyDictionary<string, List<HeroCandidate>> heroCandidates,
-        IReadOnlyDictionary<string, IReadOnlyList<EffectiveContentFile>> heroOverridesByClass,
-        IReadOnlyDictionary<string, ActiveContentSource> sourcesById,
+    private static IReadOnlyDictionary<string, HeroUpgradeTreeCandidate> ResolveHeroUpgradeTrees(
+        IReadOnlyList<EffectiveContentFile> files,
         List<string> issues)
     {
-        var result = new Dictionary<string, HeroUpgradeDefinition>(StringComparer.OrdinalIgnoreCase);
-        foreach (var pair in candidates)
+        var result = new Dictionary<string, HeroUpgradeTreeCandidate>(StringComparer.Ordinal);
+        // IO_FindFiles supplies effective files in native order. Upgrade lookups
+        // (0x1406741C0 / 0x1404703D0, build 27890) retain the last matching tree,
+        // including duplicates within one file; filenames do not identify heroes.
+        foreach (var file in files)
         {
-            var effective = SelectEffectiveDefinitions(
-                pair.Value,
-                sourcesById,
-                definition => definition.Source,
-                definition => definition.SourcePath,
-                GetHeroUpgradeSignature);
-            pair.Value.Clear();
-            pair.Value.AddRange(effective);
-            if (effective.Count == 1)
+            try
             {
-                result[pair.Key] = effective[0];
-                continue;
-            }
-
-            HeroCandidate? selectedHero = null;
-            if (heroCandidates.TryGetValue(pair.Key, out var classCandidates))
-            {
-                var effectiveHeroes = SelectEffectiveDefinitions(
-                    classCandidates,
-                    sourcesById,
-                    candidate => candidate.Source,
-                    candidate => candidate.SourcePath,
-                    GetHeroCandidateSignature);
-                if (effectiveHeroes.Count == 1)
+                using var document = JsonDocument.Parse(File.ReadAllBytes(file.Path), new JsonDocumentOptions
                 {
-                    selectedHero = ApplyHeroOverrides(
-                        effectiveHeroes[0],
-                        heroOverridesByClass.TryGetValue(pair.Key, out var overrideFiles)
-                            ? overrideFiles
-                            : [],
-                        sourcesById);
+                    AllowTrailingCommas = true,
+                    CommentHandling = JsonCommentHandling.Skip
+                });
+                if (document.RootElement.ValueKind != JsonValueKind.Object ||
+                    !document.RootElement.TryGetProperty("trees", out var trees) ||
+                    trees.ValueKind != JsonValueKind.Array)
+                {
+                    throw new InvalidDataException("Upgrade definition is missing its trees array.");
+                }
+
+                foreach (var tree in trees.EnumerateArray())
+                {
+                    // Native IDs are hashed verbatim; display-text trimming would
+                    // merge distinct trees and change their effective definition.
+                    var id = tree.ValueKind == JsonValueKind.Object &&
+                             tree.TryGetProperty("id", out var idNode) && idNode.ValueKind == JsonValueKind.String
+                        ? idNode.GetString() ?? string.Empty
+                        : string.Empty;
+                    if (string.IsNullOrWhiteSpace(id))
+                    {
+                        issues.Add($"Upgrade tree is missing its id in '{file.Path}'.");
+                        continue;
+                    }
+
+                    IReadOnlyList<HeroUpgradeRequirementDefinition> requirements = [];
+                    var reason = string.Empty;
+                    try
+                    {
+                        requirements = ReadHeroUpgradeRequirements(tree, id);
+                    }
+                    catch (InvalidDataException ex)
+                    {
+                        // Keep the winning ID occupied. It must not expose an
+                        // earlier definition or be synthesized as a tree-less skill.
+                        reason = ex.Message;
+                    }
+                    result[id] = new HeroUpgradeTreeCandidate(
+                        id, requirements, file.Source.Id, Path.GetFullPath(file.Path), reason);
                 }
             }
-
-            var compatible = selectedHero is null
-                ? null
-                : SelectCompatibleHeroUpgrade(selectedHero, effective);
-            if (compatible is not null)
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or InvalidDataException)
             {
-                result[pair.Key] = compatible;
-                continue;
+                issues.Add($"Failed to read hero upgrade definition '{file.Path}': {ex.Message}");
             }
-
-            issues.Add(
-                $"Hero upgrade '{pair.Key}' has conflicting definitions at the same effective priority and was left unresolved: " +
-                string.Join(
-                    " | ",
-                    effective.Select(candidate => $"{candidate.Source}:{candidate.SourcePath}")));
         }
 
+        var collisions = NativeResourceIdentity.FindCollisions(result.Keys);
+        foreach (var id in collisions)
+        {
+            result[id] = result[id] with { UnsupportedReason = "升级树 ID 与其他 ID 的游戏哈希冲突" };
+        }
         return result;
     }
 
-    private static HeroUpgradeDefinition? SelectCompatibleHeroUpgrade(
+    private static HeroUpgradeDefinition BindHeroUpgradeTrees(
         HeroCandidate hero,
-        IReadOnlyList<HeroUpgradeDefinition> candidates)
+        IReadOnlyDictionary<string, HeroUpgradeTreeCandidate> candidates,
+        List<string> issues)
     {
-        var expectedTreeIds = hero.CombatSkillIds
-            .Select(skillId => $"{hero.Id}.{skillId}")
-            .ToHashSet(StringComparer.Ordinal);
-        var ranked = candidates
-            .Select(candidate =>
+        var trees = new List<HeroUpgradeTreeDefinition>();
+        void AddTree(string id, HeroUpgradeTreeKind kind)
+        {
+            if (!candidates.TryGetValue(id, out var candidate)) return;
+            if (!string.IsNullOrWhiteSpace(candidate.UnsupportedReason))
+                issues.Add($"Hero upgrade tree '{id}' is unavailable: {candidate.UnsupportedReason} ({candidate.SourcePath})");
+            // The caller constructs the ID. Tags and filenames do not change
+            // which tree the game's skill/equipment lookup returns.
+            trees.Add(new HeroUpgradeTreeDefinition(id, kind, candidate.Requirements)
             {
-                var combatTreeIds = candidate.Trees
-                    .Where(tree => tree.Kind == HeroUpgradeTreeKind.CombatSkill)
-                    .Select(tree => tree.Id)
-                    .ToHashSet(StringComparer.Ordinal);
-                var equipmentFailures =
-                    (string.IsNullOrWhiteSpace(BuildEquipmentProgression(
-                        "weapon",
-                        hero.WeaponRanks,
-                        candidate.WeaponRequirements,
-                        requireHp: false).UnsupportedReason) ? 0 : 1) +
-                    (string.IsNullOrWhiteSpace(BuildEquipmentProgression(
-                        "armour",
-                        hero.ArmourRanks,
-                        candidate.ArmourRequirements,
-                        requireHp: true).UnsupportedReason) ? 0 : 1);
-                return new HeroUpgradeCompatibility(
-                    candidate,
-                    equipmentFailures,
-                    expectedTreeIds.Count(combatTreeIds.Contains),
-                    combatTreeIds.Count(treeId => !expectedTreeIds.Contains(treeId)));
-            })
-            .OrderBy(item => item.HardFailureCount)
-            .ThenByDescending(item => item.MatchedCombatTreeCount)
-            .ThenBy(item => item.UnexpectedCombatTreeCount)
-            .ToArray();
-        if (ranked.Length == 0)
-        {
-            return null;
+                Source = candidate.Source,
+                SourcePath = candidate.SourcePath,
+                UnsupportedReason = candidate.UnsupportedReason
+            });
         }
+        AddTree($"{hero.Id}.weapon", HeroUpgradeTreeKind.Weapon);
+        AddTree($"{hero.Id}.armour", HeroUpgradeTreeKind.Armour);
+        foreach (var skillId in hero.CombatSkillIds.Distinct(StringComparer.Ordinal))
+            AddTree($"{hero.Id}.{skillId}", HeroUpgradeTreeKind.CombatSkill);
 
-        var best = ranked[0];
-        if (best.HardFailureCount != 0)
-        {
-            return null;
-        }
-
-        return ranked.Skip(1).Any(item =>
-            item.HardFailureCount == best.HardFailureCount &&
-            item.MatchedCombatTreeCount == best.MatchedCombatTreeCount &&
-            item.UnexpectedCombatTreeCount == best.UnexpectedCombatTreeCount)
-            ? null
-            : best.Definition;
+        IReadOnlyDictionary<string, int> Requirements(HeroUpgradeTreeKind kind) => trees
+            .Where(tree => tree.Kind == kind)
+            .SelectMany(tree => tree.Requirements)
+            .ToDictionary(requirement => requirement.Code, requirement => requirement.PrerequisiteResolveLevel, StringComparer.Ordinal);
+        return new HeroUpgradeDefinition(
+            Requirements(HeroUpgradeTreeKind.Weapon), Requirements(HeroUpgradeTreeKind.Armour), trees);
     }
+
     private static IReadOnlyList<int> ReadEffectiveResolveLevelThresholds(
         IReadOnlyList<EffectiveContentFile> files,
         List<string> issues)
@@ -192,134 +177,38 @@ public static partial class HeroClassCatalog
         }
     }
 
-    private static HeroUpgradeDefinition ReadHeroUpgrade(EffectiveContentFile file)
+    private static IReadOnlyList<HeroUpgradeRequirementDefinition> ReadHeroUpgradeRequirements(JsonElement tree, string treeId)
     {
-        var fileName = Path.GetFileName(file.Path);
-        var heroClassId = fileName.EndsWith(HeroUpgradeSuffix, StringComparison.OrdinalIgnoreCase)
-            ? fileName[..^HeroUpgradeSuffix.Length]
-            : Path.GetFileNameWithoutExtension(fileName);
-        var weaponRequirements = new Dictionary<string, int>(StringComparer.Ordinal);
-        var armourRequirements = new Dictionary<string, int>(StringComparer.Ordinal);
-        var upgradeTrees = new List<HeroUpgradeTreeDefinition>();
-        using var document = JsonDocument.Parse(
-            File.ReadAllBytes(file.Path),
-            new JsonDocumentOptions
-            {
-                AllowTrailingCommas = true,
-                CommentHandling = JsonCommentHandling.Skip
-            });
-        if (document.RootElement.TryGetProperty("trees", out var trees) &&
-            trees.ValueKind == JsonValueKind.Array)
+        if (!tree.TryGetProperty("requirements", out var requirements) || requirements.ValueKind != JsonValueKind.Array)
         {
-            foreach (var tree in trees.EnumerateArray())
-            {
-                if (tree.ValueKind != JsonValueKind.Object)
-                {
-                    continue;
-                }
-
-                var tags = ReadJsonStringArray(tree, "tags");
-                HeroUpgradeTreeKind? kind = tags.Contains("weapon", StringComparer.OrdinalIgnoreCase)
-                    ? HeroUpgradeTreeKind.Weapon
-                    : tags.Contains("armour", StringComparer.OrdinalIgnoreCase)
-                        ? HeroUpgradeTreeKind.Armour
-                        : tags.Contains("combat_skill", StringComparer.OrdinalIgnoreCase)
-                            ? HeroUpgradeTreeKind.CombatSkill
-                            : null;
-                if (kind is null)
-                {
-                    continue;
-                }
-
-                var treeId = ReadJsonString(tree, "id");
-                if (string.IsNullOrWhiteSpace(treeId))
-                {
-                    throw new InvalidDataException(
-                        $"A {string.Join('/', tags)} upgrade tree is missing its id.");
-                }
-                if (!tree.TryGetProperty("requirements", out var requirements) ||
-                    requirements.ValueKind != JsonValueKind.Array)
-                {
-                    throw new InvalidDataException(
-                        $"Upgrade tree '{treeId}' is missing its requirements array.");
-                }
-
-                var parsedRequirements = new Dictionary<string, int>(StringComparer.Ordinal);
-
-                foreach (var requirement in requirements.EnumerateArray())
-                {
-                    var code = ReadJsonString(requirement, "code");
-                    var prerequisiteLevel = ReadJsonInt(requirement, "prerequisite_resolve_level");
-                    if (string.IsNullOrWhiteSpace(code) || prerequisiteLevel is null or < 0)
-                    {
-                        throw new InvalidDataException(
-                            $"A {string.Join('/', tags)} requirement is missing code or prerequisite_resolve_level.");
-                    }
-                    if (code.Length != 1 || code[0] > 0x7F)
-                    {
-                        throw new InvalidDataException(
-                            $"Upgrade tree '{treeId}' requirement code '{code}' cannot be represented " +
-                            "losslessly by persist.upgrades; one ASCII character is required.");
-                    }
-
-                    if (parsedRequirements.TryGetValue(code, out var existing) && existing != prerequisiteLevel.Value)
-                    {
-                        throw new InvalidDataException(
-                            $"Upgrade tree '{treeId}' requirement '{code}' has conflicting resolve prerequisites " +
-                            $"{existing} and {prerequisiteLevel.Value}.");
-                    }
-
-                    parsedRequirements[code] = prerequisiteLevel.Value;
-                }
-
-                if (upgradeTrees.Any(existing =>
-                        existing.Id.Equals(treeId, StringComparison.Ordinal)))
-                {
-                    throw new InvalidDataException($"Upgrade tree '{treeId}' is defined more than once.");
-                }
-
-                upgradeTrees.Add(new HeroUpgradeTreeDefinition(
-                    treeId,
-                    kind.Value,
-                    parsedRequirements
-                        .Select(pair => new HeroUpgradeRequirementDefinition(pair.Key, pair.Value))
-                        .OrderBy(requirement => requirement.PrerequisiteResolveLevel)
-                        .ThenBy(requirement => requirement.Code, StringComparer.Ordinal)
-                        .ToArray()));
-
-                var target = kind.Value switch
-                {
-                    HeroUpgradeTreeKind.Weapon => weaponRequirements,
-                    HeroUpgradeTreeKind.Armour => armourRequirements,
-                    _ => null
-                };
-                if (target is null)
-                {
-                    continue;
-                }
-
-                foreach (var requirement in parsedRequirements)
-                {
-                    if (target.TryGetValue(requirement.Key, out var existing) &&
-                        existing != requirement.Value)
-                    {
-                        throw new InvalidDataException(
-                            $"Upgrade requirement '{requirement.Key}' has conflicting resolve prerequisites " +
-                            $"{existing} and {requirement.Value}.");
-                    }
-
-                    target[requirement.Key] = requirement.Value;
-                }
-            }
+            throw new InvalidDataException($"Upgrade tree '{treeId}' is missing its requirements array.");
         }
 
-        return new HeroUpgradeDefinition(
-            heroClassId,
-            weaponRequirements,
-            armourRequirements,
-            upgradeTrees,
-            file.Source.Id,
-            Path.GetFullPath(file.Path));
+        var parsedRequirements = new Dictionary<string, int>(StringComparer.Ordinal);
+        foreach (var requirement in requirements.EnumerateArray())
+        {
+            if (requirement.ValueKind != JsonValueKind.Object)
+                throw new InvalidDataException($"Upgrade tree '{treeId}' contains a non-object requirement.");
+            var code = requirement.TryGetProperty("code", out var codeNode) && codeNode.ValueKind == JsonValueKind.String
+                ? codeNode.GetString() ?? string.Empty
+                : string.Empty;
+            var prerequisiteLevel = ReadJsonInt(requirement, "prerequisite_resolve_level");
+            if (string.IsNullOrWhiteSpace(code) || prerequisiteLevel is null or < 0)
+                throw new InvalidDataException($"Upgrade tree '{treeId}' requirement is missing code or prerequisite_resolve_level.");
+            if (code.Length != 1 || code[0] > 0x7F)
+                throw new InvalidDataException($"Upgrade tree '{treeId}' requirement code '{code}' cannot be represented " +
+                    "losslessly by persist.upgrades; one ASCII character is required.");
+
+            if (parsedRequirements.TryGetValue(code, out var existing) && existing != prerequisiteLevel.Value)
+                throw new InvalidDataException($"Upgrade tree '{treeId}' requirement '{code}' has conflicting resolve prerequisites " +
+                    $"{existing} and {prerequisiteLevel.Value}.");
+            parsedRequirements[code] = prerequisiteLevel.Value;
+        }
+
+        return parsedRequirements.Select(pair => new HeroUpgradeRequirementDefinition(pair.Key, pair.Value))
+            .OrderBy(requirement => requirement.PrerequisiteResolveLevel)
+            .ThenBy(requirement => requirement.Code, StringComparer.Ordinal)
+            .ToArray();
     }
 
     private static HeroProgressionBuildResult BuildHeroProgression(

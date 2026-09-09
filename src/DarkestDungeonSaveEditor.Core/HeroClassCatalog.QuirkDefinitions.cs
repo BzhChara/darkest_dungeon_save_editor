@@ -174,6 +174,7 @@ public static partial class HeroClassCatalog
         if (!effectiveEffects.TryGetValue(reference.EffectName, out var effect) ||
             string.IsNullOrWhiteSpace(effect.QuirkId) ||
             !effectiveQuirks.TryGetValue(effect.QuirkId, out var quirk) ||
+            !quirk.Id.Equals(effect.QuirkId, StringComparison.Ordinal) ||
             quirk.RandomChance is null or > 0)
         {
             return null;
@@ -209,7 +210,10 @@ public static partial class HeroClassCatalog
             var attributes = ParseAttributes(line[(separator + 1)..]);
             var name = ReadString(attributes, "name");
             var quirkId = ReadString(attributes, "disease");
-            if (!string.IsNullOrWhiteSpace(name) && !string.IsNullOrWhiteSpace(quirkId))
+            // The native Effect object survives duplicate declarations:
+            // omitted disease retains the old string; explicit "" clears it.
+            // Keep even non-disease entries for native identity validation.
+            if (!string.IsNullOrWhiteSpace(name))
             {
                 yield return new EffectQuirkAssignment(
                     name,

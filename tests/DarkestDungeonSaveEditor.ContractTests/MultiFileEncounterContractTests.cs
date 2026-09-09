@@ -301,6 +301,7 @@ internal static partial class ContractSuite
         WriteMultiMash(caseRoot, "dungeons/cove/a.cove.2.mash.darkest", "hall: .chance 1 .types second\n");
         WriteMultiMash(caseMod, "dungeons/cove/z.cove.2.mash.darkest", "hall: .chance 1 .types override\n");
         CreateBattleMonsterDefinitions(caseRoot, ["first", "second", "override"]);
+        WriteFixtureManifest(caseMod);
         var caseCatalog = BattleEncounterCatalog.Load(content with
         {
             Sources = [new ActiveContentSource("base", "base", "base", caseRoot, 0),

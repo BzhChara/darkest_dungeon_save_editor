@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Globalization;
 using System.IO;
 using System.Security.Cryptography;
@@ -66,6 +67,24 @@ public partial class MainWindow : Window
     {
         base.OnSourceInitialized(e);
         NativeWindowTheme.ApplyDarkTitleBar(this);
+    }
+
+    protected override async void OnClosing(CancelEventArgs e)
+    {
+        base.OnClosing(e);
+        if (e.Cancel) return;
+        if (_catalogLoadTask is not { IsCompleted: false } loadTask) return;
+
+        // Keep the Dispatcher alive until cancellation has killed/waited for
+        // the official tool and finished its receipt/temp-directory cleanup.
+        e.Cancel = true;
+        if (_catalogCloseRequested) return;
+        _catalogCloseRequested = true;
+        IsEnabled = false;
+        StopProfileSync();
+        try { await loadTask; }
+        catch (Exception ex) { CrashDiagnostics.RecordException("Close: catalog cleanup", ex); }
+        Close();
     }
 
     protected override void OnClosed(EventArgs e)

@@ -60,6 +60,7 @@ internal static partial class ContractSuite
               { "name": "shipwreck", "default_data": { "inherits_from": { "prop_type_name": "obstacle" } } }
             ] }
             """);
+        WriteFixtureManifest(modRoot);
         var catalog = BattleRoomAttachmentCatalog.Load(template with
         {
             Sources = [new ActiveContentSource("base", "Base", "base", baseRoot, 0),

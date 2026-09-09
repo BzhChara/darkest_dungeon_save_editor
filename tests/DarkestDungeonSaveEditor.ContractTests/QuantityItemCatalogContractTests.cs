@@ -116,11 +116,16 @@ internal static partial class ContractSuite
             catalogSaveOnly.LocalizedName == new BilingualContentName("存档遗物", "Save Relic"),
             "Town-reachable Mod items, hidden orphan definitions, definition-backed save residues, and save-only entries must remain distinguishable and editable.");
 
+        var localReferenceRoot = activeContent.Sources.Single(source => source.Id == "local:Local Test Mod").Directory;
+        var localReferenceManifestPath = Path.Combine(localReferenceRoot, "modfiles.txt");
+        var localReferenceManifestBytes = File.ReadAllBytes(localReferenceManifestPath);
         var malformedRaidJsonTownOverridePath = Path.Combine(
             localRaidCampingRoot,
             "malformed_town_override.json");
         QuantityItemCatalogResult malformedRaidJsonTownOverrideCatalog;
         File.WriteAllText(malformedRaidJsonTownOverridePath, "{ invalid", new UTF8Encoding(false));
+        File.AppendAllText(localReferenceManifestPath,
+            Environment.NewLine + "raid/camping/malformed_town_override.json 9", new UTF8Encoding(false));
         try
         {
             malformedRaidJsonTownOverrideCatalog = QuantityItemCatalog.Load(
@@ -131,6 +136,7 @@ internal static partial class ContractSuite
         finally
         {
             File.Delete(malformedRaidJsonTownOverridePath);
+            File.WriteAllBytes(localReferenceManifestPath, localReferenceManifestBytes);
         }
 
         Assert(
@@ -148,6 +154,8 @@ internal static partial class ContractSuite
         var malformedReferencePath = Path.Combine(localTownEventsRoot, "malformed_reference.json");
         QuantityItemCatalogResult malformedReferenceCatalog;
         File.WriteAllText(malformedReferencePath, "{ invalid", new UTF8Encoding(false));
+        File.AppendAllText(localReferenceManifestPath,
+            Environment.NewLine + "campaign/town_events/malformed_reference.json 9", new UTF8Encoding(false));
         try
         {
             malformedReferenceCatalog = QuantityItemCatalog.Load(
@@ -158,6 +166,7 @@ internal static partial class ContractSuite
         finally
         {
             File.Delete(malformedReferencePath);
+            File.WriteAllBytes(localReferenceManifestPath, localReferenceManifestBytes);
         }
 
         Assert(
@@ -174,6 +183,8 @@ internal static partial class ContractSuite
         var malformedLootPath = Path.Combine(localLootRoot, "malformed_reference.loot.json");
         QuantityItemCatalogResult malformedLootCatalog;
         File.WriteAllText(malformedLootPath, "{ \"loot_tables\": [", new UTF8Encoding(false));
+        File.AppendAllText(localReferenceManifestPath,
+            Environment.NewLine + "loot/malformed_reference.loot.json 18", new UTF8Encoding(false));
         try
         {
             malformedLootCatalog = QuantityItemCatalog.Load(
@@ -184,6 +195,7 @@ internal static partial class ContractSuite
         finally
         {
             File.Delete(malformedLootPath);
+            File.WriteAllBytes(localReferenceManifestPath, localReferenceManifestBytes);
         }
 
         Assert(
@@ -381,6 +393,9 @@ internal static partial class ContractSuite
             Path.Combine(conflictingRaidItemLowerInventoryRoot, "lower.inventory.items.darkest"),
             """inventory_item: .type "supply" .id "conflicting_raid_item" .base_stack_limit 99""",
             new UTF8Encoding(false));
+        WriteFixtureManifest(conflictingRaidItemModRootA);
+        WriteFixtureManifest(conflictingRaidItemModRootB);
+        WriteFixtureManifest(conflictingRaidItemLowerModRoot);
         var conflictingRaidItemContent = activeContent with
         {
             Sources = activeContent.Sources

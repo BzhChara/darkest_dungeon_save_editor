@@ -150,6 +150,7 @@ internal static partial class ContractSuite
 
         var addedMod = Path.Combine(root, "added-mod");
         WriteMultiMash(addedMod, "dungeons/cove/added.cove.2.mash.darkest", "hall: .chance 1 .types mod_added\n");
+        WriteFixtureManifest(addedMod);
         var managedOrder = content.Sources.Single(source => source.Directory == installed.PackageDirectory).LoadOrder;
         var shiftedContent = content with { Sources = [.. content.Sources,
             new ActiveContentSource("local:Added", "Added", "local", addedMod, managedOrder + 1)] };

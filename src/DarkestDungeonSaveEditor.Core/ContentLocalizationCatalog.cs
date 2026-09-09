@@ -99,7 +99,7 @@ internal sealed class ContentLocalizationCatalog
         }
 
         var builders = new Dictionary<string, BilingualNameBuilder>(StringComparer.OrdinalIgnoreCase);
-        var files = ContentFileOverlay.Resolve(candidates, "Localization", issues)
+        var files = NativeContentFileResolver.Resolve(candidates, activeContent.Sources, "Localization", issues)
             .OrderBy(file => GetLayer(file.Source.Kind))
             .ThenBy(file => file.Source.Kind is "workshop" or "local"
                 ? -file.Source.LoadOrder
@@ -309,14 +309,7 @@ internal sealed class ContentLocalizationCatalog
         }
 
         var manifestPath = Path.Combine(source.Directory, "modfiles.txt");
-        if (!ModManifestFile.Exists(manifestPath))
-        {
-            return ContentFileOverlay.GetFallbackContentRoots(source.Directory, enabledDlcPrefixes)
-                .SelectMany(root => EnumerateDirectory(Path.Combine(root, "localization")))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
-                .ToArray();
-        }
+        ModManifestFile.Require(manifestPath);
 
         var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var entry in ModManifestFile.ReadEntries(manifestPath, ".string_table.xml", ".loc", ".loc2"))

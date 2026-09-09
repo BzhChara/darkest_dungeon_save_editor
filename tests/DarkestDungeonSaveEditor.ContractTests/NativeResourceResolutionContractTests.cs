@@ -117,7 +117,7 @@ internal static partial class ContractSuite
                 "{\"quirks\":[{\"id\":\"" + id + "\",\"is_positive\":true,\"random_chance\":0}]}");
             WriteMultiMash(mod, $"monsters/{folder}/{id}_A.info.darkest", "display: .size 4\n");
         }
-        var source = new ActiveContentSource("local:directory-device", "directory-device", "local", mod, 1000);
+        var source = new ActiveContentSource("base", "directory-device", "base", mod, 0);
         var snapshot = content with { Sources = [source] };
         var expected = new[] { "normal", "underscore" }.ToHashSet(StringComparer.Ordinal);
         Assert(QuantityItemCatalog.LoadDefinitions(snapshot, QuantityItemSaveContext.Raid)
@@ -131,6 +131,7 @@ internal static partial class ContractSuite
             "The native C locale conversion is a byte-range rule, not an ASCII-only rule.");
         // Manifest discovery does not go through the directory-device conversion.
         // A canonical definition must still be an eligible manifest provider.
+        snapshot = snapshot with { Sources = [source with { Id = "local:directory-device", Kind = "local", LoadOrder = 1000 }] };
         WriteMultiMash(mod, "monsters/unicode/unicode_A/unicode_A.info.darkest", "display: .size 2\n");
         File.WriteAllText(Path.Combine(mod, "modfiles.txt"), "monsters/中文/unicode_A.info.darkest 20\n");
         var listed = BattleEncounterCatalog.ReadMaintenanceMonsterSizes(snapshot.Sources);

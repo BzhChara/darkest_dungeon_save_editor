@@ -47,6 +47,8 @@ internal static partial class QuantityItemReferenceAnalyzer
         var rootLootEvidence = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
         var scanComplete = true;
         var files = LoadEffectiveFiles(activeContent, saveContext, issues, ref scanComplete);
+        var eventIds = new Dictionary<uint, string>();
+        var dlcPrefixes = ContentFileOverlay.GetEnabledDlcPrefixes(activeContent.Sources);
 
         foreach (var definition in definitions.Where(definition => definition.EstateCanBeProvision == true))
         {
@@ -73,7 +75,10 @@ internal static partial class QuantityItemReferenceAnalyzer
                 activeEvidence,
                 rootLootEvidence,
                 incompleteEvidence,
-                issues);
+                issues,
+                file.File.RelativePath.EndsWith(".events.json", StringComparison.OrdinalIgnoreCase) &&
+                ContentFileOverlay.IsRootOrEnabledDlcPath(file.File.RelativePath, "campaign/town_events", dlcPrefixes)
+                    ? eventIds : null);
         }
 
         TraverseLootRoots(lootTables, rootLootEvidence, activeEvidence);

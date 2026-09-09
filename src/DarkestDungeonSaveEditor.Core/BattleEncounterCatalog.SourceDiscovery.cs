@@ -45,20 +45,17 @@ public static partial class BattleEncounterCatalog
         if (source.Kind is "workshop" or "local")
         {
             var manifestPath = Path.Combine(source.Directory, "modfiles.txt");
-            if (ModManifestFile.Exists(manifestPath))
-            {
-                return EnumerateManifestMashFiles(
-                    source,
-                    manifestPath,
-                    enabledDlcPrefixes,
-                    issues);
-            }
+            ModManifestFile.Require(manifestPath);
+            return EnumerateManifestMashFiles(
+                source,
+                manifestPath,
+                enabledDlcPrefixes,
+                issues);
         }
 
         try
         {
-            return ContentFileOverlay.GetFallbackContentRoots(
-                    source.Directory, source.Kind is "workshop" or "local" ? enabledDlcPrefixes : [])
+            return new[] { source.Directory }
                 .Select(root => Path.Combine(root, "dungeons"))
                 .Where(Directory.Exists)
                 .SelectMany(directory => NativeDirectoryDiscovery.EnumerateFiles(
@@ -214,20 +211,17 @@ public static partial class BattleEncounterCatalog
         if (source.Kind is "workshop" or "local")
         {
             var manifestPath = Path.Combine(source.Directory, "modfiles.txt");
-            if (ModManifestFile.Exists(manifestPath))
-            {
-                return EnumerateManifestMonsterInfoFiles(
-                    source,
-                    manifestPath,
-                    enabledDlcPrefixes,
-                    issues);
-            }
+            ModManifestFile.Require(manifestPath);
+            return EnumerateManifestMonsterInfoFiles(
+                source,
+                manifestPath,
+                enabledDlcPrefixes,
+                issues);
         }
 
         try
         {
-            return ContentFileOverlay.GetFallbackContentRoots(
-                    source.Directory, source.Kind is "workshop" or "local" ? enabledDlcPrefixes : [])
+            return new[] { source.Directory }
                 .Select(root => Path.Combine(root, "monsters"))
                 .Where(Directory.Exists)
                 .SelectMany(directory => NativeDirectoryDiscovery.EnumerateFiles(

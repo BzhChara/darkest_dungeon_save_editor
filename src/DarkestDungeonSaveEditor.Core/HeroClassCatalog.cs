@@ -22,7 +22,6 @@ public static partial class HeroClassCatalog
         var effectCandidates = new Dictionary<string, List<EffectQuirkAssignment>>(StringComparer.OrdinalIgnoreCase);
         var quirkCandidates = new Dictionary<string, List<QuirkDefinition>>(StringComparer.OrdinalIgnoreCase);
         var buffCandidates = new Dictionary<string, List<BuffDefinition>>(StringComparer.OrdinalIgnoreCase);
-        var upgradeCandidates = new Dictionary<string, List<HeroUpgradeDefinition>>(StringComparer.OrdinalIgnoreCase);
         var campingSkills = new Dictionary<string, CampingSkillBuilder>(StringComparer.OrdinalIgnoreCase);
         var heroNames = new HashSet<string>(StringComparer.Ordinal);
         var sourceFiles = new List<SourceFiles>();
@@ -67,7 +66,7 @@ public static partial class HeroClassCatalog
         {
             try
             {
-                var candidate = ReadHeroInfo(file);
+                var candidate = ReadHeroInfo(file, sourcesById);
                 if (!candidates.TryGetValue(candidate.Id, out var classCandidates))
                 {
                     classCandidates = [];
@@ -191,19 +190,6 @@ public static partial class HeroClassCatalog
             }
         }
 
-        foreach (var file in upgradeFiles)
-        {
-            try
-            {
-                var upgrade = ReadHeroUpgrade(file);
-                AddCandidate(upgradeCandidates, upgrade.HeroClassId, upgrade);
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or InvalidDataException)
-            {
-                issues.Add($"Failed to read hero upgrade definition '{file.Path}': {ex.Message}");
-            }
-        }
-
         foreach (var file in eventFiles)
         {
             try
@@ -233,12 +219,10 @@ public static partial class HeroClassCatalog
                 .ToArray(),
             StringComparer.OrdinalIgnoreCase);
 
-        var effectiveEffects = ResolveUniqueDefinitions(
+        var effectiveEffects = ResolveOrderedDefinitions(
             effectCandidates,
-            sourcesById,
-            definition => definition.Source,
-            definition => definition.SourcePath,
-            definition => definition.QuirkId,
+            definition => definition.Name,
+            definitions => definitions.LastOrDefault(definition => definition.QuirkId is not null) ?? definitions[^1],
             "Effect",
             issues);
         // Native quirk lookup (0x1404ABD00) walks the entire loaded vector and
@@ -248,28 +232,18 @@ public static partial class HeroClassCatalog
         var effectiveQuirks = quirkCandidates.Where(pair => !pair.Value.Any(quirk => quirkHashCollisions.Contains(quirk.Id)) && pair.Value.Select(value => value.Id)
                 .Distinct(StringComparer.Ordinal).Count() == 1).ToDictionary(pair => pair.Key,
             pair => pair.Value[^1], StringComparer.OrdinalIgnoreCase);
-        var effectiveBuffs = ResolveUniqueDefinitions(
+        var effectiveBuffs = ResolveOrderedDefinitions(
             buffCandidates,
-            sourcesById,
-            definition => definition.Source,
-            definition => definition.SourcePath,
-            GetBuffSignature,
+            definition => definition.Id,
+            definitions => definitions[^1],
             "Buff",
-            issues,
-            reportConflicts: false);
-        var effectiveUpgrades = ResolveHeroUpgradeDefinitions(
-            upgradeCandidates,
-            candidates,
-            heroOverridesByClass,
-            sourcesById,
             issues);
+        var effectiveUpgrades = ResolveHeroUpgradeTrees(upgradeFiles, issues);
         var resolveLevelThresholds = ReadEffectiveResolveLevelThresholds(rosterVariableFiles, issues);
-        var effectiveEvents = ResolveUniqueDefinitions(
+        var effectiveEvents = ResolveOrderedDefinitions(
             eventCandidates,
-            sourcesById,
-            definition => definition.Source,
-            definition => definition.SourcePath,
-            GetRecruitEventSignature,
+            definition => definition.EventId,
+            definitions => definitions[0],
             "Town event",
             issues);
         var recruitEvents = effectiveEvents.Values

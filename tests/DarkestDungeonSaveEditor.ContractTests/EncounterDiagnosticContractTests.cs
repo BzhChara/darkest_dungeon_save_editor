@@ -85,8 +85,8 @@ internal static partial class ContractSuite
                malformedLogs.Any(entry => entry.Message ==
                    $"目录警告：遭遇行缺少怪物列表（.types），已跳过：{mashPath}:1；报告模块=战斗遭遇") &&
                malformedLogs.Any(entry => entry.Message ==
-                   $"目录警告：遭遇行的怪物列表（.types）为空，已跳过：{mashPath}:2；报告模块=战斗遭遇"),
-            "Missing and empty monster-list warnings must use distinct Chinese reasons and retain the source path, line, module, and warning severity.");
+                   $"目录警告：遭遇行的怪物列表（.types）没有值，已跳过：{mashPath}:2；报告模块=战斗遭遇"),
+            "Missing and valueless monster-list warnings must use distinct Chinese reasons and retain the source path, line, module, and warning severity.");
         Assert(malformedCatalog.Encounters.Count == 1 && malformedCatalog.DirectEncounters.Count == 1 &&
                malformedCatalog.BridgeEncounters.Count == 1 &&
                malformedCatalog.DirectEncounters.Single().MashIndex == 0 &&

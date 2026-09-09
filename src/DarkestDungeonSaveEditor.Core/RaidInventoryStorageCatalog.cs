@@ -23,22 +23,14 @@ public static partial class RaidInventoryStorageCatalog
             }
         }
 
-        var parsedFiles = new List<ParsedInventoryFile>();
-        foreach (var candidate in candidates)
-        {
-            var fullPath = Path.GetFullPath(candidate.Path);
-            var virtualPath = ContentFileOverlay.NormalizeRelativePath(candidate.Source, fullPath);
-            if (virtualPath is null)
-            {
-                issues.Add($"Ignored raid inventory config path outside its active content source: {fullPath}");
-                continue;
-            }
-
-            parsedFiles.Add(ReadCandidate(candidate.Source, fullPath, virtualPath, issues));
-        }
-
-        var signals = ResolveEffectiveCapacitySignals(parsedFiles, issues);
-        if (signals.Count == 0)
+        var effectiveFiles = NativeContentFileResolver.Resolve(candidates, activeContent.Sources, "Raid inventory config", issues);
+        if (issues.Any(issue => issue.Contains("multiple providers", StringComparison.Ordinal)))
+            return new RaidInventoryStorageCatalogResult(null, issues);
+        var signals = effectiveFiles.Select(file => ReadCandidate(file.Source, file.Path, file.RelativePath, issues))
+            .Where(file => file.HasPotentialDefinition)
+            .Select(file => new CapacitySignal(file.Source, file.Definitions,
+                file.ReadFailed || file.HasInvalidDefinition, file.Path)).ToArray();
+        if (signals.Length == 0)
         {
             issues.Add("No active raid max_slots definition was found; expedition inventory editing is disabled.");
             return new RaidInventoryStorageCatalogResult(null, issues);
@@ -84,64 +76,7 @@ public static partial class RaidInventoryStorageCatalog
         return new RaidInventoryStorageCatalogResult(winner, issues);
     }
 
-    private static IReadOnlyList<CapacitySignal> ResolveEffectiveCapacitySignals(
-        IReadOnlyList<ParsedInventoryFile> files,
-        List<string> issues)
-    {
-        var result = new List<CapacitySignal>();
-        foreach (var group in files
-                     .GroupBy(file => file.VirtualPath, StringComparer.OrdinalIgnoreCase)
-                     .OrderBy(group => group.Key, StringComparer.OrdinalIgnoreCase))
-        {
-            var highestPrioritySource = group.First().Source;
-            foreach (var file in group.Skip(1))
-            {
-                if (ContentFileOverlay.ComparePriority(file.Source, highestPrioritySource) > 0)
-                {
-                    highestPrioritySource = file.Source;
-                }
-            }
 
-            var winners = group
-                .Where(file => ContentFileOverlay.ComparePriority(file.Source, highestPrioritySource) == 0)
-                .OrderBy(file => file.Source.Id, StringComparer.OrdinalIgnoreCase)
-                .ThenBy(file => file.Path, StringComparer.OrdinalIgnoreCase)
-                .ToArray();
-            if (winners
-                    .Select(file => file.Source.Id)
-                    .Distinct(StringComparer.OrdinalIgnoreCase)
-                    .Skip(1)
-                    .Any())
-            {
-                var description = string.Join(" | ", winners.Select(file => $"{file.Source.Id}:{file.Path}"));
-                issues.Add(
-                    $"Raid inventory config '{group.Key}' has multiple providers at the same unverified priority and was ignored: " +
-                    description);
-                if (winners.Any(file => file.HasPotentialDefinition))
-                {
-                    result.Add(new CapacitySignal(
-                        highestPrioritySource,
-                        [],
-                        true,
-                        $"unresolved providers for {group.Key}: {description}"));
-                }
-
-                continue;
-            }
-
-            var winner = winners[0];
-            if (winner.HasPotentialDefinition)
-            {
-                result.Add(new CapacitySignal(
-                    winner.Source,
-                    winner.Definitions,
-                    winner.ReadFailed || winner.HasInvalidDefinition,
-                    winner.Path));
-            }
-        }
-
-        return result;
-    }
 
     private static ParsedInventoryFile ReadCandidate(
         ActiveContentSource source,
@@ -236,23 +171,7 @@ public static partial class RaidInventoryStorageCatalog
         }
 
         var manifestPath = Path.Combine(source.Directory, "modfiles.txt");
-        if (!ModManifestFile.Exists(manifestPath))
-        {
-            var files = ContentFileOverlay.GetFallbackContentRoots(source.Directory, enabledDlcPrefixes)
-                .Select(root => Path.Combine(root, "inventory"))
-                .Where(Directory.Exists)
-                .SelectMany(directory => NativeDirectoryDiscovery.EnumerateFiles(
-                    directory, $"*{InventoryConfigSuffix}", SearchOption.AllDirectories))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
-                .ToArray();
-            if (files.Length > 0)
-            {
-                issues.Add($"Mod has no modfiles.txt; raid inventory config scan used standard inventory directories including enabled DLC paths: {source.Directory}");
-            }
-
-            return files;
-        }
+        ModManifestFile.Require(manifestPath);
 
         var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var entry in ModManifestFile.ReadEntries(manifestPath, InventoryConfigSuffix))

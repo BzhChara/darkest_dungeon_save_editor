@@ -54,13 +54,18 @@ internal static partial class ContractSuite
         var protectedFiles = Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories)
             .Append(Path.Combine(content.Profile.ProfileDirectory, "persist.game.json"))
             .ToDictionary(path => path, path => Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(path))));
-        var trinketsBefore = JsonSerializer.Serialize(TrinketCatalog.Load(content));
-        var heroesBefore = JsonSerializer.Serialize(HeroClassCatalog.Load(content));
+        var catalogContent = content with { Sources = content.Sources.Where(source => source.Directory != fallbackRoot).ToArray() };
+        var missingRejected = false;
+        try { TrinketCatalog.Load(content); }
+        catch (InvalidDataException error) when (error.Message.Contains("modfiles.txt", StringComparison.Ordinal)) { missingRejected = true; }
+        Assert(missingRejected, "Missing-manifest Mods are diagnostic-only until explicit preparation succeeds.");
+        var trinketsBefore = JsonSerializer.Serialize(TrinketCatalog.Load(catalogContent));
+        var heroesBefore = JsonSerializer.Serialize(HeroClassCatalog.Load(catalogContent));
         var estate = JsonNode.Parse(File.ReadAllText(fixture.DecodedSeedPath))!.AsObject();
-        var itemsBefore = JsonSerializer.Serialize(QuantityItemCatalog.Load(content, estate));
+        var itemsBefore = JsonSerializer.Serialize(QuantityItemCatalog.Load(catalogContent, estate));
         var map = new BattleMapSnapshot(content.Profile.ProfileDirectory, "", "", "", "", "probe", 1, 1,
             null, null, null, null, null, null, null, null, null, false, [], [], [], DateTime.UtcNow);
-        var encountersBefore = JsonSerializer.Serialize(BattleEncounterCatalog.Load(content, map));
+        var encountersBefore = JsonSerializer.Serialize(BattleEncounterCatalog.Load(catalogContent, map));
 
         var snapshot = ContentFileInventory.Scan(content);
         var mod = snapshot.Mods.Single(item => item.SourceId == "local:inventory");
@@ -118,16 +123,16 @@ internal static partial class ContractSuite
                severityEntries.Count(entry => entry.Level == DiagnosticLogLevel.Warning) == 4 &&
                ContentFileInventory.FormatDetails(severityProbe).SequenceEqual(ContentFileInventory.FormatLogDetails(severityProbe).Select(entry => entry.Message)),
             "Only exact desktop.ini metadata may be downgraded; missing definitions, translations, assets and similarly named files remain warnings and the string formatter stays compatible.");
-        Assert(trinketsBefore == JsonSerializer.Serialize(TrinketCatalog.Load(content)) &&
-               heroesBefore == JsonSerializer.Serialize(HeroClassCatalog.Load(content)) &&
-               itemsBefore == JsonSerializer.Serialize(QuantityItemCatalog.Load(content, estate)) &&
-               encountersBefore == JsonSerializer.Serialize(BattleEncounterCatalog.Load(content, map)),
+        Assert(trinketsBefore == JsonSerializer.Serialize(TrinketCatalog.Load(catalogContent)) &&
+               heroesBefore == JsonSerializer.Serialize(HeroClassCatalog.Load(catalogContent)) &&
+               itemsBefore == JsonSerializer.Serialize(QuantityItemCatalog.Load(catalogContent, estate)) &&
+               encountersBefore == JsonSerializer.Serialize(BattleEncounterCatalog.Load(catalogContent, map)),
             "Inventory must not change any catalog result, availability, overlay, scene or encounter classification.");
-        var trinkets = TrinketCatalog.Load(content).Trinkets;
-        Assert(trinkets.Any(item => item.Id == "inventory_fallback") && trinkets.All(item => item.Id != "inventory_unlisted") &&
+        var trinkets = TrinketCatalog.Load(catalogContent).Trinkets;
+        Assert(trinkets.All(item => item.Id is not ("inventory_fallback" or "inventory_unlisted")) &&
                trinkets.Single(item => item.Id == "inventory_listed").LocalizedName == BilingualContentName.Empty &&
                protectedFiles.All(pair => pair.Value == Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(pair.Key)))),
-            "Discovery diagnostics must not promote unlisted definitions or XML, disable manifest-free definitions, or write source files or saves.");
+            "Diagnostic inventory must not promote missing-manifest/unlisted definitions or XML, or write source files or saves.");
 
         Write(manifestRoot, "trinkets/new.entries.trinkets.json", "{\"entries\":[]}");
         var refreshed = ContentFileInventory.Scan(content);

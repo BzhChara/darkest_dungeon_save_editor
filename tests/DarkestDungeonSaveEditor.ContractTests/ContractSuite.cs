@@ -1,6 +1,6 @@
 internal static partial class ContractSuite
 {
-    public static async Task RunAsync(string repositoryRoot)
+    public static async Task RunAsync(string repositoryRoot, bool includeBattle = true)
     {
         RunUiContracts(repositoryRoot);
         var fixture = BuildContractFixture(repositoryRoot);
@@ -32,17 +32,22 @@ internal static partial class ContractSuite
         var rosterHeroesSeed = fixture.RosterHeroesSeed;
         var codec = fixture.Codec;
 
-        await RunNativeResourceResolutionContractsAsync(runRoot, codec);
-        await RunNativeCatalogReadingContractsAsync(runRoot, codec);
-        RunSaveReplacementContracts(runRoot);
-        await RunEncounterMaintenanceContractsAsync(runRoot, codec);
-        await RunInheritedLegacyBridgeContractsAsync(runRoot, codec);
-        await RunBattleMapWriteSafetyContractsAsync(runRoot, codec);
-        await RunBattleMapContractsAsync(runRoot, codec);
-        await RunBridgeClassificationContractsAsync(runRoot, codec);
-        await RunMultiFileEncounterContractsAsync(runRoot, codec);
-        await RunDlcNativeEncounterContractsAsync(runRoot, codec);
-        await RunDedicatedBridgeContractsAsync(runRoot, codec, repositoryRoot);
+        if (includeBattle)
+        {
+            await RunModManifestPreparationContractsAsync(runRoot);
+            await RunNativeResourceResolutionContractsAsync(runRoot, codec);
+            await RunNativeCatalogReadingContractsAsync(runRoot, codec);
+            RunSaveReplacementContracts(runRoot);
+            await RunEncounterMaintenanceContractsAsync(runRoot, codec);
+            await RunInheritedLegacyBridgeContractsAsync(runRoot, codec);
+            await RunBattleMapWriteSafetyContractsAsync(runRoot, codec);
+            await RunBattleMapContractsAsync(runRoot, codec);
+            await RunBridgeClassificationContractsAsync(runRoot, codec);
+            await RunMultiFileEncounterContractsAsync(runRoot, codec);
+            await RunEmptyEncounterSlotContractsAsync(runRoot, codec);
+            await RunDlcNativeEncounterContractsAsync(runRoot, codec);
+            await RunDedicatedBridgeContractsAsync(runRoot, codec, repositoryRoot);
+        }
         await codec.EncodeAsync(decodedSeedPath, estatePath, originalBinaryPath: null);
         await codec.EncodeAsync(decodedGameSeedPath, gameSavePath, originalBinaryPath: null);
         await codec.EncodeAsync(decodedTownSeedPath, townSavePath, originalBinaryPath: null);
@@ -154,6 +159,13 @@ internal static partial class ContractSuite
             codec,
             quantityState);
         RunRealModLocalizationContracts(runRoot);
+
+        if (!includeBattle)
+        {
+            Console.WriteLine("PASS: catalog, localization, synchronization, hero, inventory and save contracts (battle group not selected).");
+            Console.WriteLine($"Artifacts: {runRoot}");
+            return;
+        }
 
         Console.WriteLine("PASS: active game-mode/Mod catalogs, bilingual names, town/raid quantity edits with stack and slot guards, pristine ordinary/stateful trinket construction, level 0-max progression, blank/default and explicit natural/special quirks, HP/skill/camping rules, ordinary/shard stagecoach routing with GUID/upgrade append, real battle-map snapshot/live-monitor plus guarded delete/move/battle placement and room battle attachments, global enabled-content encounter discovery and persistent managed Bridge append/reuse, force-town contracts, full-roster preservation, stale guards, DSON roundtrips, verified backups, three-file rollback, and trinket/quantity commit contracts.");
         Console.WriteLine($"Artifacts: {runRoot}");

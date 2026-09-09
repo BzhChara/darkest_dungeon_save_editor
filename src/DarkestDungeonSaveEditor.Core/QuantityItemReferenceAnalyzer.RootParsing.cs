@@ -14,7 +14,8 @@ internal static partial class QuantityItemReferenceAnalyzer
         Dictionary<string, List<string>> activeEvidence,
         Dictionary<string, List<string>> rootLootEvidence,
         Dictionary<string, List<string>> incompleteEvidence,
-        List<string> issues)
+        List<string> issues,
+        Dictionary<uint, string>? eventIds = null)
     {
         var defaultReachability = GetDefaultReachability(file.File.RelativePath);
         var extension = Path.GetExtension(file.File.Path);
@@ -24,6 +25,11 @@ internal static partial class QuantityItemReferenceAnalyzer
             {
                 using (document)
                 {
+                    if (eventIds is not null && document.RootElement.ValueKind == JsonValueKind.Object)
+                    {
+                        return VisitTownEventJson(document.RootElement, file.File.RelativePath, index, saveContext,
+                            defaultReachability, activeEvidence, rootLootEvidence, eventIds, issues);
+                    }
                     VisitRootJson(
                         document.RootElement,
                         string.Empty,
@@ -78,6 +84,55 @@ internal static partial class QuantityItemReferenceAnalyzer
         return true;
     }
 
+    private static bool VisitTownEventJson(
+        JsonElement root,
+        string relativePath,
+        QuantityItemIndex index,
+        QuantityItemSaveContext saveContext,
+        ReferenceReachability reachability,
+        Dictionary<string, List<string>> activeEvidence,
+        Dictionary<string, List<string>> rootLootEvidence,
+        Dictionary<uint, string> eventIds,
+        List<string> issues)
+    {
+        var complete = true;
+        foreach (var property in root.EnumerateObject())
+        {
+            if (property.Name != "events" || property.Value.ValueKind != JsonValueKind.Array)
+            {
+                VisitRootJson(property.Value, property.Name, relativePath, index, saveContext,
+                    reachability, activeEvidence, rootLootEvidence);
+                continue;
+            }
+            foreach (var eventNode in property.Value.EnumerateArray())
+            {
+                var id = ReadString(eventNode, "id");
+                var first = true;
+                if (!string.IsNullOrWhiteSpace(id))
+                {
+                    var hash = Loc2LocalizationReader.HashName(id);
+                    first = eventIds.TryAdd(hash, id);
+                    if (!first && !eventIds[hash].Equals(id, StringComparison.Ordinal))
+                    {
+                        complete = false;
+                        issues.Add($"Town event IDs share a native hash; item-reference analysis is incomplete: {eventIds[hash]} / {id}");
+                    }
+                }
+                else
+                {
+                    complete = false;
+                    issues.Add($"Town event has no usable ID; item-reference analysis is incomplete: {relativePath}");
+                }
+                // Event result execution looks up the FIRST record by ID,
+                // even if its data is absent/empty. Do not deduplicate the
+                // eligibility/cost/other fields of the random candidate pool.
+                VisitRootJson(eventNode, "events", relativePath, index, saveContext,
+                    reachability, activeEvidence, rootLootEvidence, skipTownEventData: !first);
+            }
+        }
+        return complete;
+    }
+
     private static void VisitRootJson(
         JsonElement node,
         string parentProperty,
@@ -86,7 +141,8 @@ internal static partial class QuantityItemReferenceAnalyzer
         QuantityItemSaveContext saveContext,
         ReferenceReachability inheritedReachability,
         Dictionary<string, List<string>> activeEvidence,
-        Dictionary<string, List<string>> rootLootEvidence)
+        Dictionary<string, List<string>> rootLootEvidence,
+        bool skipTownEventData = false)
     {
         if (node.ValueKind == JsonValueKind.Array)
         {
@@ -154,6 +210,7 @@ internal static partial class QuantityItemReferenceAnalyzer
 
         foreach (var property in node.EnumerateObject())
         {
+            if (skipTownEventData && property.Name == "data") continue;
             VisitRootJson(
                 property.Value,
                 property.Name,

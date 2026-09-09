@@ -186,8 +186,8 @@ internal static partial class ContractSuite
             mainWindowXaml.Descendants(presentationNamespace + "Run")
                 .Any(run => run.Attribute("Text")?.Value == "{Binding GenerationMode, Mode=OneWay}") &&
             !mainWindowXaml.Descendants(presentationNamespace + "DataGridCheckBoxColumn").Any() &&
-            mainWindowCode.Contains("{ IsEnabled: true } => \"游戏自然 / 编辑器手动\"", StringComparison.Ordinal) &&
-            mainWindowCode.Contains("{ IsEnabled: false } => \"仅编辑器手动\"", StringComparison.Ordinal) &&
+            mainWindowCode.Contains("{ IsEnabled: true } => \"普通招募开启 / 编辑器手动\"", StringComparison.Ordinal) &&
+            mainWindowCode.Contains("{ IsEnabled: false } => \"普通招募关闭 / 编辑器手动\"", StringComparison.Ordinal) &&
             mainWindowCode.Contains("_ => \"自然状态未知 / 编辑器手动\"", StringComparison.Ordinal),
             "The hero catalog must distinguish game-side natural generation from editor-side manual generation instead of showing a misleading availability checkbox.");
         Assert(

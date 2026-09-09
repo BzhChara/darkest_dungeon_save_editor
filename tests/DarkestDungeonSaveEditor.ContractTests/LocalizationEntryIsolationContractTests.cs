@@ -121,6 +121,7 @@ internal static partial class ContractSuite
             </root>
             """);
         var xmlOriginal = File.ReadAllBytes(xmlFile);
+        WriteFixtureManifest(xmlRoot);
         var xmlProbe = ReadLocalizationProbe(ContentAt(xmlRoot), keys);
         Assert(xmlProbe.Names[goodKey] == new BilingualContentName("有效名称", "Valid XML Name") &&
                xmlProbe.Names[badColourKey] == BilingualContentName.Empty &&

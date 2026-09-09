@@ -47,7 +47,7 @@ internal static partial class ContractSuite
         Assert(activeCatalog.Trinkets.All(item => item.Id != "disabled_workshop_trinket"), "Persistent history must not enable a disabled Workshop Mod.");
         Assert(activeCatalog.Trinkets.All(item => item.Id != "backup_trinket"), "A manifest backup path must not enter the active trinket catalog.");
         Assert(activeCatalog.Trinkets.All(item => item.Id != "disabled_mod_trinket"), "A normalized Mod path under a disabled DLC feature must not enter the active trinket catalog.");
-        Assert(activeCatalog.Issues.Any(issue => issue.Contains("no modfiles.txt", StringComparison.Ordinal)), "A local development Mod without a manifest should use the reported fallback scan.");
+        Assert(activeCatalog.Issues.All(issue => !issue.Contains("no modfiles.txt", StringComparison.Ordinal)), "Prepared local Mods must use their explicit manifests.");
         Assert(
             activeCatalog.Storage is { MaxSlots: 3, Source: "workshop:111" } &&
             !string.IsNullOrWhiteSpace(activeCatalog.Storage.SourceSha256) &&
@@ -64,6 +64,7 @@ internal static partial class ContractSuite
     inventory_system_config: .type "trinket_storage" .max_slots invalid
     """,
             new UTF8Encoding(false));
+        WriteFixtureManifest(invalidCapacityModRoot);
         var invalidCapacityContent = activeContent with
         {
             Sources = activeContent.Sources
@@ -117,6 +118,8 @@ internal static partial class ContractSuite
     inventory_system_config: .type "raid" .max_slots 24
     """,
             new UTF8Encoding(false));
+        WriteFixtureManifest(conflictingCapacityModRootA);
+        WriteFixtureManifest(conflictingCapacityModRootB);
         var conflictingCapacityContent = activeContent with
         {
             Sources = activeContent.Sources

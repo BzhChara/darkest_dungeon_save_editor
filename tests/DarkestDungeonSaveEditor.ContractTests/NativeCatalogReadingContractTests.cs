@@ -32,6 +32,7 @@ internal static partial class ContractSuite
         WriteMultiMash(game, "dungeons/ruins/ruins.2.mash.darkest", string.Concat(kinds.Select(kind =>
             $"{kind}: .chance 1 .types foreign_A\n{kind}: .chance 1 .types foreign_a\n")));
         var locations = new SaveEditorLocations(root, Path.Combine(root, "workspaces"), Path.Combine(root, "backups"));
+        WriteFixtureManifest(mod);
         var content = await ActiveContentResolver.ResolveAsync(profile, game, null, codec, locations.WorkspaceDirectory);
         var reader = new BattleMapSnapshotReader(codec);
         var snapshot = await reader.LoadAsync(profile.ProfileDirectory);
@@ -81,6 +82,7 @@ internal static partial class ContractSuite
         // Two separate sources can define IDs differing only in case even on Windows.
         WriteMultiMash(mod, "monsters/large/large_a/large_a.info.darkest", "display: .size 1\n");
         WriteMultiMash(mod, "monsters/foreign/foreign_a/foreign_a.info.darkest", "display: .size 1\n");
+        WriteFixtureManifest(mod);
         content = await ActiveContentResolver.ResolveAsync(profile, game, null, codec, locations.WorkspaceDirectory);
         catalog = BattleEncounterCatalog.Load(content, snapshot);
         var sizes = BattleEncounterCatalog.ReadMaintenanceMonsterSizes(content.Sources);

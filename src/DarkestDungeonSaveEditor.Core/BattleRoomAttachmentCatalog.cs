@@ -390,20 +390,17 @@ public static partial class BattleRoomAttachmentCatalog
         if (source.Kind is "workshop" or "local")
         {
             var manifestPath = Path.Combine(source.Directory, "modfiles.txt");
-            if (ModManifestFile.Exists(manifestPath))
-            {
-                return EnumerateManifestPropFiles(
-                    source,
-                    manifestPath,
-                    enabledDlcPrefixes,
-                    issues, contentDirectory, extension);
-            }
+            ModManifestFile.Require(manifestPath);
+            return EnumerateManifestPropFiles(
+                source,
+                manifestPath,
+                enabledDlcPrefixes,
+                issues, contentDirectory, extension);
         }
 
         try
         {
-            return ContentFileOverlay.GetFallbackContentRoots(
-                    source.Directory, source.Kind is "workshop" or "local" ? enabledDlcPrefixes : [])
+            return new[] { source.Directory }
                 .Select(root => Path.Combine(root, contentDirectory))
                 .Where(Directory.Exists)
                 .SelectMany(directory => NativeDirectoryDiscovery.EnumerateFiles(

@@ -35,6 +35,7 @@ internal static partial class ContractSuite
             {
                 CreateBattleMonsterDefinitions(Path.GetDirectoryName(localProject)!, ["lost"]);
                 File.WriteAllText(localProject, "<project><Title>Monster Provider</Title></project>");
+                WriteFixtureManifest(Path.GetDirectoryName(localProject)!);
                 var gamePath = Path.Combine(profile.ProfileDirectory, "persist.game.json");
                 var configuration = JsonNode.Parse(File.ReadAllText(gamePath))!;
                 configuration["base_root"]!["applied_ugcs_1_0"] = new JsonObject

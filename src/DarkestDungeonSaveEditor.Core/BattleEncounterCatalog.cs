@@ -50,7 +50,7 @@ public sealed record BattleEncounterDefinition(
     string UnavailableReason,
     BattleEncounterTableGuard TableGuard)
 {
-    public string DisplayName => string.Join(" + ", MonsterIds);
+    public string DisplayName => MonsterIds.Count == 0 ? "（空遭遇位置）" : string.Join(" + ", MonsterIds);
 
     public string ChineseDisplayName =>
         MonsterNames.Count == MonsterIds.Count
@@ -213,8 +213,8 @@ public static partial class BattleEncounterCatalog
             encounters.Add(entry with
             {
                 MashIndex = nextIndex,
-                CanPlaceDirectly = true,
-                UnavailableReason = string.Empty
+                CanPlaceDirectly = entry.MonsterIds.Count > 0,
+                UnavailableReason = entry.MonsterIds.Count == 0 ? "空遭遇占用运行时编号，但不能放置" : string.Empty
             });
         }
 
@@ -382,7 +382,7 @@ public static partial class BattleEncounterCatalog
     public static void ValidateSpecialEncounter(BattleEncounterDefinition encounter)
     {
         ArgumentNullException.ThrowIfNull(encounter);
-        if (encounter.CanPlaceDirectly ||
+        if (encounter.MonsterIds.Count == 0 || encounter.CanPlaceDirectly ||
             encounter.MashIndex is not null ||
             encounter.SourceKind is not (
                 BattleEncounterSourceKind.Conditional or BattleEncounterSourceKind.Additional))
@@ -457,6 +457,8 @@ public static partial class BattleEncounterCatalog
 
     private static void ValidateMonsterDefinitions(BattleEncounterDefinition encounter)
     {
+        if (encounter.MonsterIds.Count == 0)
+            throw new InvalidOperationException("空遭遇占用运行时编号，但不能放置。");
         var availableMonsters = ResolveAvailableMonsterDefinitions(encounter.TableGuard.ActiveSources, []);
         var missingIds = GetMissingMonsterIds(encounter, availableMonsters.Ids);
         if (missingIds.Length > 0)
@@ -545,10 +547,11 @@ public static partial class BattleEncounterCatalog
         left.MonsterIds.SequenceEqual(right.MonsterIds, StringComparer.Ordinal);
 
     private static bool IsBridgeCandidate(BattleEncounterDefinition encounter) =>
-        ((encounter.SourceKind is BattleEncounterSourceKind.Conditional or
+        encounter.MonsterIds.Count > 0 &&
+        (((encounter.SourceKind is BattleEncounterSourceKind.Conditional or
             BattleEncounterSourceKind.Additional) && encounter.MashType is 0 or 1) ||
-        encounter.SourceKind == BattleEncounterSourceKind.Standard &&
-        encounter.MashType is 0 or 1 or 2;
+         encounter.SourceKind == BattleEncounterSourceKind.Standard &&
+         encounter.MashType is 0 or 1 or 2);
 
     private static BattleEncounterDefinition ClassifyEncounter(
         BattleEncounterDefinition encounter,
@@ -683,12 +686,16 @@ public static partial class BattleEncounterCatalog
             // Empty quoted actors still occupy native slots. Limit the raw
             // slots before removing empty actors from the displayed formation.
             var monsters = actorSlots.Take(4).Where(token => !string.IsNullOrWhiteSpace(token)).ToArray();
-            if (monsters.Length == 0)
+            if (monsters.Length == 0 && actorSlots.Length == 0)
             {
                 if (sourceKind == BattleEncounterSourceKind.Standard) unparsedTypes?.Add(mashType);
-                issues.Add($"遭遇行的怪物列表（.types）为空，已跳过：{file.Path}:{lineIndex + 1}");
+                issues.Add($"遭遇行的怪物列表（.types）没有值，已跳过：{file.Path}:{lineIndex + 1}");
                 continue;
             }
+            // Explicit empty actors still produce a native table slot. Keep
+            // the row for index/append/maintenance calculations, not placement.
+            if (monsters.Length == 0 && reportNativeAdjustments)
+                issues.Add($"空遭遇保留编号，不影响后续索引，不能放置：{file.Path}:{lineIndex + 1}");
             // MashGuide's .types parser copies exactly four 32-byte slots;
             // fifth and later IDs never reach AddMashEntry.
             if (actorSlots.Length > 4)

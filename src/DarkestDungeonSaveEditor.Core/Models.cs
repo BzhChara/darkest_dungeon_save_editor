@@ -94,7 +94,12 @@ public sealed record HeroUpgradeRequirementDefinition(
 public sealed record HeroUpgradeTreeDefinition(
     string Id,
     HeroUpgradeTreeKind Kind,
-    IReadOnlyList<HeroUpgradeRequirementDefinition> Requirements);
+    IReadOnlyList<HeroUpgradeRequirementDefinition> Requirements)
+{
+    public string Source { get; init; } = string.Empty;
+    public string SourcePath { get; init; } = string.Empty;
+    public string UnsupportedReason { get; init; } = string.Empty;
+}
 
 public sealed record HeroUpgradePurchase(
     string TreeId,

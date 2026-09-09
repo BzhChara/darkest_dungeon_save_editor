@@ -7,9 +7,10 @@ The suite is split by responsibility:
 - `ContractFixture.cs`: isolated game, Mod, profile, localization, and DSON fixtures;
 - `UiContractTests.cs`: XAML, theme, asset, and UI source contracts;
 - `UiLayoutContractTests.cs`: fixed load footer, selected-row details for all three catalogs, responsive tab headers, minimal quirk layout, and themed checkbox contracts;
-- `ContentDiscoveryContractTests.cs`: manifest-free enabled-DLC root discovery, overlay dependencies, XML/loc2 names, capacities, and exclusion of disabled/backup content;
+- `ContentDiscoveryContractTests.cs`: manifest-listed enabled-DLC root discovery, missing-manifest rejection, overlay dependencies, XML/loc2 names, capacities, and exclusion of disabled/backup content;
+- `ModManifestPreparationContractTests.cs`: enabled-source selection, missing-manifest preparation, unchanged sources, cancellation, concurrent changes, partial installation records, and optional isolated official-tool execution;
 - `ContentInventoryContractTests.cs`: diagnostic-only full active-Mod inventory, manifest differences, unlisted XML diagnostics, scope classification, read/cancellation/link failures, log routing, fresh reloads and unchanged catalog/source data;
-- `LocalizationPolicyContractTests.cs`: strict manifest gating for XML/LOC/LOC2, malformed XML rejection, per-language format/provider precedence, enabled-DLC and manifest-free roots, and source-file preservation;
+- `LocalizationPolicyContractTests.cs`: strict manifest gating for XML/LOC/LOC2, malformed XML rejection, per-language format/provider precedence, manifest-listed enabled-DLC roots, and source-file preservation;
 - `LegacyLocalizationContractTests.cs`: legacy LOC layout, multi-value hashes, colour controls, whole-file rejection for structural corruption, per-value rejection for invalid UTF-8/colour controls, and binary fixture construction;
 - `LocalizationEntryIsolationContractTests.cs`: shared LOC/LOC2 bounded-value isolation, late structural errors rejecting all names, bounded diagnostic summaries, strict XML parsing with individual invalid-entry isolation, XML-only random-name consistency, same-language fallback, and source-file preservation;
 - `HeroAvailabilityContractTests.cs`: per-level catalog preflight agreement with generation, missing skill/camping dependencies, and partially available levels;
@@ -22,6 +23,8 @@ The suite is split by responsibility:
 - `TrinketSaveContractTests.cs`: pristine trinket construction and guarded commits;
 - `HeroContractTests.cs`: orchestration of the following hero-related modules;
 - `HeroCatalogContractTests.cs`: effective hero definitions, overrides, localization, and progression catalogs;
+- `HeroUpgradeTreeContractTests.cs`: native last-match tree resolution, partial/mixed-class/nested files, same-path slot ordering, exact IDs/codes, invalid winners, hash collisions, and DSON purchase round trips;
+- `HeroSkinManifestContractTests.cs`: unlisted skin exclusion in real candidate generation, missing listed texture refresh, and restored continuous colour ranges;
 - `HeroQuirkContractTests.cs`: quirk classification, HP rules, conflicts, and selection boundaries;
 - `HeroCandidateContractTests.cs`: candidate serialization, progression, full skill unlocks, and initial quirks;
 - `StagecoachHeroSaveContractTests.cs`: ordinary/shard pool routing, GUID/upgrade append, stale guards, and multi-file transactions;
@@ -35,3 +38,5 @@ Run the complete suite from the repository root:
 ```powershell
 dotnet run --project tests\DarkestDungeonSaveEditor.ContractTests\DarkestDungeonSaveEditor.ContractTests.csproj -c Release -- "<repository-root>"
 ```
+
+Close Darkest Dungeon before the suite: save transaction contracts exercise the real process guard even with isolated fixtures. `--catalogs` selects the catalog/save group, `--maintenance` selects encounter maintenance, `--manifests` selects manifest preparation, and `--semantics` selects duplicate Buff/Effect/skill/event rules plus empty encounter slots; these partial runs do not replace the complete suite. Set `DDSE_TEST_GAME_DIRECTORY` to the installed game root to additionally exercise the verified official uploader against isolated samples.

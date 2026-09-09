@@ -16,16 +16,12 @@ public static partial class HeroClassCatalog
         if (source.Kind is "workshop" or "local")
         {
             var manifestPath = Path.Combine(source.Directory, "modfiles.txt");
-            if (ModManifestFile.Exists(manifestPath))
-            {
-                return EnumerateManifestFiles(source.Directory, manifestPath, enabledDlcPrefixes, issues);
-            }
+            ModManifestFile.Require(manifestPath);
+            return EnumerateManifestFiles(source.Directory, manifestPath, enabledDlcPrefixes, issues);
 
-            issues.Add($"Mod has no modfiles.txt; standard fallback scan used: {source.Directory}");
         }
 
-        var roots = ContentFileOverlay.GetFallbackContentRoots(
-            source.Directory, source.Kind is "workshop" or "local" ? enabledDlcPrefixes : []);
+        var roots = new[] { source.Directory };
         IReadOnlyList<string> Files(string directory, string pattern) => SortPaths(
             roots.SelectMany(root => EnumerateFiles(root, directory, pattern))
                 .Distinct(StringComparer.OrdinalIgnoreCase));
@@ -39,7 +35,7 @@ public static partial class HeroClassCatalog
             Files(Path.Combine("shared", "buffs"), "*.buffs.json"),
             Files(Path.Combine("raid", "camping"), "*.camping_skills.json"),
             Files("localization", "*.string_table.xml"),
-            SortPaths(roots.SelectMany(EnumerateHeroUpgradeFiles).Distinct(StringComparer.OrdinalIgnoreCase)),
+            Files("upgrades", $"*{HeroUpgradeSuffix}"),
             Files(Path.Combine("campaign", "roster"), "roster.variables.json"));
     }
 
@@ -116,7 +112,7 @@ public static partial class HeroClassCatalog
             {
                 target = nameFiles;
             }
-            else if (IsHeroUpgradeManifestPath(normalizedRelative, enabledDlcPrefixes) &&
+            else if (ContentFileOverlay.IsRootOrEnabledDlcPath(normalizedRelative, "upgrades", enabledDlcPrefixes) &&
                       normalizedRelative.EndsWith(HeroUpgradeSuffix, StringComparison.OrdinalIgnoreCase))
             {
                 target = upgradeFiles;
@@ -168,48 +164,6 @@ public static partial class HeroClassCatalog
             ".string_table.xml",
             HeroUpgradeSuffix,
             "roster.variables.json");
-    }
-
-    private static bool IsHeroUpgradeManifestPath(
-        string normalizedRelative,
-        IReadOnlyList<string> enabledDlcPrefixes)
-    {
-        if (ContentFileOverlay.IsRootOrEnabledDlcPath(
-                normalizedRelative,
-                "upgrades/heroes",
-                enabledDlcPrefixes))
-        {
-            return true;
-        }
-
-        var separator = normalizedRelative.LastIndexOf('/');
-        if (separator < 0)
-        {
-            return false;
-        }
-
-        var directory = normalizedRelative[..separator];
-        return directory.Equals("upgrades", StringComparison.OrdinalIgnoreCase) ||
-               enabledDlcPrefixes.Any(prefix => directory.Equals(
-                   $"{prefix.TrimEnd('/')}/upgrades",
-                   StringComparison.OrdinalIgnoreCase));
-    }
-
-    private static IReadOnlyList<string> EnumerateHeroUpgradeFiles(string root)
-    {
-        var result = new HashSet<string>(
-            EnumerateFiles(root, Path.Combine("upgrades", "heroes"), $"*{HeroUpgradeSuffix}"),
-            StringComparer.OrdinalIgnoreCase);
-        var upgradeRoot = Path.Combine(root, "upgrades");
-        if (Directory.Exists(upgradeRoot))
-        {
-            result.UnionWith(NativeDirectoryDiscovery.EnumerateFiles(
-                upgradeRoot,
-                $"*{HeroUpgradeSuffix}",
-                SearchOption.TopDirectoryOnly));
-        }
-
-        return SortPaths(result);
     }
 
     private static IReadOnlyList<string> EnumerateFiles(string root, string relativeDirectory, string pattern)

@@ -4,6 +4,12 @@ internal sealed record ModManifestEntry(string RawLine, string RelativePath);
 
 internal static class ModManifestFile
 {
+    public static void Require(string manifestPath)
+    {
+        if (!Exists(manifestPath))
+            throw new InvalidDataException($"Mod 缺少 modfiles.txt：{Path.GetDirectoryName(manifestPath)}。请关闭游戏后点击载入存档自动补齐清单。");
+    }
+
     public static bool Exists(string manifestPath)
     {
         try

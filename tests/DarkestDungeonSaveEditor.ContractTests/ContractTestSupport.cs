@@ -13,6 +13,7 @@ internal static class ContractTestSupport
             Path.Combine(inventoryRoot, $"{probeName}.inventory.system_configs.darkest"),
             configText,
             new UTF8Encoding(false));
+        File.WriteAllText(Path.Combine(modRoot, "modfiles.txt"), $"inventory/{probeName}.inventory.system_configs.darkest\n");
         return TrinketStorageCatalog.Load(baseline with
         {
             Sources = baseline.Sources
