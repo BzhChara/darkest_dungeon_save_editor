@@ -32,6 +32,8 @@ internal static partial class ContractSuite
         var rosterHeroesSeed = fixture.RosterHeroesSeed;
         var codec = fixture.Codec;
 
+        RunInventoryCapacityContracts(runRoot);
+
         if (includeBattle)
         {
             await RunModManifestPreparationContractsAsync(runRoot);

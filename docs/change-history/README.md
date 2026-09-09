@@ -2,6 +2,7 @@
 
 此目录集中保存带有时间和任务范围的修复记录、审查报告、实验过程与结果。后续同类记录继续放在这里；当前有效规则与设计说明保留在上一级 `docs/`。
 
+- [Obsolete-rule audit and inventory capacity corrections: 2026-09-09](obsolete-rule-audit-2026-09-09.md)
 - [Resource semantics integration and disease-field live verification: 2026-09-09](resource-semantics-integration-2026-09-09.md)
 - [Live tests of skills, Effects, Buffs, events, and encounter indexes: 2026-09-08](resource-semantics-live-2026-09-08.md)
 - [清单统一加载实验：2026-09-08](manifest-only-loading-2026-09-08.md)

@@ -54,7 +54,7 @@ internal static partial class ContractSuite
             activeCatalog.Storage.SourcePath.Equals(
                 Path.GetFullPath(Path.Combine(activeWorkshopInventoryRoot, "base.inventory.system_configs.darkest")),
                 StringComparison.OrdinalIgnoreCase),
-            "The highest-priority active inventory config should define the effective trinket storage capacity without reading commented max_slots values.");
+            "The effective inventory config at this native file slot should define trinket storage capacity without reading commented max_slots values.");
         var invalidCapacityModRoot = Path.Combine(runRoot, "invalid_capacity_mod");
         var invalidCapacityInventoryRoot = Path.Combine(invalidCapacityModRoot, "inventory");
         Directory.CreateDirectory(invalidCapacityInventoryRoot);
@@ -81,23 +81,23 @@ internal static partial class ContractSuite
             invalidCapacityCatalog.Storage is null &&
             invalidCapacityCatalog.Issues.Any(issue =>
                 issue.Contains("instead of falling back", StringComparison.Ordinal)),
-            "An invalid highest-priority storage definition must fail closed instead of falling back to a lower capacity source.");
+            "An invalid final storage assignment must fail closed instead of falling back to an earlier capacity value.");
         var duplicateCapacityCatalog = LoadStorageCapacityProbe(
             activeContent,
             runRoot,
             "duplicate_capacity",
             """inventory_system_config: .type "trinket_storage" .max_slots 3 .max_slots 1""");
         Assert(
-            duplicateCapacityCatalog.Storage is null,
-            "A highest-priority storage entry with duplicate max_slots declarations must fail closed.");
+            duplicateCapacityCatalog.Storage is { MaxSlots: 1 },
+            "A storage entry with duplicate max_slots fields must use the last native field value.");
         var malformedCapacityTokenCatalog = LoadStorageCapacityProbe(
             activeContent,
             runRoot,
             "malformed_capacity_token",
             """inventory_system_config: .type "trinket_storage" .max_slots 3oops""");
         Assert(
-            malformedCapacityTokenCatalog.Storage is null,
-            "A highest-priority storage entry with a numeric-prefix max_slots token must fail closed.");
+            malformedCapacityTokenCatalog.Storage is { MaxSlots: 3 },
+            "A storage max_slots field must use the native integer prefix.");
         var conflictingCapacityModRootA = Path.Combine(runRoot, "conflicting_capacity_mod_a");
         var conflictingCapacityModRootB = Path.Combine(runRoot, "conflicting_capacity_mod_b");
         var conflictingCapacityInventoryRootA = Path.Combine(conflictingCapacityModRootA, "inventory");

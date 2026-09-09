@@ -287,8 +287,8 @@ public static partial class HeroClassCatalog
             })
             .OrderBy(item => item.Id, StringComparer.OrdinalIgnoreCase)
             .ToArray();
-        // Keep unresolved cross-path conflicts in the selection catalog so the
-        // editor can show them as unavailable. When one effective definition was
+        // Keep unresolved native-identity conflicts in the selection catalog so
+        // the editor can show them as unavailable. When one definition was
         // resolved (including repeated declarations in the same path), show only
         // that selected definition to keep display and runtime semantics aligned.
         var initialQuirks = quirkCandidates.Values

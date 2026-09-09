@@ -177,7 +177,7 @@ It is also not a raid-reachability or unconditional catalog-hiding flag. A defin
 
 - The input remains an absolute total for the exact `(type, id)` identity across all matching bag stacks.
 - Increasing first fills existing matching stacks up to the active `.base_stack_limit`, then creates the minimum required new stacks in the lowest numbered empty slots.
-- The effective `inventory_system_config .type "raid" .max_slots` value is resolved through the same base/DLC/Mod overlay. Unknown, invalid, conflicting (including same-virtual-path providers at equal priority), or changed capacity disables the write rather than assuming 16 or falling back to a lower layer.
+- Resolve inventory config files through the base/DLC/Mod overlay, then apply `.max_slots` assignments for the exact type `raid` in native file/record order. A later assignment replaces the prior value; omission retains it. Do not select a highest-priority Mod again across different files. Unknown, invalid final, ambiguous-path, or changed capacity disables the write rather than assuming 16 or reviving an earlier value. See [inventory config semantics](resource-duplicate-semantics.md#7-inventory-system-capacity).
 - No occupied slot is replaced. If the requested total needs more stacks than the available slots, preview fails with a concise full-bag message.
 - Decreasing preserves retained stack objects and removes only surplus matching stacks. A target of zero removes all matching stacks—including physically present zero-amount residues—and frees those slots.
 - A current stack already above the base limit is preserved; the editor does not normalize a value that may result from a legitimate runtime stack modifier. Newly created stacks never exceed the active base limit.
@@ -221,7 +221,7 @@ Real game loading after a deliberate raid edit remains a separate authorized smo
 | Per-trinket definition `limit` | Count existing inventory copies plus the requested addition. Exceeding it produces a prominent warning, but console mode allows the explicit write. |
 | Total `trinket_storage.max_slots` | Count current and resulting inventory occupancy. Exceeding effective capacity is a hard stop. |
 
-Total capacity comes from the final active overlay. If the highest-priority capacity source is missing, malformed, or remains ambiguous at equal priority, trinket preview/application is disabled. The editor must not silently fall back to the base-game capacity.
+Total capacity uses the same native config loader as the raid bag, with exact type `trinket_storage`. After same-path file overrides, the last assigned `.max_slots` wins; later records without that field retain it. Repeated fields use the last field and native integer-prefix conversion. A final non-positive or out-of-range result, an unreadable effective config, a native type-hash collision, or unresolved file order disables writes. A later known valid assignment can replace an earlier invalid numeric value. Different values in different ordered files are not inherently a conflict. The editor must not silently revive an earlier capacity after an invalid final assignment. See [inventory config semantics](resource-duplicate-semantics.md#7-inventory-system-capacity).
 
 ### 5.3 Pristine stateful trinket creation
 

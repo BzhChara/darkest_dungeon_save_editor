@@ -20,12 +20,12 @@ public static partial class HeroClassCatalog
         IReadOnlyList<int> resolveLevelThresholds,
         List<string> issues)
     {
-        var ordered = SelectEffectiveDefinitions(
-                candidates,
-                sourcesById,
-                candidate => candidate.Source,
-                candidate => candidate.SourcePath,
-                GetHeroCandidateSignature)
+        // Candidate files have already been resolved at the canonical actor
+        // path. Repeated discovery of that same file is not another provider
+        // election, and semantic similarity cannot justify merging other paths.
+        var ordered = candidates
+            .GroupBy(candidate => candidate.SourcePath, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.Last())
             .OrderBy(item => item.SourcePath, StringComparer.OrdinalIgnoreCase)
             .ToArray();
         var sources = candidates
@@ -38,7 +38,7 @@ public static partial class HeroClassCatalog
         if (ordered.Length > 1)
         {
             issues.Add(
-                $"Hero class '{ordered[0].Id}' has conflicting definitions at the same effective priority and was left unresolved: " +
+                $"Hero class '{ordered[0].Id}' has multiple canonical definition files and was left unresolved: " +
                 string.Join(" | ", ordered.Select(candidate => $"{candidate.Source}:{candidate.SourcePath}")));
             return new HeroClassDefinition(
                 ordered[0].Id,
@@ -65,12 +65,6 @@ public static partial class HeroClassCatalog
         }
 
         var selected = ApplyHeroOverrides(ordered[0], overrideFiles, sourcesById);
-        selected = selected with
-        {
-            ColourVariationCount = Math.Max(
-                selected.ColourVariationCount,
-                candidates.Select(candidate => candidate.ColourVariationCount).DefaultIfEmpty(0).Max())
-        };
         sources = sources
             .Concat(selected.ProviderSources)
             .Distinct(StringComparer.OrdinalIgnoreCase)
