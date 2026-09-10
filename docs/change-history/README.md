@@ -2,6 +2,11 @@
 
 此目录集中保存带有时间和任务范围的修复记录、审查报告、实验过程与结果。后续同类记录继续放在这里；当前有效规则与设计说明保留在上一级 `docs/`。
 
+- [持久副本子目录读取与写入修复：2026-09-10](persistent-raid-path-fix-2026-09-10.md)
+
+- [JSON 字段、Buff 引用次数与资源来源修复：2026-09-10](json-reference-rule-fixes-2026-09-10.md)
+
+- [历史修改第八轮审核：JSON 字段、Buff 引用次数与资源来源，2026-09-10](json-reference-rule-audit-2026-09-10.md)
 - [HP、资源引用与战斗权重修复：2026-09-10](hp-reference-rule-fixes-2026-09-10.md)
 - [历史修改第七轮审核：HP、资源引用与战斗权重，2026-09-10](hp-reference-rule-audit-2026-09-10.md)
 - [战斗记录与资源消费规则修复：2026-09-10](encounter-consumer-fixes-2026-09-10.md)

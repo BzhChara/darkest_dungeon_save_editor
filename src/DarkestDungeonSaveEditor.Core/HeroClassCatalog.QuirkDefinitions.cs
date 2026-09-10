@@ -17,7 +17,6 @@ public static partial class HeroClassCatalog
         "attack_rating", "crit_chance", "max_hp", "riposte_on_hit_chance", "riposte_on_miss_chance"
     }.Select(Loc2LocalizationReader.HashName).ToHashSet();
     private static readonly uint MaxHpStatHash = Loc2LocalizationReader.HashName("max_hp");
-    private static readonly UTF8Encoding BuffUtf8 = new(false, true);
 
     private static HeroInitialQuirkDefinition BuildInitialQuirk(
         QuirkDefinition quirk,
@@ -242,7 +241,7 @@ public static partial class HeroClassCatalog
                 AllowTrailingCommas = true,
                 CommentHandling = JsonCommentHandling.Skip
             });
-        if (!document.RootElement.TryGetProperty("quirks", out var quirks) ||
+        if (!NativeJsonReader.TryGetProperty(document.RootElement, "quirks", out var quirks) ||
             quirks.ValueKind != JsonValueKind.Array)
         {
             yield break;
@@ -251,7 +250,7 @@ public static partial class HeroClassCatalog
         foreach (var item in quirks.EnumerateArray())
         {
             if (item.ValueKind != JsonValueKind.Object ||
-                !item.TryGetProperty("id", out var idNode) ||
+                !NativeJsonReader.TryGetProperty(item, "id", out var idNode) ||
                 idNode.ValueKind != JsonValueKind.String ||
                 string.IsNullOrWhiteSpace(idNode.GetString()))
             {
@@ -259,7 +258,7 @@ public static partial class HeroClassCatalog
             }
 
             double? randomChance = null;
-            if (item.TryGetProperty("random_chance", out var chanceNode) &&
+            if (NativeJsonReader.TryGetProperty(item, "random_chance", out var chanceNode) &&
                 chanceNode.ValueKind == JsonValueKind.Number &&
                 chanceNode.TryGetDouble(out var chance))
             {
@@ -267,7 +266,7 @@ public static partial class HeroClassCatalog
             }
 
             bool? isPositive = null;
-            if (item.TryGetProperty("is_positive", out var positiveNode) &&
+            if (NativeJsonReader.TryGetProperty(item, "is_positive", out var positiveNode) &&
                 positiveNode.ValueKind is JsonValueKind.True or JsonValueKind.False)
             {
                 isPositive = positiveNode.GetBoolean();
@@ -281,7 +280,7 @@ public static partial class HeroClassCatalog
                 isPositive,
                 ReadJsonBoolean(item, "is_disease") == true,
                 ReadJsonStringArray(item, "incompatible_quirks"),
-                ReadJsonStringArray(item, "buffs"),
+                ReadJsonStringList(item, "buffs"),
                 ReadJsonStringArray(item, "tags"),
                 ReadJsonInt(item, "roster_limit"),
                 evolution,
@@ -339,7 +338,7 @@ public static partial class HeroClassCatalog
                 AllowTrailingCommas = true,
                 CommentHandling = JsonCommentHandling.Skip
             });
-        if (!document.RootElement.TryGetProperty("buffs", out var buffs) ||
+        if (!NativeJsonReader.TryGetProperty(document.RootElement, "buffs", out var buffs) ||
             buffs.ValueKind != JsonValueKind.Array)
         {
             yield break;
@@ -353,7 +352,7 @@ public static partial class HeroClassCatalog
                 continue;
             }
 
-            var hasRuleData = item.TryGetProperty("rule_data", out var ruleData) &&
+            var hasRuleData = NativeJsonReader.TryGetProperty(item, "rule_data", out var ruleData) &&
                               ruleData.ValueKind == JsonValueKind.Object;
             var invalidString = false;
 
@@ -379,13 +378,9 @@ public static partial class HeroClassCatalog
         // Buff enum names and rule strings are copied to 64-byte native buffers.
         // Preserve case/whitespace, stop at NUL and never substitute a replacement
         // character when truncation splits a UTF-8 sequence.
-        var value = ReadJsonIdentity(element, propertyName);
-        var nul = value.IndexOf('\0');
-        if (nul >= 0) value = value[..nul];
         try
         {
-            var bytes = BuffUtf8.GetBytes(value);
-            return BuffUtf8.GetString(bytes, 0, Math.Min(bytes.Length, 63));
+            return NativeJsonReader.ReadBoundedString(element, propertyName, 63);
         }
         catch (Exception error) when (error is EncoderFallbackException or DecoderFallbackException)
         {
@@ -398,10 +393,11 @@ public static partial class HeroClassCatalog
     {
         var fields = element
             .EnumerateObject()
-            .Where(property => property.Name.StartsWith("evolution_", StringComparison.OrdinalIgnoreCase))
-            .OrderBy(property => property.Name, StringComparer.OrdinalIgnoreCase)
+            .Where(property => property.Name.StartsWith("evolution_", StringComparison.Ordinal))
+            .GroupBy(property => property.Name, StringComparer.Ordinal).Select(group => group.First())
+            .OrderBy(property => property.Name, StringComparer.Ordinal)
             .Select(property =>
-                $"{property.Name.ToLowerInvariant()}={NormalizeSemanticJsonValue(property.Value)}")
+                $"{property.Name}={NormalizeSemanticJsonValue(property.Value)}")
             .ToArray();
         return fields.Length == 0 ? null : string.Join("|", fields);
     }
@@ -437,7 +433,7 @@ public static partial class HeroClassCatalog
             validationErrors);
 
         string? targetQuirkId = null;
-        if (element.TryGetProperty("evolution_class_id", out var targetNode))
+        if (NativeJsonReader.TryGetProperty(element, "evolution_class_id", out var targetNode))
         {
             if (targetNode.ValueKind == JsonValueKind.String &&
                 !string.IsNullOrWhiteSpace(targetNode.GetString()))
@@ -451,7 +447,7 @@ public static partial class HeroClassCatalog
         }
 
         var causesDeath = false;
-        if (element.TryGetProperty("evolution_causes_death", out var causesDeathNode))
+        if (NativeJsonReader.TryGetProperty(element, "evolution_causes_death", out var causesDeathNode))
         {
             if (causesDeathNode.ValueKind is JsonValueKind.True or JsonValueKind.False)
             {
@@ -502,7 +498,7 @@ public static partial class HeroClassCatalog
         bool required,
         List<string> validationErrors)
     {
-        if (!element.TryGetProperty(propertyName, out var property))
+        if (!NativeJsonReader.TryGetProperty(element, propertyName, out var property))
         {
             if (required)
             {

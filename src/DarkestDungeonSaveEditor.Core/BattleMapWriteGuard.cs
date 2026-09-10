@@ -22,39 +22,40 @@ internal sealed class BattleMapWriteGuard : IDisposable
         try
         {
             var directory = Path.GetFullPath(profile.ProfileDirectory);
-            var mapPath = Path.Combine(directory, "persist.map.json");
-            var raidPath = Path.Combine(directory, "persist.raid.json");
-            if (!Path.GetFullPath(expected.ProfileDirectory).Equals(directory, StringComparison.OrdinalIgnoreCase) ||
-                !Path.GetFullPath(expected.MapSavePath).Equals(mapPath, StringComparison.OrdinalIgnoreCase) ||
-                !Path.GetFullPath(expected.RaidSavePath).Equals(raidPath, StringComparison.OrdinalIgnoreCase))
-                throw new InvalidOperationException("当前地图快照不属于所选档案。");
-
             var sourceDirectory = Path.Combine(workspace, "source");
             var decodedDirectory = Path.Combine(workspace, "decoded");
             Directory.CreateDirectory(sourceDirectory);
             Directory.CreateDirectory(decodedDirectory);
             var hashes = new Dictionary<string, string>();
+            var location = new RaidSaveLocation(directory, string.Empty);
             foreach (var name in new[] { "persist.game.json", "persist.map.json", "persist.raid.json" })
             {
-                var stream = new FileStream(Path.Combine(directory, name), FileMode.Open, FileAccess.Read, FileShare.Read);
+                var stream = new FileStream(location.GetPath(name), FileMode.Open, FileAccess.Read, FileShare.Read);
                 guard._locks.Add(stream);
                 if (name == "persist.game.json") guard._gameLock = stream;
                 if (name == "persist.map.json") guard._mapLock = stream;
                 hashes[name] = Convert.ToHexString(SHA256.HashData(stream)).ToLowerInvariant();
                 stream.Position = 0;
-                using var copy = new FileStream(Path.Combine(sourceDirectory, name), FileMode.CreateNew, FileAccess.Write);
-                await stream.CopyToAsync(copy, cancellationToken).ConfigureAwait(false);
+                using (var copy = new FileStream(Path.Combine(sourceDirectory, name), FileMode.CreateNew, FileAccess.Write))
+                    await stream.CopyToAsync(copy, cancellationToken).ConfigureAwait(false);
+                await codec.DecodeAsync(Path.Combine(sourceDirectory, name), Path.Combine(decodedDirectory, name), cancellationToken)
+                    .ConfigureAwait(false);
+                if (name == "persist.game.json")
+                {
+                    location = RaidSaveLocation.FromGame(directory, JsonSupport.ReadObject(Path.Combine(decodedDirectory, name)));
+                    if (!Path.GetFullPath(expected.ProfileDirectory).Equals(directory, StringComparison.OrdinalIgnoreCase) ||
+                        !Path.GetFullPath(expected.MapSavePath).Equals(location.MapPath, StringComparison.OrdinalIgnoreCase) ||
+                        !Path.GetFullPath(expected.RaidSavePath).Equals(location.RaidPath, StringComparison.OrdinalIgnoreCase))
+                        throw new InvalidOperationException("当前地图快照不属于所选档案或当前副本目录，请重新加载。");
+                }
             }
             if (!hashes["persist.map.json"].Equals(expected.MapSha256, StringComparison.OrdinalIgnoreCase) ||
                 !hashes["persist.raid.json"].Equals(expected.RaidSha256, StringComparison.OrdinalIgnoreCase))
                 throw new InvalidOperationException("地图或副本存档在显示后已经变化，请等待地图刷新后重试。");
 
-            foreach (var name in hashes.Keys)
-                await codec.DecodeAsync(Path.Combine(sourceDirectory, name), Path.Combine(decodedDirectory, name), cancellationToken)
-                    .ConfigureAwait(false);
             guard.MapDocument = JsonSupport.ReadObject(Path.Combine(decodedDirectory, "persist.map.json"));
             guard.RaidDocument = JsonSupport.ReadObject(Path.Combine(decodedDirectory, "persist.raid.json"));
-            guard.Snapshot = BattleMapSnapshotReader.Parse(directory, mapPath, raidPath,
+            guard.Snapshot = BattleMapSnapshotReader.Parse(directory, location.MapPath, location.RaidPath,
                 hashes["persist.map.json"], hashes["persist.raid.json"], guard.MapDocument, guard.RaidDocument);
             var game = JsonSupport.RequireObject(JsonSupport.ReadObject(Path.Combine(decodedDirectory, "persist.game.json")), "base_root");
             if (game["inraid"] is not JsonValue inRaid || !inRaid.TryGetValue<bool>(out var isInRaid) ||

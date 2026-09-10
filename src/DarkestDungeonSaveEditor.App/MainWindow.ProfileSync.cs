@@ -200,7 +200,7 @@ public partial class MainWindow : Window
                 await BattleMapPanel.SynchronizeProfileAsync(snapshot, contentChanged, token);
                 if (generation != _catalogGeneration || token.IsCancellationRequested) return;
                 var currentHashes = await Task.Run(() => ProfileCatalogSnapshotReader.CaptureHashes(
-                    snapshot.Content.Profile.ProfileDirectory), token);
+                    snapshot.Content.Profile), token);
                 if (!ProfileCatalogSnapshotReader.HashesEqual(snapshot.FileHashes, currentHashes))
                     throw new IOException("游戏仍在保存，等待完整存档后自动重试。");
                 if (contentChanged && snapshot.ContentFingerprint != await Task.Run(() =>

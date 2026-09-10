@@ -19,6 +19,8 @@ internal static partial class ContractSuite
         await VerifyResourceConsumerRecordsAsync(content, hero, fixture.RunRoot, fixture.Codec);
         await VerifyBuffPrecisionAndIdentityAsync(content, hero, fixture.RunRoot, fixture.Codec);
         VerifyReferenceFileEligibility(content, hero, fixture.RunRoot);
+        await VerifyJsonMembersAndBuffReferencesAsync(content, hero, fixture.RunRoot, fixture.Codec);
+        VerifyJsonReferenceConsumers(content, fixture.RunRoot);
         await VerifyNativeEncounterChanceAsync(fixture.RunRoot, fixture.Codec);
         await RunEmptyEncounterSlotContractsAsync(fixture.RunRoot, fixture.Codec);
         await RunEncounterRecordContractsAsync(fixture.RunRoot, fixture.Codec);
@@ -143,10 +145,10 @@ internal static partial class ContractSuite
             JsonNode.Parse("""{"base_root":{"wallet":{},"estate_items":{"items":{}}}}""")!.AsObject());
         QuantityItemReferenceStatus Status(string id) => town.Items.Single(row => row.ItemId == id).ReferenceStatus;
         Assert(Status("sd_first_item") == QuantityItemReferenceStatus.ConfirmedActive &&
-               Status("sd_candidate_cost") == QuantityItemReferenceStatus.ConfirmedActive &&
+               Status("sd_candidate_cost") == QuantityItemReferenceStatus.SuspectedUnused &&
                Status("sd_later_item") == QuantityItemReferenceStatus.SuspectedUnused &&
                Status("sd_absent_item") == QuantityItemReferenceStatus.SuspectedUnused,
-            "Item reachability must follow first event result data, including missing/empty winners, while preserving other candidate fields.");
+            "Item reachability must follow first event result data, including missing/empty winners; arbitrary event cost objects are not native consumers.");
         Console.WriteLine("PASS: native Buff replacement, Effect disease fields, skill effect append, first event results and item dependencies.");
     }
 }

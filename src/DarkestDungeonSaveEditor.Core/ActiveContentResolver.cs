@@ -98,6 +98,7 @@ public static class ActiveContentResolver
         var normalizedAdditionalLocalModDirectory = string.IsNullOrWhiteSpace(additionalLocalModDirectory)
             ? null : Path.GetFullPath(additionalLocalModDirectory);
         var root = JsonSupport.ReadObject(decodedGamePath);
+        profile = RaidSaveLocation.FromGame(profile.ProfileDirectory, root).Bind(profile);
         var baseRoot = JsonSupport.RequireObject(root, "base_root");
         var gameMode = JsonSupport.ReadString(baseRoot, "game_mode");
         if (string.IsNullOrWhiteSpace(gameMode))

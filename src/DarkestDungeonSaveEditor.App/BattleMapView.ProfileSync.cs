@@ -41,6 +41,7 @@ public partial class BattleMapView : UserControl
             cancellationToken.ThrowIfCancellationRequested();
             if (generation != _profileGeneration) return;
             var content = profileSnapshot.Content;
+            _profile = content.Profile;
             if (profileSnapshot.QuantityItems.SaveContext == QuantityItemSaveContext.Town)
             {
                 _activeContentSnapshot = content;
@@ -55,12 +56,13 @@ public partial class BattleMapView : UserControl
             }
 
             var snapshot = _currentSnapshot;
-            if (snapshot is null || !snapshot.MapSha256.Equals(profileSnapshot.FileHashes["persist.map.json"], StringComparison.OrdinalIgnoreCase) ||
+            if (snapshot is null || !snapshot.MapSavePath.Equals(content.Profile.MapSavePath, StringComparison.OrdinalIgnoreCase) || !snapshot.MapSha256.Equals(profileSnapshot.FileHashes["persist.map.json"], StringComparison.OrdinalIgnoreCase) ||
                 !snapshot.RaidSha256.Equals(profileSnapshot.FileHashes["persist.raid.json"], StringComparison.OrdinalIgnoreCase))
             {
                 snapshot = await LoadSnapshotWithRetryAsync(_snapshotReader, _profileDirectory, cancellationToken);
             }
-            if (!snapshot.MapSha256.Equals(profileSnapshot.FileHashes["persist.map.json"], StringComparison.OrdinalIgnoreCase) ||
+            if (!snapshot.MapSavePath.Equals(content.Profile.MapSavePath, StringComparison.OrdinalIgnoreCase) ||
+                !snapshot.MapSha256.Equals(profileSnapshot.FileHashes["persist.map.json"], StringComparison.OrdinalIgnoreCase) ||
                 !snapshot.RaidSha256.Equals(profileSnapshot.FileHashes["persist.raid.json"], StringComparison.OrdinalIgnoreCase))
                 throw new IOException("地图仍在保存，稍后自动重试。");
 

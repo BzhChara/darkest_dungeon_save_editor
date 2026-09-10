@@ -188,11 +188,11 @@ public sealed partial class SaveEditService
             $"{DateTime.UtcNow:yyyyMMdd_HHmmss_fff}_{Guid.NewGuid():N}");
         Directory.CreateDirectory(backupDirectory);
 
-        var files = Directory.EnumerateFiles(profile.ProfileDirectory, "persist*.json", SearchOption.TopDirectoryOnly)
+        var files = ProfileSaveFiles.Enumerate(profile.ProfileDirectory)
             .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
             .Select(path =>
             {
-                var destination = Path.Combine(backupDirectory, Path.GetFileName(path));
+                var destination = ProfileSaveFiles.BackupPath(profile.ProfileDirectory, backupDirectory, path);
                 var sourceHashBeforeCopy = ComputeSha256(path);
                 File.Copy(path, destination, overwrite: false);
                 var backupHash = ComputeSha256(destination);
@@ -205,7 +205,7 @@ public sealed partial class SaveEditService
 
                 return new
                 {
-                    fileName = Path.GetFileName(path),
+                    fileName = Path.GetRelativePath(profile.ProfileDirectory, path),
                     sha256 = backupHash,
                     length = new FileInfo(destination).Length,
                     lastWriteTimeUtc = File.GetLastWriteTimeUtc(destination)

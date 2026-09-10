@@ -7,8 +7,9 @@ public sealed record EditorBattleMaintenanceResult(bool Changed, bool Deferred, 
     int ReindexedCombinations, int ClearedBattles, string? BackupDirectory, IReadOnlyList<string> Reasons)
 {
     public static EditorBattleMaintenanceResult Unchanged { get; } = new(false, false, 0, 0, 0, null, []);
+    public string? DeferredReason { get; init; }
     public string Message => Deferred
-        ? "检测到编辑器战斗记录失效，已暂缓自动清理；退出游戏后将自动重试。"
+        ? DeferredReason ?? "检测到编辑器战斗记录失效，已暂缓自动清理；退出游戏后将自动重试。"
         : $"战斗记录自动维护：删除失效 Bridge 组合 {RemovedCombinations} 条，更新编号 {ReindexedCombinations} 条，" +
           $"清空编辑器放置的战斗 {ClearedBattles} 场；备份={BackupDirectory}；原因={string.Join("；", Reasons)}";
 }
@@ -29,7 +30,7 @@ public sealed partial class ManagedBattleEncounterBridgeService
         await _maintenanceGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            RecoverInterruptedMaintenance(content.Profile, gameDirectory, localModDirectory);
+            await RecoverInterruptedMaintenanceAsync(content.Profile, gameDirectory, localModDirectory, cancellationToken).ConfigureAwait(false);
             return await ReconcileCoreAsync(content, gameDirectory, localModDirectory, cancellationToken).ConfigureAwait(false);
         }
         finally
@@ -68,7 +69,7 @@ public sealed partial class ManagedBattleEncounterBridgeService
         var package = Path.Combine(installRoot, GetPackageDirectoryName(profile));
         ValidateManagedPackagePath(installRoot, package);
         var manifestPath = Path.Combine(package, ManifestFileName);
-        var hashes = ProfileCatalogSnapshotReader.CaptureHashes(profile.ProfileDirectory);
+        var hashes = ProfileCatalogSnapshotReader.CaptureHashes(profile);
         if (hashes["persist.game.json"] != content.SourceGameSha256)
             throw new IOException("活动配置在战斗清理检查前发生变化，请重新同步。");
         var fingerprint = BattleEncounterCatalog.CaptureContentFingerprint(content.Sources);
@@ -98,6 +99,8 @@ public sealed partial class ManagedBattleEncounterBridgeService
         var reindexed = 0;
         var invalidated = false;
         var oldBridgeBindings = new HashSet<(int Type, int Index)>();
+        var allBridgeBindings = new Dictionary<(string Dungeon, int Difficulty, int Type), HashSet<int>>();
+        var affectedBridgeTables = new HashSet<(string Dungeon, int Difficulty, int Type)>();
         var stagedFiles = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var originalFiles = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         string? workspace = null;
@@ -123,6 +126,10 @@ public sealed partial class ManagedBattleEncounterBridgeService
             RejectReparsePoint(package, "托管 Bridge 目录");
             var manifest = ReadManifest(manifestPath);
             ValidateManifestIdentity(manifest, profile, title);
+            foreach (var table in manifest.Tables)
+            foreach (var type in table.Entries.GroupBy(entry => entry.MashType))
+                allBridgeBindings[(table.DungeonId.ToLowerInvariant(), table.Difficulty, type.Key)] =
+                    type.Select(entry => entry.MashIndex).ToHashSet();
             if (snapshot is not null)
                 foreach (var table in manifest.Tables.Where(table => table.DungeonId.Equals(snapshot.DungeonId, StringComparison.OrdinalIgnoreCase) &&
                     table.Difficulty == snapshot.Difficulty))
@@ -176,6 +183,7 @@ public sealed partial class ManagedBattleEncounterBridgeService
                 {
                     if (obsoleteEntries.Contains(entry))
                     {
+                        affectedBridgeTables.Add((table.DungeonId.ToLowerInvariant(), table.Difficulty, entry.MashType));
                         removed++;
                         invalidated = true;
                         reasons.Add($"{table.DungeonId}/{table.Difficulty}/{entry.MashType}/{entry.MashIndex}：旧版 Bridge 的实际怪物槽与记录不同，清除旧记录后可重新放置");
@@ -186,6 +194,7 @@ public sealed partial class ManagedBattleEncounterBridgeService
                         throw new InvalidOperationException("战斗自动清理暂缓，怪物体型尚无法确认：" + string.Join(", ", entry.MonsterIds));
                     if (missing.Length > 0 || entry.MonsterIds.Count > 4 || entry.MonsterIds.Sum(id => monsters[id] ?? 0) > 4)
                     {
+                        affectedBridgeTables.Add((table.DungeonId.ToLowerInvariant(), table.Difficulty, entry.MashType));
                         removed++;
                         invalidated = true;
                         reasons.Add($"{table.DungeonId}/{table.Difficulty}/{entry.MashType}/{entry.MashIndex}：" +
@@ -231,6 +240,7 @@ public sealed partial class ManagedBattleEncounterBridgeService
                         throw new InvalidOperationException("战斗自动清理暂缓，重建的专用文件未得到可验证的运行时编号。");
                     if (entry.MashIndex != row.MashIndex)
                     {
+                        affectedBridgeTables.Add((table.DungeonId.ToLowerInvariant(), table.Difficulty, type));
                         reasons.Add($"{table.DungeonId}/{table.Difficulty}/{type}：{entry.MashIndex} → {row.MashIndex}");
                         entry.MashIndex = row.MashIndex!.Value;
                         reindexed++;
@@ -266,6 +276,40 @@ public sealed partial class ManagedBattleEncounterBridgeService
             _maintenanceCheckedKey = key;
             return EditorBattleMaintenanceResult.Unchanged;
         }
+        var retainedGuards = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var pendingRaids = new List<string>();
+        if (affectedBridgeTables.Count > 0)
+        {
+            var retainedPaths = ProfileSaveFiles.Enumerate(profile.ProfileDirectory).Where(path =>
+                Path.GetFileName(path).Equals("persist.map.json", StringComparison.OrdinalIgnoreCase) &&
+                !Path.GetDirectoryName(path)!.Equals(Path.GetFullPath(profile.ProfileDirectory), StringComparison.OrdinalIgnoreCase) &&
+                !path.Equals(snapshot?.MapSavePath, StringComparison.OrdinalIgnoreCase)).ToArray();
+            foreach (var path in retainedPaths)
+            {
+                var relative = Path.GetRelativePath(profile.ProfileDirectory, Path.GetDirectoryName(path)!);
+                var retained = await new BattleMapSnapshotReader(_codec).LoadPersistentAsync(profile.ProfileDirectory, relative, token)
+                    .ConfigureAwait(false);
+                retainedGuards[retained.MapSavePath] = retained.MapSha256;
+                retainedGuards[retained.RaidSavePath] = retained.RaidSha256;
+                if (retained.Areas.SelectMany(area => area.Tiles).Any(tile =>
+                    EditorBattleHistory.IsBattle(tile.Content) &&
+                    affectedBridgeTables.Contains((retained.DungeonId.ToLowerInvariant(), retained.Difficulty, tile.MashType)) &&
+                    allBridgeBindings[(retained.DungeonId.ToLowerInvariant(), retained.Difficulty, tile.MashType)].Contains(tile.MashIndex)))
+                    pendingRaids.Add(relative);
+            }
+        }
+        string PendingMessage(int count) => $"已清理当前副本的编辑器战斗 {count} 场；持久副本 {string.Join("、", pendingRaids)} " +
+            "仍引用待维护的 Bridge 编号，暂缓删除和重排这些条目；在对应副本状态下关闭游戏后继续清理。";
+        if (pendingRaids.Count > 0)
+        {
+            // Clear the active map first without compacting the shared package. Visiting
+            // each retained raid can then make progress, even when two raids share a table.
+            if (snapshot is null || placements.Count == 0)
+                return new(false, true, 0, 0, 0, null, reasons) { DeferredReason = PendingMessage(0) };
+            foreach (var path in stagedFiles.Keys.Where(path => IsWithinDirectory(path, package)).ToArray())
+                stagedFiles.Remove(path);
+            removed = reindexed = 0;
+        }
         if (_gameRunningProbe()) return new(false, true, removed, reindexed, 0, null, reasons);
         token.ThrowIfCancellationRequested();
         Directory.CreateDirectory(Workspace());
@@ -297,31 +341,33 @@ public sealed partial class ManagedBattleEncounterBridgeService
                 originalFiles[snapshot.MapSavePath] = snapshot.MapSha256;
                 stagedFiles[snapshot.MapSavePath] = encoded;
             }
-            if (!ProfileCatalogSnapshotReader.HashesEqual(hashes, ProfileCatalogSnapshotReader.CaptureHashes(profile.ProfileDirectory)) ||
+            if (!ProfileCatalogSnapshotReader.HashesEqual(hashes, ProfileCatalogSnapshotReader.CaptureHashes(profile)) ||
                 BattleEncounterCatalog.CaptureContentFingerprint(content.Sources) != fingerprint)
                 throw new IOException("存档或 Mod 文件在自动清理准备期间发生变化，等待稳定后重试。");
             token.ThrowIfCancellationRequested();
             EnsureGameIsNotRunning();
+            var readOnlyFiles = originalFiles.Where(pair => !stagedFiles.ContainsKey(pair.Key)).Concat(retainedGuards).ToArray();
             backup = CreateProfileBackup(profile, Path.GetFileName(Workspace()), content.SourceGameSha256);
             if (Directory.Exists(package)) CopyDirectory(package, Path.Combine(backup, "bridge-package"));
             File.WriteAllText(Path.Combine(backup, "backup-manifest.json"), JsonSerializer.Serialize(new
             {
-                version = 1, operation = EditorBattleHistory.CleanupOperation,
-                profile.ProfileId, profile.SteamUserId, profile.ProfileDirectory,
-                Invalidated = invalidated, RaidIdentity = snapshot?.RaidIdentity,
+                version = 2, operation = EditorBattleHistory.CleanupOperation,
+                profile.ProfileId, profile.SteamUserId, profile.ProfileDirectory, profile.RaidSaveRelativeDirectory,
+                Invalidated = invalidated && snapshot is not null, RaidIdentity = snapshot?.RaidIdentity,
                 GameSha256 = hashes["persist.game.json"], RaidSha256 = hashes["persist.raid.json"],
                 RemovedCombinations = removed, ReindexedCombinations = reindexed, ClearedBattles = cleared,
                 Reasons = reasons, CreatedAtUtc = DateTime.UtcNow,
+                ReadOnlyFiles = readOnlyFiles.Select(pair => new { TargetPath = pair.Key, Sha256 = pair.Value }).ToArray(),
                 Files = stagedFiles.Select(pair => new { TargetPath = pair.Key, OriginalSha256 = originalFiles[pair.Key],
                     FinalSha256 = ComputeSha256(pair.Value) }).ToArray()
             }, JsonSupport.SerializerOptions), Utf8NoBom);
             // A pending marker is written only after the backup and plan are complete.
             File.WriteAllText(Path.Combine(backup, "maintenance-pending.json"), "{}", Utf8NoBom);
-            foreach (var pair in originalFiles.Where(pair => !stagedFiles.ContainsKey(pair.Key)))
+            foreach (var pair in readOnlyFiles)
             {
                 var stream = new FileStream(pair.Key, FileMode.Open, FileAccess.Read, FileShare.Read);
                 unchangedPackageLocks.Add(stream);
-                if (ComputeSha256(pair.Key) != pair.Value) throw new IOException("Bridge 在清理准备期间被外部修改。");
+                if (ComputeSha256(pair.Key) != pair.Value) throw new IOException("Bridge 或保留副本在清理准备期间被外部修改。");
             }
             mapGuard?.ReleaseMapLock();
             // The map is cleared before indexes are compacted. All replacements
@@ -343,7 +389,10 @@ public sealed partial class ManagedBattleEncounterBridgeService
             SaveCommitMarker.Publish(Path.Combine(backup, "commit-result.json"), result);
             foreach (var replacement in replacements) replacement.Complete();
             _maintenanceCheckedKey = null;
-            return new(true, false, removed, reindexed, cleared, backup, reasons);
+            return new(true, pendingRaids.Count > 0, removed, reindexed, cleared, backup, reasons)
+            {
+                DeferredReason = pendingRaids.Count > 0 ? PendingMessage(cleared) : null
+            };
         }
         catch (Exception error)
         {

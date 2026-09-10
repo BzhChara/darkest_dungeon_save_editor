@@ -99,8 +99,9 @@ public partial class BattleMapView : UserControl
         BattleMapSnapshot? snapshot = null;
         try
         {
-            var mapExists = File.Exists(Path.Combine(profileDirectory, "persist.map.json"));
-            var raidExists = File.Exists(Path.Combine(profileDirectory, "persist.raid.json"));
+            var location = await RaidSaveLocation.ReadAsync(profileDirectory, codec, cancellationToken);
+            var mapExists = File.Exists(location.MapPath);
+            var raidExists = File.Exists(location.RaidPath);
             if (mapExists && raidExists)
             {
                 snapshot = await LoadSnapshotWithRetryAsync(_snapshotReader, profileDirectory, cancellationToken);

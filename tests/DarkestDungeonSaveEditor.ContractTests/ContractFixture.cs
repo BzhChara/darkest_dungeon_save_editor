@@ -594,7 +594,7 @@ internal static partial class ContractSuite
         {
           "name": "cross_mod_item_building",
           "buff_list": [
-            { "type": "DistrictSupplyBuffData", "target_inventory": "estate", "loot_table_code": "LOCAL_ACTIVE_LOOT" }
+            { "type": "DistrictSupplyBuffData", "target_inventory": "estate", "item_type": "estate", "item_name": "local_mod_essence", "range_min": 1, "range_max": 1 }
           ]
         }
       ]

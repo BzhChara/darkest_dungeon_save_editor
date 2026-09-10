@@ -99,7 +99,7 @@ internal static partial class ContractSuite
             new[] { "reward_only", "provision_only", "overlap", "hero_starter" }.Select(id =>
                 $"inventory_item: .type \"estate\" .id \"{id}\" .base_stack_limit 3 .estate_can_be_provision false"),
             new UTF8Encoding(false));
-        File.WriteAllText(Path.Combine(root, "campaign", "quest", "test.plot_quests.json"),
+        File.WriteAllText(Path.Combine(root, "campaign", "quest", "test.quest.plot_quests.json"),
             """
             { "plot_quests": [{ "id": "test", "quest": {
               "completion_reward": { "items_definition": { "system_config_type": "quest_rewards", "items": {

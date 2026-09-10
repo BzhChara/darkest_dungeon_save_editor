@@ -28,7 +28,8 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             CrashDiagnostics.RecordException("BattleMap: snapshot diagnostics", ex,
-                $"档案目录={snapshot.ProfileDirectory}；persist.map.json SHA-256={snapshot.MapSha256}；persist.raid.json SHA-256={snapshot.RaidSha256}");
+                $"档案目录={snapshot.ProfileDirectory}；地图文件={snapshot.MapSavePath}；副本文件={snapshot.RaidSavePath}；" +
+                $"persist.map.json SHA-256={snapshot.MapSha256}；persist.raid.json SHA-256={snapshot.RaidSha256}");
         }
     }
 

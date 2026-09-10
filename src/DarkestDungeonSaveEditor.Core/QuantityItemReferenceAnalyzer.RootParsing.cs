@@ -20,29 +20,23 @@ internal static partial class QuantityItemReferenceAnalyzer
     {
         var defaultReachability = GetDefaultReachability(file.File.RelativePath);
         var extension = Path.GetExtension(file.File.Path);
-        if (eventIds is not null || extension.Equals(".json", StringComparison.OrdinalIgnoreCase))
+        if (file.JsonKind != NativeReferenceJsonKind.None)
         {
             if (TryParseJson(file.Text, out var document) && document is not null)
             {
                 using (document)
                 {
-                    if (eventIds is not null && document.RootElement.ValueKind == JsonValueKind.Object)
+                    try
                     {
-                        return VisitTownEventJson(document.RootElement, file.File.RelativePath, index, saveContext,
-                            defaultReachability, activeEvidence, rootLootEvidence, eventIds, issues);
+                        return VisitReferenceJson(document.RootElement, file, index, knownLootTables, saveContext,
+                            activeEvidence, incompleteEvidence, uncertainLootEvidence, eventIds, issues);
                     }
-                    VisitRootJson(
-                        document.RootElement,
-                        string.Empty,
-                        file.File.RelativePath,
-                        index,
-                        saveContext,
-                        defaultReachability,
-                        activeEvidence,
-                        rootLootEvidence);
+                    catch (Exception error) when (error is DecoderFallbackException or EncoderFallbackException)
+                    {
+                        issues.Add($"Quantity-item JSON identity could not be parsed: {file.File.Path} ({error.Message})");
+                        return false;
+                    }
                 }
-
-                return true;
             }
 
             if (!ReferencePathCanAffectContext(file.File.RelativePath, saveContext))
@@ -90,144 +84,6 @@ internal static partial class QuantityItemReferenceAnalyzer
         return true;
     }
 
-    private static bool VisitTownEventJson(
-        JsonElement root,
-        string relativePath,
-        QuantityItemIndex index,
-        QuantityItemSaveContext saveContext,
-        ReferenceReachability reachability,
-        Dictionary<string, List<string>> activeEvidence,
-        Dictionary<string, List<string>> rootLootEvidence,
-        Dictionary<uint, string> eventIds,
-        List<string> issues)
-    {
-        var complete = true;
-        foreach (var property in root.EnumerateObject())
-        {
-            if (property.Name != "events" || property.Value.ValueKind != JsonValueKind.Array)
-            {
-                VisitRootJson(property.Value, property.Name, relativePath, index, saveContext,
-                    reachability, activeEvidence, rootLootEvidence);
-                continue;
-            }
-            foreach (var eventNode in property.Value.EnumerateArray())
-            {
-                var id = ReadString(eventNode, "id");
-                var first = true;
-                if (!string.IsNullOrWhiteSpace(id))
-                {
-                    var hash = Loc2LocalizationReader.HashName(id);
-                    first = eventIds.TryAdd(hash, id);
-                    if (!first && !eventIds[hash].Equals(id, StringComparison.Ordinal))
-                    {
-                        complete = false;
-                        issues.Add($"Town event IDs share a native hash; item-reference analysis is incomplete: {eventIds[hash]} / {id}");
-                    }
-                }
-                else
-                {
-                    complete = false;
-                    issues.Add($"Town event has no usable ID; item-reference analysis is incomplete: {relativePath}");
-                }
-                // Event result execution looks up the FIRST record by ID,
-                // even if its data is absent/empty. Do not deduplicate the
-                // eligibility/cost/other fields of the random candidate pool.
-                VisitRootJson(eventNode, "events", relativePath, index, saveContext,
-                    reachability, activeEvidence, rootLootEvidence, skipTownEventData: !first);
-            }
-        }
-        return complete;
-    }
-
-    private static void VisitRootJson(
-        JsonElement node,
-        string parentProperty,
-        string relativePath,
-        QuantityItemIndex index,
-        QuantityItemSaveContext saveContext,
-        ReferenceReachability inheritedReachability,
-        Dictionary<string, List<string>> activeEvidence,
-        Dictionary<string, List<string>> rootLootEvidence,
-        bool skipTownEventData = false)
-    {
-        if (node.ValueKind == JsonValueKind.Array)
-        {
-            foreach (var child in node.EnumerateArray())
-            {
-                VisitRootJson(
-                    child,
-                    parentProperty,
-                    relativePath,
-                    index,
-                    saveContext,
-                    inheritedReachability,
-                    activeEvidence,
-                    rootLootEvidence);
-            }
-
-            return;
-        }
-
-        if (node.ValueKind != JsonValueKind.Object)
-        {
-            return;
-        }
-
-        var reachability = GetJsonReachability(node, parentProperty, inheritedReachability);
-        if (IsReachableInContext(reachability, saveContext))
-        {
-            var type = ReadString(node, "type");
-            var id = ReadString(node, "id");
-            MarkResolved(index.Resolve(type, id), activeEvidence, relativePath);
-
-            var itemType = ReadString(node, "item_type");
-            var itemName = ReadString(node, "item_name");
-            MarkResolved(index.Resolve(itemType, itemName), activeEvidence, relativePath);
-
-            if (type.Equals("bonus_currency", StringComparison.OrdinalIgnoreCase) ||
-                type.Equals("event_cost", StringComparison.OrdinalIgnoreCase))
-            {
-                MarkResolved(
-                    index.ResolveIdentity(ReadString(node, "string_data")),
-                    activeEvidence,
-                    relativePath);
-            }
-
-            if (type.Equals("loot", StringComparison.OrdinalIgnoreCase))
-            {
-                AddEvidence(rootLootEvidence, ReadString(node, "sub_type"), relativePath);
-            }
-
-            foreach (var field in new[] { "loot_table_code", "loot_table", "loot_code" })
-            {
-                AddEvidence(rootLootEvidence, ReadString(node, field), relativePath);
-            }
-
-            foreach (var field in new[] { "item_id", "currency_id" })
-            {
-                MarkResolved(index.ResolveIdentity(ReadString(node, field)), activeEvidence, relativePath);
-            }
-
-            if (parentProperty.Equals("currencies", StringComparison.OrdinalIgnoreCase))
-            {
-                MarkResolved(index.ResolveIdentity(id), activeEvidence, relativePath);
-            }
-        }
-
-        foreach (var property in node.EnumerateObject())
-        {
-            if (skipTownEventData && property.Name == "data") continue;
-            VisitRootJson(
-                property.Value,
-                property.Name,
-                relativePath,
-                index,
-                saveContext,
-                reachability,
-                activeEvidence,
-                rootLootEvidence);
-        }
-    }
 
     private static void ParseDarkestRoot(
         ScannedContentFile file,

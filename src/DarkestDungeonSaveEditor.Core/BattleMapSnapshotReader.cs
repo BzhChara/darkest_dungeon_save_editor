@@ -9,14 +9,25 @@ public sealed class BattleMapSnapshotReader(DsonSaveCodec codec)
     private const string RaidFileName = "persist.raid.json";
     private static readonly TimeSpan PairVerificationDelay = TimeSpan.FromMilliseconds(350);
 
-    public async Task<BattleMapSnapshot> LoadAsync(
+    public Task<BattleMapSnapshot> LoadAsync(
         string profileDirectory,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default) => LoadCoreAsync(profileDirectory, null, cancellationToken);
+
+    // Read-only inspection of retained expeditions. Write guards still require the active raid.
+    internal Task<BattleMapSnapshot> LoadPersistentAsync(string profileDirectory, string relativeDirectory,
+        CancellationToken cancellationToken) => LoadCoreAsync(profileDirectory, relativeDirectory, cancellationToken);
+
+    private async Task<BattleMapSnapshot> LoadCoreAsync(string profileDirectory, string? relativeDirectory,
+        CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(profileDirectory);
         profileDirectory = Path.GetFullPath(profileDirectory);
-        var mapPath = Path.Combine(profileDirectory, MapFileName);
-        var raidPath = Path.Combine(profileDirectory, RaidFileName);
+        var location = await RaidSaveLocation.ReadAsync(profileDirectory, codec, cancellationToken,
+            allowMissingGame: relativeDirectory is null).ConfigureAwait(false);
+        if (relativeDirectory is not null)
+            location = location with { RelativeDirectory = RaidSaveLocation.NormalizeRelative(relativeDirectory) };
+        var mapPath = location.MapPath;
+        var raidPath = location.RaidPath;
         if (!File.Exists(mapPath) || !File.Exists(raidPath))
         {
             throw new FileNotFoundException(
@@ -48,6 +59,7 @@ public sealed class BattleMapSnapshotReader(DsonSaveCodec codec)
             await codec.DecodeAsync(mapCopyPath, decodedMapPath, cancellationToken).ConfigureAwait(false);
             await codec.DecodeAsync(raidCopyPath, decodedRaidPath, cancellationToken).ConfigureAwait(false);
             cancellationToken.ThrowIfCancellationRequested();
+            location.ValidateGameUnchanged();
 
             return Parse(
                 profileDirectory,

@@ -170,10 +170,11 @@ public partial class MainWindow : Window
             throw new InvalidOperationException("档案目录已变化，请重新加载内容目录。");
         }
 
+        profile = _activeContentSnapshot?.Profile ?? profile;
         var gameSavePath = Path.Combine(profile.ProfileDirectory, "persist.game.json");
         if (!_syncReady || _catalogFileHashes is null ||
             !ProfileCatalogSnapshotReader.HashesEqual(_catalogFileHashes,
-                ProfileCatalogSnapshotReader.CaptureHashes(profile.ProfileDirectory)))
+                ProfileCatalogSnapshotReader.CaptureHashes(profile)))
         {
             RequestProfileSync();
             throw new InvalidOperationException("存档已变化，正在自动同步；同步完成后请重新生成预览，无需重新加载目录。");

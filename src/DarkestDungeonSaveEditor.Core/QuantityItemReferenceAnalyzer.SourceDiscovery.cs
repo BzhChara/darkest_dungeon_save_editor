@@ -51,7 +51,8 @@ internal static partial class QuantityItemReferenceAnalyzer
                     Path.GetExtension(file.Path).Equals(".csv", StringComparison.OrdinalIgnoreCase)
                         ? new UTF8Encoding(false, true).GetString(File.ReadAllBytes(file.Path))
                         : File.ReadAllText(file.Path, Encoding.UTF8),
-                    NativeResourceFileRules.IsLootFile(file.RelativePath, enabledDlcPrefixes)));
+                    NativeResourceFileRules.IsLootFile(file.RelativePath, enabledDlcPrefixes),
+                    NativeResourceFileRules.ReferenceJsonKind(file.RelativePath, enabledDlcPrefixes)));
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or DecoderFallbackException)
             {
@@ -151,7 +152,7 @@ internal static partial class QuantityItemReferenceAnalyzer
             if (relativePath is null ||
                 (!TextExtensions.Contains(Path.GetExtension(path)) &&
                  !NativeResourceFileRules.IsLootFile(relativePath, enabledDlcPrefixes) &&
-                 !NativeResourceFileRules.IsTownEventFile(relativePath, enabledDlcPrefixes)))
+                 NativeResourceFileRules.ReferenceJsonKind(relativePath, enabledDlcPrefixes) == NativeReferenceJsonKind.None))
             {
                 continue;
             }
@@ -179,7 +180,7 @@ internal static partial class QuantityItemReferenceAnalyzer
         var mounted = prefix is null ? path : path[(prefix.Length + 1)..];
         var suffix = new[] { ".info.darkest", ".art.darkest", ".override.darkest" }
             .FirstOrDefault(value => mounted.EndsWith(value, StringComparison.OrdinalIgnoreCase));
-        if (suffix is null) return true; // Provision JSON and other independently loaded resources keep their own rules.
+        if (suffix is null) return true; // JSON consumers were checked above; actor definitions have canonical open paths below.
         var id = Path.GetFileName(mounted)[..^suffix.Length];
         if (mounted.StartsWith("heroes/", StringComparison.OrdinalIgnoreCase))
             return mounted.Equals($"heroes/{id}/{id}{suffix}", StringComparison.OrdinalIgnoreCase);

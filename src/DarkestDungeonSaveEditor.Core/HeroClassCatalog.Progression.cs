@@ -26,7 +26,7 @@ public static partial class HeroClassCatalog
                     CommentHandling = JsonCommentHandling.Skip
                 });
                 if (document.RootElement.ValueKind != JsonValueKind.Object ||
-                    !document.RootElement.TryGetProperty("trees", out var trees) ||
+                    !NativeJsonReader.TryGetProperty(document.RootElement, "trees", out var trees) ||
                     trees.ValueKind != JsonValueKind.Array)
                 {
                     throw new InvalidDataException("Upgrade definition is missing its trees array.");
@@ -37,7 +37,7 @@ public static partial class HeroClassCatalog
                     // Native IDs are hashed verbatim; display-text trimming would
                     // merge distinct trees and change their effective definition.
                     var id = tree.ValueKind == JsonValueKind.Object &&
-                             tree.TryGetProperty("id", out var idNode) && idNode.ValueKind == JsonValueKind.String
+                             NativeJsonReader.TryGetProperty(tree, "id", out var idNode) && idNode.ValueKind == JsonValueKind.String
                         ? idNode.GetString() ?? string.Empty
                         : string.Empty;
                     if (string.IsNullOrWhiteSpace(id))
@@ -141,7 +141,7 @@ public static partial class HeroClassCatalog
                     AllowTrailingCommas = true,
                     CommentHandling = JsonCommentHandling.Skip
                 });
-            if (!document.RootElement.TryGetProperty("resolve_level_thresholds", out var thresholdsNode) ||
+            if (!NativeJsonReader.TryGetProperty(document.RootElement, "resolve_level_thresholds", out var thresholdsNode) ||
                 thresholdsNode.ValueKind != JsonValueKind.Array)
             {
                 issues.Add($"Resolve level thresholds are missing from '{matches[0].Path}'.");
@@ -179,7 +179,7 @@ public static partial class HeroClassCatalog
 
     private static IReadOnlyList<HeroUpgradeRequirementDefinition> ReadHeroUpgradeRequirements(JsonElement tree, string treeId)
     {
-        if (!tree.TryGetProperty("requirements", out var requirements) || requirements.ValueKind != JsonValueKind.Array)
+        if (!NativeJsonReader.TryGetProperty(tree, "requirements", out var requirements) || requirements.ValueKind != JsonValueKind.Array)
         {
             throw new InvalidDataException($"Upgrade tree '{treeId}' is missing its requirements array.");
         }
@@ -189,7 +189,7 @@ public static partial class HeroClassCatalog
         {
             if (requirement.ValueKind != JsonValueKind.Object)
                 throw new InvalidDataException($"Upgrade tree '{treeId}' contains a non-object requirement.");
-            var code = requirement.TryGetProperty("code", out var codeNode) && codeNode.ValueKind == JsonValueKind.String
+            var code = NativeJsonReader.TryGetProperty(requirement, "code", out var codeNode) && codeNode.ValueKind == JsonValueKind.String
                 ? codeNode.GetString() ?? string.Empty
                 : string.Empty;
             var prerequisiteLevel = ReadJsonInt(requirement, "prerequisite_resolve_level");

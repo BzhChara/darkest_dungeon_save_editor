@@ -42,6 +42,8 @@ internal sealed class EditorBattleHistory(DsonSaveCodec codec, SaveEditorLocatio
     {
         var directory = Path.Combine(locations.BackupDirectory, SafeSegment(profile.SteamUserId), SafeSegment(profile.ProfileId));
         if (!Directory.Exists(directory)) return [];
+        var relative = Path.GetRelativePath(profile.ProfileDirectory, Path.GetDirectoryName(snapshot.MapSavePath)!);
+        var raidDirectory = relative == "." ? string.Empty : RaidSaveLocation.NormalizeRelative(relative);
         var records = new List<(JsonObject Manifest, string Directory, DateTime Time)>();
         foreach (var backup in Directory.EnumerateDirectories(directory).Order(StringComparer.Ordinal))
         {
@@ -53,6 +55,10 @@ internal sealed class EditorBattleHistory(DsonSaveCodec codec, SaveEditorLocatio
             var operation = JsonSupport.ReadString(manifest, "operation");
             if (operation is not ("PlaceBattle" or "DeleteContent" or "PlaceContent" or CleanupOperation)) continue;
             if (!SameProfile(manifest, profile)) continue;
+            if (!RaidSaveLocation.NormalizeRelative(JsonSupport.ReadString(manifest, "RaidSaveRelativeDirectory"))
+                    .Equals(raidDirectory, StringComparison.OrdinalIgnoreCase)) continue;
+            if (operation == CleanupOperation && (snapshot.RaidIdentity.Length == 0 ||
+                    JsonSupport.ReadString(manifest, "RaidIdentity") != snapshot.RaidIdentity)) continue;
             if (operation == CleanupOperation && File.Exists(Path.Combine(backup, "maintenance-recovered.json"))) continue;
             if (!SaveCommitMarker.IsComplete(marker, profile.ProfileDirectory))
                 throw new InvalidDataException($"历史写入提交记录不完整，不能据此删除地图战斗：{marker}");
@@ -97,8 +103,9 @@ internal sealed class EditorBattleHistory(DsonSaveCodec codec, SaveEditorLocatio
 
     private async Task<string> ReadLegacyIdentityAsync(string directory, JsonObject manifest, CancellationToken token)
     {
-        var mapPath = Path.Combine(directory, "persist.map.json");
-        var raidPath = Path.Combine(directory, "persist.raid.json");
+        var location = await RaidSaveLocation.ReadAsync(directory, codec, token, allowMissingGame: true).ConfigureAwait(false);
+        var mapPath = location.MapPath;
+        var raidPath = location.RaidPath;
         var mapHash = Hash(mapPath);
         var raidHash = Hash(raidPath);
         if (!mapHash.Equals(JsonSupport.ReadString(manifest, "MapOriginalSha256"), StringComparison.OrdinalIgnoreCase) ||

@@ -71,17 +71,7 @@ internal static partial class QuantityItemReferenceAnalyzer
 
     private static bool TryGetProperty(JsonElement item, string name, out JsonElement value)
     {
-        foreach (var property in item.EnumerateObject())
-        {
-            if (property.Name.Equals(name, StringComparison.Ordinal))
-            {
-                value = property.Value;
-                return true;
-            }
-        }
-
-        value = default;
-        return false;
+        return NativeJsonReader.TryGetProperty(item, name, out value);
     }
 
     private static string ReadString(JsonElement item, string name)

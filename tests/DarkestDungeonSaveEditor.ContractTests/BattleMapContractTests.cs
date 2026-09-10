@@ -1473,7 +1473,7 @@ internal static partial class ContractSuite
         "version": 17,
         "inraid": true,
         "raiddungeon": "cove",
-        "raid_save": "keep-this-value",
+        "raid_save": "",
         "game_mode": "base",
         "unrelated_state": { "sentinel": 73 }
       }
@@ -1520,7 +1520,7 @@ internal static partial class ContractSuite
             Path.Combine(forceTownResult.BackupDirectory, "backup-manifest.json")))!.AsObject();
         Assert(
             JsonNode.DeepEquals(forceTownExpectedDocument, forceTownDocument) &&
-            forceTownDocument["base_root"]!["raid_save"]!.GetValue<string>() == "keep-this-value" &&
+            forceTownDocument["base_root"]!["raid_save"]!.GetValue<string>() == "" &&
             forceTownManifest["operation"]!.GetValue<string>() == "force-town-save-edit" &&
             forceTownManifest["previousRaidDungeon"]!.GetValue<string>() == "cove" &&
             File.Exists(Path.Combine(forceTownResult.BackupDirectory, "persist.game.json")) &&
@@ -1770,7 +1770,7 @@ internal static partial class ContractSuite
         Assert(
             !dsonForceTownBaseRoot["inraid"]!.GetValue<bool>() &&
             dsonForceTownBaseRoot["raiddungeon"]!.GetValue<string>() == "none" &&
-            dsonForceTownBaseRoot["raid_save"]!.GetValue<string>() == "keep-this-value" &&
+            dsonForceTownBaseRoot["raid_save"]!.GetValue<string>() == "" &&
             ReadRevision(dsonBattleGamePath).SequenceEqual(new byte[] { 0x00, 0x00, 0x61, 0x44 }) &&
             ComputeSha256(dsonBattleMapPath).Equals(dsonMapHashBeforeForceTown, StringComparison.OrdinalIgnoreCase) &&
             ComputeSha256(dsonBattleRaidPath).Equals(dsonRaidHashBeforeForceTown, StringComparison.OrdinalIgnoreCase),

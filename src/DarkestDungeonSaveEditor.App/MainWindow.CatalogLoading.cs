@@ -136,7 +136,7 @@ public partial class MainWindow : Window
             var defaultVisibleItemCount = _allItems.Count - hiddenItemCount;
             var diagnostics = diagnosticBatch.Summarize();
             var quantitySourcePath = _quantitySaveContext == QuantityItemSaveContext.Raid
-                ? Path.Combine(profile.ProfileDirectory, "persist.raid.json")
+                ? activeContent.Profile.RaidSavePath
                 : profile.EstateSavePath;
             CrashDiagnostics.RecordStatus(
                 $"内容目录数量快照：场景={FormatQuantitySaveContext(_quantitySaveContext)}；" +

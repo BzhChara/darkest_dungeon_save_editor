@@ -9,7 +9,8 @@ internal static partial class QuantityItemReferenceAnalyzer
     private sealed record ScannedContentFile(
         EffectiveContentFile File,
         string Text,
-        bool IsLootFile);
+        bool IsLootFile,
+        NativeReferenceJsonKind JsonKind);
 
     private enum ReferenceReachability
     {
@@ -67,6 +68,14 @@ internal static partial class QuantityItemReferenceAnalyzer
                 .Select(definition => definition.CatalogKey)
                 .Distinct(StringComparer.Ordinal)
                 .ToArray();
+        }
+
+        public IEnumerable<string> ResolveIdentityHash(string identity)
+        {
+            if (identity.Length == 0) return [];
+            var hash = Loc2LocalizationReader.HashName(identity);
+            return _definitions.Where(definition => Loc2LocalizationReader.HashName(definition.DisplayId) == hash)
+                .Select(definition => definition.CatalogKey).Distinct(StringComparer.Ordinal).ToArray();
         }
 
         private static bool Matches(QuantityItemDefinition definition, string type, string id)

@@ -64,7 +64,7 @@ public sealed class ProfileCatalogSnapshotReader
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            var before = CaptureHashes(_profile.ProfileDirectory);
+            var before = CaptureHashes(_content.Profile);
             if (!refreshContent && _lastSnapshot is not null && HashesEqual(before, _lastSnapshot.FileHashes))
             {
                 return _lastSnapshot with { ReadAtUtc = DateTime.UtcNow };
@@ -81,11 +81,17 @@ public sealed class ProfileCatalogSnapshotReader
             var gamePath = await DecodeCopyAsync(workspace, "persist.game.json", before, cancellationToken)
                 .ConfigureAwait(false);
             var key = ProfileContentConfiguration.GetKey(JsonSupport.ReadObject(gamePath));
+            var profile = RaidSaveLocation.FromGame(_profile.ProfileDirectory, JsonSupport.ReadObject(gamePath)).Bind(_profile);
+            var routedHashes = CaptureHashes(profile);
+            if (routedHashes["persist.game.json"] != before["persist.game.json"])
+                throw new IOException("副本入口在同步期间发生变化，稍后自动重试。");
+            before = routedHashes;
             var content = key != _configurationKey || refreshContent
-                ? ActiveContentResolver.ResolveDecoded(_profile, _gameDirectory, _workshopDirectory,
+                ? ActiveContentResolver.ResolveDecoded(profile, _gameDirectory, _workshopDirectory,
                     _localModDirectory, workspace, gamePath, before["persist.game.json"]!, cancellationToken)
                 : _content with
                 {
+                    Profile = profile,
                     WorkspaceDirectory = workspace,
                     DecodedGamePath = gamePath,
                     SourceGameSha256 = before["persist.game.json"]!
@@ -119,7 +125,7 @@ public sealed class ProfileCatalogSnapshotReader
             }
             else
             {
-                var decoded = await DecodeCopyAsync(workspace, quantityFile, before, cancellationToken).ConfigureAwait(false);
+                var decoded = await DecodeCopyAsync(workspace, quantityFile, before, cancellationToken, profile).ConfigureAwait(false);
                 var root = JsonSupport.ReadObject(decoded);
                 quantities = cached is not null
                     ? QuantityItemCatalog.RefreshSavedAmounts(content, cached, root, before[quantityFile]!)
@@ -128,7 +134,7 @@ public sealed class ProfileCatalogSnapshotReader
                         : QuantityItemCatalog.Load(content, root, before[quantityFile]!);
             }
             cancellationToken.ThrowIfCancellationRequested();
-            if (!HashesEqual(before, CaptureHashes(_profile.ProfileDirectory)))
+            if (!HashesEqual(before, CaptureHashes(profile)))
             {
                 throw new IOException("游戏仍在保存，等待完整存档后自动重试。");
             }
@@ -151,12 +157,17 @@ public sealed class ProfileCatalogSnapshotReader
         }
     }
 
-    public static IReadOnlyDictionary<string, string?> CaptureHashes(string profileDirectory)
+    public static IReadOnlyDictionary<string, string?> CaptureHashes(SaveProfile profile) =>
+        CaptureHashes(profile.ProfileDirectory, profile.RaidSaveRelativeDirectory);
+
+    public static IReadOnlyDictionary<string, string?> CaptureHashes(string profileDirectory, string raidSaveRelativeDirectory = "")
     {
         var result = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+        var location = new RaidSaveLocation(profileDirectory, raidSaveRelativeDirectory);
+        result["raid_save"] = RaidSaveLocation.NormalizeRelative(raidSaveRelativeDirectory);
         foreach (var name in WatchedFileNames)
         {
-            var path = Path.Combine(profileDirectory, name);
+            var path = location.GetPath(name);
             if (!File.Exists(path))
             {
                 result[name] = null;
@@ -170,7 +181,9 @@ public sealed class ProfileCatalogSnapshotReader
 
     public static bool HashesEqual(IReadOnlyDictionary<string, string?> left, IReadOnlyDictionary<string, string?> right) =>
         WatchedFileNames.All(name => string.Equals(left.GetValueOrDefault(name), right.GetValueOrDefault(name),
-            StringComparison.OrdinalIgnoreCase));
+            StringComparison.OrdinalIgnoreCase)) &&
+        string.Equals(left.GetValueOrDefault("raid_save") ?? string.Empty, right.GetValueOrDefault("raid_save") ?? string.Empty,
+            StringComparison.OrdinalIgnoreCase);
 
     private static void RequireHash(IReadOnlyDictionary<string, string?> hashes, string name)
     {
@@ -181,7 +194,7 @@ public sealed class ProfileCatalogSnapshotReader
     }
 
     private async Task<string> DecodeCopyAsync(string workspace, string name,
-        IReadOnlyDictionary<string, string?> expected, CancellationToken cancellationToken)
+        IReadOnlyDictionary<string, string?> expected, CancellationToken cancellationToken, SaveProfile? profile = null)
     {
         var sourceDirectory = Path.Combine(workspace, "source");
         var decodedDirectory = Path.Combine(workspace, "decoded");
@@ -189,7 +202,7 @@ public sealed class ProfileCatalogSnapshotReader
         Directory.CreateDirectory(decodedDirectory);
         var source = Path.Combine(sourceDirectory, name);
         var decoded = Path.Combine(decodedDirectory, name);
-        File.Copy(Path.Combine(_profile.ProfileDirectory, name), source, overwrite: true);
+        File.Copy((profile ?? _profile).RaidLocation.GetPath(name), source, overwrite: true);
         using (var stream = File.OpenRead(source))
         {
             if (!Convert.ToHexString(SHA256.HashData(stream)).Equals(expected[name], StringComparison.OrdinalIgnoreCase))
