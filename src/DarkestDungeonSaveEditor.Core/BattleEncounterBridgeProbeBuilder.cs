@@ -74,19 +74,7 @@ public static class BattleEncounterBridgeBuilder
             packageDirectory,
             relativeMashPath.Replace('/', Path.DirectorySeparatorChar));
         Directory.CreateDirectory(Path.GetDirectoryName(mashFilePath)!);
-        var kind = encounter.MashType switch
-        {
-            0 => "hall",
-            1 => "room",
-            2 => "boss",
-            _ => throw new InvalidOperationException("Encounter Bridge 不支持该 mash_type。")
-        };
-        var appendedOptions = encounter.MashType == 2
-            ? string.Empty
-            : " .limit 1 .can_be_ambush false";
-        var appendedLine =
-            $"{kind}: .chance 0 .types {string.Join(' ', encounter.MonsterIds)}" +
-            appendedOptions + Environment.NewLine;
+        var appendedLine = EncounterBridgeRow.Format(encounter.MashType, encounter.MonsterIds);
         var appendedBytes = Utf8NoBom.GetBytes(appendedLine);
         using (var output = new FileStream(
                    mashFilePath,
@@ -145,6 +133,7 @@ public static class BattleEncounterBridgeBuilder
                     sourcePath = encounter.SourcePath,
                     sourceRelativePath = encounter.SourceRelativePath,
                     sourceLine = encounter.SourceLine,
+                    sourceRecordIndex = encounter.SourceRecordIndex,
                     sourceTableFingerprint,
                     generatedMashPath = relativeMashPath,
                     generatedMashSha256,

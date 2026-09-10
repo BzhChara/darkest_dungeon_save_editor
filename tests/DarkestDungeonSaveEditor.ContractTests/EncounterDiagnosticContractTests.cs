@@ -34,16 +34,16 @@ internal static partial class ContractSuite
         var catalog = BattleEncounterCatalog.Load(isolated, snapshot);
         var summary = catalog.Issues.Single(issue => issue.StartsWith("遭遇排除汇总", StringComparison.Ordinal));
         var details = catalog.Issues.Where(issue => issue.StartsWith("遭遇排除明细", StringComparison.Ordinal)).ToArray();
-        Assert(summary.Contains("7 条遭遇行；疑似字段粘连 4 条，其他未找到活动怪物定义 3 条", StringComparison.Ordinal) &&
-               summary.Contains("未解析字符串 9 个（去重，不等于缺失怪物数量）", StringComparison.Ordinal) &&
+        Assert(summary.Contains("9 条遭遇行；疑似字段粘连 4 条，其他未找到活动怪物定义 5 条", StringComparison.Ordinal) &&
+               summary.Contains("未解析字符串 11 个（去重，不等于缺失怪物数量）", StringComparison.Ordinal) &&
                summary.Contains("每行只计一类", StringComparison.Ordinal) &&
-               details.Length == 7,
+               details.Length == 9,
             "Exclusion logs must count source rows separately from unique unresolved tokens, count a mixed row only once, and not double-count direct failures.");
         var glued = details.Single(issue => issue.Contains($"{mashPath}:4；", StringComparison.Ordinal));
         Assert(glued.Contains("疑似字段粘连", StringComparison.Ordinal) &&
                glued.Contains("粘连线索=probe_B.quirk_tag", StringComparison.Ordinal) &&
                glued.Contains("后续字段值可能混入 .types", StringComparison.Ordinal) &&
-               glued.Contains("未解析字符串=[probe_B.quirk_tag, watched]", StringComparison.Ordinal) &&
+               glued.Contains("未解析字符串=[probe_B.quirk_tag, watched, .limit, 1]", StringComparison.Ordinal) &&
                glued.Contains("编辑器不自动拆分", StringComparison.Ordinal) &&
                glued.Contains("来源=", StringComparison.Ordinal) &&
                glued.Contains($"地区={snapshot.DungeonId}；难度={snapshot.Difficulty}；位置=房间 room", StringComparison.Ordinal),
@@ -54,18 +54,19 @@ internal static partial class ContractSuite
                    .StartsWith("遭遇排除明细（全局 Bridge）：未找到活动怪物定义", StringComparison.Ordinal) &&
                details.All(issue => !issue.Contains("literal_B.limit", StringComparison.Ordinal)),
             "An arbitrary dot, an absent field-prefix ID, and an existing complete dotted ID must not be treated as proven field glue.");
-        Assert(catalog.Encounters.Count == 11 && catalog.DirectEncounters.Count == 4 && catalog.BridgeEncounters.Count == 4 &&
-               catalog.Encounters.Count(row => !row.CanPlaceDirectly) == 7 &&
+        Assert(catalog.Encounters.Count == 11 && catalog.DirectEncounters.Count == 2 && catalog.BridgeEncounters.Count == 2 &&
+               catalog.Encounters.Count(row => !row.CanPlaceDirectly) == 9 &&
                catalog.DirectEncounters.Single(row => row.SourceLine == 9).MashIndex == 5 &&
-               catalog.DirectEncounters.Single(row => row.SourceLine == 10).MashIndex == 6 &&
+               catalog.Encounters.Single(row => row.SourceLine == 10).MashIndex == 6 &&
+               catalog.Encounters.Single(row => row.SourceLine == 10).MonsterIds.SequenceEqual(["probe_B", ".limit", "1"]) &&
                catalog.Encounters.Single(row => row.SourceLine == 3).MonsterIds.SequenceEqual(["probe_B.limit", "1"]) &&
                catalog.Issues.Any(issue => issue.StartsWith("当前副本遭遇不可直写（索引 2 保留，不重排后续索引）：疑似字段粘连", StringComparison.Ordinal)) &&
                mashHash == ComputeSha256(mashPath) && gameHash == ComputeSha256(gamePath),
             "Diagnostics must preserve parsing, eligibility, direct indexes, Mod definitions, and source saves.");
 
         File.WriteAllText(mashPath,
-            "hall: .chance 1 .types probe_B .limit 1\n" +
-            "room: .chance 1 .types probe_B .quirk_tag watched .limit 1\n" +
+            "hall: .chance 1 .limit 1 .types probe_B\n" +
+            "room: .chance 1 .quirk_tag watched .limit 1 .types probe_B\n" +
             "boss: .chance 1 .types literal_B.limit\n", new UTF8Encoding(false));
         var validCatalog = BattleEncounterCatalog.Load(isolated, snapshot);
         Assert(validCatalog.DirectEncounters.Count == 3 && validCatalog.BridgeEncounters.Count == 3 &&
@@ -75,7 +76,7 @@ internal static partial class ContractSuite
 
         File.WriteAllText(mashPath,
             "hall: .chance 1\n" +
-            "room: .chance 1 .types .limit 1\n" +
+            "room: .chance 1 .types\n" +
             "boss: .chance 1 .types literal_B.limit\n", new UTF8Encoding(false));
         var malformedMashHash = ComputeSha256(mashPath);
         var malformedCatalog = BattleEncounterCatalog.Load(isolated, snapshot);

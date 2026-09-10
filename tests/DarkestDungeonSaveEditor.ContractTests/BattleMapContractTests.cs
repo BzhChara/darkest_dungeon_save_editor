@@ -407,18 +407,18 @@ internal static partial class ContractSuite
             standardEncounterPath,
             """
             hall: .chance 1 .types brigand_cutthroat_B cultist_brawler_B
-            hall: .chance 0 .types collector_B .limit 1 .can_be_ambush false
+            hall: .chance 0 .limit 1 .can_be_ambush false .types collector_B
             room: .chance 1 .types pelagic_grouper_B pelagic_shaman_B
             boss: .chance 1 .types siren_B drowned_crew_anchor_B
             """,
             new UTF8Encoding(false));
         File.WriteAllText(
             Path.Combine(encounterDungeonRoot, "cove.conditional.2.mash.darkest"),
-            "hall: .chance 0.04 .types shambler_B .torchlight_valid_percent_range 0 0\n",
+            "hall: .chance 0.04 .torchlight_valid_percent_range 0 0 .types shambler_B\n",
             new UTF8Encoding(false));
         File.WriteAllText(
             Path.Combine(encounterDungeonRoot, "cove.additional.2.mash.darkest"),
-            "hall: .chance 0.5 .types thing_B .random_dungeon_roaming_id thing\n",
+            "hall: .chance 0.5 .random_dungeon_roaming_id thing .types thing_B\n",
             new UTF8Encoding(false));
         var encounterWealdRoot = Path.Combine(encounterGameRoot, "dungeons", "weald");
         Directory.CreateDirectory(encounterWealdRoot);
@@ -450,8 +450,8 @@ internal static partial class ContractSuite
             new UTF8Encoding(false));
         File.WriteAllText(
             modShipPath,
-            "hall: .chance 0.25 .types mod_roamer_B .random_dungeon_roaming_id mod_roamer\n" +
-            "hall: .chance 0.25 .types missing_dependency_B .random_dungeon_roaming_id missing_dependency\n",
+            "hall: .chance 0.25 .random_dungeon_roaming_id mod_roamer .types mod_roamer_B\n" +
+            "hall: .chance 0.25 .random_dungeon_roaming_id missing_dependency .types missing_dependency_B\n",
             new UTF8Encoding(false));
         File.WriteAllText(
             modShipPropPath,
@@ -859,7 +859,7 @@ internal static partial class ContractSuite
             !bridgePackage.ProjectTitle.Contains("Probe", StringComparison.OrdinalIgnoreCase) &&
             File.ReadAllBytes(standardEncounterPath).SequenceEqual(sourceMashBytes) &&
             File.ReadAllText(bridgePackage.MashFilePath).Trim() ==
-                "hall: .chance 0 .types shambler_B .limit 1 .can_be_ambush false" &&
+                "hall: .chance 0 .limit 1 .can_be_ambush false .types shambler_B" &&
             Path.GetFileName(bridgePackage.ManifestPath) == "ddse-encounter-bridge.json" &&
             File.Exists(bridgePackage.ManifestPath) &&
             File.Exists(Path.Combine(bridgePackage.PackageDirectory, "project.xml")) &&
@@ -1293,7 +1293,7 @@ internal static partial class ContractSuite
             secondManagedResult.MashType == 2 &&
             secondManagedResult.MashIndex == 1 &&
             managedMashAfterSecond.Contains(
-                "hall: .chance 0 .types shambler_B .limit 1 .can_be_ambush false",
+                "hall: .chance 0 .limit 1 .can_be_ambush false .types shambler_B",
                 StringComparison.Ordinal) &&
             managedMashAfterSecond.Contains(
                 "boss: .chance 0 .types hag_B cauldron_empty_B",

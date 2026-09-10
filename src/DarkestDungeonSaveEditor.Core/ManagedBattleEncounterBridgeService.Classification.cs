@@ -3,7 +3,7 @@ namespace DarkestDungeonSaveEditor.Core;
 public sealed partial class ManagedBattleEncounterBridgeService
 {
     internal static string ClassificationKey(BattleEncounterDefinition encounter) =>
-        $"{Path.GetFullPath(encounter.SourcePath)}\n{encounter.SourceLine}";
+        $"{Path.GetFullPath(encounter.SourcePath)}\n{encounter.SourceRecordIndex}";
 
     internal static IReadOnlyDictionary<string, BattleEncounterClassification?> ReadClassificationOverrides(
         ActiveContentSnapshot content,
@@ -23,7 +23,7 @@ public sealed partial class ManagedBattleEncounterBridgeService
                     var path = Path.GetFullPath(Path.Combine(source.Directory, table.RelativeMashPath));
                     var rows = classifiedRows.Where(row => Path.GetFullPath(row.SourcePath)
                             .Equals(path, StringComparison.OrdinalIgnoreCase))
-                        .OrderBy(row => row.SourceLine).ToArray();
+                        .OrderBy(row => row.SourceRecordIndex).ToArray();
                     if (rows.Length == 0)
                     {
                         continue;
@@ -100,6 +100,7 @@ public sealed partial class ManagedBattleEncounterBridgeService
                             !result.ContainsKey(ClassificationKey(candidate)) &&
                             candidate.SourceKind.ToString() == entry.SourceKind &&
                             candidate.MashType == entry.MashType && candidate.SourceLine == entry.SourceLine &&
+                            (entry.SourceRecordIndex is null || candidate.SourceRecordIndex == entry.SourceRecordIndex) &&
                             candidate.OriginDifficulty == entry.OriginDifficulty &&
                             candidate.OriginDungeonId.Equals(entry.OriginDungeonId, StringComparison.OrdinalIgnoreCase) &&
                             candidate.SourceRelativePath.Equals(entry.SourceRelativePath, StringComparison.OrdinalIgnoreCase) &&

@@ -12,7 +12,7 @@ internal static partial class ContractSuite
         Directory.CreateDirectory(quirkRoot);
         File.WriteAllText(Path.Combine(heroRoot, "local_hero.info.darkest"),
             File.ReadAllText(originalHero.SourcePath) + "\n" + """
-            armour: .name "local_hero_armour_0" .hp 33// old .hp 999
+            armour: .name "local_hero_armour_0" .hp 33 // old .hp 999
             combat_skill: .id "local_skill" .level 0 .effect ".Grant // \"Quoted\"" // .effect "Missing"
             """);
         File.WriteAllText(Path.Combine(effectRoot, "safety.effects.darkest"), """

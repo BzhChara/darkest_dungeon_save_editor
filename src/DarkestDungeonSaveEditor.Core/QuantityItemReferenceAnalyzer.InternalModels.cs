@@ -6,9 +6,6 @@ namespace DarkestDungeonSaveEditor.Core;
 
 internal static partial class QuantityItemReferenceAnalyzer
 {
-    [GeneratedRegex(@"(?<id>[A-Za-z0-9_.-]+)#(?<type>[A-Za-z0-9_.-]+)", RegexOptions.IgnoreCase)]
-    private static partial Regex CsvTypedItemRegex();
-
     private sealed record ScannedContentFile(
         EffectiveContentFile File,
         string Text,

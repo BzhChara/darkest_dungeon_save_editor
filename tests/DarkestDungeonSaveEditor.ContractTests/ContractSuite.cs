@@ -54,6 +54,7 @@ internal static partial class ContractSuite
             await RunBridgeClassificationContractsAsync(runRoot, codec);
             await RunMultiFileEncounterContractsAsync(runRoot, codec);
             await RunEmptyEncounterSlotContractsAsync(runRoot, codec);
+            await RunEncounterRecordContractsAsync(runRoot, codec);
             await RunDlcNativeEncounterContractsAsync(runRoot, codec);
             await RunDedicatedBridgeContractsAsync(runRoot, codec, repositoryRoot);
         }

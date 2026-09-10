@@ -48,7 +48,9 @@ internal static partial class QuantityItemReferenceAnalyzer
 
                 result.Add(new ScannedContentFile(
                     file,
-                    File.ReadAllText(file.Path, Encoding.UTF8),
+                    Path.GetExtension(file.Path).Equals(".csv", StringComparison.OrdinalIgnoreCase)
+                        ? new UTF8Encoding(false, true).GetString(File.ReadAllBytes(file.Path))
+                        : File.ReadAllText(file.Path, Encoding.UTF8),
                     IsLootPath(file.RelativePath)));
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or DecoderFallbackException)
@@ -90,7 +92,7 @@ internal static partial class QuantityItemReferenceAnalyzer
 
             var normalized = ContentFileOverlay.NormalizeRelativePath(source, path);
             if (normalized is null ||
-                !IsEligibleActorReferencePath(normalized, enabledDlcPrefixes) ||
+                !IsEligibleReferencePath(normalized, enabledDlcPrefixes) ||
                 !ContentDirectories.Any(directory =>
                     ContentFileOverlay.IsRootOrEnabledDlcPath(normalized, directory, enabledDlcPrefixes)) ||
                 IsDefinitionOnlyPath(normalized) ||
@@ -152,7 +154,7 @@ internal static partial class QuantityItemReferenceAnalyzer
 
             var relativePath = ContentFileOverlay.NormalizeRelativePath(source, path);
             if (relativePath is null ||
-                !IsEligibleActorReferencePath(relativePath, enabledDlcPrefixes) ||
+                !IsEligibleReferencePath(relativePath, enabledDlcPrefixes) ||
                 !ContentDirectories.Any(directory =>
                     ContentFileOverlay.IsRootOrEnabledDlcPath(relativePath, directory, enabledDlcPrefixes)) ||
                 IsDefinitionOnlyPath(relativePath))
@@ -164,8 +166,11 @@ internal static partial class QuantityItemReferenceAnalyzer
         }
     }
 
-    private static bool IsEligibleActorReferencePath(string path, IReadOnlyList<string> enabledDlcPrefixes)
+    private static bool IsEligibleReferencePath(string path, IReadOnlyList<string> enabledDlcPrefixes)
     {
+        if (path.EndsWith(".csv", StringComparison.OrdinalIgnoreCase))
+            return path.EndsWith("curio_type_library.csv", StringComparison.OrdinalIgnoreCase) &&
+                ContentFileOverlay.IsRootOrEnabledDlcPath(path, "curios", enabledDlcPrefixes);
         var prefix = enabledDlcPrefixes.OrderByDescending(value => value.Length)
             .FirstOrDefault(value => path.StartsWith(value + "/", StringComparison.OrdinalIgnoreCase));
         var mounted = prefix is null ? path : path[(prefix.Length + 1)..];

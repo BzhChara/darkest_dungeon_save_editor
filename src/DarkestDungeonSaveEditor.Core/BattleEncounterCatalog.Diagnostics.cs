@@ -32,6 +32,7 @@ public static partial class BattleEncounterCatalog
             .Where(row => row.UnresolvedTokens.Length > 0)
             .OrderBy(row => row.Encounter.SourcePath, StringComparer.OrdinalIgnoreCase)
             .ThenBy(row => row.Encounter.SourceLine)
+            .ThenBy(row => row.Encounter.SourceRecordIndex)
             .ToArray();
         if (rows.Length == 0)
         {
@@ -67,7 +68,7 @@ public static partial class BattleEncounterCatalog
               "后续字段值可能混入 .types，不应全算作缺失怪物；编辑器不自动拆分，请核对原始行的字段分隔"
             : "未找到活动怪物定义；仅凭此项无法区分拼写错误、依赖未启用或缺少对应难度版本；不猜测替代 ID";
         return $"{reason}；来源={encounter.SourceLabel}；" +
-            $"文件={encounter.SourcePath}:{encounter.SourceLine}；" +
+            $"文件={encounter.SourcePath}:{encounter.SourceLine}；记录={encounter.SourceRecordIndex}；" +
             $"地区={encounter.OriginDungeonId}；难度={encounter.OriginDifficulty}；位置={location}；" +
             $"原始 .types 解析结果=[{string.Join(", ", encounter.MonsterIds)}]；" +
             $"未解析字符串=[{string.Join(", ", row.UnresolvedTokens)}]";

@@ -627,6 +627,7 @@ public sealed class BattleMapEditService
                     prepared.Encounter.SourceLabel,
                     prepared.Encounter.SourcePath,
                     prepared.Encounter.SourceLine,
+                    prepared.Encounter.SourceRecordIndex,
                     tableFingerprint = prepared.Encounter.TableGuard.Fingerprint
                 },
             mapContent = prepared.Attachment is null ? null : new

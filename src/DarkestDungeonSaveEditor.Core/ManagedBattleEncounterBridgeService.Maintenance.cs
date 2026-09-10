@@ -139,6 +139,16 @@ public sealed partial class ManagedBattleEncounterBridgeService
                 var liveMash = Path.GetFullPath(Path.Combine(package, table.RelativeMashPath));
                 var stageMash = Path.Combine(stage, table.RelativeMashPath);
                 ValidateExistingTable(table, liveMash, sourceFingerprint, requireCurrentContentFingerprint: false);
+                // Earlier generators placed options after .types. A short
+                // formation therefore contains option tokens in native slots.
+                // Retire those records, per the configured cleanup policy; do
+                // not teach the general parser to ignore those monster IDs.
+                // Ownership requires the entire old generated file, its hash,
+                // and every authored ordinal to match the existing manifest.
+                var oldGeneratedFile = File.ReadAllText(liveMash) == string.Concat(table.Entries.Select(entry =>
+                        $"{(entry.MashType == 0 ? "hall" : entry.MashType == 1 ? "room" : "boss")}: .chance 0 .types {string.Join(' ', entry.MonsterIds)}" +
+                        (entry.MashType == 2 ? string.Empty : " .limit 1 .can_be_ambush false") + Environment.NewLine));
+                var obsoleteEntries = new HashSet<ManagedBridgeEncounterManifest>();
                 // Use the installed carrier's authored ordinals to verify ownership,
                 // even when a missing/oversized unit has no usable runtime index.
                 var verificationSources = content.Sources.Any(source => Path.GetFullPath(source.Directory)
@@ -149,15 +159,28 @@ public sealed partial class ManagedBattleEncounterBridgeService
                     var authored = BattleEncounterCatalog.ReadMaintenanceTable(content with { Sources = verificationSources },
                         table.DungeonId, table.Difficulty, type, authoredOnly: true)
                         .Where(row => Path.GetFullPath(row.SourcePath).Equals(liveMash, StringComparison.OrdinalIgnoreCase))
-                        .OrderBy(row => row.SourceLine).ToArray();
+                        .OrderBy(row => row.SourceRecordIndex).ToArray();
                     var entries = table.Entries.Where(entry => entry.MashType == type).OrderBy(entry => entry.FileRowIndex).ToArray();
-                    if (authored.Length != entries.Length || entries.Where((entry, index) => entry.FileRowIndex != index ||
-                        !entry.MonsterIds.SequenceEqual(authored[index].MonsterIds, StringComparer.Ordinal)).Any())
+                    if (authored.Length != entries.Length || entries.Where((entry, index) => entry.FileRowIndex != index).Any())
                         throw new InvalidDataException("Bridge 清单与专用文件的组合记录不一致，暂缓自动清理。");
+                    foreach (var (entry, index) in entries.Select((entry, index) => (entry, index)))
+                    {
+                        if (entry.MonsterIds.SequenceEqual(authored[index].MonsterIds, StringComparer.Ordinal)) continue;
+                        if (!oldGeneratedFile)
+                            throw new InvalidDataException("Bridge 清单与专用文件的组合记录不一致，暂缓自动清理。");
+                        obsoleteEntries.Add(entry);
+                    }
                 }
                 var retained = new List<ManagedBridgeEncounterManifest>();
                 foreach (var entry in table.Entries)
                 {
+                    if (obsoleteEntries.Contains(entry))
+                    {
+                        removed++;
+                        invalidated = true;
+                        reasons.Add($"{table.DungeonId}/{table.Difficulty}/{entry.MashType}/{entry.MashIndex}：旧版 Bridge 的实际怪物槽与记录不同，清除旧记录后可重新放置");
+                        continue;
+                    }
                     var missing = entry.MonsterIds.Where(id => !monsters.ContainsKey(id)).ToArray();
                     if (missing.Length == 0 && entry.MonsterIds.Any(id => monsters[id] is null))
                         throw new InvalidOperationException("战斗自动清理暂缓，怪物体型尚无法确认：" + string.Join(", ", entry.MonsterIds));
@@ -176,9 +199,7 @@ public sealed partial class ManagedBattleEncounterBridgeService
                 var ordinals = new Dictionary<int, int>();
                 foreach (var entry in retained)
                 {
-                    var kind = entry.MashType switch { 0 => "hall", 1 => "room", _ => "boss" };
-                    File.AppendAllText(stageMash, $"{kind}: .chance 0 .types {string.Join(' ', entry.MonsterIds)}" +
-                        (entry.MashType == 2 ? string.Empty : " .limit 1 .can_be_ambush false") + Environment.NewLine, Utf8NoBom);
+                    File.AppendAllText(stageMash, EncounterBridgeRow.Format(entry.MashType, entry.MonsterIds), Utf8NoBom);
                     entry.FileRowIndex = ordinals.GetValueOrDefault(entry.MashType);
                     ordinals[entry.MashType] = entry.FileRowIndex.Value + 1;
                 }
@@ -202,7 +223,7 @@ public sealed partial class ManagedBattleEncounterBridgeService
             {
                 var rows = BattleEncounterCatalog.ReadMaintenanceTable(stagedContent, table.DungeonId, table.Difficulty, type)
                     .Where(row => Path.GetFullPath(row.SourcePath).Equals(Path.GetFullPath(Path.Combine(stage, table.RelativeMashPath)), StringComparison.OrdinalIgnoreCase))
-                    .OrderBy(row => row.SourceLine).ToArray();
+                    .OrderBy(row => row.SourceRecordIndex).ToArray();
                 foreach (var entry in table.Entries.Where(entry => entry.MashType == type))
                 {
                     var row = rows.ElementAtOrDefault(entry.FileRowIndex!.Value);

@@ -17,7 +17,7 @@ internal static partial class ContractSuite
         File.WriteAllText(Path.Combine(game, "dungeons", "ruins", "ruins.2.mash.darkest"),
             "hall: .chance 1 .types ordinary_probe\n" +
             "hall: .chance 0 .types authored_zero_probe\n" +
-            "hall: .chance 1 .types roaming_probe .random_dungeon_roaming_id roaming_test\n",
+            "hall: .chance 1 .random_dungeon_roaming_id roaming_test .types roaming_probe\n",
             new UTF8Encoding(false));
         CreateBattleMonsterDefinitions(game,
             ["native_probe", "ordinary_probe", "authored_zero_probe", "roaming_probe"], ["roaming_probe"]);

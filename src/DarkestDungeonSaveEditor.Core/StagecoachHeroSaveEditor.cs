@@ -205,9 +205,9 @@ public static class StagecoachHeroSaveEditor
 
                 return new
                 {
-                    TreeId = purchase.TreeId.Trim(),
-                    RequirementCode = purchase.RequirementCode.Trim(),
-                    TreeHash = unchecked((int)Loc2LocalizationReader.HashName(purchase.TreeId.Trim()))
+                    TreeId = purchase.TreeId,
+                    RequirementCode = purchase.RequirementCode,
+                    TreeHash = unchecked((int)Loc2LocalizationReader.HashName(purchase.TreeId))
                 };
             })
             .ToArray();
