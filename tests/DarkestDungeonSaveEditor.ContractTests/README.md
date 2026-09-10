@@ -29,6 +29,8 @@ The suite is split by responsibility:
 - `EncounterRecordContractTests.cs`: logical record identity across all three types, same-line and multiline records, raw byte-limited slots, roaming overwrite/clear behavior, direct/Bridge map writes and deletion, generated option placement, and obsolete-package cleanup with ownership/tamper guards;
 - `HeroSkinManifestContractTests.cs`: unlisted skin exclusion in real candidate generation, missing listed texture refresh, and restored continuous colour ranges;
 - `HeroQuirkContractTests.cs`: quirk classification, HP rules, conflicts, and selection boundaries;
+- `JsonMemberContractTests.cs`: first exact resource JSON members (including wrong types), repeated Buff occurrences through HP validation and DSON persistence, and raw town-event recruit payload/class binding;
+- `JsonReferenceConsumerContractTests.cs`: native JSON filename/structure filtering, town/raid roots, irrelevant notes, duplicate fields, uncertain loaded structures, refresh of nonliteral suffixes, and real actor-to-nested-loot references;
 - `HeroCandidateContractTests.cs`: candidate serialization, progression, full skill unlocks, and initial quirks;
 - `StagecoachHeroSaveContractTests.cs`: ordinary/shard pool routing, GUID/upgrade append, stale guards, and multi-file transactions;
 - `RealModLocalizationContractTests.cs`: optional read-only probes selected by `DDSE_SCHINESE_LOC_PROBE_MOD_ROOT` (Workshop 1143685298: 43 invalid values skipped while known valid names remain), `DDSE_RULER_LOC_PROBE_MOD_ROOT`, `DDSE_LOC2_PROBE_MOD_ROOT` (Eos_Nyx), and `DDSE_RURUTIA_LOC2_PROBE_MOD_ROOT`;
@@ -43,3 +45,9 @@ dotnet run --project tests\DarkestDungeonSaveEditor.ContractTests\DarkestDungeon
 ```
 
 Close Darkest Dungeon before the suite: save transaction contracts exercise the real process guard even with isolated fixtures. `--catalogs` selects the catalog/save group, `--maintenance` selects encounter maintenance, `--manifests` selects manifest preparation, `--semantics` selects duplicate Buff/Effect/skill/event rules, exact identities, shared record/curio consumers, empty encounter slots and logical encounter/Bridge contracts, and `--map-content` selects the battle-map group including standalone JSON/DSON placements and native prop pools; these partial runs do not replace the complete suite. Set `DDSE_TEST_GAME_DIRECTORY` to the installed game root to additionally exercise the verified official uploader against isolated samples.
+
+## 持久副本目录验证
+
+`dotnet run --project tests/DarkestDungeonSaveEditor.ContractTests -c Release -- . --raid-paths`
+
+`NestedRaidSaveContractTests` 覆盖 `raid_save` 子目录读取、背包和地图 DSON 写入、备份、回滚、目录切换保护、自动同步和强制回城。并复用维护契约验证子目录下的直接写入及 Bridge 放置、失效清理、回城和 A→B 后保留引用、两个持久副本共用表时逐图清理，以及中断恢复和外部修改保留。共享表恢复分别验证依赖未变、冻结包改变、未激活地图改变；不会操作真实档案。

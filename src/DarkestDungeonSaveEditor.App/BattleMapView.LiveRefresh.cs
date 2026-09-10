@@ -45,7 +45,7 @@ public partial class BattleMapView : UserControl
         {
             _profileMonitor = new ProfileSaveMonitor(
                 _profileDirectory,
-                ["persist.map.json", "persist.raid.json"]);
+                ["persist.game.json", "persist.map.json", "persist.raid.json"]);
             _profileMonitor.Changed += ProfileMonitor_Changed;
             _profileMonitor.Start();
         }
@@ -160,8 +160,10 @@ public partial class BattleMapView : UserControl
                 return;
             }
 
-            var mapExists = File.Exists(Path.Combine(_profileDirectory, "persist.map.json"));
-            var raidExists = File.Exists(Path.Combine(_profileDirectory, "persist.raid.json"));
+            var location = await RaidSaveLocation.ReadAsync(_profileDirectory, _codec!);
+            if (generation != _profileGeneration) return;
+            var mapExists = File.Exists(location.MapPath);
+            var raidExists = File.Exists(location.RaidPath);
             if (!mapExists || !raidExists)
             {
                 if (mapExists != raidExists)
@@ -198,6 +200,7 @@ public partial class BattleMapView : UserControl
             }
 
             if (_currentSnapshot is not null &&
+                _currentSnapshot.MapSavePath.Equals(snapshot.MapSavePath, StringComparison.OrdinalIgnoreCase) &&
                 _currentSnapshot.MapSha256.Equals(snapshot.MapSha256, StringComparison.OrdinalIgnoreCase) &&
                 _currentSnapshot.RaidSha256.Equals(snapshot.RaidSha256, StringComparison.OrdinalIgnoreCase))
             {

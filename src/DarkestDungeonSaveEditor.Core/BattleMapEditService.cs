@@ -231,6 +231,8 @@ public sealed class BattleMapEditService
         ArgumentException.ThrowIfNullOrWhiteSpace(tileId);
         cancellationToken.ThrowIfCancellationRequested();
         _codec.ValidateAvailability();
+        profile = (await RaidSaveLocation.ReadAsync(profile.ProfileDirectory, _codec, cancellationToken)
+            .ConfigureAwait(false)).Bind(profile);
         var (mapPath, raidPath) = ValidateBattleProfile(profile);
         ValidateExpectedSnapshot(profile, expectedSnapshot, mapPath, raidPath);
         if (kind == BattleMapEditKind.PlaceBattle)
@@ -421,8 +423,8 @@ public sealed class BattleMapEditService
                 "所选档案缺少预期的 persist.estate.json 文件。");
         }
 
-        var mapPath = Path.Combine(profileDirectory, "persist.map.json");
-        var raidPath = Path.Combine(profileDirectory, "persist.raid.json");
+        var mapPath = profile.MapSavePath;
+        var raidPath = profile.RaidSavePath;
         if (!File.Exists(mapPath) || !File.Exists(raidPath))
         {
             throw new InvalidOperationException(
@@ -579,11 +581,11 @@ public sealed class BattleMapEditService
             SanitizePathSegment(profile.ProfileId),
             $"{DateTime.UtcNow:yyyyMMdd_HHmmss_fff}_{Guid.NewGuid():N}");
         Directory.CreateDirectory(backupDirectory);
-        var files = Directory.EnumerateFiles(profile.ProfileDirectory, "persist*.json", SearchOption.TopDirectoryOnly)
+        var files = ProfileSaveFiles.Enumerate(profile.ProfileDirectory)
             .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
             .Select(path =>
             {
-                var destination = Path.Combine(backupDirectory, Path.GetFileName(path));
+                var destination = ProfileSaveFiles.BackupPath(profile.ProfileDirectory, backupDirectory, path);
                 var before = ComputeSha256(path);
                 File.Copy(path, destination, overwrite: false);
                 var backup = ComputeSha256(destination);
@@ -596,7 +598,7 @@ public sealed class BattleMapEditService
 
                 return new
                 {
-                    fileName = Path.GetFileName(path),
+                    fileName = Path.GetRelativePath(profile.ProfileDirectory, path),
                     sha256 = backup,
                     length = new FileInfo(destination).Length,
                     lastWriteTimeUtc = File.GetLastWriteTimeUtc(destination)
@@ -611,6 +613,7 @@ public sealed class BattleMapEditService
             profile.ProfileId,
             profile.SteamUserId,
             profile.ProfileDirectory,
+            profile.RaidSaveRelativeDirectory,
             prepared.SessionId,
             prepared.RaidIdentity,
             prepared.Preview.AreaId,

@@ -23,8 +23,8 @@ internal static partial class ContractSuite
             inventory_system_config: .type raid .max_slots 16
             inventory_system_config: .type trinket_storage .max_slots 16
             """);
-        Write("campaign/town/provision/identity.json", """
-            {"items":[{"type":"estate","id":"ni_case","amount":1}]}
+        Write("campaign/provision/identity.provision.json", """
+            {"default_store_inventory_item_lists":[[{"type":"estate","id":"ni_case","amount":1}]]}
             """);
         Directory.CreateDirectory(Path.Combine(root, "localization"));
         WriteLoc2(Path.Combine(root, "localization", "identity_english.loc2"),

@@ -17,7 +17,8 @@ internal sealed record QuantityItemSaveScene(QuantityItemSaveContext Context, bo
             }
         }
 
-        var root = JsonSupport.RequireObject(JsonSupport.ReadObject(content.DecodedGamePath), "base_root");
+        var game = JsonSupport.ReadObject(content.DecodedGamePath);
+        var root = JsonSupport.RequireObject(game, "base_root");
         if (root["inraid"] is not JsonValue inRaidNode || !inRaidNode.TryGetValue<bool>(out var inRaid) ||
             root["raiddungeon"] is not JsonValue dungeonNode || !dungeonNode.TryGetValue<string>(out var dungeon) ||
             string.IsNullOrWhiteSpace(dungeon))
@@ -25,7 +26,8 @@ internal sealed record QuantityItemSaveScene(QuantityItemSaveContext Context, bo
             throw new InvalidDataException("无法确定当前档案的小镇／副本状态，请在游戏中正常保存后重新加载。");
         }
 
-        var hasRaid = File.Exists(content.Profile.RaidSavePath);
+        var location = RaidSaveLocation.FromGame(content.Profile.ProfileDirectory, game);
+        var hasRaid = File.Exists(location.RaidPath);
         var hasDungeon = !dungeon.Equals("none", StringComparison.OrdinalIgnoreCase);
         if (inRaid != hasDungeon)
         {

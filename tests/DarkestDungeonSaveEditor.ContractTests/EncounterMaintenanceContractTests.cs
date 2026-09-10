@@ -7,21 +7,25 @@ internal static partial class ContractSuite
         Console.WriteLine($"Artifacts: {fixture.RunRoot}");
     }
 
-    private static async Task RunEncounterMaintenanceContractsAsync(string runRoot, DsonSaveCodec codec)
+    private static async Task RunEncounterMaintenanceContractsAsync(string runRoot, DsonSaveCodec codec, bool nested = false)
     {
-        foreach (var scenario in new[] { "cleanup", "binary", "new-raid", "ambiguous-new-raid", "missing-history", "partial-history",
+        foreach (var scenario in new[] { "shared-interrupted-package", "shared-interrupted-raid", "shared-interrupted", "town-other-raid", "shared-persistent", "town-persistent", "town-reset-route", "cleanup", "binary", "new-raid", "ambiguous-new-raid", "missing-history", "partial-history",
             "unmapped-local", "rollback", "deferred", "direct-only", "unknown", "stats-only", "interrupted", "truncated-marker", "incomplete-marker", "external" })
         {
-            var root = Path.Combine(runRoot, "encounter-maintenance", scenario);
+            var sharedPersistent = scenario.StartsWith("shared-", StringComparison.Ordinal);
+            if (!nested && (sharedPersistent || scenario is "town-persistent" or "town-reset-route" or "town-other-raid")) continue;
+            if (nested && !sharedPersistent && scenario is not ("cleanup" or "binary" or "rollback" or "interrupted" or "external" or "town-persistent" or "town-reset-route" or "town-other-raid")) continue;
+            var root = Path.Combine(runRoot, nested ? "nested-encounter-maintenance" : "encounter-maintenance", scenario);
             var game = Path.Combine(root, "game");
             var mods = Path.Combine(game, "mods");
             Directory.CreateDirectory(mods);
             var profile = WriteBattleSafetyProfile(Path.Combine(root, "profile"));
-            var seedMapPath = Path.Combine(profile.ProfileDirectory, "persist.map.json");
+            if (nested) profile = MoveRaidToSubdirectory(profile, "plot_crimson_court_1/");
+            var seedMapPath = profile.MapSavePath;
             var seedMap = JsonNode.Parse(File.ReadAllText(seedMapPath))!;
             seedMap["base_root"]!["map"]!["final_room_id"] = 250;
             File.WriteAllText(seedMapPath, seedMap.ToJsonString());
-            var raidPath = Path.Combine(profile.ProfileDirectory, "persist.raid.json");
+            var raidPath = profile.RaidSavePath;
             var raid = JsonNode.Parse(File.ReadAllText(raidPath))!;
             raid["base_root"]!["start_elapsed_time"] = 100;
             raid["base_root"]!["raid_instance"]!["id"] = "generated_1";
@@ -143,6 +147,9 @@ internal static partial class ContractSuite
                 File.WriteAllText(manifestPath, record.ToJsonString());
                 bridge = new ManagedBattleEncounterBridgeService(codec, locations, () => running);
             }
+            (SaveProfile Profile, byte[] Game)? otherRaid = null;
+            if (scenario == "town-other-raid" || sharedPersistent)
+                otherRaid = await CreateSecondaryRetainedRaidAsync(profile, game, mods, codec, locations, sharedPersistent);
             File.WriteAllText(nativeMash,
                 "hall: .chance 1 .types added\nhall: .chance 1 .types added\nhall: .chance 1 .types native\n" +
                 "room: .chance 1 .types added\nroom: .chance 1 .types native\nboss: .chance 1 .types native\n");
@@ -150,6 +157,91 @@ internal static partial class ContractSuite
                 File.Delete(Directory.EnumerateFiles(Path.Combine(game, "monsters"), "lost.info.darkest", SearchOption.AllDirectories).Single());
             var bridgeBefore = installed is null ? null : Directory.EnumerateFiles(installed.PackageDirectory, "*", SearchOption.AllDirectories)
                 .ToDictionary(path => path, ComputeSha256);
+            if (sharedPersistent || scenario is "town-persistent" or "town-reset-route" or "town-other-raid")
+            {
+                snapshot = await snapshotReader.LoadAsync(profile.ProfileDirectory);
+                var gamePath = Path.Combine(profile.ProfileDirectory, "persist.game.json");
+                var activeGame = File.ReadAllBytes(gamePath);
+                var town = new ForceTownSaveService(codec, locations);
+                _ = await town.CommitAsync(await town.PrepareAsync(profile, snapshot));
+                if (scenario == "town-reset-route")
+                {
+                    var townGame = JsonNode.Parse(File.ReadAllText(gamePath))!.AsObject();
+                    townGame["base_root"]!["raid_save"] = string.Empty;
+                    File.WriteAllText(gamePath, townGame.ToJsonString());
+                }
+                var townContent = await ActiveContentResolver.ResolveAsync(profile, game, null, mods, codec, locations.WorkspaceDirectory);
+                var history = new EditorBattleHistory(codec, locations);
+                Assert((await history.ReadAsync(profile, snapshot, CancellationToken.None)).Count == 2,
+                    "Persistent raid placements must remain owned after force-town.");
+                var deferred = await bridge.ReconcileAsync(townContent, game, mods);
+                Assert(deferred.Deferred && !deferred.Changed && deferred.ClearedBattles == 0 &&
+                    ComputeSha256(mapPath) == beforeMap && bridgeBefore!.All(pair => ComputeSha256(pair.Key) == pair.Value) &&
+                    (await history.ReadAsync(profile, snapshot, CancellationToken.None)).Count == 2,
+                    "Town maintenance must preserve persistent raid ownership and defer Bridge compaction, including a reset raid_save pointer.");
+                foreach (var identity in new string?[] { null, "another-raid-instance" })
+                {
+                    var journal = Path.Combine(locations.BackupDirectory, profile.SteamUserId, profile.ProfileId, Guid.NewGuid().ToString("N"));
+                    Directory.CreateDirectory(journal);
+                    File.WriteAllText(Path.Combine(journal, "backup-manifest.json"), System.Text.Json.JsonSerializer.Serialize(new
+                    {
+                        operation = EditorBattleHistory.CleanupOperation, profile.ProfileId, profile.SteamUserId,
+                        profile.ProfileDirectory, profile.RaidSaveRelativeDirectory, Invalidated = true, RaidIdentity = identity
+                    }));
+                    SaveCommitMarker.Publish(Path.Combine(journal, "commit-result.json"), new SaveCommitResult(profile.ProfileDirectory,
+                        gamePath, journal, ComputeSha256(gamePath), ComputeSha256(gamePath), DateTime.UtcNow));
+                }
+                Assert((await history.ReadAsync(profile, snapshot, CancellationToken.None)).Count == 2,
+                    "A cleanup without a matching raid instance must not retire another persistent map's placements.");
+                if (otherRaid is { } other)
+                {
+                    File.WriteAllBytes(gamePath, other.Game);
+                    var otherContent = await ActiveContentResolver.ResolveAsync(other.Profile, game, null, mods, codec, locations.WorkspaceDirectory);
+                    var otherResult = await bridge.ReconcileAsync(otherContent, game, mods);
+                    Assert(otherResult.Deferred && ComputeSha256(mapPath) == beforeMap &&
+                        bridgeBefore!.All(pair => ComputeSha256(pair.Key) == pair.Value) &&
+                        (await history.ReadAsync(profile, snapshot, CancellationToken.None)).Count == 2,
+                        "Entering B must not compact A's shared Bridge table or retire A's retained placements.");
+                    if (sharedPersistent)
+                    {
+                        Assert(otherResult.Changed && otherResult.ClearedBattles == 1 &&
+                            otherResult.RemovedCombinations == 0 && otherResult.ReindexedCombinations == 0,
+                            "With two retained maps sharing a table, clear B first while keeping the package intact, so maintenance can make progress.");
+                        var otherMap = await snapshotReader.LoadAsync(profile.ProfileDirectory);
+                        Assert((await history.ReadAsync(other.Profile, otherMap, CancellationToken.None)).Count == 0,
+                            "Partial cleanup retires only B's own placements, not A's history.");
+                        if (scenario.StartsWith("shared-interrupted", StringComparison.Ordinal))
+                        {
+                            var pendingBackup = otherResult.BackupDirectory!;
+                            File.Delete(Path.Combine(pendingBackup, "commit-result.json"));
+                            bridge = new ManagedBattleEncounterBridgeService(codec, locations, () => false);
+                            if (scenario is "shared-interrupted-package" or "shared-interrupted-raid")
+                            {
+                                var changedPath = scenario == "shared-interrupted-package"
+                                    ? Directory.EnumerateFiles(installed!.PackageDirectory, "*.mash.darkest", SearchOption.AllDirectories).Single()
+                                    : mapPath;
+                                File.AppendAllText(changedPath, "\n ");
+                                var changedHash = ComputeSha256(changedPath);
+                                var clearedHash = ComputeSha256(otherMap.MapSavePath);
+                                var error = await CaptureSaveFailureAsync(() => bridge.ReconcileAsync(otherContent, game, mods));
+                                Assert(error is IOException && ComputeSha256(otherMap.MapSavePath) == clearedHash &&
+                                    ComputeSha256(changedPath) == changedHash &&
+                                    !File.Exists(Path.Combine(pendingBackup, "maintenance-recovered.json")),
+                                    "Interrupted partial cleanup must preserve B's cleared map when its frozen package or retained A dependency changed.");
+                                continue;
+                            }
+                            var resumed = await bridge.ReconcileAsync(otherContent, game, mods);
+                            Assert(resumed.Changed && resumed.Deferred && resumed.ClearedBattles == 1 &&
+                                File.Exists(Path.Combine(pendingBackup, "maintenance-recovered.json")),
+                                "With unchanged dependencies, interrupted partial cleanup must recover and retry B while A still defers compaction.");
+                        }
+                    }
+                    else Assert(!otherResult.Changed && otherResult.ClearedBattles == 0,
+                        "An unrelated B without editor placements must simply defer A's compaction.");
+                }
+                File.WriteAllBytes(gamePath, activeGame);
+                content = await ActiveContentResolver.ResolveAsync(profile, game, null, mods, codec, locations.WorkspaceDirectory);
+            }
             if (scenario is "missing-history" or "partial-history" or "ambiguous-new-raid")
             {
                 var bridgeMarker = Path.Combine(bridgeCommit!.BackupDirectory, "commit-result.json");
@@ -226,7 +318,7 @@ internal static partial class ContractSuite
                     catalog, source, game, null, mods);
                 Assert(!reused.EncounterWasAdded && reused.MashIndex == 3, "Future placement must reuse the recalculated index without duplicating a formation.");
             }
-            Assert(File.Exists(Path.Combine(cleaned.BackupDirectory!, "persist.map.json")) &&
+            Assert(File.Exists(Path.Combine(cleaned.BackupDirectory!, Path.GetRelativePath(profile.ProfileDirectory, profile.MapSavePath))) &&
                 File.Exists(Path.Combine(cleaned.BackupDirectory!, "commit-result.json")), "Successful cleanup must retain a complete profile backup and completion record.");
             Assert(!(await bridge.ReconcileAsync(content, game, mods)).Changed, "A completed cleanup retires old placements and must not repeat on the next poll.");
             if (scenario is "interrupted" or "truncated-marker" or "incomplete-marker" or "external")
@@ -257,6 +349,47 @@ internal static partial class ContractSuite
                 }
             }
         }
-        Console.WriteLine("PASS: encounter maintenance: direct + Bridge cleanup, native/attachment preservation, history import and loss, raid isolation, missing/shifted rows, reuse, unresolved local Mods, deferral, rollback, malformed commit recovery, external preservation, uncertainty and stats-only changes.");
+        Console.WriteLine(nested
+            ? "PASS: retained-raid maintenance: direct/Bridge cleanup, town and A-to-B deferral, shared-table progress, DSON, rollback, history, interrupted recovery and external preservation."
+            : "PASS: encounter maintenance: direct + Bridge cleanup, native/attachment preservation, history import and loss, raid isolation, missing/shifted rows, reuse, unresolved local Mods, deferral, rollback, malformed commit recovery, external preservation, uncertainty and stats-only changes.");
+    }
+
+    private static async Task<(SaveProfile Profile, byte[] Game)> CreateSecondaryRetainedRaidAsync(SaveProfile primary,
+        string game, string mods, DsonSaveCodec codec, SaveEditorLocations locations, bool persistent)
+    {
+        var gamePath = Path.Combine(primary.ProfileDirectory, "persist.game.json");
+        var primaryGame = File.ReadAllBytes(gamePath);
+        var estate = File.ReadAllBytes(primary.EstateSavePath);
+        try
+        {
+            var other = WriteBattleSafetyProfile(primary.ProfileDirectory);
+            if (persistent) other = MoveRaidToSubdirectory(other, "second_persistent/");
+            var dungeon = persistent ? "cove" : "weald";
+            if (!persistent) WriteMultiMash(game, "dungeons/weald/weald.2.mash.darkest",
+                "hall: .chance 1 .types native\nroom: .chance 1 .types native\nboss: .chance 1 .types native\n");
+            var otherGame = JsonNode.Parse(primaryGame)!.AsObject();
+            otherGame["base_root"]!["raid_save"] = persistent ? "second_persistent/" : string.Empty;
+            otherGame["base_root"]!["raiddungeon"] = dungeon;
+            File.WriteAllText(gamePath, otherGame.ToJsonString());
+            var otherRaid = JsonNode.Parse(File.ReadAllText(other.RaidSavePath))!.AsObject();
+            otherRaid["base_root"]!["raid_instance"]!["dungeon"] = dungeon;
+            otherRaid["base_root"]!["start_elapsed_time"] = 333;
+            File.WriteAllText(other.RaidSavePath, otherRaid.ToJsonString());
+            if (persistent)
+            {
+                var content = await ActiveContentResolver.ResolveAsync(other, game, null, mods, codec, locations.WorkspaceDirectory);
+                var snapshot = await new BattleMapSnapshotReader(codec).LoadAsync(other.ProfileDirectory);
+                var entry = BattleEncounterCatalog.Load(content, snapshot).DirectEncounters.Single(row =>
+                    row.MashType == 0 && row.MonsterIds.SequenceEqual(["valid"]));
+                var service = new BattleMapEditService(codec, locations);
+                _ = await service.CommitAsync(await service.PreparePlaceBattleAsync(other, snapshot, "coAB", "tile1", entry));
+            }
+            return (other, File.ReadAllBytes(gamePath));
+        }
+        finally
+        {
+            File.WriteAllBytes(gamePath, primaryGame);
+            File.WriteAllBytes(primary.EstateSavePath, estate);
+        }
     }
 }

@@ -12,7 +12,7 @@ public static partial class HeroClassCatalog
         IReadOnlyList<HeroCandidate> candidates,
         IReadOnlyList<EffectiveContentFile> overrideFiles,
         IReadOnlyDictionary<string, ActiveContentSource> sourcesById,
-        IReadOnlyDictionary<string, IReadOnlyList<HeroRecruitEventDefinition>> eventsByClass,
+        IReadOnlyDictionary<uint, IReadOnlyList<HeroRecruitEventDefinition>> eventsByClass,
         IReadOnlyDictionary<string, EffectQuirkAssignment> effectiveEffects,
         IReadOnlyDictionary<string, QuirkDefinition> effectiveQuirks,
         IReadOnlyDictionary<string, CampingSkillBuilder> campingSkills,
@@ -32,7 +32,7 @@ public static partial class HeroClassCatalog
             .SelectMany(item => item.ProviderSources)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
-        var recruitEvents = eventsByClass.TryGetValue(ordered[0].Id, out var classEvents)
+        var recruitEvents = eventsByClass.TryGetValue(Loc2LocalizationReader.HashName(ordered[0].Id), out var classEvents)
             ? classEvents
             : [];
         if (ordered.Length > 1)

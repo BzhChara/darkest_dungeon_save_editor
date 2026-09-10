@@ -18,7 +18,10 @@ public sealed record SaveProfile(
     string SteamUserId,
     DateTime LastWriteTimeUtc)
 {
-    public string RaidSavePath => Path.Combine(ProfileDirectory, "persist.raid.json");
+    public string RaidSaveRelativeDirectory { get; init; } = string.Empty;
+    public RaidSaveLocation RaidLocation => new(ProfileDirectory, RaidSaveRelativeDirectory);
+    public string RaidSavePath => RaidLocation.RaidPath;
+    public string MapSavePath => RaidLocation.MapPath;
 }
 
 public sealed record DiscoverySnapshot(

@@ -43,6 +43,8 @@ internal static partial class ContractSuite
 
         if (includeBattle)
         {
+            await RunNestedRaidSaveContractsAsync(fixture);
+            await RunEncounterMaintenanceContractsAsync(runRoot, codec, nested: true);
             await RunModManifestPreparationContractsAsync(runRoot);
             await RunNativeResourceResolutionContractsAsync(runRoot, codec);
             await RunNativeCatalogReadingContractsAsync(runRoot, codec);

@@ -18,12 +18,12 @@ public static partial class HeroClassCatalog
                 CommentHandling = JsonCommentHandling.Skip
             });
         uint threshold = 0;
-        if (document.RootElement.TryGetProperty("configuration", out var configuration) && configuration.ValueKind == JsonValueKind.Object)
+        if (NativeJsonReader.TryGetProperty(document.RootElement, "configuration", out var configuration) && configuration.ValueKind == JsonValueKind.Object)
         {
             threshold = unchecked((uint)(ReadJsonInt(configuration, "class_specific_number_of_classes_threshold") ?? 0));
         }
 
-        if (!document.RootElement.TryGetProperty("skills", out var skills) ||
+        if (!NativeJsonReader.TryGetProperty(document.RootElement, "skills", out var skills) ||
             skills.ValueKind != JsonValueKind.Array)
         {
             yield break;
@@ -31,13 +31,13 @@ public static partial class HeroClassCatalog
 
         foreach (var item in skills.EnumerateArray())
         {
-            if (item.ValueKind != JsonValueKind.Object || !item.TryGetProperty("id", out var idNode) ||
+            if (item.ValueKind != JsonValueKind.Object || !NativeJsonReader.TryGetProperty(item, "id", out var idNode) ||
                 idNode.ValueKind != JsonValueKind.String || string.IsNullOrEmpty(idNode.GetString()))
             {
                 continue;
             }
             var id = idNode.GetString()!;
-            var hasClasses = item.TryGetProperty("hero_classes", out var classNodes) && classNodes.ValueKind == JsonValueKind.Array;
+            var hasClasses = NativeJsonReader.TryGetProperty(item, "hero_classes", out var classNodes) && classNodes.ValueKind == JsonValueKind.Array;
             var heroClasses = hasClasses ? classNodes.EnumerateArray()
                 .Where(node => node.ValueKind == JsonValueKind.String)
                 .Select(node => node.GetString()!).ToArray() : [];
@@ -57,7 +57,7 @@ public static partial class HeroClassCatalog
                 AllowTrailingCommas = true,
                 CommentHandling = JsonCommentHandling.Skip
             });
-        if (!document.RootElement.TryGetProperty("events", out var events) ||
+        if (!NativeJsonReader.TryGetProperty(document.RootElement, "events", out var events) ||
             events.ValueKind != JsonValueKind.Array)
         {
             yield break;
@@ -66,27 +66,31 @@ public static partial class HeroClassCatalog
         foreach (var eventNode in events.EnumerateArray())
         {
             if (eventNode.ValueKind != JsonValueKind.Object ||
-                !eventNode.TryGetProperty("id", out var idNode) ||
+                !NativeJsonReader.TryGetProperty(eventNode, "id", out var idNode) ||
                 idNode.ValueKind != JsonValueKind.String ||
                 string.IsNullOrWhiteSpace(idNode.GetString()))
             {
                 continue;
             }
 
-            var eventId = idNode.GetString()!;
+            // Native event ID hashing (0x14046BC50) also stops at NUL.
+            // Keep the same first-result key as the item-reference consumer.
+            var eventId = NativeJsonReader.CString(idNode.GetString()!);
+            if (eventId.Length == 0) continue;
             var recruits = new List<HeroRecruitEventDefinition>();
-            if (eventNode.TryGetProperty("data", out var data) && data.ValueKind == JsonValueKind.Array)
+            if (NativeJsonReader.TryGetProperty(eventNode, "data", out var data) && data.ValueKind == JsonValueKind.Array)
             {
                 foreach (var dataNode in data.EnumerateArray())
                 {
                     if (dataNode.ValueKind != JsonValueKind.Object ||
-                        !ReadJsonString(dataNode, "type").Equals("bonus_recruit", StringComparison.OrdinalIgnoreCase))
+                        Loc2LocalizationReader.HashName(NativeJsonReader.ReadBoundedString(dataNode, "type", 63)) !=
+                            Loc2LocalizationReader.HashName("bonus_recruit"))
                     {
                         continue;
                     }
 
-                    var heroClass = ReadJsonString(dataNode, "string_data");
-                    if (string.IsNullOrWhiteSpace(heroClass))
+                    var heroClass = NativeJsonReader.ReadCString(dataNode, "string_data");
+                    if (string.IsNullOrEmpty(heroClass))
                     {
                         continue;
                     }
@@ -94,7 +98,7 @@ public static partial class HeroClassCatalog
                     recruits.Add(new HeroRecruitEventDefinition(
                         eventId,
                         heroClass,
-                        ReadJsonDouble(dataNode, "number_data"),
+                        NativeJsonReader.ReadFloat(dataNode, "number_data"),
                         source,
                         Path.GetFullPath(path)));
                 }

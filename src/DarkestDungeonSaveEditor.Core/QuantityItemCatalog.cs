@@ -66,7 +66,8 @@ public static partial class QuantityItemCatalog
         DsonSaveCodec codec,
         CancellationToken cancellationToken)
     {
-        var raidPath = Path.GetFullPath(activeContent.Profile.RaidSavePath);
+        var raidPath = RaidSaveLocation.FromGame(activeContent.Profile.ProfileDirectory,
+            JsonSupport.ReadObject(activeContent.DecodedGamePath)).RaidPath;
         if (!File.Exists(raidPath))
         {
             throw new InvalidOperationException(

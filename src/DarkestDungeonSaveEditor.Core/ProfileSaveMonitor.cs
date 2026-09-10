@@ -83,7 +83,7 @@ public sealed class ProfileSaveMonitor : IDisposable
             CaptureBaselineLocked();
             _watcher = new FileSystemWatcher(_profileDirectory, "persist*.json")
             {
-                IncludeSubdirectories = false,
+                IncludeSubdirectories = true,
                 NotifyFilter = NotifyFilters.FileName |
                                NotifyFilters.LastWrite |
                                NotifyFilters.Size |
@@ -158,15 +158,18 @@ public sealed class ProfileSaveMonitor : IDisposable
 
             var changes = new HashSet<string>(_pendingFileNames, StringComparer.OrdinalIgnoreCase);
             _pendingFileNames.Clear();
-            foreach (var fileName in _fileNames.OrderBy(name => name, StringComparer.OrdinalIgnoreCase))
+            var current = CaptureStamps();
+            foreach (var fileName in _baseline.Keys.Union(current.Keys, StringComparer.OrdinalIgnoreCase).ToArray())
             {
-                var stamp = ReadStamp(Path.Combine(_profileDirectory, fileName));
+                var stamp = current.GetValueOrDefault(fileName, FileStamp.Missing);
                 if (!_baseline.TryGetValue(fileName, out var previous) || previous != stamp)
                 {
                     _baseline[fileName] = stamp;
-                    _ = changes.Add(fileName);
+                    _ = changes.Add(Path.GetFileName(fileName));
                 }
             }
+            _baseline.Clear();
+            foreach (var pair in current) _baseline[pair.Key] = pair.Value;
 
             if (changes.Count > 0)
             {
@@ -195,18 +198,17 @@ public sealed class ProfileSaveMonitor : IDisposable
 
     private void Watcher_Changed(object sender, FileSystemEventArgs e)
     {
-        if (_fileNames.Contains(e.Name ?? string.Empty))
+        if (IsWatchedRelativePath(e.Name))
         {
-            SchedulePoll([e.Name!]);
+            SchedulePoll([Path.GetFileName(e.Name)!]);
         }
     }
 
     private void Watcher_Renamed(object sender, RenamedEventArgs e)
     {
-        if (_fileNames.Contains(e.Name ?? string.Empty) ||
-            _fileNames.Contains(e.OldName ?? string.Empty))
+        if (IsWatchedRelativePath(e.Name) || IsWatchedRelativePath(e.OldName))
         {
-            SchedulePoll([e.Name ?? string.Empty, e.OldName ?? string.Empty]);
+            SchedulePoll([Path.GetFileName(e.Name) ?? string.Empty, Path.GetFileName(e.OldName) ?? string.Empty]);
         }
     }
 
@@ -243,12 +245,13 @@ public sealed class ProfileSaveMonitor : IDisposable
 
             var scheduleNeeded = _pendingFileNames.Count == 0;
             var detectedChange = false;
-            foreach (var fileName in _fileNames)
+            var current = CaptureStamps();
+            foreach (var fileName in _baseline.Keys.Union(current.Keys, StringComparer.OrdinalIgnoreCase))
             {
-                var stamp = ReadStamp(Path.Combine(_profileDirectory, fileName));
+                var stamp = current.GetValueOrDefault(fileName, FileStamp.Missing);
                 if (!_baseline.TryGetValue(fileName, out var previous) || previous != stamp)
                 {
-                    _ = _pendingFileNames.Add(fileName);
+                    _ = _pendingFileNames.Add(Path.GetFileName(fileName));
                     detectedChange = true;
                 }
             }
@@ -266,10 +269,33 @@ public sealed class ProfileSaveMonitor : IDisposable
     {
         _baseline.Clear();
         _pendingFileNames.Clear();
-        foreach (var fileName in _fileNames)
+        foreach (var pair in CaptureStamps()) _baseline[pair.Key] = pair.Value;
+    }
+
+    private bool IsWatchedRelativePath(string? path)
+    {
+        if (string.IsNullOrEmpty(path) || !_fileNames.Contains(Path.GetFileName(path))) return false;
+        var parts = path.Replace('\\', '/').Split('/');
+        return !parts.Any(part => part.Equals("backup", StringComparison.OrdinalIgnoreCase)) &&
+            (parts.Length == 1 || Path.GetFileName(path) is "persist.map.json" or "persist.raid.json");
+    }
+
+    private Dictionary<string, FileStamp> CaptureStamps()
+    {
+        var result = _fileNames.ToDictionary(name => name,
+            name => ReadStamp(Path.Combine(_profileDirectory, name)), StringComparer.OrdinalIgnoreCase);
+        try
         {
-            _baseline[fileName] = ReadStamp(Path.Combine(_profileDirectory, fileName));
+            foreach (var path in ProfileSaveFiles.Enumerate(_profileDirectory))
+            {
+                var relative = Path.GetRelativePath(_profileDirectory, path);
+                if (IsWatchedRelativePath(relative)) result[relative] = ReadStamp(path);
+            }
         }
+        catch (IOException) { } // A save folder can disappear during the game's multi-file save.
+        catch (InvalidDataException) { } // Linked or malformed paths are rejected by the snapshot reader.
+        catch (UnauthorizedAccessException) { }
+        return result;
     }
 
     private static FileStamp ReadStamp(string path)

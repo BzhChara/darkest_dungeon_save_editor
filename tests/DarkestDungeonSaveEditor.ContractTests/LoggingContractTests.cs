@@ -229,5 +229,24 @@ internal static partial class ContractSuite
         tracker.Reset();
         Assert(tracker.Observe(snapshot)[0].Message.StartsWith("战斗地图初始快照", StringComparison.Ordinal),
             "Explicit catalog invalidation must reset only the diagnostic baseline.");
+        tracker.Reset();
+        var nested = snapshot with
+        {
+            MapSavePath = Path.Combine(snapshot.ProfileDirectory, "raid_A", "persist.map.json"),
+            RaidSavePath = Path.Combine(snapshot.ProfileDirectory, "raid_A", "persist.raid.json")
+        };
+        var nestedLog = tracker.Observe(nested);
+        Assert(nestedLog[0].Message.Contains(nested.MapSavePath, StringComparison.Ordinal) &&
+            nestedLog[0].Message.Contains(nested.RaidSavePath, StringComparison.Ordinal),
+            "Normal information logs must identify the actual expedition files.");
+        var switched = nested with
+        {
+            MapSavePath = Path.Combine(snapshot.ProfileDirectory, "raid_B", "persist.map.json"),
+            RaidSavePath = Path.Combine(snapshot.ProfileDirectory, "raid_B", "persist.raid.json")
+        };
+        var switchLog = tracker.Observe(switched);
+        Assert(switchLog.Count >= 2 && switchLog[0].Message.StartsWith("战斗地图初始快照", StringComparison.Ordinal) &&
+            switchLog[0].Message.Contains(switched.MapSavePath, StringComparison.Ordinal) && tracker.Observe(switched).Count == 0,
+            "A byte-identical expedition in another directory must start a new log context exactly once.");
     }
 }

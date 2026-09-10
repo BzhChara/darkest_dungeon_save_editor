@@ -51,6 +51,8 @@ public sealed class ForceTownSaveService
         ArgumentNullException.ThrowIfNull(expectedSnapshot);
         cancellationToken.ThrowIfCancellationRequested();
         _codec.ValidateAvailability();
+        profile = (await RaidSaveLocation.ReadAsync(profile.ProfileDirectory, _codec, cancellationToken)
+            .ConfigureAwait(false)).Bind(profile);
 
         var paths = ValidateProfile(profile, expectedSnapshot);
         var gameHash = ComputeSha256(paths.GamePath);
@@ -79,6 +81,9 @@ public sealed class ForceTownSaveService
 
         await _codec.DecodeAsync(sourceCopyPath, decodedPath, cancellationToken).ConfigureAwait(false);
         var gameDocument = JsonSupport.ReadObject(decodedPath);
+        var capturedLocation = RaidSaveLocation.FromGame(profile.ProfileDirectory, gameDocument);
+        if (!capturedLocation.MapPath.Equals(paths.MapPath, StringComparison.OrdinalIgnoreCase))
+            throw new IOException("副本目录在准备强制回城时发生变化，请重新加载。");
         var baseRoot = JsonSupport.RequireObject(gameDocument, "base_root");
         if (baseRoot["inraid"] is not JsonValue inRaidNode ||
             !inRaidNode.TryGetValue<bool>(out var previousInRaid))
@@ -311,8 +316,8 @@ public sealed class ForceTownSaveService
 
         var estatePath = Path.Combine(profileDirectory, "persist.estate.json");
         var gamePath = Path.Combine(profileDirectory, "persist.game.json");
-        var mapPath = Path.Combine(profileDirectory, "persist.map.json");
-        var raidPath = Path.Combine(profileDirectory, "persist.raid.json");
+        var mapPath = profile.MapSavePath;
+        var raidPath = profile.RaidSavePath;
         if (!Path.GetFullPath(profile.EstateSavePath).Equals(estatePath, StringComparison.OrdinalIgnoreCase) ||
             !File.Exists(estatePath))
         {
@@ -392,12 +397,11 @@ public sealed class ForceTownSaveService
             SanitizePathSegment(profile.ProfileId),
             $"force-town_{DateTime.UtcNow:yyyyMMdd_HHmmss_fff}_{Guid.NewGuid():N}");
         Directory.CreateDirectory(backupDirectory);
-        var files = Directory
-            .EnumerateFiles(profile.ProfileDirectory, "persist*.json", SearchOption.TopDirectoryOnly)
+        var files = ProfileSaveFiles.Enumerate(profile.ProfileDirectory)
             .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
             .Select(path =>
             {
-                var destination = Path.Combine(backupDirectory, Path.GetFileName(path));
+                var destination = ProfileSaveFiles.BackupPath(profile.ProfileDirectory, backupDirectory, path);
                 var before = ComputeSha256(path);
                 File.Copy(path, destination, overwrite: false);
                 var backup = ComputeSha256(destination);
@@ -410,7 +414,7 @@ public sealed class ForceTownSaveService
 
                 return new
                 {
-                    fileName = Path.GetFileName(path),
+                    fileName = Path.GetRelativePath(profile.ProfileDirectory, path),
                     sha256 = backup,
                     length = new FileInfo(destination).Length,
                     lastWriteTimeUtc = File.GetLastWriteTimeUtc(destination)
@@ -420,8 +424,8 @@ public sealed class ForceTownSaveService
         foreach (var required in new[]
                  {
                      "persist.game.json",
-                     "persist.map.json",
-                     "persist.raid.json",
+                     Path.GetRelativePath(profile.ProfileDirectory, profile.MapSavePath),
+                     Path.GetRelativePath(profile.ProfileDirectory, profile.RaidSavePath),
                      "persist.estate.json"
                  })
         {

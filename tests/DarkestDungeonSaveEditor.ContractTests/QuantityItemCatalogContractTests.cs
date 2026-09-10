@@ -75,8 +75,7 @@ internal static partial class ContractSuite
             catalogModEssence.LocalizedName == new BilingualContentName("本地精华", "Local Essence") &&
             catalogModEssence.ReferenceStatus == QuantityItemReferenceStatus.ConfirmedActive &&
             catalogModEssence.ReferenceEvidence.Any(evidence =>
-                evidence.Contains("LOCAL_ACTIVE_LOOT", StringComparison.Ordinal) &&
-                evidence.Contains("LOCAL_NESTED_LOOT", StringComparison.Ordinal)) &&
+                evidence.Contains("quantity_reference.districts.json", StringComparison.Ordinal)) &&
             !catalogModEssence.IsHiddenByDefault &&
             catalogProvisionableModEssence is
             {
@@ -143,13 +142,12 @@ internal static partial class ContractSuite
             malformedRaidJsonTownOverrideCatalog.Items.Single(item =>
                 item.DisplayId == "orphan_mod_essence") is
             {
-                ReferenceStatus: QuantityItemReferenceStatus.AnalysisIncomplete,
-                IsHiddenByDefault: false
+                ReferenceStatus: QuantityItemReferenceStatus.SuspectedUnused,
+                IsHiddenByDefault: true
             } &&
-            malformedRaidJsonTownOverrideCatalog.Issues.Any(issue =>
-                issue.Contains("could not parse active JSON file", StringComparison.OrdinalIgnoreCase) &&
+            !malformedRaidJsonTownOverrideCatalog.Issues.Any(issue =>
                 issue.Contains("malformed_town_override.json", StringComparison.OrdinalIgnoreCase)),
-            "A malformed JSON under a raid-default path must fail open for the town catalog because its nodes could target estate or wallet storage.");
+            "An unconsumed malformed JSON must not make item analysis incomplete merely because it might contain inventory-shaped fields.");
 
         var malformedReferencePath = Path.Combine(localTownEventsRoot, "malformed_reference.town_events.events.json");
         QuantityItemCatalogResult malformedReferenceCatalog;
@@ -261,13 +259,12 @@ internal static partial class ContractSuite
             missingRaidJsonTownOverrideCatalog.Items.Single(item =>
                 item.DisplayId == "orphan_mod_essence") is
             {
-                ReferenceStatus: QuantityItemReferenceStatus.AnalysisIncomplete,
-                IsHiddenByDefault: false
+                ReferenceStatus: QuantityItemReferenceStatus.SuspectedUnused,
+                IsHiddenByDefault: true
             } &&
-            missingRaidJsonTownOverrideCatalog.Issues.Any(issue =>
-                issue.Contains("reference file listed by active Mod is missing", StringComparison.OrdinalIgnoreCase) &&
+            !missingRaidJsonTownOverrideCatalog.Issues.Any(issue =>
                 issue.Contains("missing_town_override.json", StringComparison.OrdinalIgnoreCase)),
-            "A missing manifest-listed JSON under a raid-default path must fail open for the town catalog because it could have contained a town inventory override.");
+            "A missing unconsumed JSON must not poison reference analysis solely because the manifest lists it.");
 
         var (goldAdjustedRoot, goldPreview) = QuantityItemSaveEditor.SetAmount(quantityEstateRoot, catalogGold, 5000);
         Assert(
@@ -641,7 +638,7 @@ internal static partial class ContractSuite
         QuantityItemCatalogResult raidWithMissingMixedDistrictReference;
         File.AppendAllText(
             quantityReferenceManifestPath,
-            Environment.NewLine + "campaign/town/districts/missing_raid_supply_reference.json 100",
+            Environment.NewLine + "campaign/town/districts/missing_raid_supply_reference.districts.json 100",
             new UTF8Encoding(false));
         try
         {
@@ -664,7 +661,7 @@ internal static partial class ContractSuite
             } &&
             raidWithMissingMixedDistrictReference.Issues.Any(issue =>
                 issue.Contains("reference file listed by active Mod is missing", StringComparison.OrdinalIgnoreCase) &&
-                issue.Contains("missing_raid_supply_reference.json", StringComparison.OrdinalIgnoreCase)),
+                issue.Contains("missing_raid_supply_reference.districts.json", StringComparison.OrdinalIgnoreCase)),
             "A missing manifest-listed district JSON must fail open in raid mode because its content could have supplied the expedition inventory.");
 
         var raidWithZeroSaveOnlyStackRoot = quantityRaidRoot.DeepClone() as JsonObject

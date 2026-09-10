@@ -207,7 +207,7 @@ public static partial class HeroClassCatalog
                     AddCandidate(eventCandidates, eventGroup.EventId, eventGroup);
                 }
             }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or EncoderFallbackException or DecoderFallbackException)
             {
                 issues.Add($"Failed to read town event definitions '{file.Path}': {ex.Message}");
             }
@@ -260,11 +260,10 @@ public static partial class HeroClassCatalog
             .ThenBy(item => item.Id, StringComparer.OrdinalIgnoreCase)
             .ToArray();
         var eventsByClass = recruitEvents
-            .GroupBy(item => item.HeroClass, StringComparer.OrdinalIgnoreCase)
+            .GroupBy(item => Loc2LocalizationReader.HashName(item.HeroClass))
             .ToDictionary(
                 group => group.Key,
-                group => (IReadOnlyList<HeroRecruitEventDefinition>)group.ToArray(),
-                StringComparer.OrdinalIgnoreCase);
+                group => (IReadOnlyList<HeroRecruitEventDefinition>)group.ToArray());
 
         var heroHashCollisions = NativeResourceIdentity.FindCollisions(heroIds);
         if (heroHashCollisions.Count > 0) issues.Add("Hero IDs share native hashes and remain unresolved: " + string.Join(", ", heroHashCollisions));
