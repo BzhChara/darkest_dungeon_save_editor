@@ -350,3 +350,33 @@ Evidence includes provisioning `0x1404503C0`, estate `0x14044CDA0`, quest types 
 Inventory dictionaries are read at numeric slot keys, not by recursively matching arbitrary child objects. A repeated member keeps its first value. `system_config_type`, a `type/id` pair, or a loot code in an unrelated object no longer creates a gameplay root. `campaign/quest/notes.json` and matching quest/event files containing only `notes` do not prove use. Missing or malformed **eligible** files still retain analysis-incomplete safeguards; unconsumed filenames do not poison analysis.
 
 The native district supply structure uses `item_type`, `item_name`, and `target_inventory`; it is not a generic loot-table container. Nested loot traversal remains supported through real actor and curio roots. For known loaded structures whose item consumer is not established (building-specific data/requirements, goal-specific data, quest modifiers/restriction/exit-penalty content), textual clues stay **uncertain**, never confirmed. These are coverage limits, not proof that the game cannot use the resource. No full mission/event trigger simulator or new blanket normalization rule is introduced.
+
+## 16. Trinket and map JSON members; catalog file queries (2026-09-10)
+
+The ninth audit extends the first-member rule to the remaining trinket and map-prop readers. Evidence is static analysis of the same pinned build 27890 and executable editor contracts, not another live-game A/B experiment. See the [audit](change-history/resource-json-query-audit-2026-09-10.md).
+
+### 16.1 First members in trinket and map resources
+
+`Trinket::Library::LoadEntriesFile` (`0x1404F2E40`) takes the first exact JSON member. This applies to `entries`, entry IDs, class requirements, rarity, limit, price and instance counters, as well as the editor's provider attribution. Within one object, `quest_uses: 2` followed by `quest_uses: 7` initializes `quest_uses_remaining` to 2; the analogous first `trigger_limit` initializes `triggers_remaining`. A wrong-typed or invalid first counter remains unsupported for pristine creation; later duplicates cannot rescue it. This is separate from choosing the first complete trinket entry for repeated definition IDs, and from the existing quantity-limit warning policy.
+
+Map prop parsing (`0x1404D76E0`, applying data at `0x1404D5010`) uses the same first-member lookup for root arrays/defaults, names, nested inheritance references, script flags, difficulty arrays and variation levels. Repeated names are retained in the parsed JSON member list rather than inserted into a unique-key dictionary. Thus `instance_type: "trap"` followed by `instance_type: "obstacle"` uses `trap` without a duplicate-key exception. Wrong-typed first fields retain the relevant unsupported-metadata or structural-error guard. Repeated resource names and separate same-level variation objects still follow section 12's registration/update rules; they are not deduplicated as JSON members.
+
+### 16.2 Match the query of each consumer
+
+After manifest eligibility and mounted-path resolution, these catalog queries govern file consumption. Native unescaped dots match a single character; they are not literal filename suffixes.
+
+| Family / query root | Native pattern | Relevant distinction |
+| --- | --- | --- |
+| Trinkets / `trinkets/` | `.*trinkets/.*\.entries.trinkets.json` | The leading dot is literal; later dots are not. |
+| Buffs / `shared/buffs/` | `.*shared/buffs/.*\.buffs.json` | `z.buffsXjson` is accepted; `zXbuffs.json` is not. |
+| Quirks / `shared/quirk/` | `.*quirk_library.json` | Do not replace the query with a literal `.json` suffix. |
+| Camping / `raid/camping/` | `.*camping_skills.json` | Both `camping_skills.json` and `x.camping_skillsXjson` are accepted. |
+| Nested prop definitions / `props/` | `.*props/.*/prop_definitions.json` | Nested query stage 3. |
+| Nested traps / `props/` | `.*props/.*/trap_definitions.json` | Nested query stage 4. |
+| Nested obstacles / `props/` | `.*props/.*/obstacle_definitions.json` | Nested query stage 5. |
+
+Call sites are `0x1403E8333`, `0x1404A32BF`, `0x1404DDC5F`, `0x1404A4B5A`, and the three nested searches in `0x1404D8770`. The three root prop paths remain exact direct opens in prop/obstacle/trap order, stages 0–2; a root `props/trap_definitionsXjson` does not become valid through the nested query. Upgrade trees retain `.*upgrades/.*\.upgrades\.json$`, with both dots literal. These differences must not be flattened into one universal filename rule.
+
+The shared `NativeResourceFileRules` supplies discovery and missing-file eligibility; map stage sorting uses the same classification. The rules cover Base, mode, enabled DLC, local/Workshop manifests and enabled-DLC paths inside Mods. Unlisted Mod files, disabled DLC paths and unrelated files remain excluded. Same-path Mod priority and each resource's duplicate-ID rule are unchanged. Existing content fingerprints include these consumed `*json` names and invalidate stale map choices after a resource changes.
+
+Contracts verify the consequences through persistence: trinket instances retain the first counter values through DSON, and a later consumed +75% Buff replaces an earlier +25% Buff, yielding a stagecoach candidate with HP 35 from base HP 20, also verified through town DSON. Map contracts check first-member inheritance/difficulty behavior, root-before-nested stage ordering and stale-choice rejection. This does not establish full simulation of every resource effect, script or native malformed-input behavior.

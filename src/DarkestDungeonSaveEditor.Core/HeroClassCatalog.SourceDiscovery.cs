@@ -25,16 +25,18 @@ public static partial class HeroClassCatalog
         IReadOnlyList<string> Files(string directory, string pattern) => SortPaths(
             roots.SelectMany(root => EnumerateFiles(root, directory, pattern))
                 .Distinct(StringComparer.OrdinalIgnoreCase));
+        IReadOnlyList<string> ResourceFiles(string directory, Func<string, IReadOnlyList<string>, bool> eligible) =>
+            Files(directory, "*json").Where(path => eligible(Path.GetRelativePath(source.Directory, path), [])).ToArray();
 
         return new SourceFileSet(
             Files("heroes", $"*{HeroInfoSuffix}"),
             Files("heroes", $"*{HeroOverrideSuffix}"),
             Files("effects", "*.effects.darkest"),
-            Files(Path.Combine("shared", "quirk"), "*quirk_library.json"),
+            ResourceFiles(Path.Combine("shared", "quirk"), NativeResourceFileRules.IsQuirkFile),
             Files(Path.Combine("campaign", "town_events"), "*")
                 .Where(path => NativeResourceFileRules.IsTownEventFile(Path.GetRelativePath(source.Directory, path), [])).ToArray(),
-            Files(Path.Combine("shared", "buffs"), "*.buffs.json"),
-            Files(Path.Combine("raid", "camping"), "*.camping_skills.json"),
+            ResourceFiles(Path.Combine("shared", "buffs"), NativeResourceFileRules.IsBuffFile),
+            ResourceFiles(Path.Combine("raid", "camping"), NativeResourceFileRules.IsCampingSkillFile),
             Files("localization", "*.string_table.xml"),
             Files("upgrades", $"*{HeroUpgradeSuffix}"),
             Files(Path.Combine("campaign", "roster"), "roster.variables.json"));
@@ -88,8 +90,7 @@ public static partial class HeroClassCatalog
             {
                 target = effectFiles;
             }
-            else if (ContentFileOverlay.IsRootOrEnabledDlcPath(normalizedRelative, "shared/quirk", enabledDlcPrefixes) &&
-                     normalizedRelative.EndsWith("quirk_library.json", StringComparison.OrdinalIgnoreCase))
+            else if (NativeResourceFileRules.IsQuirkFile(normalizedRelative, enabledDlcPrefixes))
             {
                 target = quirkFiles;
             }
@@ -97,13 +98,11 @@ public static partial class HeroClassCatalog
             {
                 target = eventFiles;
             }
-            else if (ContentFileOverlay.IsRootOrEnabledDlcPath(normalizedRelative, "shared/buffs", enabledDlcPrefixes) &&
-                     normalizedRelative.EndsWith(".buffs.json", StringComparison.OrdinalIgnoreCase))
+            else if (NativeResourceFileRules.IsBuffFile(normalizedRelative, enabledDlcPrefixes))
             {
                 target = buffFiles;
             }
-            else if (ContentFileOverlay.IsRootOrEnabledDlcPath(normalizedRelative, "raid/camping", enabledDlcPrefixes) &&
-                     normalizedRelative.EndsWith(".camping_skills.json", StringComparison.OrdinalIgnoreCase))
+            else if (NativeResourceFileRules.IsCampingSkillFile(normalizedRelative, enabledDlcPrefixes))
             {
                 target = campingFiles;
             }
@@ -157,10 +156,7 @@ public static partial class HeroClassCatalog
             HeroInfoSuffix,
             HeroOverrideSuffix,
             ".effects.darkest",
-            "quirk_library.json",
             "json",
-            ".buffs.json",
-            ".camping_skills.json",
             ".string_table.xml",
             HeroUpgradeSuffix,
             "roster.variables.json");

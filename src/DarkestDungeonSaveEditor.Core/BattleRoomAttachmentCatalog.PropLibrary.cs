@@ -1,6 +1,5 @@
 using System.Text;
 using System.Text.Json;
-using System.Text.Json.Nodes;
 
 namespace DarkestDungeonSaveEditor.Core;
 
@@ -59,36 +58,37 @@ public static partial class BattleRoomAttachmentCatalog
 
     private static void ReadPropFile(EffectiveContentFile file, PropResources resources)
     {
-        var root = JsonNode.Parse(File.ReadAllBytes(file.Path), documentOptions: new JsonDocumentOptions
-        { AllowTrailingCommas = true, CommentHandling = JsonCommentHandling.Skip }) as JsonObject
-            ?? throw new InvalidDataException($"地图资源 JSON 根节点不是对象：{file.Path}");
+        using var document = JsonDocument.Parse(File.ReadAllBytes(file.Path), new JsonDocumentOptions
+        { AllowTrailingCommas = true, CommentHandling = JsonCommentHandling.Skip });
+        var root = document.RootElement;
+        if (root.ValueKind != JsonValueKind.Object)
+            throw new InvalidDataException($"地图资源 JSON 根节点不是对象：{file.Path}");
         var fileDefault = ApplyPropData(new PropData(), root, "default_data", resources);
-        if (root["props"] is not JsonArray props) return;
-        foreach (var prop in props.OfType<JsonObject>())
+        foreach (var prop in NativeJsonReader.Array(root, "props").Where(value => value.ValueKind == JsonValueKind.Object))
         {
-            if (prop["name"] is not JsonValue nameNode || !nameNode.TryGetValue<string>(out var name) ||
-                string.IsNullOrWhiteSpace(name) || name.Contains('\0'))
+            var name = NativeJsonReader.ReadString(prop, "name");
+            if (string.IsNullOrWhiteSpace(name) || name.Contains('\0'))
             {
                 throw new InvalidDataException($"地图资源名称无效：{file.Path}");
             }
             var id = JsonPropRegistrationId(name, file.Path);
             var data = ApplyPropData(fileDefault, prop, "default_data", resources);
-            if (!prop.ContainsKey("difficulty_variations"))
+            if (!NativeJsonReader.TryGetProperty(prop, "difficulty_variations", out var variations))
             {
                 resources.Add(id, -1, data);
             }
-            else if (prop["difficulty_variations"] is JsonArray variations)
+            else if (variations.ValueKind == JsonValueKind.Array)
             {
                 // Native creates all seven copies even when the variation array is empty.
                 var levels = Enumerable.Repeat(data, 7).ToArray();
-                foreach (var variation in variations)
+                foreach (var variation in variations.EnumerateArray())
                 {
-                    if (variation is not JsonObject obj || obj["level"] is not JsonValue levelNode ||
-                        !levelNode.TryGetValue<int>(out var level) || level is < 1 or > 7)
+                    if (!NativeJsonReader.TryGetProperty(variation, "level", out var levelNode) ||
+                        levelNode.ValueKind != JsonValueKind.Number || !levelNode.TryGetInt32(out var level) || level is < 1 or > 7)
                     {
                         throw new InvalidDataException($"地图资源难度变化无效：{file.Path}；{id}");
                     }
-                    levels[level - 1] = ApplyPropData(levels[level - 1], obj, resources);
+                    levels[level - 1] = ApplyPropData(levels[level - 1], variation, resources);
                 }
                 for (var index = 0; index < levels.Length; index++) resources.Add(id, index + 1, levels[index]);
             }
@@ -121,18 +121,17 @@ public static partial class BattleRoomAttachmentCatalog
         }
     }
 
-    private static PropData ApplyPropData(PropData current, JsonObject owner, string key, PropResources resources) =>
-        !owner.ContainsKey(key) ? current : owner[key] is JsonObject data
+    private static PropData ApplyPropData(PropData current, JsonElement owner, string key, PropResources resources) =>
+        !NativeJsonReader.TryGetProperty(owner, key, out var data) ? current : data.ValueKind == JsonValueKind.Object
             ? ApplyPropData(current, data, resources)
             : current with { Rejection = $"{key} 不是对象" };
 
-    private static PropData ApplyPropData(PropData current, JsonObject data, PropResources resources)
+    private static PropData ApplyPropData(PropData current, JsonElement data, PropResources resources)
     {
-        if (data.ContainsKey("inherits_from"))
+        if (NativeJsonReader.TryGetProperty(data, "inherits_from", out var inherits))
         {
-            if (data["inherits_from"] is not JsonObject inherits ||
-                inherits["prop_type_name"] is not JsonValue parentNode ||
-                !parentNode.TryGetValue<string>(out var parent) || !IsPropIdentity(parent))
+            var parent = NativeJsonReader.ReadString(inherits, "prop_type_name");
+            if (!IsPropIdentity(parent))
                 return current with { Rejection = "资源继承缺少有效父名称" };
             // Copy the already loaded default query result; never resolve a future parent
             // or recursively merge the JSON. A parent copy replaces earlier defaults.
@@ -142,16 +141,16 @@ public static partial class BattleRoomAttachmentCatalog
         }
         string StringField(string key, string previous)
         {
-            if (!data.ContainsKey(key)) return previous;
-            if (data[key] is JsonValue value && value.TryGetValue<string>(out var text) && !text.Contains('\0'))
-                return text;
+            if (!NativeJsonReader.TryGetProperty(data, key, out var value)) return previous;
+            if (value.ValueKind == JsonValueKind.String && !value.GetString()!.Contains('\0'))
+                return value.GetString()!;
             current = current with { Rejection = $"{key} 不是有效字符串" };
             return previous;
         }
         bool BoolField(string key, bool previous)
         {
-            if (!data.ContainsKey(key)) return previous;
-            if (data[key] is JsonValue value && value.TryGetValue<bool>(out var flag)) return flag;
+            if (!NativeJsonReader.TryGetProperty(data, key, out var value)) return previous;
+            if (value.ValueKind is JsonValueKind.True or JsonValueKind.False) return value.GetBoolean();
             current = current with { Rejection = $"{key} 不是布尔值" };
             return previous;
         }

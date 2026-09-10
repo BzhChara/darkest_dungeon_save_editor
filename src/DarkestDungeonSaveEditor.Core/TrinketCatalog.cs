@@ -91,7 +91,7 @@ public static class TrinketCatalog
                     AllowTrailingCommas = true,
                     CommentHandling = JsonCommentHandling.Skip
                 });
-            if (!document.RootElement.TryGetProperty("entries", out var entries) ||
+            if (!NativeJsonReader.TryGetProperty(document.RootElement, "entries", out var entries) ||
                 entries.ValueKind != JsonValueKind.Array)
             {
                 issues.Add($"Trinket file has no entries array: {path}");
@@ -101,7 +101,7 @@ public static class TrinketCatalog
             foreach (var entry in entries.EnumerateArray())
             {
                 if (entry.ValueKind != JsonValueKind.Object ||
-                    !entry.TryGetProperty("id", out var idNode) ||
+                    !NativeJsonReader.TryGetProperty(entry, "id", out var idNode) ||
                     idNode.ValueKind != JsonValueKind.String)
                 {
                     continue;
@@ -115,7 +115,7 @@ public static class TrinketCatalog
 
                 // Native loader 0x1404F39A0 checks every required class and
                 // skips this entry when any class is absent from the actor table.
-                if (entry.TryGetProperty("hero_class_requirements", out var requirements) &&
+                if (NativeJsonReader.TryGetProperty(entry, "hero_class_requirements", out var requirements) &&
                     requirements.ValueKind == JsonValueKind.Array &&
                     requirements.EnumerateArray().Any(value => value.ValueKind != JsonValueKind.String ||
                         !heroIds.Contains(value.GetString()!)))
@@ -129,7 +129,7 @@ public static class TrinketCatalog
                     : [file.Source.Id];
 
                 var statefulFields = StatefulFieldNames
-                    .Where(name => entry.TryGetProperty(name, out _))
+                    .Where(name => NativeJsonReader.TryGetProperty(entry, name, out _))
                     .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
                     .ToArray();
                 var unsupportedStateFields = new List<string>();
@@ -224,7 +224,7 @@ public static class TrinketCatalog
                 AllowTrailingCommas = true,
                 CommentHandling = JsonCommentHandling.Skip
             });
-        if (!document.RootElement.TryGetProperty("entries", out var entries) ||
+        if (!NativeJsonReader.TryGetProperty(document.RootElement, "entries", out var entries) ||
             entries.ValueKind != JsonValueKind.Array)
         {
             yield break;
@@ -233,7 +233,7 @@ public static class TrinketCatalog
         foreach (var entry in entries.EnumerateArray())
         {
             if (entry.ValueKind == JsonValueKind.Object &&
-                entry.TryGetProperty("id", out var idNode) &&
+                NativeJsonReader.TryGetProperty(entry, "id", out var idNode) &&
                 idNode.ValueKind == JsonValueKind.String &&
                 !string.IsNullOrWhiteSpace(idNode.GetString()))
             {
@@ -255,7 +255,8 @@ public static class TrinketCatalog
 
         if (!useModManifest)
         {
-            return NativeDirectoryDiscovery.EnumerateFiles(root, "*.entries.trinkets.json", SearchOption.AllDirectories)
+            return NativeDirectoryDiscovery.EnumerateFiles(root, "*json", SearchOption.AllDirectories)
+                .Where(path => NativeResourceFileRules.IsTrinketFile("trinkets/" + Path.GetRelativePath(root, path), []))
                 .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
                 .ToArray();
         }
@@ -264,7 +265,7 @@ public static class TrinketCatalog
         ModManifestFile.Require(manifestPath);
 
         var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var entry in ModManifestFile.ReadEntries(manifestPath, ".entries.trinkets.json"))
+        foreach (var entry in ModManifestFile.ReadEntries(manifestPath, "json"))
         {
             var rawLine = entry.RawLine;
             var relativePath = entry.RelativePath;
@@ -279,10 +280,7 @@ public static class TrinketCatalog
                 continue;
             }
 
-            if (!ContentFileOverlay.IsRootOrEnabledDlcPath(
-                    relativeToRoot,
-                    "trinkets",
-                    enabledDlcPrefixes))
+            if (!NativeResourceFileRules.IsTrinketFile(relativeToRoot, enabledDlcPrefixes))
             {
                 continue;
             }
@@ -314,14 +312,15 @@ public static class TrinketCatalog
 
     private static string ReadString(JsonElement value, string name)
     {
-        return value.TryGetProperty(name, out var node) && node.ValueKind == JsonValueKind.String
+        return NativeJsonReader.TryGetProperty(value, name, out var node) && node.ValueKind == JsonValueKind.String
             ? node.GetString()?.Trim() ?? string.Empty
             : string.Empty;
     }
 
     private static int? ReadInt(JsonElement value, string name)
     {
-        return value.TryGetProperty(name, out var node) && node.TryGetInt32(out var result)
+        return NativeJsonReader.TryGetProperty(value, name, out var node) &&
+               node.ValueKind == JsonValueKind.Number && node.TryGetInt32(out var result)
             ? result
             : null;
     }
@@ -334,7 +333,7 @@ public static class TrinketCatalog
         List<string> unsupportedStateFields,
         List<string> issues)
     {
-        if (!entry.TryGetProperty(fieldName, out var node))
+        if (!NativeJsonReader.TryGetProperty(entry, fieldName, out var node))
         {
             return null;
         }

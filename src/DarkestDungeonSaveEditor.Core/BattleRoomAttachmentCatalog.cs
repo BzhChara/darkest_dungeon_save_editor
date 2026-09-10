@@ -403,7 +403,8 @@ public static partial class BattleRoomAttachmentCatalog
         List<string> issues,
         string contentDirectory = "dungeons",
         string pattern = "*.props.darkest",
-        string extension = ".props.darkest")
+        string extension = ".props.darkest",
+        Func<string, bool>? eligible = null)
     {
         if (!Directory.Exists(source.Directory))
         {
@@ -419,7 +420,7 @@ public static partial class BattleRoomAttachmentCatalog
                 source,
                 manifestPath,
                 enabledDlcPrefixes,
-                issues, contentDirectory, extension);
+                issues, contentDirectory, extension, eligible);
         }
 
         try
@@ -432,6 +433,7 @@ public static partial class BattleRoomAttachmentCatalog
                 .SelectMany(directory => extension == ".props.darkest"
                     ? Directory.EnumerateFiles(directory, pattern, SearchOption.AllDirectories)
                     : NativeDirectoryDiscovery.EnumerateFiles(directory, pattern, SearchOption.AllDirectories))
+                .Where(path => eligible is null || eligible(Path.GetRelativePath(source.Directory, path)))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
                 .ToArray();
@@ -449,7 +451,8 @@ public static partial class BattleRoomAttachmentCatalog
         IReadOnlyList<string> enabledDlcPrefixes,
         List<string> issues,
         string contentDirectory,
-        string extension)
+        string extension,
+        Func<string, bool>? eligible)
     {
         var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         try
@@ -474,7 +477,7 @@ public static partial class BattleRoomAttachmentCatalog
                 if (!ContentFileOverlay.IsRootOrEnabledDlcPath(
                         relativeToRoot,
                         contentDirectory,
-                        enabledDlcPrefixes))
+                        enabledDlcPrefixes) || (eligible is not null && !eligible(relativeToRoot)))
                 {
                     continue;
                 }

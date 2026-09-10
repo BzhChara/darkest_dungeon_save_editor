@@ -39,6 +39,63 @@ internal static partial class NativeResourceFileRules
     [GeneratedRegex(@"\.upgrades\.json\z", RegexOptions.CultureInvariant)]
     private static partial Regex UpgradesName();
 
+    // Catalog queries: trinkets 0x1403E8333, Buffs 0x1404A32BF,
+    // quirks 0x1404DDC5F, camping 0x1404A4B5A. Only the first dots
+    // in the trinket and Buff suffixes are escaped by the game.
+    [GeneratedRegex(@"\.entries.trinkets.json\z", RegexOptions.CultureInvariant)]
+    private static partial Regex TrinketName();
+    [GeneratedRegex(@"\.buffs.json\z", RegexOptions.CultureInvariant)]
+    private static partial Regex BuffName();
+    [GeneratedRegex(@"quirk_library.json\z", RegexOptions.CultureInvariant)]
+    private static partial Regex QuirkName();
+    [GeneratedRegex(@"camping_skills.json\z", RegexOptions.CultureInvariant)]
+    private static partial Regex CampingSkillName();
+
+    [GeneratedRegex(@"/prop_definitions.json\z", RegexOptions.CultureInvariant)]
+    private static partial Regex PropDefinitionsName();
+    [GeneratedRegex(@"/trap_definitions.json\z", RegexOptions.CultureInvariant)]
+    private static partial Regex TrapDefinitionsName();
+    [GeneratedRegex(@"/obstacle_definitions.json\z", RegexOptions.CultureInvariant)]
+    private static partial Regex ObstacleDefinitionsName();
+
+    internal static bool IsTrinketFile(string path, IReadOnlyList<string> enabledDlcPrefixes)
+    {
+        var mounted = MountedPath(path, enabledDlcPrefixes);
+        return mounted.StartsWith("trinkets/", StringComparison.OrdinalIgnoreCase) && TrinketName().IsMatch(mounted);
+    }
+
+    internal static bool IsBuffFile(string path, IReadOnlyList<string> enabledDlcPrefixes)
+    {
+        var mounted = MountedPath(path, enabledDlcPrefixes);
+        return mounted.StartsWith("shared/buffs/", StringComparison.OrdinalIgnoreCase) && BuffName().IsMatch(mounted);
+    }
+
+    internal static bool IsQuirkFile(string path, IReadOnlyList<string> enabledDlcPrefixes)
+    {
+        var mounted = MountedPath(path, enabledDlcPrefixes);
+        return mounted.StartsWith("shared/quirk/", StringComparison.OrdinalIgnoreCase) && QuirkName().IsMatch(mounted);
+    }
+
+    internal static bool IsCampingSkillFile(string path, IReadOnlyList<string> enabledDlcPrefixes)
+    {
+        var mounted = MountedPath(path, enabledDlcPrefixes);
+        return mounted.StartsWith("raid/camping/", StringComparison.OrdinalIgnoreCase) && CampingSkillName().IsMatch(mounted);
+    }
+
+    internal static int PropResourceStage(string path, IReadOnlyList<string> enabledDlcPrefixes)
+    {
+        var mounted = MountedPath(path, enabledDlcPrefixes);
+        // 0x1404D8770 opens three exact root paths, then searches three
+        // nested families. A root name cannot use the search's wildcard dot.
+        if (mounted.Equals("props/prop_definitions.json", StringComparison.OrdinalIgnoreCase)) return 0;
+        if (mounted.Equals("props/obstacle_definitions.json", StringComparison.OrdinalIgnoreCase)) return 1;
+        if (mounted.Equals("props/trap_definitions.json", StringComparison.OrdinalIgnoreCase)) return 2;
+        if (!mounted.StartsWith("props/", StringComparison.OrdinalIgnoreCase) || !mounted[6..].Contains('/')) return -1;
+        if (PropDefinitionsName().IsMatch(mounted)) return 3;
+        if (TrapDefinitionsName().IsMatch(mounted)) return 4;
+        return ObstacleDefinitionsName().IsMatch(mounted) ? 5 : -1;
+    }
+
     internal static NativeReferenceJsonKind ReferenceJsonKind(string path, IReadOnlyList<string> enabledDlcPrefixes)
     {
         var mounted = MountedPath(path, enabledDlcPrefixes);

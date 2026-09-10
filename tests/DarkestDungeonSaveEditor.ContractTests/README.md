@@ -21,6 +21,7 @@ The suite is split by responsibility:
 - `QuantityItemCatalogContractTests.cs`: town/raid item discovery and direct mutations;
 - `QuantityItemSaveContractTests.cs`: guarded quantity preview and commit transactions;
 - `TrinketCatalogContractTests.cs`: trinket overlays, localization, limits, and state definitions;
+- `TrinketJsonMemberContractTests.cs`: first JSON members, invalid first values, provider attribution and actual trinket-counter DSON roundtrips;
 - `TrinketSaveContractTests.cs`: pristine trinket construction and guarded commits;
 - `HeroContractTests.cs`: orchestration of the following hero-related modules;
 - `HeroCatalogContractTests.cs`: effective hero definitions, overrides, localization, and progression catalogs;
@@ -31,6 +32,8 @@ The suite is split by responsibility:
 - `HeroQuirkContractTests.cs`: quirk classification, HP rules, conflicts, and selection boundaries;
 - `JsonMemberContractTests.cs`: first exact resource JSON members (including wrong types), repeated Buff occurrences through HP validation and DSON persistence, and raw town-event recruit payload/class binding;
 - `JsonReferenceConsumerContractTests.cs`: native JSON filename/structure filtering, town/raid roots, irrelevant notes, duplicate fields, uncertain loaded structures, refresh of nonliteral suffixes, and real actor-to-nested-loot references;
+- `CatalogFileQueryContractTests.cs`: native trinket/Buff/quirk/camping filename queries across six source types, exact-dot/root exclusions, manifests, same-path priority, missing files, content refresh and generated HP DSON;
+- `MapPropJsonContractTests.cs`: first nested JSON members, inherited defaults, difficulty fields, root/nested query stages, missing-path diagnostics and stale-choice guards across six source types;
 - `HeroCandidateContractTests.cs`: candidate serialization, progression, full skill unlocks, and initial quirks;
 - `StagecoachHeroSaveContractTests.cs`: ordinary/shard pool routing, GUID/upgrade append, stale guards, and multi-file transactions;
 - `RealModLocalizationContractTests.cs`: optional read-only probes selected by `DDSE_SCHINESE_LOC_PROBE_MOD_ROOT` (Workshop 1143685298: 43 invalid values skipped while known valid names remain), `DDSE_RULER_LOC_PROBE_MOD_ROOT`, `DDSE_LOC2_PROBE_MOD_ROOT` (Eos_Nyx), and `DDSE_RURUTIA_LOC2_PROBE_MOD_ROOT`;

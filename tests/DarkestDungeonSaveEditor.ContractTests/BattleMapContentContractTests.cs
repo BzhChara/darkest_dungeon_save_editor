@@ -359,6 +359,7 @@ internal static partial class ContractSuite
         RunRegionalMapContentContracts(root, content);
         RunMapPropNativeContracts(root, content);
         RunMapResourceConsumerContracts(root, content);
+        RunMapPropJsonContracts(root, content);
         Console.WriteLine("Battle standalone content contracts passed.");
     }
 

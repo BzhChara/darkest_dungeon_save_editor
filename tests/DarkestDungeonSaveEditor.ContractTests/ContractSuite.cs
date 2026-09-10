@@ -139,6 +139,7 @@ internal static partial class ContractSuite
             activeContent,
             runRoot,
             activeWorkshopInventoryRoot);
+        await VerifyTrinketJsonMembersAsync(activeContent, runRoot, codec);
         await RunHeroContractsAsync(
             activeContent,
             trinketState.ActiveCatalog,

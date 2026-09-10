@@ -26,6 +26,7 @@ internal static partial class ContractSuite
         VerifyReferenceFileEligibility(activeContent, catalog.LocalHero, runRoot);
         await VerifyJsonMembersAndBuffReferencesAsync(activeContent, catalog.LocalHero, runRoot, codec);
         VerifyJsonReferenceConsumers(activeContent, runRoot);
+        await VerifyCatalogFileQueriesAsync(activeContent, catalog.LocalHero, runRoot, codec);
         await VerifyNativeEncounterChanceAsync(runRoot, codec);
         VerifyHeroAvailabilityContracts(catalog.HeroCatalog, catalog.LocalHero);
         await VerifyImplicitSkillProgressionContractsAsync(catalog.HeroCatalog, catalog.LocalHero, codec, runRoot);

@@ -9,31 +9,13 @@ public static partial class BattleRoomAttachmentCatalog
     {
         var enabledDlcPrefixes = ContentFileOverlay.GetEnabledDlcPrefixes(sources);
         var files = NativeContentFileResolver.Resolve(sources.SelectMany(source =>
-                EnumeratePropFiles(source, enabledDlcPrefixes, issues, "props", "*.json", ".json")
-                    .Where(path => Path.GetFileName(path).ToLowerInvariant() is
-                        "prop_definitions.json" or "trap_definitions.json" or "obstacle_definitions.json")
+                EnumeratePropFiles(source, enabledDlcPrefixes, issues, "props", "*json", "json",
+                    path => NativeResourceFileRules.PropResourceStage(path, enabledDlcPrefixes) >= 0)
                     .Select(path => new ContentFileCandidate(source, path))).ToArray(), sources,
             "Map prop resource", issues);
-        int Stage(EffectiveContentFile file)
-        {
-            var relative = file.RelativePath;
-            var prefix = enabledDlcPrefixes.OrderByDescending(value => value.Length)
-                .FirstOrDefault(value => relative.StartsWith(value + "/", StringComparison.OrdinalIgnoreCase));
-            if (prefix is not null) relative = relative[(prefix.Length + 1)..];
-            var root = relative.Count(character => character == '/') == 1;
-            return (root, Path.GetFileName(relative).ToLowerInvariant()) switch
-            {
-                (true, "prop_definitions.json") => 0,
-                (true, "obstacle_definitions.json") => 1,
-                (true, "trap_definitions.json") => 2,
-                (false, "prop_definitions.json") => 3,
-                (false, "trap_definitions.json") => 4,
-                _ => 5
-            };
-        }
         // 0x1404D87A0 opens the three root paths before the subdirectory searches.
         // Stable ordering preserves native resolver slots within each searched family.
-        return files.OrderBy(Stage).ToArray();
+        return files.OrderBy(file => NativeResourceFileRules.PropResourceStage(file.RelativePath, enabledDlcPrefixes)).ToArray();
     }
 
     private static PropResources ReadResources(
