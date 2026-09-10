@@ -593,17 +593,8 @@ public static partial class BattleEncounterCatalog
         string dungeonId,
         int difficulty)
     {
-        var normalized = relativePath.Replace('\\', '/');
-        var dungeonSegment = $"/dungeons/{dungeonId.Trim()}/";
-        var padded = $"/{normalized.TrimStart('/')}";
-        return padded.Contains(dungeonSegment, StringComparison.OrdinalIgnoreCase) &&
-               Path.GetFileName(normalized).EndsWith(
-                   $".{difficulty.ToString(CultureInfo.InvariantCulture)}.mash.darkest",
-                   StringComparison.OrdinalIgnoreCase) &&
-               (ClassifyFile(normalized) != BattleEncounterSourceKind.Standard ||
-                Path.GetFileName(normalized).EndsWith(
-                    $"{dungeonId.Trim()}.{difficulty.ToString(CultureInfo.InvariantCulture)}.mash.darkest",
-                    StringComparison.OrdinalIgnoreCase));
+        return TryDescribeMashFile(relativePath, out var originDungeon, out var originDifficulty) &&
+               originDungeon.Equals(dungeonId, StringComparison.Ordinal) && originDifficulty == difficulty;
     }
 
     private static IEnumerable<BattleEncounterDefinition> ParseFile(

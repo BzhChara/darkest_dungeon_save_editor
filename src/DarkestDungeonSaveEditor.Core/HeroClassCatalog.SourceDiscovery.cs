@@ -31,7 +31,8 @@ public static partial class HeroClassCatalog
         return new SourceFileSet(
             Files("heroes", $"*{HeroInfoSuffix}"),
             Files("heroes", $"*{HeroOverrideSuffix}"),
-            Files("effects", "*.effects.darkest"),
+            Files("effects", "*darkest")
+                .Where(path => NativeResourceFileRules.IsEffectFile(Path.GetRelativePath(source.Directory, path), [])).ToArray(),
             ResourceFiles(Path.Combine("shared", "quirk"), NativeResourceFileRules.IsQuirkFile),
             Files(Path.Combine("campaign", "town_events"), "*")
                 .Where(path => NativeResourceFileRules.IsTownEventFile(Path.GetRelativePath(source.Directory, path), [])).ToArray(),
@@ -85,8 +86,7 @@ public static partial class HeroClassCatalog
             {
                 target = heroOverrideFiles;
             }
-            else if (ContentFileOverlay.IsRootOrEnabledDlcPath(normalizedRelative, "effects", enabledDlcPrefixes) &&
-                     normalizedRelative.EndsWith(".effects.darkest", StringComparison.OrdinalIgnoreCase))
+            else if (NativeResourceFileRules.IsEffectFile(normalizedRelative, enabledDlcPrefixes))
             {
                 target = effectFiles;
             }
@@ -155,7 +155,7 @@ public static partial class HeroClassCatalog
             rawLine,
             HeroInfoSuffix,
             HeroOverrideSuffix,
-            ".effects.darkest",
+            "darkest",
             "json",
             ".string_table.xml",
             HeroUpgradeSuffix,

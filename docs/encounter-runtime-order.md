@@ -8,7 +8,7 @@ Read-only disassembly of the installed Windows x64 build 27890 established the f
 
 | Native code | Observed behavior |
 | --- | --- |
-| `0x1404C90F0` (MashGuide loader), query at `0x1404C9239` | Searches `dungeons/<dungeon>/` recursively with the standard `<dungeon>.<difficulty>.mash.darkest` suffix. Consumes returned files forward, then their lines in order. Conditional and additional collections are separate. |
+| `0x1404C90F0` (MashGuide loader), query at `0x1404C9239` | Searches `dungeons/<dungeon>/` recursively with the query `.*<dungeon>.<difficulty>.mash.darkest`; its separator dots are regex wildcards. Consumes returned files forward, then their logical records in order. Conditional and additional collections are separate. |
 | `0x140247D20` (`IO_FindFiles`) | Enumerates the base device first, then alternate mounts in reverse registration order. This call uses flags 0, so no final reversal or erase-and-reappend override occurs. |
 | `0x1403EBB50`, registration call `0x1403EBF68`; mount append `0x140238430` | Enabled Mods register in profile order. Reverse enumeration applies lower-priority Mods before higher-priority Mods. |
 | Startup calls `0x1403D6BAC` and `0x1403D6BC7`; DLC registration `0x1403EC920` | Mods register before DLC. Reverse enumeration consequently applies DLC mounts before root Mod mounts. The order between multiple DLC feature/package mounts is not generalized by this implementation. |
@@ -26,6 +26,8 @@ Red Hook's [official guide](https://steamcommunity.com/sharedfiles/filedetails/?
 DLC tables and root Mod overlays are now reconciled by mounted relative path, so a shadowed built-in table is not counted twice. A region/difficulty whose indexed declarations span multiple DLC prefixes still stays guarded. Files containing only `named`, `stall`, or other non-indexed declarations do not trigger that restriction. New DLC-relative files supplied only by a Mod, without an existing built-in provider, can be Bridge formation sources but cannot establish a proven destination index; native discovery for that case has not been established. Nonstandard directories and case-only path collisions also stay guarded. The native evidence is scoped to this Windows build; it is not a claim of testing every executable/platform or future engine version.
 
 ## Resolver contract
+
+File discovery and all current-table/direct/Bridge/maintenance checks share this native query. For example, `dungeons/cove/a.coveX2.mash.darkest` participates in the difficulty-2 table before a later `b.cove.2.mash.darkest`. With one retained row per file, their indexes are 0 and 1, and the next append index is 2. Skipping the first file as a nonliteral suffix would incorrectly authorize index 0 for the second. Manifest eligibility remains mandatory for Mods. Details and validation: [query rules](resource-duplicate-semantics.md#17-inventory-effect-curio-and-encounter-file-queries-2026-09-10) and [fix record](change-history/resource-discovery-fixes-2026-09-10.md).
 
 1. Resolve active same-path overlays while retaining their full provider chains.
 2. Replay every root provider at its own application position, original path depth, and original case-sensitive filename. The first appearance establishes the slot; later applications can change its content without moving it. DLC-prefixed paths keep their DLC mount position even when a Mod supplies replacement bytes. A root Mod must still be replayed after DLC even if Base already established the root path's slot.

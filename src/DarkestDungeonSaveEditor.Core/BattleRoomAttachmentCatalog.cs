@@ -152,7 +152,8 @@ public static partial class BattleRoomAttachmentCatalog
         var resourceFiles = ResolveEffectiveResourceFiles(activeContent.Sources, issues);
         var resources = ReadResources(resourceFiles);
         var curioFiles = ResolveEffectiveCurioFiles(activeContent.Sources, issues);
-        var curios = ReadCurioResources(curioFiles, resources, issues);
+        var curios = ReadCurioResources(curioFiles, resources, issues,
+            ContentFileOverlay.GetEnabledDlcPrefixes(activeContent.Sources));
         var fingerprints = effectiveFiles
             .Concat(resourceFiles)
             .Concat(curioFiles)
@@ -302,7 +303,8 @@ public static partial class BattleRoomAttachmentCatalog
             throw new InvalidOperationException("所选地图内容的存档哈希与另一项资源冲突。");
         }
         var resources = ReadResources(ResolveEffectiveResourceFiles(definition.CatalogGuard.ActiveSources, issues));
-        var curios = ReadCurioResources(ResolveEffectiveCurioFiles(definition.CatalogGuard.ActiveSources, issues), resources, issues);
+        var curios = ReadCurioResources(ResolveEffectiveCurioFiles(definition.CatalogGuard.ActiveSources, issues), resources, issues,
+            ContentFileOverlay.GetEnabledDlcPrefixes(definition.CatalogGuard.ActiveSources));
         if (GetResourceRejection(definition, resources, curios) is { } rejection)
         {
             throw new InvalidOperationException($"所选地图内容不可写入：{rejection}");

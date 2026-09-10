@@ -10,7 +10,8 @@ internal static partial class QuantityItemReferenceAnalyzer
         EffectiveContentFile File,
         string Text,
         bool IsLootFile,
-        NativeReferenceJsonKind JsonKind);
+        NativeReferenceJsonKind JsonKind,
+        bool IsCurioTypeFile);
 
     private enum ReferenceReachability
     {

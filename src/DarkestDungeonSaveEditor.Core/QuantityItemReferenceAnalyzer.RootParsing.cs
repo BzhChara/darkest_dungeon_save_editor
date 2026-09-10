@@ -68,7 +68,7 @@ internal static partial class QuantityItemReferenceAnalyzer
             return true;
         }
 
-        if (extension.Equals(".csv", StringComparison.OrdinalIgnoreCase))
+        if (file.IsCurioTypeFile)
         {
             if (IsReachableInContext(defaultReachability, saveContext))
             {

@@ -7,19 +7,20 @@ public static partial class BattleRoomAttachmentCatalog
     {
         var enabledDlcPrefixes = ContentFileOverlay.GetEnabledDlcPrefixes(sources);
         return NativeContentFileResolver.Resolve(sources.SelectMany(source =>
-                EnumeratePropFiles(source, enabledDlcPrefixes, issues, "curios", "*.csv", ".csv")
-                    .Where(path => path.EndsWith("curio_props.csv", StringComparison.OrdinalIgnoreCase) ||
-                        path.EndsWith("curio_type_library.csv", StringComparison.OrdinalIgnoreCase))
+                EnumeratePropFiles(source, enabledDlcPrefixes, issues, "curios", "*csv", "csv",
+                    path => NativeResourceFileRules.IsCurioTypeFile(path, enabledDlcPrefixes) ||
+                        NativeResourceFileRules.IsCurioPropFile(path, enabledDlcPrefixes))
                     .Select(path => new ContentFileCandidate(source, path))).ToArray(), sources,
             "Curio resource", issues);
     }
 
     private static CurioResources ReadCurioResources(
-        IReadOnlyList<EffectiveContentFile> files, PropResources resources, List<string> issues)
+        IReadOnlyList<EffectiveContentFile> files, PropResources resources, List<string> issues,
+        IReadOnlyList<string> enabledDlcPrefixes)
     {
         var types = new HashSet<string>(StringComparer.Ordinal);
         // Native loads every type library before it consumes any prop mapping.
-        foreach (var file in files.Where(file => file.Path.EndsWith("curio_type_library.csv", StringComparison.OrdinalIgnoreCase)))
+        foreach (var file in files.Where(file => NativeResourceFileRules.IsCurioTypeFile(file.RelativePath, enabledDlcPrefixes)))
         {
             foreach (var block in NativeCurioCsvReader.TypeBlocks(NativeCurioCsvReader.Read(file.Path, 24, mapping: false)))
             {
@@ -37,7 +38,7 @@ public static partial class BattleRoomAttachmentCatalog
                 if (resource is not null) resource.Data = resource.Data with { InstanceType = "curio" };
             }
         }
-        foreach (var file in files.Where(file => file.Path.EndsWith("curio_props.csv", StringComparison.OrdinalIgnoreCase)))
+        foreach (var file in files.Where(file => NativeResourceFileRules.IsCurioPropFile(file.RelativePath, enabledDlcPrefixes)))
         foreach (var row in NativeCurioCsvReader.Read(file.Path, 16, mapping: true))
         {
             var fields = row.Fields;

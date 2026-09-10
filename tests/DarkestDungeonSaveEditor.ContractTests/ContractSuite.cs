@@ -40,9 +40,11 @@ internal static partial class ContractSuite
         var codec = fixture.Codec;
 
         RunInventoryCapacityContracts(runRoot);
+        await RunTextResourceQueryContractsAsync(runRoot, codec);
 
         if (includeBattle)
         {
+            await RunEncounterFileQueryContractsAsync(runRoot, codec);
             await RunNestedRaidSaveContractsAsync(fixture);
             await RunEncounterMaintenanceContractsAsync(runRoot, codec, nested: true);
             await RunModManifestPreparationContractsAsync(runRoot);

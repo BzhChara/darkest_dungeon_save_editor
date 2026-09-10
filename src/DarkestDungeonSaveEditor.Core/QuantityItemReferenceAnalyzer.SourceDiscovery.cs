@@ -48,11 +48,12 @@ internal static partial class QuantityItemReferenceAnalyzer
 
                 result.Add(new ScannedContentFile(
                     file,
-                    Path.GetExtension(file.Path).Equals(".csv", StringComparison.OrdinalIgnoreCase)
+                    NativeResourceFileRules.IsCurioTypeFile(file.RelativePath, enabledDlcPrefixes)
                         ? new UTF8Encoding(false, true).GetString(File.ReadAllBytes(file.Path))
                         : File.ReadAllText(file.Path, Encoding.UTF8),
                     NativeResourceFileRules.IsLootFile(file.RelativePath, enabledDlcPrefixes),
-                    NativeResourceFileRules.ReferenceJsonKind(file.RelativePath, enabledDlcPrefixes)));
+                    NativeResourceFileRules.ReferenceJsonKind(file.RelativePath, enabledDlcPrefixes),
+                    NativeResourceFileRules.IsCurioTypeFile(file.RelativePath, enabledDlcPrefixes)));
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or DecoderFallbackException)
             {
@@ -81,7 +82,7 @@ internal static partial class QuantityItemReferenceAnalyzer
         }
 
         var reported = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var entry in ModManifestFile.ReadEntries(manifestPath, "json", ".darkest", ".csv"))
+        foreach (var entry in ModManifestFile.ReadEntries(manifestPath, "json", ".darkest", "csv"))
         {
             var relative = entry.RelativePath;
 
@@ -96,7 +97,7 @@ internal static partial class QuantityItemReferenceAnalyzer
                 !IsEligibleReferencePath(normalized, enabledDlcPrefixes) ||
                 !ContentDirectories.Any(directory =>
                     ContentFileOverlay.IsRootOrEnabledDlcPath(normalized, directory, enabledDlcPrefixes)) ||
-                IsDefinitionOnlyPath(normalized) ||
+                IsDefinitionOnlyPath(normalized, enabledDlcPrefixes) ||
                 !ReferencePathCanAffectContext(normalized, saveContext) ||
                 File.Exists(path) ||
                 !reported.Add(path))
@@ -123,7 +124,7 @@ internal static partial class QuantityItemReferenceAnalyzer
         if (source.Kind is "workshop" or "local")
         {
             ModManifestFile.Require(manifestPath);
-            paths = ModManifestFile.ReadEntries(manifestPath, "json", ".darkest", ".csv")
+            paths = ModManifestFile.ReadEntries(manifestPath, "json", ".darkest", "csv")
                 .Select(entry => Path.GetFullPath(Path.Combine(source.Directory, entry.RelativePath)))
                 .Where(path => IsInsideSource(source.Directory, path) && File.Exists(path))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -151,6 +152,7 @@ internal static partial class QuantityItemReferenceAnalyzer
             var relativePath = ContentFileOverlay.NormalizeRelativePath(source, path);
             if (relativePath is null ||
                 (!TextExtensions.Contains(Path.GetExtension(path)) &&
+                 !NativeResourceFileRules.IsCurioTypeFile(relativePath, enabledDlcPrefixes) &&
                  !NativeResourceFileRules.IsLootFile(relativePath, enabledDlcPrefixes) &&
                  NativeResourceFileRules.ReferenceJsonKind(relativePath, enabledDlcPrefixes) == NativeReferenceJsonKind.None))
             {
@@ -160,7 +162,7 @@ internal static partial class QuantityItemReferenceAnalyzer
             if (!IsEligibleReferencePath(relativePath, enabledDlcPrefixes) ||
                 !ContentDirectories.Any(directory =>
                     ContentFileOverlay.IsRootOrEnabledDlcPath(relativePath, directory, enabledDlcPrefixes)) ||
-                IsDefinitionOnlyPath(relativePath))
+                IsDefinitionOnlyPath(relativePath, enabledDlcPrefixes))
             {
                 continue;
             }
@@ -172,15 +174,18 @@ internal static partial class QuantityItemReferenceAnalyzer
     private static bool IsEligibleReferencePath(string path, IReadOnlyList<string> enabledDlcPrefixes)
     {
         if (!NativeResourceFileRules.IsEligibleReferenceFile(path, enabledDlcPrefixes)) return false;
-        if (path.EndsWith(".csv", StringComparison.OrdinalIgnoreCase))
-            return path.EndsWith("curio_type_library.csv", StringComparison.OrdinalIgnoreCase) &&
-                ContentFileOverlay.IsRootOrEnabledDlcPath(path, "curios", enabledDlcPrefixes);
+        if (path.EndsWith("csv", StringComparison.OrdinalIgnoreCase))
+            return NativeResourceFileRules.IsCurioTypeFile(path, enabledDlcPrefixes);
         var prefix = enabledDlcPrefixes.OrderByDescending(value => value.Length)
             .FirstOrDefault(value => path.StartsWith(value + "/", StringComparison.OrdinalIgnoreCase));
         var mounted = prefix is null ? path : path[(prefix.Length + 1)..];
         var suffix = new[] { ".info.darkest", ".art.darkest", ".override.darkest" }
             .FirstOrDefault(value => mounted.EndsWith(value, StringComparison.OrdinalIgnoreCase));
-        if (suffix is null) return true; // JSON consumers were checked above; actor definitions have canonical open paths below.
+        // Actor item/loot references come from canonical definitions. Merely
+        // listing heroes/inventory/README.darkest must not create a consumer.
+        if (suffix is null)
+            return !mounted.StartsWith("heroes/", StringComparison.OrdinalIgnoreCase) &&
+                   !mounted.StartsWith("monsters/", StringComparison.OrdinalIgnoreCase);
         var id = Path.GetFileName(mounted)[..^suffix.Length];
         if (mounted.StartsWith("heroes/", StringComparison.OrdinalIgnoreCase))
             return mounted.Equals($"heroes/{id}/{id}{suffix}", StringComparison.OrdinalIgnoreCase);
@@ -199,15 +204,17 @@ internal static partial class QuantityItemReferenceAnalyzer
                !relative.StartsWith($"..{Path.AltDirectorySeparatorChar}", StringComparison.Ordinal);
     }
 
-    private static bool IsDefinitionOnlyPath(string relativePath)
+    private static bool IsDefinitionOnlyPath(string relativePath, IReadOnlyList<string> enabledDlcPrefixes)
     {
-        var normalized = $"/{relativePath.Replace('\\', '/').Trim('/')}";
-        return normalized.Contains("/localization/", StringComparison.OrdinalIgnoreCase) ||
-               normalized.Contains("/inventory/", StringComparison.OrdinalIgnoreCase) ||
-               normalized.Contains("/effects/", StringComparison.OrdinalIgnoreCase) ||
-               normalized.Contains("/scripts/starting_save/", StringComparison.OrdinalIgnoreCase) ||
-               normalized.Contains("/shared/buffs/", StringComparison.OrdinalIgnoreCase) ||
-               normalized.Contains("/trinkets/", StringComparison.OrdinalIgnoreCase) ||
+        // Only mounted resource roots identify consumers. A loot/trinkets/
+        // subdirectory is still part of the loot consumer, not a trinket library.
+        var normalized = NativeResourceFileRules.MountedPath(relativePath, enabledDlcPrefixes);
+        return normalized.StartsWith("localization/", StringComparison.OrdinalIgnoreCase) ||
+               normalized.StartsWith("inventory/", StringComparison.OrdinalIgnoreCase) ||
+               normalized.StartsWith("effects/", StringComparison.OrdinalIgnoreCase) ||
+               normalized.StartsWith("scripts/starting_save/", StringComparison.OrdinalIgnoreCase) ||
+               normalized.StartsWith("shared/buffs/", StringComparison.OrdinalIgnoreCase) ||
+               normalized.StartsWith("trinkets/", StringComparison.OrdinalIgnoreCase) ||
                normalized.EndsWith(".effects.darkest", StringComparison.OrdinalIgnoreCase);
     }
 
