@@ -8,7 +8,6 @@ namespace DarkestDungeonSaveEditor.Core;
 
 public static partial class QuantityItemCatalog
 {
-    private const string InventoryItemSuffix = ".inventory.items.darkest";
     private static readonly HashSet<string> WalletInventoryTypes =
         new(StringComparer.Ordinal) { "gold", "heirloom", "shard" };
     private static readonly HashSet<string> EstateInventoryTypes =

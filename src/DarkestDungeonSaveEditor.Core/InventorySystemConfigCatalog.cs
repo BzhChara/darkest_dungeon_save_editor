@@ -8,8 +8,6 @@ internal sealed record EffectiveInventoryCapacity(
 
 internal static class InventorySystemConfigCatalog
 {
-    private const string InventoryConfigSuffix = ".inventory.system_configs.darkest";
-
     internal static EffectiveInventoryCapacity? ReadCapacity(
         IReadOnlyList<ActiveContentSource> sources, string type, List<string> issues)
     {
@@ -98,7 +96,8 @@ internal static class InventorySystemConfigCatalog
         {
             var directory = Path.Combine(source.Directory, "inventory");
             return Directory.Exists(directory)
-                ? NativeDirectoryDiscovery.EnumerateFiles(directory, $"*{InventoryConfigSuffix}", SearchOption.AllDirectories)
+                ? NativeDirectoryDiscovery.EnumerateFiles(directory, "*darkest", SearchOption.AllDirectories)
+                    .Where(path => NativeResourceFileRules.IsInventoryConfigFile(Path.GetRelativePath(source.Directory, path), []))
                     .Order(StringComparer.Ordinal).ToArray()
                 : [];
         }
@@ -106,7 +105,7 @@ internal static class InventorySystemConfigCatalog
         var manifest = Path.Combine(source.Directory, "modfiles.txt");
         ModManifestFile.Require(manifest);
         var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var entry in ModManifestFile.ReadEntries(manifest, InventoryConfigSuffix))
+        foreach (var entry in ModManifestFile.ReadEntries(manifest, "darkest"))
         {
             var path = Path.GetFullPath(Path.Combine(source.Directory, entry.RelativePath));
             var relative = Path.GetRelativePath(Path.GetFullPath(source.Directory), path);
@@ -116,7 +115,7 @@ internal static class InventorySystemConfigCatalog
                 issues.Add($"Ignored inventory config manifest path outside its Mod directory: {entry.RawLine.Trim()}");
                 continue;
             }
-            if (!ContentFileOverlay.IsRootOrEnabledDlcPath(relative, "inventory", enabledDlcPrefixes)) continue;
+            if (!NativeResourceFileRules.IsInventoryConfigFile(relative, enabledDlcPrefixes)) continue;
             if (!File.Exists(path))
                 issues.Add($"Inventory system config listed by Mod is missing: {path}");
             // Keep missing candidates until overlay resolution. A missing winner

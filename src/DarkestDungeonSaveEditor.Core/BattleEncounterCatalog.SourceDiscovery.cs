@@ -5,9 +5,9 @@ namespace DarkestDungeonSaveEditor.Core;
 
 public static partial class BattleEncounterCatalog
 {
-    private static readonly Regex MashDifficultyPattern = new(
-        @"\.(?<difficulty>-?\d+)\.mash\.darkest$",
-        RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
+    // MashGuide formats .*<table>.<difficulty>.mash.darkest. Its dots are
+    // regex wildcards; %d supplies a canonical decimal rather than leading zeros.
+    private const string MashDifficultyQuery = @".(?<difficulty>-?(?:0|[1-9][0-9]*)).mash.darkest\z";
 
     private static IReadOnlyList<EffectiveContentFile> ResolveGlobalEffectiveMashFiles(
         IReadOnlyList<ActiveContentSource> sources,
@@ -59,7 +59,8 @@ public static partial class BattleEncounterCatalog
                 .Select(root => Path.Combine(root, "dungeons"))
                 .Where(Directory.Exists)
                 .SelectMany(directory => NativeDirectoryDiscovery.EnumerateFiles(
-                    directory, "*.mash.darkest", SearchOption.AllDirectories))
+                    directory, "*darkest", SearchOption.AllDirectories))
+                .Where(path => TryDescribeMashFile(Path.GetRelativePath(source.Directory, path), out _, out _))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
                 .ToArray();
@@ -81,7 +82,7 @@ public static partial class BattleEncounterCatalog
         var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         try
         {
-            foreach (var entry in ModManifestFile.ReadEntries(manifestPath, ".mash.darkest"))
+            foreach (var entry in ModManifestFile.ReadEntries(manifestPath, "darkest"))
             {
                 var rawLine = entry.RawLine;
                 var relativePath = entry.RelativePath;
@@ -105,6 +106,7 @@ public static partial class BattleEncounterCatalog
                 {
                     continue;
                 }
+                if (!TryDescribeMashFile(relativeToRoot, out _, out _)) continue;
                 if (!File.Exists(path))
                 {
                     issues.Add($"Encounter mash listed by Mod is missing: {path}");
@@ -311,13 +313,18 @@ public static partial class BattleEncounterCatalog
         }
         dungeonId = normalized[dungeonStart..dungeonEnd];
 
-        var match = MashDifficultyPattern.Match(Path.GetFileName(normalized));
+        // Standard files must satisfy the same region query used by the current
+        // table. Keep the existing separate conditional/additional collections.
+        var table = ClassifyFile(relativePath) == BattleEncounterSourceKind.Standard
+            ? Regex.Escape(dungeonId) : string.Empty;
+        var match = Regex.Match(normalized, table + MashDifficultyQuery, RegexOptions.CultureInvariant);
         return match.Success &&
                int.TryParse(
                    match.Groups["difficulty"].Value,
                    NumberStyles.Integer,
                    CultureInfo.InvariantCulture,
-               out difficulty);
+               out difficulty) &&
+               match.Groups["difficulty"].Value == difficulty.ToString(CultureInfo.InvariantCulture);
     }
 
     private sealed record AvailableMonsterDefinitions(

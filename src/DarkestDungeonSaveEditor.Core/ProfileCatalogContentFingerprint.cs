@@ -11,11 +11,11 @@ public static class ProfileCatalogContentFingerprint
     private static readonly ContentFileRule[] Rules =
         (from directory in new[] { "inventory", "trinkets", "campaign", "curios", "dungeons", "heroes",
              "loot", "monsters", "props", "raid", "rules", "scripts", "shared", "torch", "upgrades", "effects" }
-         // Native loot/event/quest/provision/estate/district queries contain
-         // unescaped dots before json. Include accepted names such as Xjson.
+         // Native queries also admit unescaped dots before json/darkest/csv.
+         // Broad discovery here observes every catalog's accepted suffix.
          // This shared fingerprint is intentionally broader than the item-root
          // consumer whitelist: other catalogs also depend on campaign data.
-         from suffix in new[] { "json", ".darkest", ".csv" }
+         from suffix in new[] { "json", "darkest", "csv" }
          select new ContentFileRule(directory, "*" + suffix))
         .Concat(new[] { new ContentFileRule("localization", "*.string_table.xml"),
             new ContentFileRule("localization", "*.loc", false), new ContentFileRule("localization", "*.loc2", false) })

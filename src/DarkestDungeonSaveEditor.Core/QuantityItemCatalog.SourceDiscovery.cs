@@ -22,7 +22,8 @@ public static partial class QuantityItemCatalog
         {
             var inventoryRoot = Path.Combine(source.Directory, "inventory");
             return Directory.Exists(inventoryRoot)
-                ? NativeDirectoryDiscovery.EnumerateFiles(inventoryRoot, $"*{InventoryItemSuffix}", SearchOption.AllDirectories)
+                ? NativeDirectoryDiscovery.EnumerateFiles(inventoryRoot, "*darkest", SearchOption.AllDirectories)
+                    .Where(path => NativeResourceFileRules.IsInventoryItemFile(Path.GetRelativePath(source.Directory, path), []))
                     .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
                     .ToArray()
                 : [];
@@ -32,7 +33,7 @@ public static partial class QuantityItemCatalog
         ModManifestFile.Require(manifestPath);
 
         var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var entry in ModManifestFile.ReadEntries(manifestPath, InventoryItemSuffix))
+        foreach (var entry in ModManifestFile.ReadEntries(manifestPath, "darkest"))
         {
             var rawLine = entry.RawLine;
             var relativePath = entry.RelativePath;
@@ -47,7 +48,7 @@ public static partial class QuantityItemCatalog
                 continue;
             }
 
-            if (!ContentFileOverlay.IsRootOrEnabledDlcPath(relativeToRoot, "inventory", enabledDlcPrefixes))
+            if (!NativeResourceFileRules.IsInventoryItemFile(relativeToRoot, enabledDlcPrefixes))
             {
                 continue;
             }

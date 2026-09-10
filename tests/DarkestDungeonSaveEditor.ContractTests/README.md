@@ -33,6 +33,8 @@ The suite is split by responsibility:
 - `JsonMemberContractTests.cs`: first exact resource JSON members (including wrong types), repeated Buff occurrences through HP validation and DSON persistence, and raw town-event recruit payload/class binding;
 - `JsonReferenceConsumerContractTests.cs`: native JSON filename/structure filtering, town/raid roots, irrelevant notes, duplicate fields, uncertain loaded structures, refresh of nonliteral suffixes, and real actor-to-nested-loot references;
 - `CatalogFileQueryContractTests.cs`: native trinket/Buff/quirk/camping filename queries across six source types, exact-dot/root exclusions, manifests, same-path priority, missing files, content refresh and generated HP DSON;
+- `TextResourceQueryContractTests.cs`: native inventory/capacity/Effect/Curio filename queries across six source types, mounted-root reference exclusions, actor-documentation rejection with canonical actor controls, manifests, overlays, missing diagnostics, same-size content refresh, curio preflight and capacity-limited DSON;
+- `EncounterFileQueryContractTests.cs`: wildcard-separator region/difficulty queries, manifest and DLC boundaries, independent hall/room/boss indexes, empty slots, direct/Bridge DSON replacement and deletion, and maintenance consistency;
 - `MapPropJsonContractTests.cs`: first nested JSON members, inherited defaults, difficulty fields, root/nested query stages, missing-path diagnostics and stale-choice guards across six source types;
 - `HeroCandidateContractTests.cs`: candidate serialization, progression, full skill unlocks, and initial quirks;
 - `StagecoachHeroSaveContractTests.cs`: ordinary/shard pool routing, GUID/upgrade append, stale guards, and multi-file transactions;
@@ -48,6 +50,12 @@ dotnet run --project tests\DarkestDungeonSaveEditor.ContractTests\DarkestDungeon
 ```
 
 Close Darkest Dungeon before the suite: save transaction contracts exercise the real process guard even with isolated fixtures. `--catalogs` selects the catalog/save group, `--maintenance` selects encounter maintenance, `--manifests` selects manifest preparation, `--semantics` selects duplicate Buff/Effect/skill/event rules, exact identities, shared record/curio consumers, empty encounter slots and logical encounter/Bridge contracts, and `--map-content` selects the battle-map group including standalone JSON/DSON placements and native prop pools; these partial runs do not replace the complete suite. Set `DDSE_TEST_GAME_DIRECTORY` to the installed game root to additionally exercise the verified official uploader against isolated samples.
+
+## 资源文件查询验证
+
+`dotnet run --project tests/DarkestDungeonSaveEditor.ContractTests -c Release -- . --queries`
+
+只运行上述物品、容量、Effect、奇物和战斗文件查询两组新契约，包含隔离 DSON 保存与 Bridge 安装；不修改真实档案或活动 Mod。完整套件也包含这两组。构建后可添加 `--no-build` 执行。
 
 ## 持久副本目录验证
 

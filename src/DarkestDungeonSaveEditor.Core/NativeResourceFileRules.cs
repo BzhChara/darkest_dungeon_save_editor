@@ -51,6 +51,50 @@ internal static partial class NativeResourceFileRules
     [GeneratedRegex(@"camping_skills.json\z", RegexOptions.CultureInvariant)]
     private static partial Regex CampingSkillName();
 
+    // Inventory queries at 0x1404C7FE4/0x1404C808B and Effect query at
+    // 0x1404E4965: only the leading dot is escaped by the native loader.
+    [GeneratedRegex(@"\.inventory.items.darkest\z", RegexOptions.CultureInvariant)]
+    private static partial Regex InventoryItemName();
+    [GeneratedRegex(@"\.inventory.system_configs.darkest\z", RegexOptions.CultureInvariant)]
+    private static partial Regex InventoryConfigName();
+    [GeneratedRegex(@"\.effects.darkest\z", RegexOptions.CultureInvariant)]
+    private static partial Regex EffectName();
+    // PropLibrary queries at 0x1404D8A22/0x1404D8ACE.
+    [GeneratedRegex(@"curio_type_library.csv\z", RegexOptions.CultureInvariant)]
+    private static partial Regex CurioTypeName();
+    [GeneratedRegex(@"curio_props.csv\z", RegexOptions.CultureInvariant)]
+    private static partial Regex CurioPropName();
+
+    internal static bool IsInventoryItemFile(string path, IReadOnlyList<string> prefixes)
+    {
+        var mounted = MountedPath(path, prefixes);
+        return mounted.StartsWith("inventory/", StringComparison.OrdinalIgnoreCase) && InventoryItemName().IsMatch(mounted);
+    }
+
+    internal static bool IsInventoryConfigFile(string path, IReadOnlyList<string> prefixes)
+    {
+        var mounted = MountedPath(path, prefixes);
+        return mounted.StartsWith("inventory/", StringComparison.OrdinalIgnoreCase) && InventoryConfigName().IsMatch(mounted);
+    }
+
+    internal static bool IsEffectFile(string path, IReadOnlyList<string> prefixes)
+    {
+        var mounted = MountedPath(path, prefixes);
+        return mounted.StartsWith("effects/", StringComparison.OrdinalIgnoreCase) && EffectName().IsMatch(mounted);
+    }
+
+    internal static bool IsCurioTypeFile(string path, IReadOnlyList<string> prefixes)
+    {
+        var mounted = MountedPath(path, prefixes);
+        return mounted.StartsWith("curios/", StringComparison.OrdinalIgnoreCase) && CurioTypeName().IsMatch(mounted);
+    }
+
+    internal static bool IsCurioPropFile(string path, IReadOnlyList<string> prefixes)
+    {
+        var mounted = MountedPath(path, prefixes);
+        return mounted.StartsWith("curios/", StringComparison.OrdinalIgnoreCase) && CurioPropName().IsMatch(mounted);
+    }
+
     [GeneratedRegex(@"/prop_definitions.json\z", RegexOptions.CultureInvariant)]
     private static partial Regex PropDefinitionsName();
     [GeneratedRegex(@"/trap_definitions.json\z", RegexOptions.CultureInvariant)]
