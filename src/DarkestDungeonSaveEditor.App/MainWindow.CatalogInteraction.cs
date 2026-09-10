@@ -164,7 +164,7 @@ public partial class MainWindow : Window
             }
 
             var selectedIds = dialog.SelectedQuirkIds.ToArray();
-            if (_selectedInitialQuirkIds.SequenceEqual(selectedIds, StringComparer.OrdinalIgnoreCase))
+            if (_selectedInitialQuirkIds.SequenceEqual(selectedIds, StringComparer.Ordinal))
             {
                 return;
             }

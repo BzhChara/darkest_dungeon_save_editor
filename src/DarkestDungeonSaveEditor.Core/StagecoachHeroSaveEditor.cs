@@ -130,7 +130,7 @@ public static class StagecoachHeroSaveEditor
         {
             var matchingDefinitions = initialQuirks
                 .Where(quirk =>
-                    quirk.Id.Equals(candidateQuirkId, StringComparison.OrdinalIgnoreCase) &&
+                    quirk.Id.Equals(candidateQuirkId, StringComparison.Ordinal) &&
                     quirk.DefinitionLimit is > 0)
                 .ToArray();
             if (matchingDefinitions.Length == 0)
@@ -170,7 +170,7 @@ public static class StagecoachHeroSaveEditor
     private static bool IsShardRecruitCandidate(JsonObject candidate)
     {
         return candidate["quirks"] is JsonObject quirks &&
-               quirks.Any(pair => pair.Key.Equals(ShardRecruitQuirkId, StringComparison.OrdinalIgnoreCase));
+               quirks.ContainsKey(ShardRecruitQuirkId);
     }
 
     private static void AddUpgradePurchases(
@@ -268,7 +268,7 @@ public static class StagecoachHeroSaveEditor
     {
         var quirks = hero["quirks"] as JsonObject ??
                      hero["hero_file_data"]?["raw_data"]?["base_root"]?["quirks"] as JsonObject;
-        return quirks?.Any(pair => pair.Key.Equals(quirkId, StringComparison.OrdinalIgnoreCase)) == true;
+        return quirks?.ContainsKey(quirkId) == true;
     }
 
     private static int ReadRequiredNonNegativeInt(JsonObject candidate, string propertyName)

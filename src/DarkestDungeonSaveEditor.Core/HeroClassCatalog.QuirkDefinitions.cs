@@ -19,7 +19,7 @@ public static partial class HeroClassCatalog
         var definitionLimits = new List<int>();
         if (!effectiveQuirks.ContainsKey(quirk.Id))
             unverifiedReasons.Add("怪癖 ID 或定义未能唯一解析，不能确定游戏实际采用的属性");
-        var visitedEvolutionIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { quirk.Id };
+        var visitedEvolutionIds = new HashSet<string>(StringComparer.Ordinal) { quirk.Id };
         var evolutionStep = quirk;
         while (evolutionStep.Evolution?.TargetQuirkId is { } targetId)
         {
@@ -61,11 +61,11 @@ public static partial class HeroClassCatalog
                 {
                     unverifiedReasons.Add($"Buff '{buffId}' 缺失，无法排除 max_hp 修正");
                 }
-                else if (unresolved.Any(candidate => candidate.StatSubType.Equals(
-                             "max_hp",
-                             StringComparison.OrdinalIgnoreCase)))
+                else
                 {
-                    unverifiedReasons.Add($"max_hp Buff '{buffId}' 定义未解析");
+                    // A colliding native key may resolve to a different Buff whose stat
+                    // is HP, even when this string's own candidates are all non-HP.
+                    unverifiedReasons.Add($"Buff '{buffId}' 定义未解析，无法排除 max_hp 修正");
                 }
 
                 continue;
@@ -276,7 +276,7 @@ public static partial class HeroClassCatalog
     private static IReadOnlyDictionary<string, IReadOnlyList<string>> ReadProviderSourcesByQuirkId(
         EffectiveContentFile file)
     {
-        var sourcesById = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+        var sourcesById = new Dictionary<string, List<string>>(StringComparer.Ordinal);
         foreach (var provider in file.Providers)
         {
             try
@@ -309,7 +309,7 @@ public static partial class HeroClassCatalog
         return sourcesById.ToDictionary(
             pair => pair.Key,
             pair => (IReadOnlyList<string>)pair.Value.ToArray(),
-            StringComparer.OrdinalIgnoreCase);
+            StringComparer.Ordinal);
     }
 
     private static IEnumerable<BuffDefinition> ReadBuffDefinitions(string path, string source)
@@ -329,7 +329,7 @@ public static partial class HeroClassCatalog
 
         foreach (var item in buffs.EnumerateArray())
         {
-            var id = ReadJsonString(item, "id");
+            var id = ReadJsonIdentity(item, "id");
             if (item.ValueKind != JsonValueKind.Object || string.IsNullOrWhiteSpace(id))
             {
                 continue;
@@ -400,7 +400,7 @@ public static partial class HeroClassCatalog
             if (targetNode.ValueKind == JsonValueKind.String &&
                 !string.IsNullOrWhiteSpace(targetNode.GetString()))
             {
-                targetQuirkId = targetNode.GetString()!.Trim();
+                targetQuirkId = targetNode.GetString()!;
             }
             else
             {

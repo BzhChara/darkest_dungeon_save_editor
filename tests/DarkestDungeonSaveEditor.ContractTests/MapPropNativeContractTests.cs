@@ -39,14 +39,14 @@ internal static partial class ContractSuite
         Pool("arena", "traps: .chance 1 .types gamma\n");
         Write("dungeons/ignored/extra.props.darkest", "traps: .chance 1 .types gamma\n");
         Write("dungeons/ignored/backup/ignored.props.darkest", "traps: .chance 1 .types gamma\n");
-        Write("props/prop_definitions.json", """{"props":[{"name":"trap","default_data":{}}]}""");
+        Write("props/prop_definitions.json", """{"props":[{"name":"trap","default_data":{"instance_type":"trap"}}]}""");
         var props = new JsonArray();
         foreach (var id in new[] { "alpha", "ALPHA", " alpha ", "beta", "gamma", ".dot", longId, "Az", "BE" })
             props.Add(new JsonObject { ["name"] = id, ["default_data"] = new JsonObject
             { ["inherits_from"] = new JsonObject { ["prop_type_name"] = "trap" } } });
         Write("props/trap_definitions.json", new JsonObject { ["props"] = props }.ToJsonString());
         Write("props/obstacle_definitions.json", """
-            {"props":[{"name":"obstacle","default_data":{}},
+            {"props":[{"name":"obstacle","default_data":{"instance_type":"obstacle"}},
                       {"name":"stone","default_data":{"inherits_from":{"prop_type_name":"obstacle"}}}]}
             """);
         Write("localization/props.string_table.xml", """

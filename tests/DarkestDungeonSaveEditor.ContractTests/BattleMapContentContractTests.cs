@@ -49,8 +49,8 @@ internal static partial class ContractSuite
             "ambiguous_curio,sprite,crate,name,audio\nambiguous_curio,sprite,fish_idol,name,audio\n");
         File.WriteAllText(curioPaths.Types, File.ReadAllText(curioPaths.Types)
             .Replace(",,foreign_room_curio,,Nothing", ",,\"foreign_behavior\",,Nothing", StringComparison.Ordinal) +
-            ",,ID STRING,,RESULT TYPES\n,,\"bad\"suffix,,Nothing\n" +
-            ",,ID STRING,,RESULT TYPES\n,,valid_after_malformed,,Nothing,,,,,,,,,,,,\"a quoted, multiline\ncomment\"\n");
+            ",1,Quote toggles\n,,ID STRING,,RESULT TYPES\n,,\"bad\"suffix,,Nothing\n,,,,ITEM\n" +
+            ",2,Physical lines\n,,ID STRING,,RESULT TYPES\n,,valid_after_malformed,,Nothing,,,,,,,,,,,,\"a quoted, multiline\ncomment\"\n,,,,ITEM\n");
         WriteMapContentFixture(baseRoot, "localization/curios.string_table.xml", """
             <root><language id="schinese"><entry id="str_curio_title_foreign_display">异地奇物</entry></language>
             <language id="english"><entry id="str_curio_title_foreign_display">Foreign Curio</entry></language></root>
@@ -70,7 +70,7 @@ internal static partial class ContractSuite
             ] }
             """);
         WriteMapContentFixture(baseRoot, "props/prop_definitions.json", """
-            { "props": [ { "name": "trap", "default_data": {} }, { "name": "obstacle", "default_data": { "teleport": false } } ] }
+            { "props": [ { "name": "trap", "default_data": { "instance_type": "trap" } }, { "name": "obstacle", "default_data": { "instance_type": "obstacle", "teleport": false } } ] }
             """);
         WriteMapContentFixture(baseRoot, "props/obstacle_definitions.json", """
             { "props": [
@@ -136,16 +136,16 @@ internal static partial class ContractSuite
                    new BilingualContentName("异地奇物", "Foreign Curio"),
             "Manifest authority, room/hall membership, per-region trap membership and genuine missing translations must remain distinct.");
         Assert(catalog.GetCandidates(BattleRoomAttachmentKind.Trap, "cove")
-                   .Select(item => item.Id).ToHashSet().SetEquals(["lurker", "shared_trap", "dlc_trap", " spaced_trap "]) &&
+                   .Select(item => item.Id).ToHashSet().SetEquals(["lurker", "shared_trap", "dlc_trap", " spaced_trap ", "ambiguous_trap"]) &&
                catalog.GetCandidates(BattleRoomAttachmentKind.Obstacle, "cove").Single().Id == "shipwreck" &&
                catalog.GetCandidates(BattleRoomAttachmentKind.Trap, "").Count == 0 &&
-               catalog.Issues.Count(issue => issue.StartsWith("地图内容候选未纳入：", StringComparison.Ordinal)) == 11 &&
-               catalog.Definitions.All(item => item.Id is not ("missing_prop_curio" or "missing_type_curio" or "ambiguous_curio" or
+               catalog.Issues.Count(issue => issue.StartsWith("地图内容候选未纳入：", StringComparison.Ordinal)) == 9 &&
+               catalog.Definitions.All(item => item.Id is not ("missing_prop_curio" or "missing_type_curio" or
                    "CASE_ONLY_CURIO" or "case_type_curio" or "CASE_ONLY_TRAP")) &&
                catalog.Curios.Count(item => item.Id is "case_twin" or "CASE_TWIN") == 2 &&
                catalog.HallCurios.Any(item => item.Id == "valid_after_malformed") &&
-               catalog.Issues.Any(issue => issue.Contains("CSV 行格式无效", StringComparison.Ordinal)),
-            "Missing/ambiguous curio mappings and types, and missing/scripted/cyclic trap resources must be withheld; valid quoted CSV aliases and other rows survive a malformed row.");
+               catalog.Curios.Any(item => item.Id == "ambiguous_curio"),
+            "Missing types/resources and scripted or unresolved inheritance stay unavailable; repeated JSON defaults and CSV updates are defined, and native quote toggles are not RFC CSV errors.");
 
         var service = new BattleMapEditService(codec, new SaveEditorLocations(
             root, Path.Combine(root, "edits"), Path.Combine(root, "backups")));
@@ -358,6 +358,7 @@ internal static partial class ContractSuite
             "Spaced trap identities must round-trip through DSON without trimming or changing paired raid bytes.");
         RunRegionalMapContentContracts(root, content);
         RunMapPropNativeContracts(root, content);
+        RunMapResourceConsumerContracts(root, content);
         Console.WriteLine("Battle standalone content contracts passed.");
     }
 
@@ -374,7 +375,7 @@ internal static partial class ContractSuite
             "Curio Prop Name,Sprite Reference,Curio Type,UI String Name,Audio Event Name\n" +
             string.Concat(ids.Select(id => $"{id},{id},{id},{id},{id}\n"))),
          WriteMapContentFixture(root, $"curios/{prefix}_curio_type_library.csv",
-            string.Concat(ids.Select(id => $",,ID STRING,,RESULT TYPES\n,,{id},,Nothing\n"))));
+            string.Concat(ids.Select((id, index) => $",{index + 1},Curio\n,,ID STRING,,RESULT TYPES\n,,{id},,Nothing\n,,,,ITEM\n"))));
 
     private static JsonObject MapContentStaticTile(JsonObject map, string areaId, string tileId) =>
         map["base_root"]!["map"]!["static_dynamic"]!["static_save"]!["base_root"]!["areas"]![areaId]!["tiles"]![tileId]!.AsObject();

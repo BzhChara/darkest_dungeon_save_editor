@@ -61,7 +61,7 @@ public partial class MainWindow : Window
             foreach (var id in _selectedInitialQuirkIds)
             {
                 var definition = _heroCatalog.InitialQuirks.FirstOrDefault(
-                    quirk => quirk.Id.Equals(id, StringComparison.OrdinalIgnoreCase));
+                    quirk => quirk.Id.Equals(id, StringComparison.Ordinal));
                 diseaseCount += definition?.IsDisease == true ? 1 : 0;
                 positiveCount += definition is { IsDisease: false, IsPositive: true } ? 1 : 0;
                 negativeCount += definition is { IsDisease: false, IsPositive: false } ? 1 : 0;
