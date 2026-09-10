@@ -216,6 +216,7 @@ Real game loading after a deliberate raid edit remains a separate authorized smo
 - Do not reuse the quantity-item absent/unreferenced filter for trinkets. Native loot tables can request a rarity pool without naming individual trinket IDs; lack of an explicit ID reference is not proof that a trinket is unused. Manifest eligibility, a valid definition and active class requirements remain necessary. This is not a claim that every parsed trinket can naturally drop; see [duplicate-resource rules](resource-duplicate-semantics.md).
 - Parse ID, Chinese name, English name, rarity, definition limit, origin, current override provider, and stateful shape.
 - All `hero_class_requirements` must resolve to discovered active classes, as in the native trinket loader. Entries referencing absent classes do not enter the usable catalog.
+- Resource JSON takes the first exact member within an object, including trinket root arrays, IDs, requirements and instance counters. Wrong-typed first values cannot fall through to later duplicates. This is independent of first-entry lookup for repeated trinket IDs. File discovery follows the native entries query rather than a literal suffix; see [catalog JSON and filename rules](resource-duplicate-semantics.md#16-trinket-and-map-json-members-catalog-file-queries-2026-09-10).
 - An ordinary trinket is added to the trinket inventory in `persist.estate.json`; it is not equipped onto a hero.
 - Inventory counts do not include copies equipped by heroes.
 - `limit=0` means unlimited, not a limit of zero.
