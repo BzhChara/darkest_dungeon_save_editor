@@ -17,6 +17,9 @@ internal static partial class ContractSuite
         VerifyResourceDuplicateSemantics(content, hero, fixture.RunRoot);
         await VerifyHeroExactIdentitiesAsync(content, hero, fixture.RunRoot, fixture.Codec);
         await VerifyResourceConsumerRecordsAsync(content, hero, fixture.RunRoot, fixture.Codec);
+        await VerifyBuffPrecisionAndIdentityAsync(content, hero, fixture.RunRoot, fixture.Codec);
+        VerifyReferenceFileEligibility(content, hero, fixture.RunRoot);
+        await VerifyNativeEncounterChanceAsync(fixture.RunRoot, fixture.Codec);
         await RunEmptyEncounterSlotContractsAsync(fixture.RunRoot, fixture.Codec);
         await RunEncounterRecordContractsAsync(fixture.RunRoot, fixture.Codec);
         Console.WriteLine($"Artifacts: {fixture.RunRoot}");
@@ -77,7 +80,7 @@ internal static partial class ContractSuite
               {"id":"SD_BAD_HP","stat_type":"combat_stat_multiply","stat_sub_type":"max_hp","rule_type":"always","is_false_rule":false}
             ]}
             """);
-        Write("campaign/town_events/a.events.json", $$$"""
+        Write("campaign/town_events/a.town_events.events.json", $$$"""
             {"events":[
               {"id":"sd_recruit","data":[{"type":"bonus_recruit","string_data":"{{{originalHero.Id}}}","number_data":1}]},
               {"id":"sd_no_recruit","data":[]},
@@ -85,7 +88,7 @@ internal static partial class ContractSuite
               {"id":"sd_no_reward"}
             ]}
             """);
-        Write("campaign/town_events/b.events.json", $$$"""
+        Write("campaign/town_events/b.town_events.events.json", $$$"""
             {"events":[
               {"id":"sd_recruit","data":[{"type":"bonus_recruit","string_data":"{{{originalHero.Id}}}","number_data":2}]},
               {"id":"sd_no_recruit","data":[{"type":"bonus_recruit","string_data":"{{{originalHero.Id}}}","number_data":9}]},

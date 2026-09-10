@@ -53,7 +53,7 @@ internal static partial class ContractSuite
                    .Select(file => file.RelativePath).SequenceEqual([prefix + "/" + extra, common, tail]),
             "Root Mod overlays must replace a DLC-relative path in its original mount slot without double-counting the built-in table.");
         Assert(catalog.BridgeEncounters.All(row => !row.MonsterIds.Contains("shadowed")) &&
-               halls[2].Weight == 0.5 && halls[3].Weight == 0.7 && !halls[4].CanPlaceDirectly && halls[5].MashIndex == 5 &&
+               halls[2].Weight == 0.5 && halls[3].Weight == (double)0.7f && !halls[4].CanPlaceDirectly && halls[5].MashIndex == 5 &&
                catalog.Encounters.Single(row => row.MonsterIds.SequenceEqual(["large", "large"])).MashIndex is null,
             "The last .types and strtod-style chance prefix must match native parsing; oversized rows are skipped while missing definitions retain slots.");
         foreach (var row in catalog.DirectEncounters) BattleEncounterCatalog.ValidateDirectEncounter(row);

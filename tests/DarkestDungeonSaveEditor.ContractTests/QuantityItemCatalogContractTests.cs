@@ -98,7 +98,7 @@ internal static partial class ContractSuite
                 IsHiddenByDefault: false
             } &&
             catalogEventCostOnlyHeirloom.ReferenceEvidence.Any(evidence =>
-                evidence.Contains("quantity_reference.events.json", StringComparison.OrdinalIgnoreCase)) &&
+                evidence.Contains("quantity_reference.town_events.events.json", StringComparison.OrdinalIgnoreCase)) &&
             catalogOrphanModEssence.ReferenceStatus == QuantityItemReferenceStatus.SuspectedUnused &&
             catalogOrphanModEssence.IsHiddenByDefault &&
             catalogStoredOrphanEssence.ReferenceStatus == QuantityItemReferenceStatus.SuspectedUnused &&
@@ -151,11 +151,11 @@ internal static partial class ContractSuite
                 issue.Contains("malformed_town_override.json", StringComparison.OrdinalIgnoreCase)),
             "A malformed JSON under a raid-default path must fail open for the town catalog because its nodes could target estate or wallet storage.");
 
-        var malformedReferencePath = Path.Combine(localTownEventsRoot, "malformed_reference.json");
+        var malformedReferencePath = Path.Combine(localTownEventsRoot, "malformed_reference.town_events.events.json");
         QuantityItemCatalogResult malformedReferenceCatalog;
         File.WriteAllText(malformedReferencePath, "{ invalid", new UTF8Encoding(false));
         File.AppendAllText(localReferenceManifestPath,
-            Environment.NewLine + "campaign/town_events/malformed_reference.json 9", new UTF8Encoding(false));
+            Environment.NewLine + "campaign/town_events/malformed_reference.town_events.events.json 9", new UTF8Encoding(false));
         try
         {
             malformedReferenceCatalog = QuantityItemCatalog.Load(
@@ -177,7 +177,7 @@ internal static partial class ContractSuite
             } &&
             malformedReferenceCatalog.Issues.Any(issue =>
                 issue.Contains("could not parse active JSON file", StringComparison.OrdinalIgnoreCase) &&
-                issue.Contains("malformed_reference.json", StringComparison.OrdinalIgnoreCase)),
+                issue.Contains("malformed_reference.town_events.events.json", StringComparison.OrdinalIgnoreCase)),
             "An unreadable active reference file must fail open: unresolved Mod items stay visible as analysis-incomplete.");
 
         var malformedLootPath = Path.Combine(localLootRoot, "malformed_reference.loot.json");
@@ -214,7 +214,7 @@ internal static partial class ContractSuite
         QuantityItemCatalogResult missingReferenceCatalog;
         File.AppendAllText(
             quantityReferenceManifestPath,
-            Environment.NewLine + "campaign/town_events/missing_quantity_reference.json 100",
+            Environment.NewLine + "campaign/town_events/missing_quantity_reference.town_events.events.json 100",
             new UTF8Encoding(false));
         try
         {
@@ -236,7 +236,7 @@ internal static partial class ContractSuite
             } &&
             missingReferenceCatalog.Issues.Any(issue =>
                 issue.Contains("reference file listed by active Mod is missing", StringComparison.OrdinalIgnoreCase) &&
-                issue.Contains("missing_quantity_reference.json", StringComparison.OrdinalIgnoreCase)),
+                issue.Contains("missing_quantity_reference.town_events.events.json", StringComparison.OrdinalIgnoreCase)),
             "A missing active manifest reference file must keep unresolved Mod items visible instead of claiming they are unused.");
 
         var nonTownReferenceManifestBytes = File.ReadAllBytes(quantityReferenceManifestPath);

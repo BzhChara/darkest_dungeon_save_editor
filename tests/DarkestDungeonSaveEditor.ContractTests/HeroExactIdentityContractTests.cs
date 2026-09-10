@@ -41,13 +41,14 @@ internal static partial class ContractSuite
         GeneratedStagecoachHeroCandidate Generate(params string[] ids) => StagecoachHeroCandidateFactory.Generate(catalog, hero, 1729, ids);
         var baseline = Generate().Preview.CurrentHp;
         Assert(baseline == 20, "The independent HP fixture must retain its known base HP.");
-        foreach (var (id, expected) in new[] { ("ni_select", 20d), (" ni_select ", 30d), ("NI_SELECT", 22d), ("ni_both_buffs", 26d) })
+        foreach (var (id, expected) in new[] { ("ni_select", 20d), (" ni_select ", 30d),
+                     ("NI_SELECT", 20 * (1 + (double)0.1f)), ("ni_both_buffs", 20 * (1 + (double)0.1f + (double)0.2f)) })
         {
             var generated = Generate(id);
             var serialized = JsonNode.Parse(generated.Candidate.ToJsonString())!.AsObject();
-            Assert(generated.Preview.CurrentHp == expected && serialized["actor"]!["current_hp"]!.GetValue<double>() == expected &&
+            Assert(generated.Preview.CurrentHp == expected && (float)serialized["actor"]!["current_hp"]!.GetValue<double>() == (float)expected &&
                    serialized["quirks"]!.AsObject().Select(pair => pair.Key).SequenceEqual([id]),
-                "Raw Buff definitions, references and selected quirk IDs must reach both preview and actual candidate JSON without aliasing.");
+                $"{id}: raw Buff identities must reach preview and candidate JSON at DSON float precision: expected {expected:R}, preview {generated.Preview.CurrentHp:R}, JSON {serialized["actor"]!["current_hp"]}.");
         }
         Assert(Generate("ni_select", "NI_SELECT").Candidate["quirks"]!.AsObject().Count == 2,
             "Case-distinct quirks must remain separately selectable.");

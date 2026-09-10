@@ -101,7 +101,15 @@ public static partial class StagecoachHeroCandidateFactory
 
     private static JsonNode CreateFloat(double value)
     {
-        return JsonNode.Parse(value.ToString("0.0###############", CultureInfo.InvariantCulture))!;
+        // DSON stores these fields as float. Keep a decimal marker even for
+        // whole values, so the codec cannot infer an integer field instead.
+        var text = ((float)value).ToString("R", CultureInfo.InvariantCulture);
+        if (!text.Contains('.'))
+        {
+            var exponent = text.IndexOf('E');
+            text = exponent < 0 ? text + ".0" : text.Insert(exponent, ".0");
+        }
+        return JsonNode.Parse(text)!;
     }
 
     private static IReadOnlyList<string> TakeRandom(

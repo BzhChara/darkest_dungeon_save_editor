@@ -33,7 +33,7 @@ internal static partial class ContractSuite
                 [
                     {
                         Kind: HeroMaxHpModifierKind.Percentage,
-                        Amount: 0.2,
+                        Amount: 0.2f,
                         RuleType: "no_trinkets",
                         IsFalseRule: false
                     }
@@ -63,7 +63,7 @@ internal static partial class ContractSuite
         var maxHpConflictQuirk = heroCatalog.InitialQuirks.Single(item => item.Id == "max_hp_conflict_quirk");
         Assert(
             maxHpConflictQuirk.WriteStatus == HeroInitialQuirkWriteStatus.Direct &&
-            maxHpConflictQuirk.MaxHpModifiers is [{ Amount: 0.2 }],
+            maxHpConflictQuirk.MaxHpModifiers is [{ Amount: 0.2f }],
             "Duplicate max-HP Buffs use the last complete native definition rather than becoming ambiguous.");
         Assert(
             heroCatalog.Issues.All(issue =>
@@ -325,7 +325,7 @@ internal static partial class ContractSuite
             ["evolution_conflict_quirk"], "进化目标 'evolution_target_b' 缺失");
         var lastBuffCandidate = StagecoachHeroCandidateFactory.Generate(heroCatalog, localHero, seed: 1729,
             selectedInitialQuirkIds: ["max_hp_conflict_quirk"]);
-        Assert(Math.Abs(lastBuffCandidate.Preview.CurrentHp - localHero.BaseHp!.Value * 1.2) < 1e-9,
+        Assert(Math.Abs(lastBuffCandidate.Preview.CurrentHp - localHero.BaseHp!.Value * (1 + (double)0.2f)) < 1e-9,
             "Explicit quirk selection and generated current_hp must use the winning Buff amount.");
         AssertInitialQuirkSelectionRejected(heroCatalog, localHero, ["fatal_weakness"], "合计 HP 修正无效");
         Assert(

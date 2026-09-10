@@ -51,7 +51,7 @@ internal static partial class QuantityItemReferenceAnalyzer
                     Path.GetExtension(file.Path).Equals(".csv", StringComparison.OrdinalIgnoreCase)
                         ? new UTF8Encoding(false, true).GetString(File.ReadAllBytes(file.Path))
                         : File.ReadAllText(file.Path, Encoding.UTF8),
-                    IsLootPath(file.RelativePath)));
+                    NativeResourceFileRules.IsLootFile(file.RelativePath, enabledDlcPrefixes)));
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or DecoderFallbackException)
             {
@@ -80,7 +80,7 @@ internal static partial class QuantityItemReferenceAnalyzer
         }
 
         var reported = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var entry in ModManifestFile.ReadEntries(manifestPath, ".json", ".darkest", ".csv"))
+        foreach (var entry in ModManifestFile.ReadEntries(manifestPath, "json", ".darkest", ".csv"))
         {
             var relative = entry.RelativePath;
 
@@ -122,7 +122,7 @@ internal static partial class QuantityItemReferenceAnalyzer
         if (source.Kind is "workshop" or "local")
         {
             ModManifestFile.Require(manifestPath);
-            paths = ModManifestFile.ReadEntries(manifestPath, ".json", ".darkest", ".csv")
+            paths = ModManifestFile.ReadEntries(manifestPath, "json", ".darkest", ".csv")
                 .Select(entry => Path.GetFullPath(Path.Combine(source.Directory, entry.RelativePath)))
                 .Where(path => IsInsideSource(source.Directory, path) && File.Exists(path))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -147,14 +147,16 @@ internal static partial class QuantityItemReferenceAnalyzer
 
         foreach (var path in paths)
         {
-            if (!TextExtensions.Contains(Path.GetExtension(path)))
+            var relativePath = ContentFileOverlay.NormalizeRelativePath(source, path);
+            if (relativePath is null ||
+                (!TextExtensions.Contains(Path.GetExtension(path)) &&
+                 !NativeResourceFileRules.IsLootFile(relativePath, enabledDlcPrefixes) &&
+                 !NativeResourceFileRules.IsTownEventFile(relativePath, enabledDlcPrefixes)))
             {
                 continue;
             }
 
-            var relativePath = ContentFileOverlay.NormalizeRelativePath(source, path);
-            if (relativePath is null ||
-                !IsEligibleReferencePath(relativePath, enabledDlcPrefixes) ||
+            if (!IsEligibleReferencePath(relativePath, enabledDlcPrefixes) ||
                 !ContentDirectories.Any(directory =>
                     ContentFileOverlay.IsRootOrEnabledDlcPath(relativePath, directory, enabledDlcPrefixes)) ||
                 IsDefinitionOnlyPath(relativePath))
@@ -168,6 +170,7 @@ internal static partial class QuantityItemReferenceAnalyzer
 
     private static bool IsEligibleReferencePath(string path, IReadOnlyList<string> enabledDlcPrefixes)
     {
+        if (!NativeResourceFileRules.IsEligibleReferenceFile(path, enabledDlcPrefixes)) return false;
         if (path.EndsWith(".csv", StringComparison.OrdinalIgnoreCase))
             return path.EndsWith("curio_type_library.csv", StringComparison.OrdinalIgnoreCase) &&
                 ContentFileOverlay.IsRootOrEnabledDlcPath(path, "curios", enabledDlcPrefixes);
@@ -210,8 +213,10 @@ internal static partial class QuantityItemReferenceAnalyzer
     private static bool IsLootPath(string relativePath)
     {
         var normalized = $"/{relativePath.Replace('\\', '/').Trim('/')}";
-        return normalized.Contains("/loot/", StringComparison.OrdinalIgnoreCase) ||
-               normalized.EndsWith(".loot.json", StringComparison.OrdinalIgnoreCase);
+        // Eligibility has already established the mounted root. This check is
+        // also used for context diagnostics, where a DLC prefix may be present.
+        var lootRoot = normalized.IndexOf("/loot/", StringComparison.OrdinalIgnoreCase);
+        return lootRoot >= 0 && NativeResourceFileRules.IsLootFile(normalized[(lootRoot + 1)..], []);
     }
 
 }

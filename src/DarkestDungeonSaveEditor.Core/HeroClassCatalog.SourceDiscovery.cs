@@ -31,7 +31,8 @@ public static partial class HeroClassCatalog
             Files("heroes", $"*{HeroOverrideSuffix}"),
             Files("effects", "*.effects.darkest"),
             Files(Path.Combine("shared", "quirk"), "*quirk_library.json"),
-            Files(Path.Combine("campaign", "town_events"), "*.events.json"),
+            Files(Path.Combine("campaign", "town_events"), "*")
+                .Where(path => NativeResourceFileRules.IsTownEventFile(Path.GetRelativePath(source.Directory, path), [])).ToArray(),
             Files(Path.Combine("shared", "buffs"), "*.buffs.json"),
             Files(Path.Combine("raid", "camping"), "*.camping_skills.json"),
             Files("localization", "*.string_table.xml"),
@@ -92,8 +93,7 @@ public static partial class HeroClassCatalog
             {
                 target = quirkFiles;
             }
-            else if (ContentFileOverlay.IsRootOrEnabledDlcPath(normalizedRelative, "campaign/town_events", enabledDlcPrefixes) &&
-                     normalizedRelative.EndsWith(".events.json", StringComparison.OrdinalIgnoreCase))
+            else if (NativeResourceFileRules.IsTownEventFile(normalizedRelative, enabledDlcPrefixes))
             {
                 target = eventFiles;
             }
@@ -158,7 +158,7 @@ public static partial class HeroClassCatalog
             HeroOverrideSuffix,
             ".effects.darkest",
             "quirk_library.json",
-            ".events.json",
+            "json",
             ".buffs.json",
             ".camping_skills.json",
             ".string_table.xml",

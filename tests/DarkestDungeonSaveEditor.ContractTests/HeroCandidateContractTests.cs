@@ -257,7 +257,7 @@ internal static partial class ContractSuite
             Math.Abs(baseGameStackedHpCandidate.Preview.CurrentHp - 21.0) < 0.000001,
             "Compatible base-game max-HP quirks should add their percentages before applying the class base HP.");
         Assert(
-            baseGameStackedHpCandidate.Candidate["actor"]?["current_hp"]?.GetValue<double>() == 21.0,
+            (float)baseGameStackedHpCandidate.Candidate["actor"]!["current_hp"]!.GetValue<double>() == (float)baseGameStackedHpCandidate.Preview.CurrentHp,
             "Candidate JSON current_hp should preserve the summed base-game max-HP result.");
 
         var mixedRuleStackedHpCandidate = StagecoachHeroCandidateFactory.Generate(

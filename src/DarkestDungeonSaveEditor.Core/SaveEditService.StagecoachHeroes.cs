@@ -148,17 +148,19 @@ public sealed partial class SaveEditService
         var upgradesRoundTripRoot = JsonSupport.ReadObject(upgradesRoundTripPath);
         var rosterRoundTripRoot = JsonSupport.ReadObject(rosterRoundTripPath);
         var townRoundTripRoot = JsonSupport.ReadObject(townRoundTripPath);
+        var townWasDson = DsonSaveCodec.IsDson(townSourceCopy);
+        var rosterWasDson = DsonSaveCodec.IsDson(rosterSourceCopy);
+        var upgradesWasDson = DsonSaveCodec.IsDson(upgradesSourceCopy);
         if (!JsonNode.DeepEquals(updatedUpgrades, upgradesRoundTripRoot) ||
             !JsonNode.DeepEquals(updatedRoster, rosterRoundTripRoot) ||
-            !JsonNode.DeepEquals(updatedTown, townRoundTripRoot))
+            !(townWasDson
+                ? HasEquivalentStagecoachTownRoundTrip(updatedTown, townRoundTripRoot, preview)
+                : JsonNode.DeepEquals(updatedTown, townRoundTripRoot)))
         {
             throw new InvalidDataException(
                 "DSON roundtrip validation failed for the prepared stagecoach town/roster/upgrades edit.");
         }
 
-        var townWasDson = DsonSaveCodec.IsDson(townSourceCopy);
-        var rosterWasDson = DsonSaveCodec.IsDson(rosterSourceCopy);
-        var upgradesWasDson = DsonSaveCodec.IsDson(upgradesSourceCopy);
         if ((townWasDson && !RevisionMatches(townSourceCopy, townEncodedPath)) ||
             (rosterWasDson && !RevisionMatches(rosterSourceCopy, rosterEncodedPath)) ||
             (upgradesWasDson && !RevisionMatches(upgradesSourceCopy, upgradesEncodedPath)))
@@ -208,6 +210,40 @@ public sealed partial class SaveEditService
             DateTime.UtcNow);
         WriteJson(Path.Combine(workspace, "session.json"), prepared);
         return prepared;
+    }
+
+    internal static bool HasEquivalentStagecoachTownRoundTrip(
+        JsonObject expectedTown, JsonObject restoredTown, StagecoachHeroMutationPreview preview)
+    {
+        if (JsonNode.DeepEquals(expectedTown, restoredTown)) return true;
+
+        var pool = preview.TargetPool == StagecoachRecruitPool.Shard ? "shard_hero_recruit" : "hero_recruit";
+        var key = preview.CandidateGuid.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        JsonObject? Actor(JsonObject town)
+        {
+            JsonNode? node = town;
+            foreach (var part in new[] { "base_root", "buildings", "stage_coach", "store", pool, "generated", key, "actor" })
+                node = (node as JsonObject)?[part];
+            return node as JsonObject;
+        }
+
+        var expectedHp = Actor(expectedTown)?["current_hp"] as JsonValue;
+        var restoredHp = Actor(restoredTown)?["current_hp"] as JsonValue;
+        if (expectedHp is null || restoredHp is null ||
+            !expectedHp.TryGetValue<double>(out var expected) || !restoredHp.TryGetValue<double>(out var restored) ||
+            !float.IsFinite((float)expected) || (float)expected <= 0 ||
+            !float.IsFinite((float)restored) || (float)restored <= 0 ||
+            restoredHp.ToJsonString().IndexOfAny(['.', 'e', 'E']) < 0 ||
+            BitConverter.SingleToInt32Bits((float)expected) != BitConverter.SingleToInt32Bits((float)restored))
+            return false;
+
+        // Java versions can print different decimals for the identical DSON
+        // float (1.0E11 / 9.9999998E10). Normalize only this new hero's HP in a
+        // comparison clone after proving identical bits; all other data stays
+        // under full-document equality, including existing heroes' HP.
+        var comparable = (JsonObject)restoredTown.DeepClone();
+        Actor(comparable)!["current_hp"] = expectedHp.DeepClone();
+        return JsonNode.DeepEquals(expectedTown, comparable);
     }
 
     private static void ValidateStagecoachContentGuard(

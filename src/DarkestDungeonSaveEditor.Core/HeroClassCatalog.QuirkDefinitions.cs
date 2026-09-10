@@ -8,6 +8,17 @@ namespace DarkestDungeonSaveEditor.Core;
 
 public static partial class HeroClassCatalog
 {
+    // ActorCombatStat enum table, x64 build 27890 (0x140068E60).
+    // Only combat_stat_* uses this subtype table; other Buff families have
+    // different subtypes and must not be rejected by this check.
+    private static readonly HashSet<uint> CombatStatHashes = new[]
+    {
+        "damage_low", "damage_high", "defense_rating", "protection_rating", "speed_rating",
+        "attack_rating", "crit_chance", "max_hp", "riposte_on_hit_chance", "riposte_on_miss_chance"
+    }.Select(Loc2LocalizationReader.HashName).ToHashSet();
+    private static readonly uint MaxHpStatHash = Loc2LocalizationReader.HashName("max_hp");
+    private static readonly UTF8Encoding BuffUtf8 = new(false, true);
+
     private static HeroInitialQuirkDefinition BuildInitialQuirk(
         QuirkDefinition quirk,
         IReadOnlyDictionary<string, QuirkDefinition> effectiveQuirks,
@@ -71,25 +82,32 @@ public static partial class HeroClassCatalog
                 continue;
             }
 
+            if (buff.HasInvalidNativeString ||
+                (buff.StatType is "combat_stat_add" or "combat_stat_multiply" &&
+                 !CombatStatHashes.Contains(Loc2LocalizationReader.HashName(buff.StatSubType))))
+            {
+                unverifiedReasons.Add($"Buff '{buff.Id}' 的原生属性或条件字符串无法确认，不能可靠计算 max_hp");
+                continue;
+            }
             referencedBuffs.Add(buff);
         }
 
         var hpBuffs = referencedBuffs
-            .Where(buff => buff.StatSubType.Equals("max_hp", StringComparison.OrdinalIgnoreCase))
+            .Where(buff => Loc2LocalizationReader.HashName(buff.StatSubType) == MaxHpStatHash)
             .ToArray();
         var maxHpModifiers = new List<HeroMaxHpModifier>(hpBuffs.Length);
         foreach (var buff in hpBuffs)
         {
-            var modifierKind = buff.StatType.ToLowerInvariant() switch
+            var modifierKind = buff.StatType switch
             {
                 "combat_stat_add" => HeroMaxHpModifierKind.Flat,
                 "combat_stat_multiply" => HeroMaxHpModifierKind.Percentage,
                 _ => (HeroMaxHpModifierKind?)null
             };
-            var hasValidRuleData = buff.RuleType.ToLowerInvariant() switch
+            var hasValidRuleData = buff.RuleType switch
             {
                 "always" or "no_trinkets" or "afflicted" => true,
-                "in_mode" => !string.IsNullOrWhiteSpace(buff.RuleString),
+                "in_mode" => buff.RuleString.Length > 0,
                 "lightabove" => buff.RuleFloat is { } threshold && double.IsFinite(threshold),
                 _ => false
             };
@@ -337,18 +355,42 @@ public static partial class HeroClassCatalog
 
             var hasRuleData = item.TryGetProperty("rule_data", out var ruleData) &&
                               ruleData.ValueKind == JsonValueKind.Object;
+            var invalidString = false;
 
             yield return new BuffDefinition(
                 id,
-                ReadJsonString(item, "stat_type"),
-                ReadJsonString(item, "stat_sub_type"),
-                ReadJsonDouble(item, "amount"),
-                ReadJsonString(item, "rule_type"),
+                ReadNativeBuffString(item, "stat_type", ref invalidString),
+                ReadNativeBuffString(item, "stat_sub_type", ref invalidString),
+                ReadJsonFloat(item, "amount"),
+                ReadNativeBuffString(item, "rule_type", ref invalidString),
                 ReadJsonBoolean(item, "is_false_rule"),
-                hasRuleData ? ReadJsonDouble(ruleData, "float") : null,
-                hasRuleData ? ReadJsonString(ruleData, "string") : string.Empty,
+                hasRuleData ? ReadJsonFloat(ruleData, "float") : null,
+                hasRuleData ? ReadNativeBuffString(ruleData, "string", ref invalidString) : string.Empty,
                 source,
-                Path.GetFullPath(path));
+                Path.GetFullPath(path)) { HasInvalidNativeString = invalidString };
+        }
+    }
+
+    private static double? ReadJsonFloat(JsonElement element, string propertyName) =>
+        ReadJsonDouble(element, propertyName) is { } value ? (double)(float)value : null;
+
+    private static string ReadNativeBuffString(JsonElement element, string propertyName, ref bool invalid)
+    {
+        // Buff enum names and rule strings are copied to 64-byte native buffers.
+        // Preserve case/whitespace, stop at NUL and never substitute a replacement
+        // character when truncation splits a UTF-8 sequence.
+        var value = ReadJsonIdentity(element, propertyName);
+        var nul = value.IndexOf('\0');
+        if (nul >= 0) value = value[..nul];
+        try
+        {
+            var bytes = BuffUtf8.GetBytes(value);
+            return BuffUtf8.GetString(bytes, 0, Math.Min(bytes.Length, 63));
+        }
+        catch (Exception error) when (error is EncoderFallbackException or DecoderFallbackException)
+        {
+            invalid = true;
+            return string.Empty;
         }
     }
 
