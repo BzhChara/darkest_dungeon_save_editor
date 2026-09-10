@@ -34,7 +34,7 @@ public partial class MainWindow : Window
                     HeroLevelComboBox.SelectedItem = _heroLevelChoices.FirstOrDefault(choice => choice.ResolveLevel == level)
                         ?? _heroLevelChoices.FirstOrDefault();
                     _selectedInitialQuirkIds = HeroGrid.SelectedItem is null ? [] : quirks
-                        .Where(id => _heroCatalog.InitialQuirks.Any(quirk => quirk.Id.Equals(id, StringComparison.OrdinalIgnoreCase)))
+                        .Where(id => _heroCatalog.InitialQuirks.Any(quirk => quirk.Id.Equals(id, StringComparison.Ordinal)))
                         .ToArray();
                 }
             }

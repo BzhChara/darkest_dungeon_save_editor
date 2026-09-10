@@ -431,7 +431,8 @@ internal static partial class ContractSuite
             localHero,
             ["test_disease", "test_disease_two", "test_disease_three", "test_disease_four"],
             "疾病 3 个");
-        AssertHeroGenerationRejected(heroCatalog, localHero, ["steady", "STEADY"], "重复选择");
+        AssertHeroGenerationRejected(heroCatalog, localHero, ["steady", "steady"], "重复选择");
+        AssertHeroGenerationRejected(heroCatalog, localHero, ["steady", "STEADY"], "不在当前活动内容目录");
         AssertHeroGenerationRejected(heroCatalog, localHero, ["missing_quirk"], "不在当前活动内容目录");
         AssertHeroLevelGenerationRejected(heroCatalog, localHero, 7, "0 到 6");
 

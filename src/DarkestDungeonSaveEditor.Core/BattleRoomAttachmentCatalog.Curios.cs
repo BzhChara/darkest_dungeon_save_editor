@@ -1,6 +1,3 @@
-using System.Text;
-using Microsoft.VisualBasic.FileIO;
-
 namespace DarkestDungeonSaveEditor.Core;
 
 public static partial class BattleRoomAttachmentCatalog
@@ -18,113 +15,72 @@ public static partial class BattleRoomAttachmentCatalog
     }
 
     private static CurioResources ReadCurioResources(
-        IReadOnlyList<EffectiveContentFile> files, List<string> issues)
+        IReadOnlyList<EffectiveContentFile> files, PropResources resources, List<string> issues)
     {
-        // Save resource hashes are case-sensitive; only filesystem paths are not.
         var types = new HashSet<string>(StringComparer.Ordinal);
-        var props = new Dictionary<string, CurioProp>(StringComparer.Ordinal);
-        foreach (var file in files)
+        // Native loads every type library before it consumes any prop mapping.
+        foreach (var file in files.Where(file => file.Path.EndsWith("curio_type_library.csv", StringComparison.OrdinalIgnoreCase)))
         {
-            var isTypeLibrary = file.Path.EndsWith("curio_type_library.csv", StringComparison.OrdinalIgnoreCase);
-            var expectsTypeId = false;
-            foreach (var row in ReadCurioCsv(file.Path, issues))
+            var inBlock = false;
+            var itemSection = false;
+            NativeCurioCsvReader.Row? first = null;
+            void FinishBlock()
             {
-                var fields = row.Fields;
-                if (isTypeLibrary)
+                if (first is null || first.Count < 3 || !IsPropIdentity(first.Fields[2]))
                 {
-                    // The native library is a series of blocks, not a flat CSV table.
-                    // Its ID is column 3 on the row immediately after ID STRING.
-                    if (expectsTypeId)
-                    {
-                        if (fields.Length > 4 && !string.IsNullOrWhiteSpace(fields[2]) &&
-                            (string.IsNullOrWhiteSpace(fields[4]) ||
-                             fields[4].Equals("Nothing", StringComparison.OrdinalIgnoreCase)))
-                        {
-                            types.Add(fields[2]);
-                        }
-                        else
-                        {
-                            issues.Add($"奇物互动类型缺少有效 ID 行，已跳过该块：{file.Path}:{row.Line}");
-                        }
-                    }
-                    expectsTypeId = fields.Length > 2 && fields[2].Equals("ID STRING", StringComparison.OrdinalIgnoreCase);
-                    continue;
+                    issues.Add($"奇物互动类型缺少有效 ID 行，已跳过该块：{file.Path}:{first?.Line}");
+                    return;
                 }
-
-                if (fields.Length == 0 || string.IsNullOrWhiteSpace(fields[0]) ||
-                    fields[0].Equals("Curio Prop Name", StringComparison.OrdinalIgnoreCase))
-                {
-                    continue;
-                }
-                if (fields.Length < 5)
-                {
-                    issues.Add($"奇物道具映射列数不足，已跳过该行：{file.Path}:{row.Line}");
-                    continue;
-                }
-                var prop = new CurioProp(file.Source, fields[1], fields[2], fields[3], false);
-                if (!props.TryGetValue(fields[0], out var previous) ||
-                    ContentFileOverlay.ComparePriority(file.Source, previous.Source) > 0)
-                {
-                    props[fields[0]] = prop;
-                }
-                else if (ContentFileOverlay.ComparePriority(file.Source, previous.Source) == 0 &&
-                    (prop.SpriteId != previous.SpriteId || prop.TypeId != previous.TypeId || prop.NameId != previous.NameId))
-                {
-                    props[fields[0]] = previous with { IsAmbiguous = true };
-                }
+                var id = first.Fields[2];
+                types.Add(id);
+                var resource = resources.Find(id);
+                if (resource is null && resources.Find("curio_default") is { } parent)
+                    resource = resources.Add(id, -1, parent.Data with { Parents = [.. parent.Data.Parents, "curio_default"] });
+                if (resource is not null) resource.Data = resource.Data with { InstanceType = "curio" };
             }
-            if (expectsTypeId)
+            foreach (var row in NativeCurioCsvReader.Read(file.Path, 24, mapping: false))
             {
-                issues.Add($"奇物互动类型文件末尾缺少 ID 行：{file.Path}");
+                if (!inBlock)
+                {
+                    if (row.Fields[2] == "ID STRING") { inBlock = true; itemSection = false; first = null; }
+                    continue;
+                }
+                if (itemSection && row.Fields[1].Length > 0)
+                {
+                    FinishBlock();
+                    inBlock = false; // The numbered separator is consumed, not part of the next block.
+                    continue;
+                }
+                first ??= row;
+                if (row.Fields[4] == "ITEM") itemSection = true;
             }
+            if (inBlock) FinishBlock();
         }
-        return new CurioResources(types, props);
-    }
-
-    private static IReadOnlyList<CurioCsvRow> ReadCurioCsv(string path, List<string> issues)
-    {
-        var rows = new List<CurioCsvRow>();
-        try
+        foreach (var file in files.Where(file => file.Path.EndsWith("curio_props.csv", StringComparison.OrdinalIgnoreCase)))
+        foreach (var row in NativeCurioCsvReader.Read(file.Path, 16, mapping: true))
         {
-            // Part of the .NET runtime; handles quoted commas and multiline CSV fields.
-            using var parser = new TextFieldParser(path, Encoding.UTF8, detectEncoding: true)
+            var fields = row.Fields;
+            if (row.Count < 2 || fields[2].Length == 0) continue;
+            if (!IsPropIdentity(fields[0]))
+                throw new InvalidDataException($"奇物道具名称无效或超过原生缓冲区：{file.Path}:{row.Line}");
+            var resource = resources.GetOrCreate(fields[0]);
+            var name = fields[3].Length > 0 ? fields[3] :
+                resource.Data.NameId.Length > 0 ? resource.Data.NameId : fields[1];
+            resource.Data = resource.Data with
             {
-                TextFieldType = FieldType.Delimited,
-                Delimiters = [","],
-                HasFieldsEnclosedInQuotes = true,
-                TrimWhiteSpace = true
+                InstanceType = "curio", SpriteId = fields[1], CurioTypeId = fields[2], NameId = name
             };
-            while (!parser.EndOfData)
-            {
-                var line = parser.LineNumber;
-                try
-                {
-                    rows.Add(new CurioCsvRow(line, parser.ReadFields() ?? []));
-                }
-                catch (MalformedLineException)
-                {
-                    issues.Add($"奇物 CSV 行格式无效，已跳过：{path}:{parser.ErrorLineNumber}");
-                    // Keep the failed row boundary: never take the next block's label as an ID.
-                    rows.Add(new CurioCsvRow(line, []));
-                }
-            }
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            issues.Add($"奇物 CSV 读取失败：{path}；{ex.Message}");
-            return [];
-        }
-        return rows;
+        var collidingProps = NativeResourceIdentity.FindCollisions(resources.Ids);
+        var collidingTypes = NativeResourceIdentity.FindCollisions(types);
+        foreach (var id in collidingProps.Concat(collidingTypes).Distinct(StringComparer.Ordinal))
+            issues.Add($"地图资源原生 hash collision：{id}");
+        return new CurioResources(types, collidingProps, collidingTypes);
     }
 
-    private static string GetCurioNameId(BattleRoomAttachmentDefinition definition, CurioResources resources) =>
-        !definition.IsRegionBound && resources.Props.TryGetValue(definition.Id, out var prop)
-            ? prop.NameId
-            : definition.Id;
+    private static string GetCurioNameId(BattleRoomAttachmentDefinition definition, PropResources resources) =>
+        !definition.IsRegionBound && resources.Find(definition.Id) is { } prop ? prop.Data.NameId : definition.Id;
 
     private sealed record CurioResources(
-        IReadOnlySet<string> TypeIds, IReadOnlyDictionary<string, CurioProp> Props);
-    private sealed record CurioProp(
-        ActiveContentSource Source, string SpriteId, string TypeId, string NameId, bool IsAmbiguous);
-    private sealed record CurioCsvRow(long Line, string[] Fields);
+        IReadOnlySet<string> TypeIds, IReadOnlySet<string> CollidingPropIds, IReadOnlySet<string> CollidingTypeIds);
 }

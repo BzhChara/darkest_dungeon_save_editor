@@ -34,9 +34,9 @@ public partial class InitialQuirkSelectionDialog : Window
         _resolveLevel = resolveLevel;
 
         InitializeComponent();
-        var selectedIds = selectedQuirkIds.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var selectedIds = selectedQuirkIds.ToHashSet(StringComparer.Ordinal);
         foreach (var group in catalog.InitialQuirks
-                     .GroupBy(quirk => quirk.Id, StringComparer.OrdinalIgnoreCase)
+                     .GroupBy(quirk => quirk.Id, StringComparer.Ordinal)
                      .OrderBy(group => group.First().Kind)
                      .ThenBy(group => group.First().IsPositive switch
                      {
@@ -230,8 +230,8 @@ public partial class InitialQuirkSelectionDialog : Window
             }
 
             var incompatible = selectedDefinitions.FirstOrDefault(selected =>
-                selected.IncompatibleQuirkIds.Contains(row.Id, StringComparer.OrdinalIgnoreCase) ||
-                row.Definition.IncompatibleQuirkIds.Contains(selected.Id, StringComparer.OrdinalIgnoreCase));
+                selected.IncompatibleQuirkIds.Contains(row.Id, StringComparer.Ordinal) ||
+                row.Definition.IncompatibleQuirkIds.Contains(selected.Id, StringComparer.Ordinal));
             if (incompatible is not null)
             {
                 var incompatibilityReason =

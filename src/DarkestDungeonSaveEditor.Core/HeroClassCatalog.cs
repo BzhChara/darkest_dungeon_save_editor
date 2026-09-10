@@ -20,8 +20,8 @@ public static partial class HeroClassCatalog
         var candidates = new Dictionary<string, List<HeroCandidate>>(StringComparer.OrdinalIgnoreCase);
         var eventCandidates = new Dictionary<string, List<RecruitEventGroup>>(StringComparer.OrdinalIgnoreCase);
         var effectCandidates = new Dictionary<string, List<EffectQuirkAssignment>>(StringComparer.OrdinalIgnoreCase);
-        var quirkCandidates = new Dictionary<string, List<QuirkDefinition>>(StringComparer.OrdinalIgnoreCase);
-        var buffCandidates = new Dictionary<string, List<BuffDefinition>>(StringComparer.OrdinalIgnoreCase);
+        var quirkCandidates = new Dictionary<string, List<QuirkDefinition>>(StringComparer.Ordinal);
+        var buffCandidates = new Dictionary<string, List<BuffDefinition>>(StringComparer.Ordinal);
         var campingSkills = new Dictionary<string, CampingSkillBuilder>(StringComparer.Ordinal);
         var heroNames = new HashSet<string>(StringComparer.Ordinal);
         var sourceFiles = new List<SourceFiles>();
@@ -225,7 +225,7 @@ public static partial class HeroClassCatalog
                 .SelectMany(quirk => quirk.AllSources)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToArray(),
-            StringComparer.OrdinalIgnoreCase);
+            StringComparer.Ordinal);
 
         var effectiveEffects = ResolveOrderedDefinitions(
             effectCandidates,
@@ -239,7 +239,7 @@ public static partial class HeroClassCatalog
         if (quirkHashCollisions.Count > 0) issues.Add("Quirk IDs share native hashes and remain unresolved: " + string.Join(", ", quirkHashCollisions));
         var effectiveQuirks = quirkCandidates.Where(pair => !pair.Value.Any(quirk => quirkHashCollisions.Contains(quirk.Id)) && pair.Value.Select(value => value.Id)
                 .Distinct(StringComparer.Ordinal).Count() == 1).ToDictionary(pair => pair.Key,
-            pair => pair.Value[^1], StringComparer.OrdinalIgnoreCase);
+            pair => pair.Value[^1], StringComparer.Ordinal);
         var effectiveBuffs = ResolveOrderedDefinitions(
             buffCandidates,
             definition => definition.Id,

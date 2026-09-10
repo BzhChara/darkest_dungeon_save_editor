@@ -1,5 +1,4 @@
 using System.Text.Json;
-using System.Text.Json.Nodes;
 
 namespace DarkestDungeonSaveEditor.Core;
 
@@ -9,130 +8,87 @@ public static partial class BattleRoomAttachmentCatalog
         IReadOnlyList<ActiveContentSource> sources, List<string> issues)
     {
         var enabledDlcPrefixes = ContentFileOverlay.GetEnabledDlcPrefixes(sources);
-        return NativeContentFileResolver.Resolve(sources.SelectMany(source =>
+        var files = NativeContentFileResolver.Resolve(sources.SelectMany(source =>
                 EnumeratePropFiles(source, enabledDlcPrefixes, issues, "props", "*.json", ".json")
                     .Where(path => Path.GetFileName(path).ToLowerInvariant() is
                         "prop_definitions.json" or "trap_definitions.json" or "obstacle_definitions.json")
                     .Select(path => new ContentFileCandidate(source, path))).ToArray(), sources,
             "Map prop resource", issues);
+        int Stage(EffectiveContentFile file)
+        {
+            var relative = file.RelativePath;
+            var prefix = enabledDlcPrefixes.OrderByDescending(value => value.Length)
+                .FirstOrDefault(value => relative.StartsWith(value + "/", StringComparison.OrdinalIgnoreCase));
+            if (prefix is not null) relative = relative[(prefix.Length + 1)..];
+            var root = relative.Count(character => character == '/') == 1;
+            return (root, Path.GetFileName(relative).ToLowerInvariant()) switch
+            {
+                (true, "prop_definitions.json") => 0,
+                (true, "obstacle_definitions.json") => 1,
+                (true, "trap_definitions.json") => 2,
+                (false, "prop_definitions.json") => 3,
+                (false, "trap_definitions.json") => 4,
+                _ => 5
+            };
+        }
+        // 0x1404D87A0 opens the three root paths before the subdirectory searches.
+        // Stable ordering preserves native resolver slots within each searched family.
+        return files.OrderBy(Stage).ToArray();
     }
 
-    private static Dictionary<string, PropResource> ReadResources(
-        IReadOnlyList<EffectiveContentFile> files, List<string> issues)
+    private static PropResources ReadResources(
+        IReadOnlyList<EffectiveContentFile> files)
     {
-        var resources = new Dictionary<string, PropResource>(StringComparer.Ordinal);
+        var resources = new PropResources();
         foreach (var file in files)
         {
-            try
+            try { ReadPropFile(file, resources); }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException or JsonException)
             {
-                if (JsonSupport.ReadObject(file.Path)["props"] is not JsonArray props)
-                {
-                    continue;
-                }
-                foreach (var prop in props.OfType<JsonObject>())
-                {
-                    if (prop["name"] is not JsonValue nameNode ||
-                        !nameNode.TryGetValue<string>(out var name) || string.IsNullOrWhiteSpace(name))
-                    {
-                        issues.Add($"地图资源定义缺少名称，已跳过该项：{file.Path}");
-                        continue;
-                    }
-                    var resource = new PropResource(file.Source, prop, false);
-                    if (!resources.TryGetValue(name, out var previous) ||
-                        ContentFileOverlay.ComparePriority(file.Source, previous.Source) > 0)
-                    {
-                        resources[name] = resource;
-                    }
-                    else if (ContentFileOverlay.ComparePriority(file.Source, previous.Source) == 0 &&
-                        !JsonNode.DeepEquals(prop, previous.Data))
-                    {
-                        resources[name] = previous with { IsAmbiguous = true };
-                    }
-                }
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
-            {
-                issues.Add($"地图资源定义读取失败：{file.Path}；{ex.Message}");
+                // A partial library could revive an earlier object or miss a parent.
+                throw new InvalidDataException($"地图资源定义读取失败：{file.Path}；{error.Message}", error);
             }
         }
         return resources;
     }
 
     private static string? GetResourceRejection(
-        BattleRoomAttachmentDefinition definition, IReadOnlyDictionary<string, PropResource> resources,
-        CurioResources curios)
+        BattleRoomAttachmentDefinition definition, PropResources resources, CurioResources curios)
     {
-        if (definition.Kind is not (BattleRoomAttachmentKind.Trap or BattleRoomAttachmentKind.Obstacle))
-        {
-            if (!curios.Props.TryGetValue(definition.Id, out var prop))
-            {
-                return $"未找到活动奇物道具映射 {definition.Id}（curio_props.csv）";
-            }
-            if (prop.IsAmbiguous)
-            {
-                return $"同优先级奇物道具映射存在歧义：{definition.Id}";
-            }
-            if (string.IsNullOrWhiteSpace(prop.SpriteId) || string.IsNullOrWhiteSpace(prop.TypeId) ||
-                !curios.TypeIds.Contains(prop.TypeId))
-            {
-                return $"奇物道具缺少图像引用或活动互动类型 {prop.TypeId}（curio_type_library.csv）";
-            }
-            return null;
-        }
-        if (string.IsNullOrWhiteSpace(definition.OriginDungeonId))
-        {
+        if (curios.CollidingPropIds.Contains(definition.Id))
+            return $"地图资源存在原生 hash collision：{definition.Id}";
+        var isRegional = definition.Kind is BattleRoomAttachmentKind.Trap or BattleRoomAttachmentKind.Obstacle;
+        if (isRegional && string.IsNullOrWhiteSpace(definition.OriginDungeonId))
             return "无法从资源池路径确认所属副本区域";
-        }
-        var expectedType = definition.Kind == BattleRoomAttachmentKind.Trap ? "trap" : "obstacle";
-        var current = definition.Id;
-        var visited = new HashSet<string>(StringComparer.Ordinal);
-        while (visited.Add(current))
+        var expectedType = definition.Kind switch
         {
-            if (!resources.TryGetValue(current, out var resource))
+            BattleRoomAttachmentKind.Trap => "trap",
+            BattleRoomAttachmentKind.Obstacle => "obstacle",
+            _ => "curio"
+        };
+        // The shared catalog has no selected quest difficulty. Accept only when every
+        // supported query resolves to a suitable object; never infer a universal winner.
+        var views = Enumerable.Range(1, 7).Select(level => resources.Find(definition.Id, level)).Distinct();
+        foreach (var resource in views)
+        {
+            if (resource is null) return $"未找到活动资源定义 {definition.Id}";
+            var data = resource.Data;
+            if (data.Rejection is not null) return data.Rejection;
+            if (data.Parents.Any(curios.CollidingPropIds.Contains))
+                return "继承资源存在原生 hash collision";
+            if (data.InstanceType != expectedType)
+                return $"无法确认资源在全部难度下属于 {expectedType} 类型";
+            if (isRegional)
             {
-                return $"未找到活动资源定义 {current}";
+                if (data.GenerateAmbush.Length > 0 || data.Teleport || data.AncestorTalk)
+                    return "资源带有伏击、传送或剧情交互，尚不属于普通地图内容写入范围";
             }
-            if (resource.IsAmbiguous)
+            else if (string.IsNullOrWhiteSpace(data.SpriteId) || data.CurioTypeId is null ||
+                !curios.TypeIds.Contains(data.CurioTypeId) || curios.CollidingTypeIds.Contains(data.CurioTypeId))
             {
-                return $"同优先级资源定义存在歧义：{current}";
+                return $"奇物道具缺少图像映射或活动互动类型 {data.CurioTypeId}（curio_props.csv / curio_type_library.csv）";
             }
-            if (HasScriptedBehavior(resource.Data))
-            {
-                return "资源带有伏击、传送或剧情交互，尚不属于普通地图内容写入范围";
-            }
-            if (current.Equals(expectedType, StringComparison.Ordinal))
-            {
-                return null;
-            }
-            if (resource.Data["default_data"] is not JsonObject data ||
-                data["inherits_from"] is not JsonObject inherits ||
-                inherits["prop_type_name"] is not JsonValue parentNode ||
-                !parentNode.TryGetValue<string>(out var parent) || string.IsNullOrWhiteSpace(parent))
-            {
-                return $"无法确认资源属于 {expectedType} 类型";
-            }
-            current = parent;
         }
-        return "资源继承存在循环";
+        return null;
     }
-
-    private static bool HasScriptedBehavior(JsonNode? node)
-    {
-        if (node is JsonArray array)
-        {
-            return array.Any(HasScriptedBehavior);
-        }
-        if (node is not JsonObject obj)
-        {
-            return false;
-        }
-        return obj.Any(pair =>
-            (pair.Key is "generate_ambush" or "teleport" or "ancestor_talk" &&
-             pair.Value is JsonValue value &&
-             ((value.TryGetValue<bool>(out var flag) && flag) ||
-              (value.TryGetValue<string>(out var text) && !string.IsNullOrWhiteSpace(text)))) ||
-            HasScriptedBehavior(pair.Value));
-    }
-
-    private sealed record PropResource(ActiveContentSource Source, JsonObject Data, bool IsAmbiguous);
 }

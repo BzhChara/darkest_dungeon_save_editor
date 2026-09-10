@@ -9,11 +9,11 @@ public static partial class StagecoachHeroCandidateFactory
         IReadOnlyList<HeroInitialQuirkDefinition> allQuirks,
         IReadOnlyCollection<string> selectedIds)
     {
-        var uniqueIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var uniqueIds = new HashSet<string>(StringComparer.Ordinal);
         var selected = new List<HeroInitialQuirkDefinition>(selectedIds.Count);
         foreach (var rawId in selectedIds)
         {
-            var id = rawId?.Trim();
+            var id = rawId;
             if (string.IsNullOrWhiteSpace(id))
             {
                 throw new InvalidOperationException("初始怪癖 ID 不能为空。");
@@ -24,7 +24,7 @@ public static partial class StagecoachHeroCandidateFactory
             }
 
             var matches = allQuirks
-                .Where(quirk => quirk.Id.Equals(id, StringComparison.OrdinalIgnoreCase))
+                .Where(quirk => quirk.Id.Equals(id, StringComparison.Ordinal))
                 .ToArray();
             if (matches.Length != 1)
             {
@@ -69,8 +69,8 @@ public static partial class StagecoachHeroCandidateFactory
             {
                 var left = selected[leftIndex];
                 var right = selected[rightIndex];
-                if (left.IncompatibleQuirkIds.Contains(right.Id, StringComparer.OrdinalIgnoreCase) ||
-                    right.IncompatibleQuirkIds.Contains(left.Id, StringComparer.OrdinalIgnoreCase))
+                if (left.IncompatibleQuirkIds.Contains(right.Id, StringComparer.Ordinal) ||
+                    right.IncompatibleQuirkIds.Contains(left.Id, StringComparer.Ordinal))
                 {
                     throw new InvalidOperationException(
                         $"初始怪癖 '{left.Id}' 与 '{right.Id}' 互斥，不能同时选择。");

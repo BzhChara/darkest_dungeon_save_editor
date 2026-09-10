@@ -8,6 +8,14 @@ namespace DarkestDungeonSaveEditor.Core;
 
 public static partial class HeroClassCatalog
 {
+    // Resource identities are hashed from their original bytes by the game.
+    // Display/enum helpers must not normalize an identity before it is resolved.
+    private static string ReadJsonIdentity(JsonElement element, string propertyName) =>
+        element.ValueKind == JsonValueKind.Object &&
+        element.TryGetProperty(propertyName, out var property) && property.ValueKind == JsonValueKind.String
+            ? property.GetString() ?? string.Empty
+            : string.Empty;
+
     private static string ReadJsonString(JsonElement element, string propertyName)
     {
         return element.TryGetProperty(propertyName, out var property) && property.ValueKind == JsonValueKind.String
@@ -48,9 +56,9 @@ public static partial class HeroClassCatalog
         }
 
         return property.EnumerateArray()
-            .Where(item => item.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(item.GetString()))
-            .Select(item => item.GetString()!.Trim())
-            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Where(item => item.ValueKind == JsonValueKind.String && !string.IsNullOrEmpty(item.GetString()))
+            .Select(item => item.GetString()!)
+            .Distinct(StringComparer.Ordinal)
             .ToArray();
     }
 

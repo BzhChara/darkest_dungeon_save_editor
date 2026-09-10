@@ -46,7 +46,7 @@ internal static partial class ContractSuite
         WriteMapContentFixture(baseRoot, "dungeons/overflow/overflow.props.darkest", "traps: .chance 1e40 .types alpha");
         WriteMapContentFixture(baseRoot, "dungeons/disabled/disabled.props.darkest", "traps: .chance 0 .types zero");
         WriteMapContentFixture(baseRoot, "props/prop_definitions.json", """
-            { "props": [ { "name": "trap", "default_data": {} }, { "name": "obstacle", "default_data": {} } ] }
+            { "props": [ { "name": "trap", "default_data": { "instance_type": "trap" } }, { "name": "obstacle", "default_data": { "instance_type": "obstacle" } } ] }
             """);
         var traps = new JsonArray();
         foreach (var id in new[] { "alpha", "beta", "gamma", "zero", "negative", "nan", "infinity", "absent", "duplicate", "scripted" })

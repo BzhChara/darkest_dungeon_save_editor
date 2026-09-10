@@ -150,9 +150,9 @@ public static partial class BattleRoomAttachmentCatalog
         var issues = new List<string>();
         var effectiveFiles = ResolveEffectivePropFiles(activeContent.Sources, issues);
         var resourceFiles = ResolveEffectiveResourceFiles(activeContent.Sources, issues);
-        var resources = ReadResources(resourceFiles, issues);
+        var resources = ReadResources(resourceFiles);
         var curioFiles = ResolveEffectiveCurioFiles(activeContent.Sources, issues);
-        var curios = ReadCurioResources(curioFiles, issues);
+        var curios = ReadCurioResources(curioFiles, resources, issues);
         var fingerprints = effectiveFiles
             .Concat(resourceFiles)
             .Concat(curioFiles)
@@ -219,13 +219,13 @@ public static partial class BattleRoomAttachmentCatalog
         var localization = ContentLocalizationCatalog.Load(
             activeContent,
             definitions
-                .Select(definition => ContentLocalizationCatalog.GetCurioTitleKey(GetCurioNameId(definition, curios)))
+                .Select(definition => ContentLocalizationCatalog.GetCurioTitleKey(GetCurioNameId(definition, resources)))
                 .Distinct(StringComparer.Ordinal));
         issues.AddRange(localization.Issues);
         definitions = definitions
             .Select(definition => definition with
             {
-                LocalizedName = localization.GetCurioTitle(GetCurioNameId(definition, curios))
+                LocalizedName = localization.GetCurioTitle(GetCurioNameId(definition, resources))
             })
             .OrderBy(definition => definition.Kind)
             .ThenBy(definition => definition.ChineseName == "—")
@@ -301,8 +301,8 @@ public static partial class BattleRoomAttachmentCatalog
         {
             throw new InvalidOperationException("所选地图内容的存档哈希与另一项资源冲突。");
         }
-        var resources = ReadResources(ResolveEffectiveResourceFiles(definition.CatalogGuard.ActiveSources, issues), issues);
-        var curios = ReadCurioResources(ResolveEffectiveCurioFiles(definition.CatalogGuard.ActiveSources, issues), issues);
+        var resources = ReadResources(ResolveEffectiveResourceFiles(definition.CatalogGuard.ActiveSources, issues));
+        var curios = ReadCurioResources(ResolveEffectiveCurioFiles(definition.CatalogGuard.ActiveSources, issues), resources, issues);
         if (GetResourceRejection(definition, resources, curios) is { } rejection)
         {
             throw new InvalidOperationException($"所选地图内容不可写入：{rejection}");
