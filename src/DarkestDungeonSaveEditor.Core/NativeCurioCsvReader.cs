@@ -12,8 +12,36 @@ internal static class NativeCurioCsvReader
     internal sealed record Row(int Line, int Count, string[] Fields);
 
     public static IReadOnlyList<Row> Read(string path, int columns, bool mapping)
+        => Read(File.ReadAllBytes(path), path, columns, mapping);
+
+    internal static IReadOnlyList<Row> ReadFromText(string text, string path, int columns, bool mapping)
+        => Read(StrictUtf8.GetBytes(text), path, columns, mapping);
+
+    internal static IEnumerable<IReadOnlyList<Row>> TypeBlocks(IEnumerable<Row> rows)
     {
-        var bytes = File.ReadAllBytes(path);
+        List<Row>? block = null;
+        var itemSection = false;
+        foreach (var row in rows)
+        {
+            if (block is null)
+            {
+                if (row.Fields[2] == "ID STRING") { block = []; itemSection = false; }
+                continue;
+            }
+            if (itemSection && row.Fields[1].Length > 0)
+            {
+                yield return block;
+                block = null; // The separator itself is consumed by the native block reader.
+                continue;
+            }
+            block.Add(row);
+            if (row.Fields[4] == "ITEM") itemSection = true;
+        }
+        if (block is not null) yield return block;
+    }
+
+    private static IReadOnlyList<Row> Read(byte[] bytes, string path, int columns, bool mapping)
+    {
         var rows = new List<Row>();
         var fields = Enumerable.Repeat(string.Empty, columns).ToArray();
         var offset = 0;

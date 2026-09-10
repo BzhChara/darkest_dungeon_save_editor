@@ -21,15 +21,13 @@ public static partial class BattleRoomAttachmentCatalog
         // Native loads every type library before it consumes any prop mapping.
         foreach (var file in files.Where(file => file.Path.EndsWith("curio_type_library.csv", StringComparison.OrdinalIgnoreCase)))
         {
-            var inBlock = false;
-            var itemSection = false;
-            NativeCurioCsvReader.Row? first = null;
-            void FinishBlock()
+            foreach (var block in NativeCurioCsvReader.TypeBlocks(NativeCurioCsvReader.Read(file.Path, 24, mapping: false)))
             {
+                var first = block.FirstOrDefault();
                 if (first is null || first.Count < 3 || !IsPropIdentity(first.Fields[2]))
                 {
                     issues.Add($"奇物互动类型缺少有效 ID 行，已跳过该块：{file.Path}:{first?.Line}");
-                    return;
+                    continue;
                 }
                 var id = first.Fields[2];
                 types.Add(id);
@@ -38,23 +36,6 @@ public static partial class BattleRoomAttachmentCatalog
                     resource = resources.Add(id, -1, parent.Data with { Parents = [.. parent.Data.Parents, "curio_default"] });
                 if (resource is not null) resource.Data = resource.Data with { InstanceType = "curio" };
             }
-            foreach (var row in NativeCurioCsvReader.Read(file.Path, 24, mapping: false))
-            {
-                if (!inBlock)
-                {
-                    if (row.Fields[2] == "ID STRING") { inBlock = true; itemSection = false; first = null; }
-                    continue;
-                }
-                if (itemSection && row.Fields[1].Length > 0)
-                {
-                    FinishBlock();
-                    inBlock = false; // The numbered separator is consumed, not part of the next block.
-                    continue;
-                }
-                first ??= row;
-                if (row.Fields[4] == "ITEM") itemSection = true;
-            }
-            if (inBlock) FinishBlock();
         }
         foreach (var file in files.Where(file => file.Path.EndsWith("curio_props.csv", StringComparison.OrdinalIgnoreCase)))
         foreach (var row in NativeCurioCsvReader.Read(file.Path, 16, mapping: true))

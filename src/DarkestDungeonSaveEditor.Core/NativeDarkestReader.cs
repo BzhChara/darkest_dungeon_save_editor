@@ -6,10 +6,7 @@ namespace DarkestDungeonSaveEditor.Core;
 
 internal static partial class NativeDarkestReader
 {
-    [GeneratedRegex(
-        @"(?<kind>[A-Za-z_]+):(?<body>.*?)(?=[A-Za-z_]+:|\z)",
-        RegexOptions.CultureInvariant | RegexOptions.Singleline)]
-    private static partial Regex EntryRegex();
+    internal sealed record Record(string Kind, string Body, int SourceLine, int RecordIndex);
 
     internal static IEnumerable<(string Kind, string Body)> ReadRecords(string path)
         => ReadRecordsFromText(File.ReadAllText(path, Encoding.UTF8));
@@ -18,9 +15,12 @@ internal static partial class NativeDarkestReader
         => ReadRecordsCore(content, includeSourceLines: false).Select(record => (record.Kind, record.Body));
 
     internal static IEnumerable<(string Kind, string Body, int SourceLine)> ReadRecordsWithSourceLinesFromText(string content)
+        => ReadRecordsWithLocationsFromText(content).Select(record => (record.Kind, record.Body, record.SourceLine));
+
+    internal static IEnumerable<Record> ReadRecordsWithLocationsFromText(string content)
         => ReadRecordsCore(content, includeSourceLines: true);
 
-    private static IEnumerable<(string Kind, string Body, int SourceLine)> ReadRecordsCore(
+    private static IEnumerable<Record> ReadRecordsCore(
         string content, bool includeSourceLines)
     {
         // LineReader::ReadNextLine stops at the first NUL. In particular,
@@ -29,13 +29,49 @@ internal static partial class NativeDarkestReader
         if (nul >= 0) content = content[..nul];
         var sourceLines = includeSourceLines ? new List<int>(content.Length) : null;
         var text = StripComments(content, sourceLines);
-        foreach (Match entry in EntryRegex().Matches(MaskHashComments(text)))
+        var cursor = 0;
+        var ordinal = 0;
+        while (cursor < text.Length)
         {
-            var body = entry.Groups["body"];
-            yield return (entry.Groups["kind"].Value, text.Substring(body.Index, body.Length),
-                sourceLines?[entry.Index] ?? 0);
+            while (cursor < text.Length)
+            {
+                if (IsWhitespace(text[cursor])) { cursor++; continue; }
+                if (text[cursor] != '#') break;
+                while (cursor < text.Length && text[cursor] != '\n') cursor++;
+            }
+            if (cursor == text.Length) yield break;
+            var start = cursor;
+            while (cursor < text.Length && IsHeaderCharacter(text[cursor])) cursor++;
+            // ReadNextLine returns false at an invalid current header. It does
+            // not search past arbitrary text for another plausible declaration.
+            if (cursor == text.Length || text[cursor] != ':') yield break;
+            var headerEnd = cursor++;
+            var bodyStart = cursor;
+            while (cursor < text.Length)
+            {
+                if (text[cursor] == '#')
+                {
+                    while (cursor < text.Length && text[cursor] != '\n') cursor++;
+                    continue;
+                }
+                if (text[cursor] == ':')
+                {
+                    // Native backs up over the next header to its preceding
+                    // separator; that separator is consumed on the next read.
+                    do { cursor--; }
+                    while (cursor >= bodyStart && IsHeaderCharacter(text[cursor]));
+                    if (cursor < bodyStart)
+                        throw new InvalidDataException("Darkest declarations have no advancing record boundary.");
+                    break;
+                }
+                cursor++;
+            }
+            yield return new Record(text[start..headerEnd], text[bodyStart..cursor],
+                sourceLines?[start] ?? 0, ordinal++);
         }
     }
+
+    private static bool IsHeaderCharacter(char value) => char.IsAsciiLetter(value) || value == '_';
 
     private static string StripComments(string text, List<int>? sourceLines)
     {
@@ -73,20 +109,6 @@ internal static partial class NativeDarkestReader
         return result.ToString();
     }
 
-    internal static string MaskHashComments(string text)
-    {
-        // Hash comments suppress declaration boundaries in ReadNextLine, but
-        // remain in the native copied body. Mask only the header-search text;
-        // field reads must use the original body at these same offsets.
-        var masked = text.ToCharArray();
-        for (var index = 0; index < masked.Length; index++)
-        {
-            if (masked[index] != '#') continue;
-            while (index < masked.Length && masked[index] != '\n') masked[index++] = ' ';
-        }
-        return new string(masked);
-    }
-
     internal static int FindValue(string body, string field)
     {
         // Native field helpers use the last case-sensitive substring, not the
@@ -116,16 +138,22 @@ internal static partial class NativeDarkestReader
     internal static int? ReadInt(string body, string field)
     {
         var start = FindValue(body, field);
-        if (start < 0) return null;
+        return start < 0 ? null : ReadIntPrefix(body.AsSpan(start));
+    }
+
+    internal static int? ReadIntPrefix(ReadOnlySpan<char> text)
+    {
+        var start = 0;
+        while (start < text.Length && IsWhitespace(text[start])) start++;
         var end = start;
-        if (end < body.Length && body[end] is '+' or '-') end++;
+        if (end < text.Length && text[end] is '+' or '-') end++;
         var digitStart = end;
-        while (end < body.Length && body[end] is >= '0' and <= '9') end++;
+        while (end < text.Length && text[end] is >= '0' and <= '9') end++;
         // atoi reads an integer prefix. Quotes or a nonnumeric final value
         // yield zero; neither permits reviving an earlier, usable limit.
         if (end == digitStart) return 0;
         // Out-of-range native conversion is not a proven usable stack limit.
-        return int.TryParse(body.AsSpan(start, end - start), NumberStyles.AllowLeadingSign,
+        return int.TryParse(text.Slice(start, end - start), NumberStyles.AllowLeadingSign,
             CultureInfo.InvariantCulture, out var value) ? value : null;
     }
 

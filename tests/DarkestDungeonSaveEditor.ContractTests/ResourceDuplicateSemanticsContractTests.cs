@@ -16,7 +16,9 @@ internal static partial class ContractSuite
         VerifyNativeItemReferences(content, fixture.RunRoot);
         VerifyResourceDuplicateSemantics(content, hero, fixture.RunRoot);
         await VerifyHeroExactIdentitiesAsync(content, hero, fixture.RunRoot, fixture.Codec);
+        await VerifyResourceConsumerRecordsAsync(content, hero, fixture.RunRoot, fixture.Codec);
         await RunEmptyEncounterSlotContractsAsync(fixture.RunRoot, fixture.Codec);
+        await RunEncounterRecordContractsAsync(fixture.RunRoot, fixture.Codec);
         Console.WriteLine($"Artifacts: {fixture.RunRoot}");
     }
 

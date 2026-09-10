@@ -1,7 +1,6 @@
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
-using System.Text.RegularExpressions;
 
 namespace DarkestDungeonSaveEditor.Core;
 
@@ -66,6 +65,8 @@ public sealed record BattleEncounterDefinition(
 
     public string SourceRelativePath { get; init; } = string.Empty;
 
+    public int SourceRecordIndex { get; init; }
+
     public string? RoamingId { get; init; }
 
     public BattleEncounterClassification Classification { get; init; }
@@ -104,9 +105,6 @@ public sealed record BattleEncounterCatalogResult(
 
 public static partial class BattleEncounterCatalog
 {
-    private static readonly Regex TokenPattern = new(
-        "\"(?:\\\\.|[^\"])*\"|\\S+",
-        RegexOptions.Compiled | RegexOptions.CultureInvariant);
     public static BattleEncounterCatalogResult Load(
         ActiveContentSnapshot activeContent,
         BattleMapSnapshot snapshot)
@@ -290,6 +288,7 @@ public static partial class BattleEncounterCatalog
             .ThenBy(encounter => encounter.DisplayName, StringComparer.OrdinalIgnoreCase)
             .ThenBy(encounter => encounter.SourcePath, StringComparer.OrdinalIgnoreCase)
             .ThenBy(encounter => encounter.SourceLine)
+            .ThenBy(encounter => encounter.SourceRecordIndex)
             .ToArray();
         issues.AddRange(globalIssues);
 
@@ -531,6 +530,7 @@ public static partial class BattleEncounterCatalog
         left.MashType == right.MashType &&
         left.SourceKind == right.SourceKind &&
         left.SourceLine == right.SourceLine &&
+        left.SourceRecordIndex == right.SourceRecordIndex &&
         Path.GetFullPath(left.SourcePath).Equals(
             Path.GetFullPath(right.SourcePath),
             StringComparison.OrdinalIgnoreCase) &&
@@ -615,14 +615,15 @@ public static partial class BattleEncounterCatalog
         bool reportNativeAdjustments = true,
         int? onlyMashType = null)
     {
-        string[] lines;
+        NativeDarkestReader.Record[] records;
         try
         {
-            lines = File.ReadAllLines(file.Path);
+            records = NativeDarkestReader.ReadRecordsWithLocationsFromText(File.ReadAllText(file.Path)).ToArray();
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException)
         {
             issues.Add($"Encounter mash could not be read: {file.Path} ({ex.Message})");
+            foreach (var type in new[] { 0, 1, 2 }) unparsedTypes?.Add(type);
             yield break;
         }
 
@@ -641,21 +642,9 @@ public static partial class BattleEncounterCatalog
             file.Source.Id,
             file.ProviderSources,
             activeSources);
-        for (var lineIndex = 0; lineIndex < lines.Length; lineIndex++)
+        foreach (var record in records)
         {
-            var line = StripComment(lines[lineIndex]).Trim();
-            if (line.Length == 0)
-            {
-                continue;
-            }
-
-            var separator = line.IndexOf(':');
-            if (separator <= 0)
-            {
-                continue;
-            }
-            var kind = line[..separator].Trim();
-            var mashType = kind.ToLowerInvariant() switch
+            var mashType = record.Kind switch
             {
                 "hall" => 0,
                 "room" => 1,
@@ -667,53 +656,49 @@ public static partial class BattleEncounterCatalog
                 continue;
             }
 
-            var tokens = TokenPattern.Matches(line[(separator + 1)..])
-                .Select(match => Unquote(match.Value))
-                .ToArray();
-            // Native FindLastSubstring returns the offset after the last .types,
-            // even if it is repeated or touches the preceding numeric field.
-            var typesIndex = line.LastIndexOf(".types", StringComparison.Ordinal);
-            if (typesIndex < 0)
+            if (NativeDarkestReader.FindValue(record.Body, ".types") < 0)
             {
                 if (sourceKind == BattleEncounterSourceKind.Standard) unparsedTypes?.Add(mashType);
-                issues.Add($"遭遇行缺少怪物列表（.types），已跳过：{file.Path}:{lineIndex + 1}");
+                issues.Add($"遭遇行缺少怪物列表（.types），已跳过：{file.Path}:{record.SourceLine}");
                 continue;
             }
-            var actorSlots = TokenPattern.Matches(line[(typesIndex + 6)..])
-                .Select(match => Unquote(match.Value))
-                .TakeWhile(token => !token.StartsWith(".", StringComparison.Ordinal))
-                .ToArray();
+            var actorSlots = NativeDarkestReader.ReadRawStringSlots(record.Body, ".types", 5).ToArray();
             // Empty quoted actors still occupy native slots. Limit the raw
             // slots before removing empty actors from the displayed formation.
-            var monsters = actorSlots.Take(4).Where(token => !string.IsNullOrWhiteSpace(token)).ToArray();
+            string[] monsters;
+            string? roamingId;
+            try
+            {
+                monsters = actorSlots.Take(4).Select(token => ReadEncounterString(token, 31))
+                    .Where(token => token.Length > 0).ToArray();
+                roamingId = NativeDarkestReader.ReadString(record.Body, ".random_dungeon_roaming_id") is { } value
+                    ? ReadEncounterString(value, 63) : null;
+            }
+            catch (DecoderFallbackException)
+            {
+                if (sourceKind == BattleEncounterSourceKind.Standard) unparsedTypes?.Add(mashType);
+                issues.Add($"遭遇字符串截断后不是完整 UTF-8，无法确认编号：{file.Path}:{record.SourceLine}");
+                continue;
+            }
             if (monsters.Length == 0 && actorSlots.Length == 0)
             {
                 if (sourceKind == BattleEncounterSourceKind.Standard) unparsedTypes?.Add(mashType);
-                issues.Add($"遭遇行的怪物列表（.types）没有值，已跳过：{file.Path}:{lineIndex + 1}");
+                issues.Add($"遭遇行的怪物列表（.types）没有值，已跳过：{file.Path}:{record.SourceLine}");
                 continue;
             }
             // Explicit empty actors still produce a native table slot. Keep
             // the row for index/append/maintenance calculations, not placement.
             if (monsters.Length == 0 && reportNativeAdjustments)
-                issues.Add($"空遭遇保留编号，不影响后续索引，不能放置：{file.Path}:{lineIndex + 1}");
+                issues.Add($"空遭遇保留编号，不影响后续索引，不能放置：{file.Path}:{record.SourceLine}");
             // MashGuide's .types parser copies exactly four 32-byte slots;
             // fifth and later IDs never reach AddMashEntry.
             if (actorSlots.Length > 4)
             {
                 if (reportNativeAdjustments)
-                    issues.Add($"遭遇行超过四个怪物，按游戏规则只读取前四个：{file.Path}:{lineIndex + 1}");
+                    issues.Add($"遭遇行超过四个怪物，按游戏规则只读取前四个：{file.Path}:{record.SourceLine}");
             }
 
-            double? weight = ReadNativeChance(line);
-
-            string? roamingId = null;
-            var roamingIdIndex = Array.FindIndex(tokens, token =>
-                token.Equals(".random_dungeon_roaming_id", StringComparison.OrdinalIgnoreCase));
-            if (roamingIdIndex >= 0 && roamingIdIndex + 1 < tokens.Length &&
-                !tokens[roamingIdIndex + 1].StartsWith(".", StringComparison.Ordinal))
-            {
-                roamingId = tokens[roamingIdIndex + 1];
-            }
+            double? weight = ReadNativeChance(record.Body);
 
             yield return new BattleEncounterDefinition(
                 mashType,
@@ -724,7 +709,7 @@ public static partial class BattleEncounterCatalog
                 sourceLabel,
                 Path.GetFullPath(file.Path),
                 sourceHash,
-                lineIndex + 1,
+                record.SourceLine,
                 false,
                 string.Empty,
                 guard)
@@ -732,6 +717,7 @@ public static partial class BattleEncounterCatalog
                 OriginDungeonId = originDungeonId,
                 OriginDifficulty = originDifficulty,
                 SourceRelativePath = file.RelativePath,
+                SourceRecordIndex = record.RecordIndex,
                 RoamingId = roamingId
             };
         }
@@ -753,29 +739,6 @@ public static partial class BattleEncounterCatalog
 
         return BattleEncounterSourceKind.Standard;
     }
-
-    private static string StripComment(string line)
-    {
-        var quoted = false;
-        for (var index = 0; index < line.Length - 1; index++)
-        {
-            if (line[index] == '"' && (index == 0 || line[index - 1] != '\\'))
-            {
-                quoted = !quoted;
-            }
-            if (!quoted && line[index] == '/' && line[index + 1] == '/')
-            {
-                return line[..index];
-            }
-        }
-
-        return line;
-    }
-
-    private static string Unquote(string token) =>
-        token.Length >= 2 && token[0] == '"' && token[^1] == '"'
-            ? token[1..^1].Replace("\\\"", "\"", StringComparison.Ordinal)
-            : token;
 
     private static string ComputeTableFingerprint(
         IReadOnlyList<BattleEncounterFileFingerprint> files)

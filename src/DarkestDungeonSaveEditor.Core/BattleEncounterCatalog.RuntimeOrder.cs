@@ -44,12 +44,8 @@ public static partial class BattleEncounterCatalog
         return NativeContentFileResolver.Resolve(candidates, activeSources, "Encounter mash", issues);
     }
 
-    private static bool HasIndexedTableDeclarations(string path) => File.ReadLines(path).Any(raw =>
-    {
-        var line = StripComment(raw).Trim();
-        var separator = line.IndexOf(':');
-        return separator > 0 && line[..separator].Trim().ToLowerInvariant() is "hall" or "room" or "boss";
-    });
+    private static bool HasIndexedTableDeclarations(string path) =>
+        NativeDarkestReader.ReadRecords(path).Any(record => record.Kind is "hall" or "room" or "boss");
 
     private static bool HasProvenFileOrder(
         IReadOnlyList<BattleEncounterDefinition> rows,
@@ -164,7 +160,7 @@ public static partial class BattleEncounterCatalog
             if (after is null ||
                 !after.MonsterIds.SequenceEqual(row.MonsterIds, StringComparer.Ordinal) ||
                 !after.SourceRelativePath.Equals(row.SourceRelativePath, StringComparison.Ordinal) ||
-                after.SourceLine != row.SourceLine)
+                after.SourceLine != row.SourceLine || after.SourceRecordIndex != row.SourceRecordIndex)
                 throw new InvalidOperationException("Bridge 会改变已有战斗的索引，本次不会写入。");
         }
     }

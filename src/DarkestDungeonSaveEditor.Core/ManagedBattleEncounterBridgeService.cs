@@ -215,6 +215,7 @@ public sealed partial class ManagedBattleEncounterBridgeService
                 SourceLabel = encounter.SourceLabel,
                 SourceRelativePath = encounter.SourceRelativePath,
                 SourceLine = encounter.SourceLine,
+                SourceRecordIndex = encounter.SourceRecordIndex,
                 OriginDungeonId = encounter.OriginDungeonId,
                 OriginDifficulty = encounter.OriginDifficulty,
                 RoamingId = encounter.RoamingId,
@@ -454,7 +455,7 @@ public sealed partial class ManagedBattleEncounterBridgeService
                 var row = catalog.Encounters.Where(row =>
                         row.SourceKind == BattleEncounterSourceKind.Standard && row.MashType == entry.MashType &&
                         row.SourcePath.Equals(path, StringComparison.OrdinalIgnoreCase))
-                    .OrderBy(row => row.SourceLine).ElementAtOrDefault(entry.FileRowIndex!.Value);
+                    .OrderBy(row => row.SourceRecordIndex).ElementAtOrDefault(entry.FileRowIndex!.Value);
                 if (row is null || row.MashIndex != entry.MashIndex ||
                     !row.MonsterIds.SequenceEqual(entry.MonsterIds, StringComparer.Ordinal))
                     throw new InvalidOperationException("托管 Bridge 的已有索引与当前多文件遭遇表不一致，本次不会写入。");
@@ -649,23 +650,11 @@ public sealed partial class ManagedBattleEncounterBridgeService
         string mashPath,
         BattleEncounterDefinition encounter)
     {
-        var kind = encounter.MashType switch
-        {
-            0 => "hall",
-            1 => "room",
-            2 => "boss",
-            _ => throw new InvalidOperationException("托管 Encounter Bridge 不支持该 mash_type。")
-        };
-        var options = encounter.MashType == 2
-            ? string.Empty
-            : " .limit 1 .can_be_ambush false";
         var existingBytes = File.ReadAllBytes(mashPath);
         var prefix = existingBytes.Length > 0 && existingBytes[^1] is not (byte)'\r' and not (byte)'\n'
             ? Environment.NewLine
             : string.Empty;
-        var line =
-            $"{prefix}{kind}: .chance 0 .types {string.Join(' ', encounter.MonsterIds)}" +
-            options + Environment.NewLine;
+        var line = prefix + EncounterBridgeRow.Format(encounter.MashType, encounter.MonsterIds);
         using var output = new FileStream(
             mashPath,
             FileMode.Append,
@@ -684,40 +673,8 @@ public sealed partial class ManagedBattleEncounterBridgeService
             2 => "boss",
             _ => throw new InvalidOperationException("托管 Encounter Bridge 不支持该 mash_type。")
         };
-        return File.ReadLines(path)
-            .Select(StripLineComment)
-            .Select(line => line.Trim())
-            .Count(line => IsMashRow(line, expectedKind));
-    }
-
-    private static bool IsMashRow(string line, string expectedKind)
-    {
-        var separator = line.IndexOf(':');
-        if (separator <= 0 ||
-            !line[..separator].Trim().Equals(expectedKind, StringComparison.OrdinalIgnoreCase))
-        {
-            return false;
-        }
-
-        var body = line[(separator + 1)..];
-        return body.LastIndexOf(".types", StringComparison.Ordinal) >= 0;
-    }
-
-    private static string StripLineComment(string line)
-    {
-        var quoted = false;
-        for (var index = 0; index < line.Length - 1; index++)
-        {
-            if (line[index] == '"' && (index == 0 || line[index - 1] != '\\'))
-            {
-                quoted = !quoted;
-            }
-            if (!quoted && line[index] == '/' && line[index + 1] == '/')
-            {
-                return line[..index];
-            }
-        }
-        return line;
+        return NativeDarkestReader.ReadRecords(path)
+            .Count(record => record.Kind == expectedKind && NativeDarkestReader.FindValue(record.Body, ".types") >= 0);
     }
 
     private static void WriteManagedPackage(
@@ -1165,6 +1122,7 @@ public sealed partial class ManagedBattleEncounterBridgeService
         public string SourceLabel { get; set; } = string.Empty;
         public string SourceRelativePath { get; set; } = string.Empty;
         public int SourceLine { get; set; }
+        public int? SourceRecordIndex { get; set; }
         public string OriginDungeonId { get; set; } = string.Empty;
         public int OriginDifficulty { get; set; }
         public string? RoamingId { get; set; }
