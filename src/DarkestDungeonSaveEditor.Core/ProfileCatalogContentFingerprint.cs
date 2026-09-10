@@ -11,7 +11,9 @@ public static class ProfileCatalogContentFingerprint
     private static readonly ContentFileRule[] Rules =
         (from directory in new[] { "inventory", "trinkets", "campaign", "curios", "dungeons", "heroes",
              "loot", "monsters", "props", "raid", "rules", "scripts", "shared", "torch", "upgrades", "effects" }
-         from suffix in new[] { ".json", ".darkest", ".csv" }
+         // Native loot/event expressions contain an unescaped dot before json.
+         // Refresh must include their accepted names (e.g. .lootXjson) too.
+         from suffix in new[] { "json", ".darkest", ".csv" }
          select new ContentFileRule(directory, "*" + suffix))
         .Concat(new[] { new ContentFileRule("localization", "*.string_table.xml"),
             new ContentFileRule("localization", "*.loc", false), new ContentFileRule("localization", "*.loc2", false) })

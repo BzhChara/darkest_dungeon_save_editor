@@ -45,6 +45,7 @@ internal static partial class QuantityItemReferenceAnalyzer
         var incompleteEvidence = new Dictionary<string, List<string>>(StringComparer.Ordinal);
         var lootTables = new Dictionary<string, LootTableNode>(StringComparer.Ordinal);
         var rootLootEvidence = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+        var uncertainLootEvidence = new Dictionary<string, List<string>>(StringComparer.Ordinal);
         var scanComplete = true;
         var files = LoadEffectiveFiles(activeContent, saveContext, issues, ref scanComplete);
         var eventIds = new Dictionary<uint, string>();
@@ -75,13 +76,14 @@ internal static partial class QuantityItemReferenceAnalyzer
                 activeEvidence,
                 rootLootEvidence,
                 incompleteEvidence,
+                uncertainLootEvidence,
                 issues,
-                file.File.RelativePath.EndsWith(".events.json", StringComparison.OrdinalIgnoreCase) &&
-                ContentFileOverlay.IsRootOrEnabledDlcPath(file.File.RelativePath, "campaign/town_events", dlcPrefixes)
+                NativeResourceFileRules.IsTownEventFile(file.File.RelativePath, dlcPrefixes)
                     ? eventIds : null);
         }
 
         TraverseLootRoots(lootTables, rootLootEvidence, activeEvidence);
+        TraverseLootRoots(lootTables, uncertainLootEvidence, incompleteEvidence);
 
         var sourcesById = activeContent.Sources.ToDictionary(
             source => source.Id,
@@ -108,7 +110,8 @@ internal static partial class QuantityItemReferenceAnalyzer
                 continue;
             }
 
-            if (!scanComplete || incompleteEvidence.TryGetValue(definition.CatalogKey, out evidence))
+            incompleteEvidence.TryGetValue(definition.CatalogKey, out evidence);
+            if (!scanComplete || evidence is not null)
             {
                 result[definition.CatalogKey] = new QuantityItemReferenceAnalysis(
                     QuantityItemReferenceStatus.AnalysisIncomplete,

@@ -75,7 +75,7 @@ public static partial class HeroClassCatalog
             .Select(signal => signal!)
             .DistinctBy(
                 signal => $"{signal.QuirkId}\n{signal.EffectName}\n{signal.SkillId}",
-                StringComparer.OrdinalIgnoreCase)
+                StringComparer.Ordinal)
             .OrderBy(signal => signal.QuirkId, StringComparer.OrdinalIgnoreCase)
             .ThenBy(signal => signal.SkillId, StringComparer.OrdinalIgnoreCase)
             .ToArray();

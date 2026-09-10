@@ -260,7 +260,7 @@ internal static partial class ContractSuite
         { "id": "MAXHP_ROUNDING_NEG20_A", "stat_type": "combat_stat_multiply", "stat_sub_type": "max_hp", "amount": -0.2, "rule_type": "always", "is_false_rule": false },
         { "id": "MAXHP_ROUNDING_NEG20_B", "stat_type": "combat_stat_multiply", "stat_sub_type": "max_hp", "amount": -0.2, "rule_type": "always", "is_false_rule": false },
         { "id": "MAXHP_ROUNDING_NEG10", "stat_type": "combat_stat_multiply", "stat_sub_type": "max_hp", "amount": -0.1, "rule_type": "always", "is_false_rule": false },
-        { "id": "ACC5", "stat_type": "combat_stat_add", "stat_sub_type": "accuracy", "amount": 5, "rule_type": "always", "is_false_rule": false }
+        { "id": "ACC5", "stat_type": "combat_stat_add", "stat_sub_type": "attack_rating", "amount": 5, "rule_type": "always", "is_false_rule": false }
       ]
     }
     """,
@@ -560,7 +560,7 @@ internal static partial class ContractSuite
     """,
             new UTF8Encoding(false));
         File.WriteAllText(
-            Path.Combine(localTownEventsRoot, "quantity_reference.events.json"),
+            Path.Combine(localTownEventsRoot, "quantity_reference.town_events.events.json"),
             """
     {
       "events": [
@@ -627,7 +627,7 @@ internal static partial class ContractSuite
     dlc/100_feature_pack/heroes/official_override_hero/official_override_hero.override.darkest 100
     dlc/100_feature_pack/effects/dlc_priority.effects.darkest 100
     dlc/100_feature_pack/shared/quirk/dlc_priority.quirk_library.json 100
-    dlc/100_feature_pack/campaign/town_events/dlc_priority.events.json 100
+    dlc/100_feature_pack/campaign/town_events/dlc_priority.town_events.events.json 100
     dlc/100_feature_pack/features/enabled_feature/trinkets/enabled.entries.trinkets.json 100
     dlc/100_feature_pack/features/enabled_feature/heroes/enabled_dlc_hero/enabled_dlc_hero.info.darkest 100
     backup/heroes/backup_hero/backup_hero.info.darkest 100
@@ -636,7 +636,7 @@ internal static partial class ContractSuite
     trinkets/../backup/trinkets/backup.entries.trinkets.json 100
     modes/bloodmoon/effects/ignored.effects.darkest 100
     modes/bloodmoon/shared/quirk/ignored.quirk_library.json 100
-    modes/bloodmoon/campaign/town_events/ignored.events.json 100
+    modes/bloodmoon/campaign/town_events/ignored.town_events.events.json 100
     dlc/100_feature_pack/features/disabled_feature/heroes/disabled_mod_hero/disabled_mod_hero.info.darkest 100
     dlc/100_feature_pack/features/enabled_feature/heroes/../../disabled_feature/heroes/disabled_mod_hero/disabled_mod_hero.info.darkest 100
     dlc/100_feature_pack/features/enabled_feature/trinkets/../../disabled_feature/trinkets/disabled.entries.trinkets.json 100
@@ -666,10 +666,10 @@ internal static partial class ContractSuite
     shared/buffs/non_hp_b.buffs.json 100
     shared/buffs/max_hp_a.buffs.json 100
     shared/buffs/max_hp_b.buffs.json 100
-    campaign/town_events/runtime_hero.events.json 100
-    campaign/town_events/local_hero.events.json 100
-    campaign/town_events/ambiguous_a.events.json 100
-    campaign/town_events/ambiguous_b.events.json 100
+    campaign/town_events/runtime_hero.town_events.events.json 100
+    campaign/town_events/local_hero.town_events.events.json 100
+    campaign/town_events/ambiguous_a.town_events.events.json 100
+    campaign/town_events/ambiguous_b.town_events.events.json 100
     localization/111_english.loc2 100
     localization/111_schinese.loc2 100
     localization/ignored_schinese.loc2.unused 100
@@ -738,7 +738,7 @@ internal static partial class ContractSuite
     """,
             new UTF8Encoding(false));
         File.WriteAllText(
-            Path.Combine(activeWorkshopDlcRoot, "campaign", "town_events", "dlc_priority.events.json"),
+            Path.Combine(activeWorkshopDlcRoot, "campaign", "town_events", "dlc_priority.town_events.events.json"),
             """
     {
       "events": [
@@ -795,7 +795,7 @@ internal static partial class ContractSuite
     """,
             new UTF8Encoding(false));
         File.WriteAllText(
-            Path.Combine(ignoredModeRoot, "campaign", "town_events", "ignored.events.json"),
+            Path.Combine(ignoredModeRoot, "campaign", "town_events", "ignored.town_events.events.json"),
             """
     {
       "events": [
@@ -839,7 +839,7 @@ internal static partial class ContractSuite
     trinkets/disabled.entries.trinkets.json 100
     inventory/base.inventory.system_configs.darkest 100
     heroes/disabled_hero/disabled_hero.info.darkest 100
-    campaign/town_events/disabled_hero.events.json 100
+    campaign/town_events/disabled_hero.town_events.events.json 100
     """,
             new UTF8Encoding(false));
 
@@ -1156,7 +1156,7 @@ internal static partial class ContractSuite
             Path.Combine(activeWorkshopBuffRoot, "non_hp_a.buffs.json"),
             """
     { "buffs": [
-      { "id": "CONFLICT_ACC", "stat_type": "combat_stat_add", "stat_sub_type": "accuracy", "amount": 3, "rule_type": "always", "is_false_rule": false }
+      { "id": "CONFLICT_ACC", "stat_type": "combat_stat_add", "stat_sub_type": "attack_rating", "amount": 3, "rule_type": "always", "is_false_rule": false }
     ] }
     """,
             new UTF8Encoding(false));
@@ -1164,7 +1164,7 @@ internal static partial class ContractSuite
             Path.Combine(activeWorkshopBuffRoot, "non_hp_b.buffs.json"),
             """
     { "buffs": [
-      { "id": "CONFLICT_ACC", "stat_type": "combat_stat_add", "stat_sub_type": "accuracy", "amount": 5, "rule_type": "always", "is_false_rule": false }
+      { "id": "CONFLICT_ACC", "stat_type": "combat_stat_add", "stat_sub_type": "attack_rating", "amount": 5, "rule_type": "always", "is_false_rule": false }
     ] }
     """,
             new UTF8Encoding(false));
@@ -1185,7 +1185,7 @@ internal static partial class ContractSuite
     """,
             new UTF8Encoding(false));
         File.WriteAllText(
-            Path.Combine(activeWorkshopRoot, "campaign", "town_events", "runtime_hero.events.json"),
+            Path.Combine(activeWorkshopRoot, "campaign", "town_events", "runtime_hero.town_events.events.json"),
             """
     {
       "events": [
@@ -1200,7 +1200,7 @@ internal static partial class ContractSuite
     """,
             new UTF8Encoding(false));
         File.WriteAllText(
-            Path.Combine(activeWorkshopRoot, "campaign", "town_events", "local_hero.events.json"),
+            Path.Combine(activeWorkshopRoot, "campaign", "town_events", "local_hero.town_events.events.json"),
             """
     {
       "events": [
@@ -1215,7 +1215,7 @@ internal static partial class ContractSuite
     """,
             new UTF8Encoding(false));
         File.WriteAllText(
-            Path.Combine(activeWorkshopRoot, "campaign", "town_events", "ambiguous_a.events.json"),
+            Path.Combine(activeWorkshopRoot, "campaign", "town_events", "ambiguous_a.town_events.events.json"),
             """
     {
       "events": [
@@ -1236,7 +1236,7 @@ internal static partial class ContractSuite
     """,
             new UTF8Encoding(false));
         File.WriteAllText(
-            Path.Combine(activeWorkshopRoot, "campaign", "town_events", "ambiguous_b.events.json"),
+            Path.Combine(activeWorkshopRoot, "campaign", "town_events", "ambiguous_b.town_events.events.json"),
             """
     {
       "events": [
@@ -1265,7 +1265,7 @@ internal static partial class ContractSuite
     """,
             new UTF8Encoding(false));
         File.WriteAllText(
-            Path.Combine(disabledWorkshopRoot, "campaign", "town_events", "disabled_hero.events.json"),
+            Path.Combine(disabledWorkshopRoot, "campaign", "town_events", "disabled_hero.town_events.events.json"),
             """
     {
       "events": [
@@ -1652,7 +1652,7 @@ internal static partial class ContractSuite
     """,
             new UTF8Encoding(false));
         File.WriteAllText(
-            Path.Combine(localModRoot, "campaign", "town_events", "local_hero.events.json"),
+            Path.Combine(localModRoot, "campaign", "town_events", "local_hero.town_events.events.json"),
             """
     {
       "events": [
@@ -1710,7 +1710,7 @@ internal static partial class ContractSuite
     """,
             new UTF8Encoding(false));
         File.WriteAllText(
-            Path.Combine(dlcPackageRoot, "campaign", "town_events", "dlc_priority.events.json"),
+            Path.Combine(dlcPackageRoot, "campaign", "town_events", "dlc_priority.town_events.events.json"),
             """
     {
       "events": [

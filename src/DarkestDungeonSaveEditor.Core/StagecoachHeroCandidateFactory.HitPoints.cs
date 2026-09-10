@@ -38,11 +38,11 @@ public static partial class StagecoachHeroCandidateFactory
         IReadOnlyList<HeroMaxHpModifier> modifiers)
     {
         var trinketStates = modifiers.Any(modifier =>
-                modifier.RuleType.Equals("no_trinkets", StringComparison.OrdinalIgnoreCase))
+                modifier.RuleType == "no_trinkets")
             ? new[] { false, true }
             : new[] { false };
         var afflictedStates = modifiers.Any(modifier =>
-                modifier.RuleType.Equals("afflicted", StringComparison.OrdinalIgnoreCase))
+                modifier.RuleType == "afflicted")
             ? new[] { false, true }
             : new[] { false };
         var modes = BuildReachableModes(modifiers);
@@ -67,7 +67,7 @@ public static partial class StagecoachHeroCandidateFactory
                             .ToArray();
                         var stateKey = string.Join('\u001f', active
                             .Select(modifier => modifier.BuffId)
-                            .OrderBy(id => id, StringComparer.OrdinalIgnoreCase));
+                            .OrderBy(id => id, StringComparer.Ordinal));
                         if (!validatedStates.Add(stateKey))
                         {
                             continue;
@@ -95,10 +95,10 @@ public static partial class StagecoachHeroCandidateFactory
         IEnumerable<HeroMaxHpModifier> modifiers)
     {
         var declaredModes = modifiers
-            .Where(modifier => modifier.RuleType.Equals("in_mode", StringComparison.OrdinalIgnoreCase))
+            .Where(modifier => modifier.RuleType == "in_mode")
             .Select(modifier => modifier.RuleString)
-            .Where(mode => !string.IsNullOrWhiteSpace(mode))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Where(mode => mode.Length > 0)
+            .DistinctBy(Loc2LocalizationReader.HashName)
             .ToList();
         if (declaredModes.Count == 0)
         {
@@ -106,7 +106,7 @@ public static partial class StagecoachHeroCandidateFactory
         }
 
         var otherMode = "__save_editor_other_mode__";
-        while (declaredModes.Contains(otherMode, StringComparer.OrdinalIgnoreCase))
+        while (declaredModes.Any(mode => Loc2LocalizationReader.HashName(mode) == Loc2LocalizationReader.HashName(otherMode)))
         {
             otherMode += "_";
         }
@@ -121,7 +121,7 @@ public static partial class StagecoachHeroCandidateFactory
         IEnumerable<HeroMaxHpModifier> modifiers)
     {
         var thresholds = modifiers
-            .Where(modifier => modifier.RuleType.Equals("lightabove", StringComparison.OrdinalIgnoreCase))
+            .Where(modifier => modifier.RuleType == "lightabove")
             .Select(modifier => modifier.RuleFloat)
             .Where(value => value is not null)
             .Select(value => value!.Value)
@@ -136,8 +136,8 @@ public static partial class StagecoachHeroCandidateFactory
         foreach (var threshold in thresholds)
         {
             levels.Add(threshold);
-            var below = Math.BitDecrement(threshold);
-            var above = Math.BitIncrement(threshold);
+            var below = MathF.BitDecrement((float)threshold);
+            var above = MathF.BitIncrement((float)threshold);
             if (double.IsFinite(below))
             {
                 levels.Add(below);
@@ -155,7 +155,7 @@ public static partial class StagecoachHeroCandidateFactory
 
     private static bool IsActiveAtGeneration(HeroMaxHpModifier modifier)
     {
-        var rawCondition = modifier.RuleType.ToLowerInvariant() switch
+        var rawCondition = modifier.RuleType switch
         {
             "always" => true,
             "no_trinkets" => true,
@@ -171,14 +171,13 @@ public static partial class StagecoachHeroCandidateFactory
         string? mode,
         double? lightLevel)
     {
-        bool? rawCondition = modifier.RuleType.ToLowerInvariant() switch
+        bool? rawCondition = modifier.RuleType switch
         {
             "always" => true,
             "no_trinkets" => !hasTrinkets,
             "afflicted" => isAfflicted,
-            "in_mode" when mode is not null => mode.Equals(
-                modifier.RuleString,
-                StringComparison.OrdinalIgnoreCase),
+            "in_mode" when mode is not null => Loc2LocalizationReader.HashName(mode) ==
+                Loc2LocalizationReader.HashName(modifier.RuleString),
             "lightabove" when lightLevel is not null && modifier.RuleFloat is { } threshold =>
                 lightLevel.Value > threshold,
             _ => null
@@ -202,6 +201,7 @@ public static partial class StagecoachHeroCandidateFactory
             !double.IsFinite(additiveResult) ||
             !double.IsFinite(multiplier) ||
             !double.IsFinite(currentHp) ||
+            !float.IsFinite((float)currentHp) ||
             additiveResult <= HpSafetyTolerance ||
             multiplier <= HpSafetyTolerance ||
             currentHp <= HpSafetyTolerance)
@@ -210,7 +210,7 @@ public static partial class StagecoachHeroCandidateFactory
                 ? "无"
                 : string.Join(", ", activeModifiers.Select(modifier => modifier.BuffId));
             throw new InvalidOperationException(
-                $"职业 '{heroClassId}' 的初始怪癖合计 HP 修正无效：存在可达条件会使生命不大于 0；" +
+                $"职业 '{heroClassId}' 的初始怪癖合计 HP 修正无效：存在可达条件会使生命不大于 0 或超出存档数值范围；" +
                 $"基础 {baseHp}，固定 {flatTotal:+0.###;-0.###;0}，" +
                 $"百分比 {percentageTotal:+0.###%;-0.###%;0%}，活动 Buff：{activeBuffs}。");
         }

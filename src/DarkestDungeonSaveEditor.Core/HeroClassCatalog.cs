@@ -18,8 +18,8 @@ public static partial class HeroClassCatalog
         ArgumentNullException.ThrowIfNull(activeContent);
         var issues = new List<string>();
         var candidates = new Dictionary<string, List<HeroCandidate>>(StringComparer.OrdinalIgnoreCase);
-        var eventCandidates = new Dictionary<string, List<RecruitEventGroup>>(StringComparer.OrdinalIgnoreCase);
-        var effectCandidates = new Dictionary<string, List<EffectQuirkAssignment>>(StringComparer.OrdinalIgnoreCase);
+        var eventCandidates = new Dictionary<string, List<RecruitEventGroup>>(StringComparer.Ordinal);
+        var effectCandidates = new Dictionary<string, List<EffectQuirkAssignment>>(StringComparer.Ordinal);
         var quirkCandidates = new Dictionary<string, List<QuirkDefinition>>(StringComparer.Ordinal);
         var buffCandidates = new Dictionary<string, List<BuffDefinition>>(StringComparer.Ordinal);
         var campingSkills = new Dictionary<string, CampingSkillBuilder>(StringComparer.Ordinal);

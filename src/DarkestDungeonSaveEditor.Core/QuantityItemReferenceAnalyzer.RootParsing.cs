@@ -14,12 +14,13 @@ internal static partial class QuantityItemReferenceAnalyzer
         Dictionary<string, List<string>> activeEvidence,
         Dictionary<string, List<string>> rootLootEvidence,
         Dictionary<string, List<string>> incompleteEvidence,
+        Dictionary<string, List<string>> uncertainLootEvidence,
         List<string> issues,
         Dictionary<uint, string>? eventIds = null)
     {
         var defaultReachability = GetDefaultReachability(file.File.RelativePath);
         var extension = Path.GetExtension(file.File.Path);
-        if (extension.Equals(".json", StringComparison.OrdinalIgnoreCase))
+        if (eventIds is not null || extension.Equals(".json", StringComparison.OrdinalIgnoreCase))
         {
             if (TryParseJson(file.Text, out var document) && document is not null)
             {
@@ -58,7 +59,7 @@ internal static partial class QuantityItemReferenceAnalyzer
                 file.Text,
                 knownLootTables,
                 file.File.RelativePath,
-                rootLootEvidence);
+                uncertainLootEvidence);
             issues.Add($"Quantity-item reference scan could not parse active JSON file: {file.File.Path}");
             return false;
         }

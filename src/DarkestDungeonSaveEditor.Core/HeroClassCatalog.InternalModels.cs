@@ -340,7 +340,10 @@ public static partial class HeroClassCatalog
         double? RuleFloat,
         string RuleString,
         string Source,
-        string SourcePath);
+        string SourcePath)
+    {
+        public bool HasInvalidNativeString { get; init; }
+    }
     private sealed record CampingSkillDefinition(
         string Id,
         IReadOnlyList<string> HeroClasses,
