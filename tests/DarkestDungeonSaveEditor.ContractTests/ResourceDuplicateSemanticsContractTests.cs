@@ -6,6 +6,7 @@ internal static partial class ContractSuite
     public static async Task RunResourceSemanticsOnlyAsync(string repositoryRoot)
     {
         var fixture = BuildContractFixture(repositoryRoot);
+        await VerifyCampingPurchaseIdentitiesAsync(fixture.RunRoot, fixture.Codec);
         await fixture.Codec.EncodeAsync(fixture.DecodedGameSeedPath, fixture.GameSavePath, originalBinaryPath: null);
         var profile = new SaveProfile("profile_7", fixture.ProfileRoot, fixture.EstatePath, "contract-user", DateTime.UtcNow);
         var content = await ActiveContentResolver.ResolveAsync(profile, fixture.GameRoot, fixture.WorkshopRoot,
