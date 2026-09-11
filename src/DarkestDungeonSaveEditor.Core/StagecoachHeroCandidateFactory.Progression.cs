@@ -1,10 +1,13 @@
 using System.Globalization;
+using System.Text;
 using System.Text.Json.Nodes;
 
 namespace DarkestDungeonSaveEditor.Core;
 
 public static partial class StagecoachHeroCandidateFactory
 {
+    private static readonly UTF8Encoding CampingPurchaseUtf8 = new(false, true);
+
     internal static IReadOnlyList<HeroUpgradePurchase> BuildUpgradePurchases(
         HeroClassDefinition heroClass,
         int resolveLevel,
@@ -52,10 +55,7 @@ public static partial class StagecoachHeroCandidateFactory
                 .Select(treeId => combatTrees[treeId]));
         var syntheticCombatPurchases = syntheticCombatTreeIds
             .SelectMany(treeId => BuildImplicitCombatPurchases(heroClass, treeId, resolveLevel, warnings));
-        var campingPurchases = heroClass.SharedCampingSkillIds
-            .Concat(heroClass.ClassCampingSkillIds)
-            .Distinct(StringComparer.Ordinal)
-            .Select(skillId => new HeroUpgradePurchase($"{heroClass.Id}.{skillId}", "0"));
+        var campingPurchases = BuildCampingUpgradePurchases(heroClass);
         var purchases = applicableTrees
             .SelectMany(tree => tree.Requirements
                 .Where(requirement => requirement.PrerequisiteResolveLevel <= resolveLevel)
@@ -73,6 +73,13 @@ public static partial class StagecoachHeroCandidateFactory
                 $"职业 '{heroClass.Id}' 的活动 upgrade 模板包含空树 ID 或空 requirement code。");
         }
 
+        var collisions = NativeResourceIdentity.FindCollisions(purchases.Select(purchase => purchase.TreeId));
+        if (collisions.Count > 0)
+        {
+            throw new InvalidOperationException(
+                $"职业 '{heroClass.Id}' 的升级购买编号冲突：{string.Join(", ", collisions)}。");
+        }
+
         var duplicate = purchases
             .GroupBy(purchase => new { purchase.TreeId, purchase.RequirementCode })
             .FirstOrDefault(group => group.Skip(1).Any());
@@ -83,6 +90,44 @@ public static partial class StagecoachHeroCandidateFactory
                 $"{duplicate.First().TreeId}/{duplicate.First().RequirementCode}。");
         }
 
+        return purchases;
+    }
+
+    private static IReadOnlyList<HeroUpgradePurchase> BuildCampingUpgradePurchases(HeroClassDefinition heroClass)
+    {
+        var targets = new Dictionary<string, string>(StringComparer.Ordinal);
+        var purchases = new List<HeroUpgradePurchase>();
+        foreach (var skillId in heroClass.SharedCampingSkillIds.Concat(heroClass.ClassCampingSkillIds).Distinct(StringComparer.Ordinal))
+        {
+            if (heroClass.Id.Contains('\0') || skillId.Contains('\0'))
+            {
+                throw new InvalidOperationException("露营技能购买目标的职业或技能 ID 含有 NUL，无法安全生成。");
+            }
+
+            string treeId;
+            try
+            {
+                // Native camping unlock/query (0x1405C7940 / 0x1405C7A20) formats
+                // <class>.<skill> through the 64-byte buffer at 0x14036B3A0.
+                // Only this purchase target is bounded; the skill ID and the
+                // common resource hash retain their existing identities.
+                var bytes = CampingPurchaseUtf8.GetBytes($"{heroClass.Id}.{skillId}");
+                treeId = CampingPurchaseUtf8.GetString(bytes, 0, Math.Min(bytes.Length, 63));
+            }
+            catch (Exception error) when (error is EncoderFallbackException or DecoderFallbackException)
+            {
+                throw new InvalidOperationException(
+                    $"职业 '{heroClass.Id}' 的露营技能 '{skillId}' 无法表示为完整 UTF-8 购买目标（原生上限 63 字节）。", error);
+            }
+
+            if (!targets.TryAdd(treeId, skillId))
+            {
+                throw new InvalidOperationException(
+                    $"职业 '{heroClass.Id}' 的露营技能 '{targets[treeId]}' 与 '{skillId}' 截断后指向同一购买目标 '{treeId}'，无法安全生成。");
+            }
+            // The game uses code 0 even when the camping JSON authors another code.
+            purchases.Add(new HeroUpgradePurchase(treeId, "0"));
+        }
         return purchases;
     }
 

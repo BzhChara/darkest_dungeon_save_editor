@@ -207,6 +207,14 @@ The raw JSON `hero_classes` array length is compared to the threshold at `0x1404
 
 Every record adds its applicable classes' skill-ID access. Same-hash skill records are appended to a group, rather than merged into one classification. During generation, `0x1405C7F76` reads the hero's available skill IDs; `0x1405C7FC0`–`0x1405C7FD4` selects the first record in the matching group, then `0x1405C7FE8` reads its classification flag. Thus later records can grant the same skill to another hero without changing the first record's classification. The editor keeps that first flag and unions exact class access; it does not OR flags across all declarations. Native-hash collisions and a first record missing a valid class array remain unavailable with diagnostics.
 
+#### 8.4.1 Camping purchase targets use a 63-byte buffer
+
+Native camping unlock (`0x1405C7940`) and ownership query (`0x1405C7A20`) both format `<class>.<skill>` through `0x14036B3A0`, a 64-byte buffer including NUL, then hash the formatted bytes. They use requirement code `0` (`0x1405C79F0`, `0x1405C7AC6`) even when the camping definition's `upgrade_requirements` contains another code. Definition parsing alone does not determine this save-purchase key.
+
+The editor bounds camping purchase targets to 63 UTF-8 bytes before the ordinary purchase writer computes their hash. It retains the full skill identity in the equipped-skill map and leaves generic resource hashing, equipment/combat trees, and the save schema unchanged. Catalog availability, generation and preview share this purchase-plan validation. NUL identities, a boundary cutting through UTF-8, and distinct skills truncating to the same target are explicitly unsupported. Purchase-hash collisions are also rejected in preflight as well as by the existing writer. These guards do not assert that the native byte engine rejects every such input; ambiguous targets are not silently merged. Repeated declarations/references of the same exact skill remain one purchase.
+
+See the [native evidence and counterexamples](change-history/camping-purchase-identity-audit-2026-09-11.md) and [fix validation](change-history/camping-purchase-identity-fixes-2026-09-11.md). The verified cases cover ASCII and complete UTF-8 targets at and beyond the boundary; they do not establish support for all malformed or overlong actor IDs.
+
 ### 8.5 Manifest eligibility and actor definition lookup are separate
 
 `modfiles.txt` still controls eligible Mod files; same-path content still follows native Mod/file-overlay order. It does not mean every listed actor definition is used from the path where its name was discovered. Hero definitions open `heroes/<id>/<id>.info.darkest`, with art/override resolved independently. Supported ASCII monster IDs open `monsters/<id minus final two characters>/<id>/<id>.info.darkest`, followed by art. Monster override files are not part of that observed branch.
