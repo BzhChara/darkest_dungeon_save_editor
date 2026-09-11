@@ -24,6 +24,8 @@ The suite is split by responsibility:
 - `TrinketJsonMemberContractTests.cs`: first JSON members, invalid first values, provider attribution and actual trinket-counter DSON roundtrips;
 - `TrinketSaveContractTests.cs`: pristine trinket construction and guarded commits;
 - `HeroContractTests.cs`: orchestration of the following hero-related modules;
+- `EquipmentProgressionContractTests.cs`: six-source equipment byte codes, sequential purchase reachability, free upper ranks/level-zero fallback, unused requirements, bounded targets and actual town/roster/upgrades DSON persistence;
+- `EquipmentProgressionGuardContractTests.cs`: inherited/cleared codes, invalid HP and identities, codec round-trip limits, unchanged-manifest refresh, raw-definition fingerprints and stale preview/save preflight;
 - `CombatPurchaseIdentityContractTests.cs`: six-source bounded combat target binding, explicit/implicit purchases, full skill metadata, UTF-8/identity/hash guards, invalid winners, content refresh and actual DSON identities;
 - `CombatPurchaseCodeContractTests.cs`: authored base-code availability, preserved code case, native reachable tiers, gap warnings, delayed/partial trees, bounded-target majority voting and DSON persistence;
 - `CampingPurchaseIdentityContractTests.cs`: native 63-byte camping purchase targets across six source kinds, ASCII/UTF-8 boundaries, code-zero behavior, target/hash collision and malformed-identity preflight guards, definition refresh, and DSON persistence without changing skill IDs or other purchases;

@@ -319,6 +319,7 @@ public sealed partial class SaveEditService
             throw new InvalidOperationException(
                 "The generated stagecoach candidate no longer matches the active all-skill upgrade plan.");
         }
+        HeroEquipmentProgression.Validate(heroClass, levelProfile, expectedPurchases);
     }
 
     private static string ComputeHeroCatalogSha256(HeroClassCatalogResult catalog)
@@ -328,6 +329,7 @@ public sealed partial class SaveEditService
             catalog.GameMode,
             catalog.ResolveLevelThresholds,
             catalog.HeroClasses,
+            Equipment = catalog.HeroClasses.Select(hero => new { hero.Id, hero.Equipment }),
             catalog.RecruitEvents,
             catalog.InitialQuirks,
             catalog.HeroNames

@@ -24,6 +24,18 @@ public static partial class StagecoachHeroCandidateFactory
             .Where(tree => tree.Kind == HeroUpgradeTreeKind.CombatSkill)
             .ToDictionary(tree => tree.Id, StringComparer.Ordinal);
         var combatTargets = HeroSkillPurchaseTargets.Combat(heroClass.Id, heroClass.CombatSkillIds);
+        var equipmentTargets = HeroSkillPurchaseTargets.Equipment(heroClass.Id);
+        var campingTargets = HeroSkillPurchaseTargets.Camping(heroClass.Id,
+            heroClass.SharedCampingSkillIds.Concat(heroClass.ClassCampingSkillIds));
+        var overlappingTarget = equipmentTargets.Values.FirstOrDefault(target =>
+            combatTargets.Values.Contains(target, StringComparer.Ordinal) ||
+            campingTargets.Values.Contains(target, StringComparer.Ordinal));
+        if (overlappingTarget is not null)
+            throw new InvalidOperationException($"职业 '{heroClass.Id}' 的装备与技能指向同一购买目标 '{overlappingTarget}'，无法安全生成。");
+        var targetCollisions = NativeResourceIdentity.FindCollisions(
+            equipmentTargets.Values.Concat(combatTargets.Values).Concat(campingTargets.Values));
+        if (targetCollisions.Count > 0)
+            throw new InvalidOperationException($"职业 '{heroClass.Id}' 的装备与技能购买编号冲突：{string.Join(", ", targetCollisions)}。");
         // Selection rules control equipped skills, not the purchase-based level lookup.
         // Every tree-less skill uses the same bounded implicit progression policy.
         var combatPurchases = new List<HeroUpgradePurchase>();
@@ -35,7 +47,10 @@ public static partial class StagecoachHeroCandidateFactory
         }
 
         var applicableTrees = heroClass.UpgradeTrees
-            .Where(tree => tree.Kind != HeroUpgradeTreeKind.CombatSkill);
+            .Where(tree => tree.Kind != HeroUpgradeTreeKind.CombatSkill).ToArray();
+        if (applicableTrees.Any(tree => tree.Id != equipmentTargets[
+                tree.Kind == HeroUpgradeTreeKind.Weapon ? "weapon" : "armour"]))
+            throw new InvalidOperationException($"职业 '{heroClass.Id}' 的装备升级树与原生购买目标不一致，请刷新人物目录。");
         var campingPurchases = BuildCampingUpgradePurchases(heroClass);
         var purchases = applicableTrees
             .SelectMany(tree => tree.Requirements
@@ -53,6 +68,8 @@ public static partial class StagecoachHeroCandidateFactory
             throw new InvalidOperationException(
                 $"职业 '{heroClass.Id}' 的活动 upgrade 模板包含空树 ID 或空 requirement code。");
         }
+        if (purchases.Any(purchase => !DsonSaveCodec.CanRoundTripPurchaseCode(purchase.RequirementCode)))
+            throw new InvalidOperationException($"职业 '{heroClass.Id}' 的购买码不能由 DSON 转换器无损保存，请检查升级树。");
 
         var collisions = NativeResourceIdentity.FindCollisions(purchases.Select(purchase => purchase.TreeId));
         if (collisions.Count > 0)

@@ -123,9 +123,9 @@ internal static partial class ContractSuite
             Assert(bounded.BaseHp == (sameSlot ? 24 : 20),
                 "Equipment comparison uses the first 63 UTF-8 bytes, including truncated multibyte sequences, not full names or decoded replacement characters.");
             if (sameSlot)
-                Assert(bounded.LevelProfiles.All(p => p.ArmourRank <= 3) &&
-                       !string.IsNullOrEmpty(bounded.ProgressionUnsupportedReason),
-                    "Collapsing native equipment names must never expose a nonexistent fifth armor slot; unmatched upgrade codes remain guarded.");
+                Assert(bounded.LevelProfiles.Select(p => p.ArmourRank).SequenceEqual([0, 0, 1, 2, 2, 3, 3]) &&
+                       string.IsNullOrEmpty(bounded.ProgressionUnsupportedReason),
+                    "Collapsing native equipment names preserves four real slots and the purchase requirement now attached to slot zero.");
         }
         Console.WriteLine("PASS: native hero text, equipment slots, mode effects and camping classification.");
     }

@@ -16,6 +16,12 @@ public sealed class DsonSaveCodec
 
     public string JarPath => _jarPath;
 
+    // The bundled codec guesses one-byte printable values as chars without
+    // JSON-escaping them; other bytes decode as booleans. Purchase codes must
+    // survive that actual round trip, not merely fit in a native byte.
+    internal static bool CanRoundTripPurchaseCode(string code) =>
+        code.Length == 1 && code[0] is >= '!' and <= '~' and not ('"' or '\\');
+
     public void ValidateAvailability()
     {
         if (!File.Exists(_jarPath))

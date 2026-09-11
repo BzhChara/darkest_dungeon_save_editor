@@ -125,6 +125,7 @@ public static partial class HeroClassCatalog
             false,
             sources)
         {
+            Equipment = CreateEquipmentDefinition(selected),
             CombatSkillLevels = selected.CombatSkillLevels.ToDictionary(
                 pair => pair.Key,
                 pair => (IReadOnlyList<int>)pair.Value.ToArray(),

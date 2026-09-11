@@ -201,7 +201,7 @@ public static partial class HeroClassCatalog
             var rank = inherited?.Rank ?? target.Count;
             var equipment = new HeroEquipmentRank(
                 rank,
-                NativeDarkestReader.ReadString(body, ".upgradeRequirementCode") ?? inherited?.RequirementCode ?? string.Empty,
+                NativeDarkestReader.ReadByte(body, ".upgradeRequirementCode") ?? inherited?.RequirementCode ?? 0,
                 NativeDarkestReader.ReadFloat(body, ".hp") ?? inherited?.Hp,
                 name);
             target[nameKey] = equipment;
@@ -384,12 +384,6 @@ public static partial class HeroClassCatalog
         IReadOnlyList<string> HeroUpgradeFiles,
         IReadOnlyList<string> RosterVariableFiles);
 
-    private sealed record HeroEquipmentRank(
-        int Rank,
-        string RequirementCode,
-        double? Hp,
-        string Name = "");
-
     private sealed record HeroUpgradeDefinition(
         IReadOnlyDictionary<string, int> WeaponRequirements,
         IReadOnlyDictionary<string, int> ArmourRequirements,
@@ -400,15 +394,6 @@ public static partial class HeroClassCatalog
         IReadOnlyList<HeroUpgradeRequirementDefinition> Requirements,
         string Source,
         string SourcePath,
-        string UnsupportedReason);
-
-    private sealed record ResolvedEquipmentRank(
-        int Rank,
-        int MinimumResolveLevel,
-        double? Hp);
-
-    private sealed record EquipmentProgressionBuildResult(
-        IReadOnlyList<ResolvedEquipmentRank> Ranks,
         string UnsupportedReason);
 
     private sealed record HeroProgressionBuildResult(

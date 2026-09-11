@@ -196,11 +196,11 @@ public static class StagecoachHeroSaveEditor
                     throw new InvalidDataException(
                         "A stagecoach upgrade purchase must contain a tree id and requirement code.");
                 }
-                if (purchase.RequirementCode.Length != 1 || purchase.RequirementCode[0] > 0x7F)
+                if (!DsonSaveCodec.CanRoundTripPurchaseCode(purchase.RequirementCode))
                 {
                     throw new InvalidDataException(
                         $"Upgrade requirement code '{purchase.RequirementCode}' cannot be written losslessly; " +
-                        "persist.upgrades requires one ASCII character.");
+                        "the DSON codec requires one printable ASCII character excluding double quote and backslash.");
                 }
 
                 return new
