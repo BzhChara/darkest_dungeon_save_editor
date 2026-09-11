@@ -39,7 +39,7 @@ public static partial class HeroClassCatalog
             ResourceFiles(Path.Combine("shared", "buffs"), NativeResourceFileRules.IsBuffFile),
             ResourceFiles(Path.Combine("raid", "camping"), NativeResourceFileRules.IsCampingSkillFile),
             Files("localization", "*.string_table.xml"),
-            Files("upgrades", $"*{HeroUpgradeSuffix}"),
+            ResourceFiles("upgrades", NativeResourceFileRules.IsUpgradeFile),
             Files(Path.Combine("campaign", "roster"), "roster.variables.json"));
     }
 
@@ -110,8 +110,7 @@ public static partial class HeroClassCatalog
             {
                 target = nameFiles;
             }
-            else if (NativeResourceFileRules.IsInDirectory(normalizedRelative, "upgrades", enabledDlcPrefixes, manifestDirectory: true) &&
-                      normalizedRelative.EndsWith(HeroUpgradeSuffix, StringComparison.OrdinalIgnoreCase))
+            else if (NativeResourceFileRules.IsUpgradeFile(normalizedRelative, enabledDlcPrefixes, manifestDirectory: true))
             {
                 target = upgradeFiles;
             }

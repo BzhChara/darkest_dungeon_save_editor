@@ -2,6 +2,9 @@
 
 此目录集中保存带有时间和任务范围的修复记录、审查报告、实验过程与结果。后续同类记录继续放在这里；当前有效规则与设计说明保留在上一级 `docs/`。
 
+- [人物成长资源筛选与 DLC 经验配置修复：2026-09-11](hero-progression-resource-fixes-2026-09-11.md)
+- [历史修改第十三轮审核：升级树文件筛选与人物经验配置，2026-09-11](hero-progression-resource-audit-2026-09-11.md)
+
 - [资源目录与人物／怪物注册修复：2026-09-11](resource-directory-and-actor-query-fixes-2026-09-11.md)
 - [历史修改第十二轮审核：资源目录大小写与人物／怪物发现，2026-09-11](resource-directory-and-actor-query-audit-2026-09-11.md)
 
