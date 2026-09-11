@@ -6,6 +6,7 @@ internal static partial class ContractSuite
     private static async Task RunEncounterFileQueryContractsAsync(string runRoot, DsonSaveCodec codec)
     {
         await VerifyEncounterDirectoryCaseAsync(runRoot);
+        await VerifyActorDiscoveryQueriesAsync(runRoot);
         foreach (var kind in new[] { "base", "mode", "dlc-feature", "local", "workshop", "dlc-mod" })
         {
             var root = Path.Combine(runRoot, "encounter-file-queries", kind);
@@ -76,8 +77,9 @@ internal static partial class ContractSuite
         }
 
         foreach (var type in new[] { 0, 1, 2 })
+        foreach (var unregisteredActor in new[] { false, true })
         {
-            var root = Path.Combine(runRoot, "encounter-query-persistence", type.ToString());
+            var root = Path.Combine(runRoot, "encounter-query-persistence", type + "-" + unregisteredActor);
             var game = Path.Combine(root, "game");
             var mods = Path.Combine(game, "mods");
             Directory.CreateDirectory(mods);
@@ -87,10 +89,11 @@ internal static partial class ContractSuite
             raid["base_root"]!["start_elapsed_time"] = 100;
             raid["base_root"]!["raid_instance"]!["id"] = "query-persistence";
             File.WriteAllText(raidPath, raid.ToJsonString());
-            WriteMultiMash(game, "dungeons/Cove/a.coveX2.mash.darkest", QueryMashes("alpha"));
+            WriteMultiMash(game, "dungeons/Cove/a.coveX2.mash.darkest", QueryMashes(unregisteredActor ? "alpha alpha" : "alpha"));
             WriteMultiMash(game, "dungeons/Cove/b.cove.2.mashXdarkest", QueryMashes("bravo"));
             WriteMultiMash(game, "dungeons/Ruins/a.ruinsX2.mash.darkest", QueryMashes("foreign"));
-            CreateBattleMonsterDefinitions(game, ["alpha", "bravo", "foreign"]);
+            CreateBattleMonsterDefinitions(game, unregisteredActor ? ["bravo", "foreign"] : ["alpha", "bravo", "foreign"]);
+            if (unregisteredActor) WriteMultiMash(game, "monsters/alp/alpha/alpha.info.DARKEST", "display: .size 3\n");
             var locations = new SaveEditorLocations(root, Path.Combine(root, "workspace"), Path.Combine(root, "backups"));
             var reader = new BattleMapSnapshotReader(codec);
             var snapshot = await reader.LoadAsync(profile.ProfileDirectory);

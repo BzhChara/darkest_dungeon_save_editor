@@ -48,7 +48,7 @@ public static partial class QuantityItemCatalog
                 continue;
             }
 
-            if (!NativeResourceFileRules.IsInventoryItemFile(relativeToRoot, enabledDlcPrefixes))
+            if (!NativeResourceFileRules.IsInventoryItemFile(relativeToRoot, enabledDlcPrefixes, manifestDirectory: true))
             {
                 continue;
             }

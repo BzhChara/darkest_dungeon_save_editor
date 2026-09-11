@@ -115,7 +115,7 @@ internal static class InventorySystemConfigCatalog
                 issues.Add($"Ignored inventory config manifest path outside its Mod directory: {entry.RawLine.Trim()}");
                 continue;
             }
-            if (!NativeResourceFileRules.IsInventoryConfigFile(relative, enabledDlcPrefixes)) continue;
+            if (!NativeResourceFileRules.IsInventoryConfigFile(relative, enabledDlcPrefixes, manifestDirectory: true)) continue;
             if (!File.Exists(path))
                 issues.Add($"Inventory system config listed by Mod is missing: {path}");
             // Keep missing candidates until overlay resolution. A missing winner

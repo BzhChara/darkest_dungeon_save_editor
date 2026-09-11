@@ -134,7 +134,7 @@ public static partial class BattleEncounterCatalog
         var prefixes = ContentFileOverlay.GetEnabledDlcPrefixes(sources);
         var candidates = sources.SelectMany(source => EnumerateMonsterInfoFiles(source, prefixes, issues)
             .Select(path => new ContentFileCandidate(source, path))).ToArray();
-        var ids = candidates.Select(file => Path.GetFileName(file.Path)[..^".info.darkest".Length])
+        var ids = candidates.Select(file => NativeContentFileResolver.ReadDiscoveredActorId(Path.GetRelativePath(file.Source.Directory, file.Path)))
             .ToHashSet(StringComparer.Ordinal);
         var bossIds = new HashSet<string>(StringComparer.Ordinal);
         var usableIds = new HashSet<string>(StringComparer.Ordinal);
@@ -204,93 +204,17 @@ public static partial class BattleEncounterCatalog
     }
 
     private static IReadOnlyList<string> EnumerateMonsterInfoFiles(
-        ActiveContentSource source,
-        IReadOnlyList<string> enabledDlcPrefixes,
-        List<string> issues)
+        ActiveContentSource source, IReadOnlyList<string> enabledDlcPrefixes, List<string> issues)
     {
-        if (!Directory.Exists(source.Directory))
-        {
-            return [];
-        }
-
-        if (source.Kind is "workshop" or "local")
-        {
-            var manifestPath = Path.Combine(source.Directory, "modfiles.txt");
-            ModManifestFile.Require(manifestPath);
-            return EnumerateManifestMonsterInfoFiles(
-                source,
-                manifestPath,
-                enabledDlcPrefixes,
-                issues);
-        }
-
         try
         {
-            return new[] { source.Directory }
-                .Select(root => Path.Combine(root, "monsters"))
-                .Where(Directory.Exists)
-                .SelectMany(directory => NativeDirectoryDiscovery.EnumerateFiles(
-                    directory, "*.info.darkest", SearchOption.AllDirectories))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
-                .ToArray();
+            return NativeContentFileResolver.EnumerateActorInfoFiles(source, enabledDlcPrefixes, "monsters", issues);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            issues.Add(
-                $"Monster definition source could not be scanned: {source.Directory} ({ex.Message})");
+            issues.Add($"Monster definition source could not be read: {source.Directory} ({ex.Message})");
             return [];
         }
-    }
-
-    private static IReadOnlyList<string> EnumerateManifestMonsterInfoFiles(
-        ActiveContentSource source,
-        string manifestPath,
-        IReadOnlyList<string> enabledDlcPrefixes,
-        List<string> issues)
-    {
-        var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        try
-        {
-            foreach (var entry in ModManifestFile.ReadEntries(manifestPath, ".info.darkest"))
-            {
-                var rawLine = entry.RawLine;
-                var relativePath = entry.RelativePath;
-
-                var path = Path.GetFullPath(Path.Combine(source.Directory, relativePath));
-                var relativeToRoot = Path.GetRelativePath(source.Directory, path);
-                if (Path.IsPathRooted(relativeToRoot) ||
-                    relativeToRoot.Equals("..", StringComparison.Ordinal) ||
-                    relativeToRoot.StartsWith(
-                        $"..{Path.DirectorySeparatorChar}",
-                        StringComparison.Ordinal))
-                {
-                    issues.Add(
-                        $"Ignored monster manifest path outside its Mod directory: {rawLine.Trim()}");
-                    continue;
-                }
-                if (!ContentFileOverlay.IsRootOrEnabledDlcPath(
-                        relativeToRoot,
-                        "monsters",
-                        enabledDlcPrefixes))
-                {
-                    continue;
-                }
-                if (!File.Exists(path))
-                {
-                    issues.Add($"Monster definition listed by Mod is missing: {path}");
-                    continue;
-                }
-
-                result.Add(path);
-            }
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            issues.Add($"Monster Mod manifest could not be read: {manifestPath} ({ex.Message})");
-        }
-
-        return result.OrderBy(path => path, StringComparer.OrdinalIgnoreCase).ToArray();
     }
 
     private static bool TryDescribeMashFile(
