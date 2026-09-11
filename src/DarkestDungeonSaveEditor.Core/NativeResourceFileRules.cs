@@ -146,6 +146,14 @@ internal static partial class NativeResourceFileRules
         return mounted.StartsWith("raid/camping/", DirectoryComparison(manifestDirectory)) && CampingSkillName().IsMatch(mounted);
     }
 
+    // Upgrade loading at 0x1403E8883: both suffix dots are literal and
+    // the filename query is case-sensitive, including on directory devices.
+    internal static bool IsUpgradeFile(string path, IReadOnlyList<string> enabledDlcPrefixes, bool manifestDirectory = false)
+    {
+        var mounted = MountedPath(path, enabledDlcPrefixes, manifestDirectory);
+        return mounted.StartsWith("upgrades/", DirectoryComparison(manifestDirectory)) && UpgradesName().IsMatch(mounted);
+    }
+
     internal static int PropResourceStage(string path, IReadOnlyList<string> enabledDlcPrefixes, bool manifestDirectory = false)
     {
         var mounted = MountedPath(path, enabledDlcPrefixes, manifestDirectory);
@@ -180,7 +188,7 @@ internal static partial class NativeResourceFileRules
         }
         if (mounted.StartsWith("campaign/town/districts/", DirectoryComparison(manifestDirectory)) && DistrictsName().IsMatch(mounted))
             return NativeReferenceJsonKind.Districts;
-        if (mounted.StartsWith("upgrades/", DirectoryComparison(manifestDirectory)) && UpgradesName().IsMatch(mounted))
+        if (IsUpgradeFile(mounted, [], manifestDirectory))
             return NativeReferenceJsonKind.Upgrades;
         // Building::Load (0x140536860) formats a query for the building ID,
         // e.g. stage_coach/.*stage_coach.building.json, within its directory.

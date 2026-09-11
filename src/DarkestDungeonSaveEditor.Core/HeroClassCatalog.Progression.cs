@@ -111,10 +111,13 @@ public static partial class HeroClassCatalog
 
     private static IReadOnlyList<int> ReadEffectiveResolveLevelThresholds(
         IReadOnlyList<EffectiveContentFile> files,
+        IReadOnlyList<string> enabledDlcPrefixes,
         List<string> issues)
     {
+        // Effective files retain the authored path for provenance. Compare
+        // the canonical open against its mounted path, including DLC aliases.
         var matches = files
-            .Where(file => file.RelativePath.Equals(
+            .Where(file => NativeResourceFileRules.MountedPath(file.RelativePath, enabledDlcPrefixes).Equals(
                 "campaign/roster/roster.variables.json",
                 StringComparison.OrdinalIgnoreCase))
             .ToArray();

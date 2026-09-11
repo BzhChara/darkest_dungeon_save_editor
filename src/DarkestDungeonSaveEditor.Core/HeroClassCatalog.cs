@@ -248,7 +248,7 @@ public static partial class HeroClassCatalog
             "Buff",
             issues);
         var effectiveUpgrades = ResolveHeroUpgradeTrees(upgradeFiles, issues);
-        var resolveLevelThresholds = ReadEffectiveResolveLevelThresholds(rosterVariableFiles, issues);
+        var resolveLevelThresholds = ReadEffectiveResolveLevelThresholds(rosterVariableFiles, enabledDlcPrefixes, issues);
         var effectiveEvents = ResolveOrderedDefinitions(
             eventCandidates,
             definition => definition.EventId,
