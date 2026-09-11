@@ -6,11 +6,12 @@ public static partial class StagecoachHeroCandidateFactory
 {
     private static IReadOnlyList<HeroUpgradePurchase> BuildImplicitCombatPurchases(
         HeroClassDefinition heroClass,
-        string treeId,
+        string skillId,
+        IReadOnlyDictionary<string, string> combatTargets,
         int resolveLevel,
         List<string>? warnings)
     {
-        var skillId = treeId[(heroClass.Id.Length + 1)..];
+        var treeId = combatTargets[skillId];
         if (heroClass.SingleLevelCombatSkillIds.Contains(skillId, StringComparer.Ordinal))
         {
             return [new HeroUpgradePurchase(treeId, "0")];
@@ -26,7 +27,7 @@ public static partial class StagecoachHeroCandidateFactory
         {
             reason = "技能等级定义不连续或缺失";
         }
-        else if (!TryGetImplicitCombatSchedule(heroClass, out schedule))
+        else if (!TryGetImplicitCombatSchedule(heroClass, combatTargets, out schedule))
         {
             reason = "同职业没有获得有效技能严格过半支持的升级规则";
         }
@@ -55,15 +56,16 @@ public static partial class StagecoachHeroCandidateFactory
 
     private static bool TryGetImplicitCombatSchedule(
         HeroClassDefinition heroClass,
+        IReadOnlyDictionary<string, string> combatTargets,
         out IReadOnlyList<HeroUpgradeRequirementDefinition> schedule)
     {
         schedule = [];
         var validSchedules = new List<IReadOnlyList<HeroUpgradeRequirementDefinition>>();
-        foreach (var skillId in heroClass.CombatSkillIds.Distinct(StringComparer.Ordinal))
+        foreach (var (skillId, target) in combatTargets)
         {
             var tree = heroClass.UpgradeTrees.SingleOrDefault(candidate =>
                 candidate.Kind == HeroUpgradeTreeKind.CombatSkill &&
-                candidate.Id.Equals($"{heroClass.Id}.{skillId}", StringComparison.Ordinal));
+                candidate.Id.Equals(target, StringComparison.Ordinal));
             if (tree is null || tree.Requirements.Count <= 1)
             {
                 continue;

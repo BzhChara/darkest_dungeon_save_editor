@@ -49,7 +49,7 @@ internal static partial class ContractSuite
         var delayedSkill = hero with
         {
             UpgradeTrees = hero.UpgradeTrees.Select(tree => tree.Id == "local_hero.local_skill_two"
-                ? tree with { Requirements = [new HeroUpgradeRequirementDefinition("a", 1)] }
+                ? tree with { Requirements = [new HeroUpgradeRequirementDefinition("0", 1)] }
                 : tree).ToArray()
         };
         var partialLevels = StagecoachHeroCandidateFactory.GetGenerationAvailability(catalog, delayedSkill);

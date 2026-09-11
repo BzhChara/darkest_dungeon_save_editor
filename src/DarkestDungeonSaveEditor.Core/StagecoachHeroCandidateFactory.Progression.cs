@@ -1,13 +1,10 @@
 using System.Globalization;
-using System.Text;
 using System.Text.Json.Nodes;
 
 namespace DarkestDungeonSaveEditor.Core;
 
 public static partial class StagecoachHeroCandidateFactory
 {
-    private static readonly UTF8Encoding CampingPurchaseUtf8 = new(false, true);
-
     internal static IReadOnlyList<HeroUpgradePurchase> BuildUpgradePurchases(
         HeroClassDefinition heroClass,
         int resolveLevel,
@@ -26,41 +23,25 @@ public static partial class StagecoachHeroCandidateFactory
         var combatTrees = heroClass.UpgradeTrees
             .Where(tree => tree.Kind == HeroUpgradeTreeKind.CombatSkill)
             .ToDictionary(tree => tree.Id, StringComparer.Ordinal);
-        var expectedCombatTreeIds = heroClass.CombatSkillIds
-            .Select(skillId => $"{heroClass.Id}.{skillId}")
-            .Distinct(StringComparer.Ordinal)
-            .ToArray();
+        var combatTargets = HeroSkillPurchaseTargets.Combat(heroClass.Id, heroClass.CombatSkillIds);
         // Selection rules control equipped skills, not the purchase-based level lookup.
         // Every tree-less skill uses the same bounded implicit progression policy.
-        var syntheticCombatTreeIds = expectedCombatTreeIds
-            .Where(treeId => !combatTrees.ContainsKey(treeId))
-            .ToArray();
-
-        var unavailableCombatTreeIds = expectedCombatTreeIds
-            .Where(combatTrees.ContainsKey)
-            .Where(treeId => combatTrees[treeId].Requirements.All(requirement =>
-                requirement.PrerequisiteResolveLevel > resolveLevel))
-            .ToArray();
-        if (unavailableCombatTreeIds.Length > 0)
+        var combatPurchases = new List<HeroUpgradePurchase>();
+        foreach (var (skillId, target) in combatTargets)
         {
-            throw new InvalidOperationException(
-                $"职业 '{heroClass.Id}' 的下列战斗技能升级树在 {resolveLevel} 级没有可用 requirement：" +
-                $"{string.Join(", ", unavailableCombatTreeIds)}；不能声称该等级已全技能解锁。");
+            combatPurchases.AddRange(combatTrees.TryGetValue(target, out var tree)
+                ? BuildAuthoredCombatPurchases(heroClass, skillId, tree, resolveLevel, warnings)
+                : BuildImplicitCombatPurchases(heroClass, skillId, combatTargets, resolveLevel, warnings));
         }
 
         var applicableTrees = heroClass.UpgradeTrees
-            .Where(tree => tree.Kind != HeroUpgradeTreeKind.CombatSkill)
-            .Concat(expectedCombatTreeIds
-                .Where(combatTrees.ContainsKey)
-                .Select(treeId => combatTrees[treeId]));
-        var syntheticCombatPurchases = syntheticCombatTreeIds
-            .SelectMany(treeId => BuildImplicitCombatPurchases(heroClass, treeId, resolveLevel, warnings));
+            .Where(tree => tree.Kind != HeroUpgradeTreeKind.CombatSkill);
         var campingPurchases = BuildCampingUpgradePurchases(heroClass);
         var purchases = applicableTrees
             .SelectMany(tree => tree.Requirements
                 .Where(requirement => requirement.PrerequisiteResolveLevel <= resolveLevel)
                 .Select(requirement => new HeroUpgradePurchase(tree.Id, requirement.Code)))
-            .Concat(syntheticCombatPurchases)
+            .Concat(combatPurchases)
             .Concat(campingPurchases)
             .OrderBy(purchase => purchase.TreeId, StringComparer.Ordinal)
             .ThenBy(purchase => purchase.RequirementCode, StringComparer.Ordinal)
@@ -95,40 +76,10 @@ public static partial class StagecoachHeroCandidateFactory
 
     private static IReadOnlyList<HeroUpgradePurchase> BuildCampingUpgradePurchases(HeroClassDefinition heroClass)
     {
-        var targets = new Dictionary<string, string>(StringComparer.Ordinal);
-        var purchases = new List<HeroUpgradePurchase>();
-        foreach (var skillId in heroClass.SharedCampingSkillIds.Concat(heroClass.ClassCampingSkillIds).Distinct(StringComparer.Ordinal))
-        {
-            if (heroClass.Id.Contains('\0') || skillId.Contains('\0'))
-            {
-                throw new InvalidOperationException("露营技能购买目标的职业或技能 ID 含有 NUL，无法安全生成。");
-            }
-
-            string treeId;
-            try
-            {
-                // Native camping unlock/query (0x1405C7940 / 0x1405C7A20) formats
-                // <class>.<skill> through the 64-byte buffer at 0x14036B3A0.
-                // Only this purchase target is bounded; the skill ID and the
-                // common resource hash retain their existing identities.
-                var bytes = CampingPurchaseUtf8.GetBytes($"{heroClass.Id}.{skillId}");
-                treeId = CampingPurchaseUtf8.GetString(bytes, 0, Math.Min(bytes.Length, 63));
-            }
-            catch (Exception error) when (error is EncoderFallbackException or DecoderFallbackException)
-            {
-                throw new InvalidOperationException(
-                    $"职业 '{heroClass.Id}' 的露营技能 '{skillId}' 无法表示为完整 UTF-8 购买目标（原生上限 63 字节）。", error);
-            }
-
-            if (!targets.TryAdd(treeId, skillId))
-            {
-                throw new InvalidOperationException(
-                    $"职业 '{heroClass.Id}' 的露营技能 '{targets[treeId]}' 与 '{skillId}' 截断后指向同一购买目标 '{treeId}'，无法安全生成。");
-            }
-            // The game uses code 0 even when the camping JSON authors another code.
-            purchases.Add(new HeroUpgradePurchase(treeId, "0"));
-        }
-        return purchases;
+        // The game uses code 0 even when the camping JSON authors another code.
+        return HeroSkillPurchaseTargets.Camping(heroClass.Id,
+                heroClass.SharedCampingSkillIds.Concat(heroClass.ClassCampingSkillIds)).Values
+            .Select(target => new HeroUpgradePurchase(target, "0")).ToArray();
     }
 
     private static HeroLevelProfile ResolveLevelProfile(

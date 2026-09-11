@@ -55,7 +55,7 @@ internal static partial class ContractSuite
         var lowerLater = Path.Combine(lowerRoot, "upgrades", "zz-later.upgrades.json");
         WriteTrees(lowerLater, Tree(priority, ("0", 0), ("1", 3)));
         var partialPath = Path.Combine(upperRoot, "upgrades", "custom", "deep", "mixed.upgrades.json");
-        WriteTrees(partialPath, Tree(alpha, ("a", 0), ("A", 2)),
+        WriteTrees(partialPath, Tree(alpha, ("0", 0), ("a", 0), ("A", 2)),
             Tree(otherId + ".alpha", ("0", 0), ("1", 3)),
             Tree(heroId + ".ALPHA", ("x", 6)), Tree(heroId + ".unused", ("0", 0)));
         var unlistedPath = Path.Combine(upperRoot, "upgrades", "zzz-unlisted.upgrades.json");
@@ -83,12 +83,12 @@ internal static partial class ContractSuite
             .Where(purchase => purchase.TreeId == id).Select(purchase => purchase.RequirementCode).ToArray();
 
         var catalog = Load();
-        Assert(Upgrade(catalog, alpha).Requirements.Select(item => item.Code).SequenceEqual(["a", "A"]) &&
+        Assert(Upgrade(catalog, alpha).Requirements.Select(item => item.Code).SequenceEqual(["0", "a", "A"]) &&
                Upgrade(catalog, alpha).SourcePath == partialPath && Upgrade(catalog, alpha).Source == "local:upgrade-upper" &&
                Hero(catalog).UpgradeTrees.Count == 5,
             "Arbitrary nested filenames must contribute only referenced exact tree IDs with their winning source.");
-        Assert(Codes(Generate(catalog, 1), alpha).SequenceEqual(["a"]) &&
-               Codes(Generate(catalog, 2), alpha).SequenceEqual(["A", "a"]) &&
+        Assert(Codes(Generate(catalog, 1), alpha).SequenceEqual(["0", "a"]) &&
+               Codes(Generate(catalog, 2), alpha).SequenceEqual(["0", "A", "a"]) &&
                Codes(Generate(catalog, 1), heroId + ".beta").SequenceEqual(["0", "1"]) &&
                Generate(catalog, 1).Preview.ArmourRank == 1 && Generate(catalog, 1).Preview.CurrentHp == 30 &&
                Codes(Generate(catalog, 2, otherId), otherId + ".alpha").SequenceEqual(["0"]) &&
@@ -110,14 +110,14 @@ internal static partial class ContractSuite
 
         var laterPath = Path.Combine(upperRoot, "upgrades", "zz-last.upgrades.json");
         WriteTrees(laterPath, Tree(alpha, ("bad", 0)), Tree(alpha, ("b", 0)),
-            Tree(alpha, ("a", 0), ("A", 2)), Tree(otherId + ".alpha", ("0", 0), ("1", 4)),
+            Tree(alpha, ("0", 0), ("a", 0), ("A", 2)), Tree(otherId + ".alpha", ("0", 0), ("1", 4)),
             Tree(" " + alpha, ("x", 0)), Tree(alpha + " ", ("y", 0)), Tree("\t" + alpha + "\n", ("z", 0)));
         catalog = Load();
-        Assert(Upgrade(catalog, alpha).Requirements.Select(item => item.Code).SequenceEqual(["a", "A"]) &&
+        Assert(Upgrade(catalog, alpha).Requirements.Select(item => item.Code).SequenceEqual(["0", "a", "A"]) &&
                Hero(catalog).UpgradeTrees.Count == 5,
             "Whitespace in raw tree IDs must remain significant; distinct unreferenced IDs cannot overwrite the hero's exact tree.");
         Assert(Upgrade(catalog, alpha).SourcePath == laterPath &&
-               Upgrade(catalog, alpha).Requirements.Select(item => item.Code).SequenceEqual(["a", "A"]) &&
+               Upgrade(catalog, alpha).Requirements.Select(item => item.Code).SequenceEqual(["0", "a", "A"]) &&
                Codes(Generate(catalog, 3, otherId), otherId + ".alpha").SequenceEqual(["0"]),
             "Same-Mod files and same-file duplicate trees must use the final full tree without merging old codes or rejecting healthy following rows.");
         var candidate = Generate(catalog, 2);
@@ -127,7 +127,7 @@ internal static partial class ContractSuite
         var mutation = StagecoachHeroSaveEditor.AddCandidate(town, roster, purchases, candidate.Candidate, candidate.UpgradePurchases);
         var written = mutation.UpdatedUpgrades["base_root"]!["purchases"]!.AsObject().Select(pair => pair.Value!.AsObject())
             .Where(item => item["tree_id"]!.GetValue<int>() == unchecked((int)HashLoc2Key(alpha))).ToArray();
-        Assert(written.Select(item => item["requirement_code"]!.GetValue<string>()).SequenceEqual(["A", "a"]) &&
+        Assert(written.Select(item => item["requirement_code"]!.GetValue<string>()).SequenceEqual(["0", "A", "a"]) &&
                written.All(item => item["instance_number"]!.GetValue<int>() == 894),
             "Winning case-sensitive purchase codes must be written to the correct tree hash and new hero GUID.");
         var decoded = Path.Combine(root, "persist.upgrades.decoded.json");
@@ -160,7 +160,7 @@ internal static partial class ContractSuite
             catch (InvalidOperationException ex) when (ex.Message.Contains(alpha, StringComparison.Ordinal)) { rejected = true; }
             Assert(rejected, "Actual generation must reject the same invalid tree as catalog preflight.");
         }
-        WriteTrees(laterPath, Tree(alpha, ("a", 0), ("A", 2)));
+        WriteTrees(laterPath, Tree(alpha, ("0", 0), ("a", 0), ("A", 2)));
         catalog = Load();
         Assert(Hero(catalog).GenerationAvailability.All(level => level.CanGenerate),
             "Fixing the winning file must clear the prior failure on the next catalog load.");

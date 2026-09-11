@@ -84,7 +84,22 @@ public static partial class HeroClassCatalog
         var trees = new List<HeroUpgradeTreeDefinition>();
         void AddTree(string id, HeroUpgradeTreeKind kind)
         {
-            if (!candidates.TryGetValue(id, out var candidate)) return;
+            if (!candidates.TryGetValue(id, out var candidate))
+            {
+                if (kind != HeroUpgradeTreeKind.CombatSkill) return;
+                // A computed target can alias an authored ID even when the
+                // authored IDs do not collide with one another. It is not a missing tree.
+                var hash = Loc2LocalizationReader.HashName(id);
+                var alias = candidates.Values.FirstOrDefault(tree => Loc2LocalizationReader.HashName(tree.Id) == hash);
+                if (alias is null) return;
+                trees.Add(new HeroUpgradeTreeDefinition(id, kind, [])
+                {
+                    Source = alias.Source,
+                    SourcePath = alias.SourcePath,
+                    UnsupportedReason = $"升级购买目标 '{id}' 与定义 '{alias.Id}' 的游戏哈希冲突"
+                });
+                return;
+            }
             if (!string.IsNullOrWhiteSpace(candidate.UnsupportedReason))
                 issues.Add($"Hero upgrade tree '{id}' is unavailable: {candidate.UnsupportedReason} ({candidate.SourcePath})");
             // The caller constructs the ID. Tags and filenames do not change
@@ -98,8 +113,17 @@ public static partial class HeroClassCatalog
         }
         AddTree($"{hero.Id}.weapon", HeroUpgradeTreeKind.Weapon);
         AddTree($"{hero.Id}.armour", HeroUpgradeTreeKind.Armour);
-        foreach (var skillId in hero.CombatSkillIds.Distinct(StringComparer.Ordinal))
-            AddTree($"{hero.Id}.{skillId}", HeroUpgradeTreeKind.CombatSkill);
+        try
+        {
+            foreach (var target in HeroSkillPurchaseTargets.Combat(hero.Id, hero.CombatSkillIds).Values)
+                AddTree(target, HeroUpgradeTreeKind.CombatSkill);
+        }
+        catch (InvalidOperationException error)
+        {
+            // Keep the hero visible. The same target validation in generation
+            // makes its preflight unavailable without aborting other classes.
+            issues.Add($"Hero combat upgrade targets are unavailable: {error.Message}");
+        }
 
         IReadOnlyDictionary<string, int> Requirements(HeroUpgradeTreeKind kind) => trees
             .Where(tree => tree.Kind == kind)

@@ -15,6 +15,8 @@ internal static partial class ContractSuite
     {
         var catalog = VerifyHeroCatalogContracts(activeContent, activeCatalog, localModRoot);
         await VerifyCampingPurchaseIdentitiesAsync(runRoot, codec);
+        await VerifyCombatPurchaseIdentitiesAsync(runRoot, codec);
+        await VerifyCombatPurchaseCodesAsync(runRoot, codec);
         await VerifyHeroUpgradeTreeResolutionAsync(activeContent, codec, runRoot);
         VerifyHeroDefinitionSafetyContracts(activeContent, catalog.LocalHero, runRoot);
         VerifyHeroNativeSemantics(activeContent, catalog.LocalHero, runRoot);
