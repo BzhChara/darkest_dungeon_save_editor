@@ -5,6 +5,7 @@ internal static partial class ContractSuite
 
     private static async Task RunEncounterFileQueryContractsAsync(string runRoot, DsonSaveCodec codec)
     {
+        await VerifyEncounterDirectoryCaseAsync(runRoot);
         foreach (var kind in new[] { "base", "mode", "dlc-feature", "local", "workshop", "dlc-mod" })
         {
             var root = Path.Combine(runRoot, "encounter-file-queries", kind);
@@ -86,9 +87,9 @@ internal static partial class ContractSuite
             raid["base_root"]!["start_elapsed_time"] = 100;
             raid["base_root"]!["raid_instance"]!["id"] = "query-persistence";
             File.WriteAllText(raidPath, raid.ToJsonString());
-            WriteMultiMash(game, "dungeons/cove/a.coveX2.mash.darkest", QueryMashes("alpha"));
-            WriteMultiMash(game, "dungeons/cove/b.cove.2.mashXdarkest", QueryMashes("bravo"));
-            WriteMultiMash(game, "dungeons/ruins/a.ruinsX2.mash.darkest", QueryMashes("foreign"));
+            WriteMultiMash(game, "dungeons/Cove/a.coveX2.mash.darkest", QueryMashes("alpha"));
+            WriteMultiMash(game, "dungeons/Cove/b.cove.2.mashXdarkest", QueryMashes("bravo"));
+            WriteMultiMash(game, "dungeons/Ruins/a.ruinsX2.mash.darkest", QueryMashes("foreign"));
             CreateBattleMonsterDefinitions(game, ["alpha", "bravo", "foreign"]);
             var locations = new SaveEditorLocations(root, Path.Combine(root, "workspace"), Path.Combine(root, "backups"));
             var reader = new BattleMapSnapshotReader(codec);

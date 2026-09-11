@@ -26,6 +26,8 @@ internal static partial class ContractSuite
     private static async Task RunTextResourceQueryContractsAsync(string runRoot, DsonSaveCodec codec)
     {
         VerifyActorReferenceQueryBoundaries(runRoot);
+        VerifyItemReferenceContexts(runRoot);
+        VerifyActorRecordReferenceBoundaries(runRoot);
         foreach (var kind in new[] { "base", "mode", "dlc-feature", "local", "workshop", "dlc-mod" })
         {
             var root = Path.Combine(runRoot, "text-resource-queries", kind);

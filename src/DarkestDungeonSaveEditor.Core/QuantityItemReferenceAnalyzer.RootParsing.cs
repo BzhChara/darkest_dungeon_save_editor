@@ -18,7 +18,7 @@ internal static partial class QuantityItemReferenceAnalyzer
         List<string> issues,
         Dictionary<uint, string>? eventIds = null)
     {
-        var defaultReachability = GetDefaultReachability(file.File.RelativePath);
+        var defaultReachability = GetDefaultReachability(file.MountedPath);
         var extension = Path.GetExtension(file.File.Path);
         if (file.JsonKind != NativeReferenceJsonKind.None)
         {
@@ -39,7 +39,7 @@ internal static partial class QuantityItemReferenceAnalyzer
                 }
             }
 
-            if (!ReferencePathCanAffectContext(file.File.RelativePath, saveContext))
+            if (!ReferencePathCanAffectContext(file.MountedPath, saveContext))
             {
                 return true;
             }
@@ -91,8 +91,20 @@ internal static partial class QuantityItemReferenceAnalyzer
         Dictionary<string, List<string>> activeEvidence,
         Dictionary<string, List<string>> rootLootEvidence)
     {
+        var hero = file.MountedPath.StartsWith("heroes/", StringComparison.OrdinalIgnoreCase);
+        var monster = file.MountedPath.StartsWith("monsters/", StringComparison.OrdinalIgnoreCase);
         foreach (var (kind, body) in NativeDarkestReader.ReadRecordsFromText(file.Text))
         {
+            if (hero || monster)
+            {
+                // HeroClass and MonsterClass dispatch their own record kinds.
+                // An unknown actor record containing item-looking fields is
+                // not an item consumer. Starting provisions use the JSON path.
+                if ((hero && kind is "extra_battle_loot" or "extra_curio_loot" || monster && kind == "loot") &&
+                    NativeDarkestReader.ReadString(body, ".code") is { Length: > 0 } actorCode)
+                    AddEvidence(rootLootEvidence, actorCode, file.File.RelativePath);
+                continue;
+            }
             if (kind is "loot" or "extra_battle_loot" or "extra_curio_loot" &&
                 NativeDarkestReader.ReadString(body, ".code") is { Length: > 0 } code)
                 AddEvidence(rootLootEvidence, code, file.File.RelativePath);

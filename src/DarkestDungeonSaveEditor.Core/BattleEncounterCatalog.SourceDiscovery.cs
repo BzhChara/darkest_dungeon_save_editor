@@ -99,14 +99,17 @@ public static partial class BattleEncounterCatalog
                         $"Ignored encounter manifest path outside its Mod directory: {rawLine.Trim()}");
                     continue;
                 }
-                if (!ContentFileOverlay.IsRootOrEnabledDlcPath(
-                        relativeToRoot,
-                        "dungeons",
-                        enabledDlcPrefixes))
+                var manifestPathKey = relativeToRoot.Replace('\\', '/');
+                // Mod directory-tree insertion and lookup hash raw path bytes
+                // (0x1403EBE30 / 0x1402397E0). Unlike FindFirstFileW, this
+                // query does not fold the directory spelling to match Windows.
+                if (!manifestPathKey.StartsWith("dungeons/", StringComparison.Ordinal) &&
+                    !enabledDlcPrefixes.Any(prefix => manifestPathKey.StartsWith(
+                        prefix + "/dungeons/", StringComparison.Ordinal)))
                 {
                     continue;
                 }
-                if (!TryDescribeMashFile(relativeToRoot, out _, out _)) continue;
+                if (!TryDescribeMashFile(relativeToRoot, out _, out _, manifestDirectory: true)) continue;
                 if (!File.Exists(path))
                 {
                     issues.Add($"Encounter mash listed by Mod is missing: {path}");
@@ -293,13 +296,15 @@ public static partial class BattleEncounterCatalog
     private static bool TryDescribeMashFile(
         string relativePath,
         out string dungeonId,
-        out int difficulty)
+        out int difficulty,
+        bool manifestDirectory = false)
     {
         dungeonId = string.Empty;
         difficulty = 0;
         var normalized = $"/{relativePath.Replace('\\', '/').TrimStart('/')}";
         const string marker = "/dungeons/";
-        var markerIndex = normalized.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
+        var markerIndex = normalized.IndexOf(marker,
+            manifestDirectory ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase);
         if (markerIndex < 0)
         {
             return false;
@@ -313,11 +318,18 @@ public static partial class BattleEncounterCatalog
         }
         dungeonId = normalized[dungeonStart..dungeonEnd];
 
-        // Standard files must satisfy the same region query used by the current
-        // table. Keep the existing separate conditional/additional collections.
-        var table = ClassifyFile(relativePath) == BattleEncounterSourceKind.Standard
-            ? Regex.Escape(dungeonId) : string.Empty;
+        // The physical directory is a Windows path, not the table ID passed to
+        // MashGuide. Infer the authored table spelling from the filename while
+        // allowing its directory alias (Cove/a.cove.2.mash.darkest). The actual
+        // requested table is still compared ordinally by the current-table query.
+        // Manifest discovery instead matches the original directory-tree bytes.
+        // Keep the suffix regex and conditional/additional collections unchanged.
+        var standard = ClassifyFile(relativePath) == BattleEncounterSourceKind.Standard;
+        var directory = Regex.Escape(dungeonId);
+        var table = standard
+            ? $"(?<table>{(manifestDirectory ? directory : $"(?i:{directory})")})" : string.Empty;
         var match = Regex.Match(normalized, table + MashDifficultyQuery, RegexOptions.CultureInvariant);
+        if (standard && match.Success) dungeonId = match.Groups["table"].Value;
         return match.Success &&
                int.TryParse(
                    match.Groups["difficulty"].Value,

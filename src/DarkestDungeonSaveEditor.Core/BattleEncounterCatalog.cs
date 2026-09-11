@@ -484,7 +484,7 @@ public static partial class BattleEncounterCatalog
             {
                 var relativePath = ContentFileOverlay.NormalizeRelativePath(source, path);
                 if (relativePath is not null &&
-                    IsCurrentDungeonDifficultyFile(relativePath, dungeonId, difficulty))
+                    IsCurrentDungeonDifficultyFile(relativePath, dungeonId, difficulty, source.Kind is "local" or "workshop"))
                 {
                     candidates.Add(new ContentFileCandidate(source, path));
                 }
@@ -591,10 +591,12 @@ public static partial class BattleEncounterCatalog
     private static bool IsCurrentDungeonDifficultyFile(
         string relativePath,
         string dungeonId,
-        int difficulty)
+        int difficulty,
+        bool manifestDirectory)
     {
-        return TryDescribeMashFile(relativePath, out var originDungeon, out var originDifficulty) &&
-               originDungeon.Equals(dungeonId, StringComparison.Ordinal) && originDifficulty == difficulty;
+        return TryDescribeMashFile(relativePath, out var originDungeon, out var originDifficulty, manifestDirectory) &&
+               originDungeon.Equals(dungeonId, manifestDirectory || ClassifyFile(relativePath) == BattleEncounterSourceKind.Standard
+                   ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase) && originDifficulty == difficulty;
     }
 
     private static IEnumerable<BattleEncounterDefinition> ParseFile(

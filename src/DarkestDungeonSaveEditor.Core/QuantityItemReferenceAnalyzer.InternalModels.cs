@@ -8,6 +8,7 @@ internal static partial class QuantityItemReferenceAnalyzer
 {
     private sealed record ScannedContentFile(
         EffectiveContentFile File,
+        string MountedPath,
         string Text,
         bool IsLootFile,
         NativeReferenceJsonKind JsonKind,
