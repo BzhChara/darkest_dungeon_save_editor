@@ -40,7 +40,7 @@ internal static partial class ContractSuite
             generatedCandidate.UpgradePurchases.Count(purchase =>
                 (purchase.TreeId == "local_hero.local_skill" ||
                  purchase.TreeId == "local_hero.local_skill_two") &&
-                purchase.RequirementCode == "a") == 2 &&
+                purchase.RequirementCode == "0") == 2 &&
             generatedCandidate.UpgradePurchases.Count(purchase =>
                 expectedCampingTreeIds.Contains(purchase.TreeId) &&
                 purchase.RequirementCode == "0") == 4,
@@ -73,7 +73,7 @@ internal static partial class ContractSuite
             heroCatalog,
             emptyCombatUpgradeHero,
             0,
-            "在 0 级没有可用 requirement");
+            "基础购买码 '0'");
 
         var delayedCombatUpgradeHero = localHero with
         {
@@ -90,7 +90,7 @@ internal static partial class ContractSuite
             heroCatalog,
             delayedCombatUpgradeHero,
             0,
-            "在 0 级没有可用 requirement");
+            "基础购买码 '0'");
 
         var explicitCandidate = StagecoachHeroCandidateFactory.Generate(
             heroCatalog,
@@ -364,7 +364,7 @@ internal static partial class ContractSuite
                 purchase.TreeId == "local_hero.local_skill" &&
                 purchase.RequirementCode == "A") &&
             levelFourCandidate.UpgradePurchases.All(purchase => purchase.RequirementCode != "c"),
-            "A level-four candidate should unlock every camping skill and every combat skill through the selected level while preserving case-sensitive custom requirement codes.");
+            "A level-four candidate should unlock every skill's base and preserve all eligible case-sensitive authored codes; extra letters do not imply combat tiers.");
 
         var levelSixCandidate = StagecoachHeroCandidateFactory.Generate(
             heroCatalog,

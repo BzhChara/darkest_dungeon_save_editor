@@ -167,7 +167,7 @@ internal static partial class ContractSuite
                     purchase["tree_id"]?.GetValue<int>() == expectedLocalSkillHash)
                 .Select(purchase => purchase["requirement_code"]?.GetValue<string>())
                 .ToHashSet(StringComparer.Ordinal)
-                .IsSupersetOf(["a", "A"]),
+                .IsSupersetOf(["b", "B"]),
             "Requirement codes that differ only by case must remain distinct purchases.");
         var expectedCampingSkillHash = unchecked((int)HashLoc2Key("local_hero.local_camp_two"));
         Assert(

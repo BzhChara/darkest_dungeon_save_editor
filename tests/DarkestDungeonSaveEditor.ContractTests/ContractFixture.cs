@@ -1334,7 +1334,7 @@ internal static partial class ContractSuite
           "id": "local_hero.local_skill",
           "tags": ["combat_skill"],
           "requirements": [
-            { "code": "a", "prerequisite_resolve_level": 0 },
+            { "code": "0", "prerequisite_resolve_level": 0 },
             { "code": "A", "prerequisite_resolve_level": 1 },
             { "code": "b", "prerequisite_resolve_level": 2 },
             { "code": "B", "prerequisite_resolve_level": 3 },
@@ -1345,7 +1345,7 @@ internal static partial class ContractSuite
           "id": "local_hero.local_skill_two",
           "tags": ["combat_skill"],
           "requirements": [
-            { "code": "a", "prerequisite_resolve_level": 0 },
+            { "code": "0", "prerequisite_resolve_level": 0 },
             { "code": "A", "prerequisite_resolve_level": 1 },
             { "code": "b", "prerequisite_resolve_level": 2 },
             { "code": "B", "prerequisite_resolve_level": 3 },

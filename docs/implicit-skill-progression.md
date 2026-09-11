@@ -33,6 +33,8 @@ return lastPurchased, or locked if no base purchase
 
 Thus writing only code `4` would not work: the lower consecutive purchases must be present. Changing a selected-skill map value from `0` to `4` would not establish an upgrade either. The implementation leaves selection serialization unchanged and writes the complete numeric purchase sequence through the existing writer.
 
+The constructed class/skill hash target is limited to the first 63 UTF-8 bytes by native `0x14036B3A0`. Since 2026-09-11, both explicit and implicit combat purchases and the catalog's tree binding share that bound. Original skill IDs remain separate for variant metadata and majority voting. The same native consecutive-code lookup also applies to authored trees: their base code `0` must be purchasable, and an intervening missing code produces a warning stating the reachable tier. It does not authorize renaming or synthesizing authored codes. See [combat purchase consumption](resource-duplicate-semantics.md#842-combat-purchase-targets-and-reachable-tiers) for guards and implementation evidence.
+
 The read-only reproduction helper is `workspaces/hero_live_verification_20260906/inspect_skill_binary.py`. It uses standard-library PE parsing plus the already-installed Visual Studio `dumpbin`, without attaching to a process, injecting, installing dependencies, or modifying the executable.
 
 ## Choosing a resolve-level schedule

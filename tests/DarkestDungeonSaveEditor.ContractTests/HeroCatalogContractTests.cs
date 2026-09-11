@@ -121,7 +121,7 @@ internal static partial class ContractSuite
             localHero.UpgradeTrees.Count(tree => tree.Kind == HeroUpgradeTreeKind.CombatSkill) == 2 &&
             localHero.UpgradeTrees.Single(tree => tree.Id == "local_hero.local_skill")
                 .Requirements.Select(requirement => requirement.Code)
-                .SequenceEqual(["a", "A", "b", "B", "c"]),
+                .SequenceEqual(["0", "A", "b", "B", "c"]),
             "The active hero upgrade template should retain exact, case-sensitive tree ids and custom requirement codes for save purchases.");
         Assert(
             heroCatalog.Issues.All(issue =>
