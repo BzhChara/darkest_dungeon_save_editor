@@ -51,11 +51,26 @@ internal static class NativeContentFileResolver
         string directory, List<string> issues)
     {
         var prefixes = ContentFileOverlay.GetEnabledDlcPrefixes(sources);
-        var candidates = sources.SelectMany(source => ContentFileDiscovery.Enumerate(source, prefixes,
-                issues, "Actor", new ContentFileRule(directory, "*.info.darkest"))
-            .Select(path => new ContentFileCandidate(source, path))).ToArray();
-        return candidates.Select(file => Path.GetFileName(file.Path)[..^".info.darkest".Length])
+        return sources.SelectMany(source => EnumerateActorInfoFiles(source, prefixes, directory, issues)
+                .Select(path => ReadDiscoveredActorId(Path.GetRelativePath(source.Directory, path))))
             .ToHashSet(StringComparer.Ordinal);
+    }
+
+    internal static IReadOnlyList<string> EnumerateActorInfoFiles(ActiveContentSource source,
+        IReadOnlyList<string> prefixes, string directory, List<string> issues) =>
+        ContentFileDiscovery.EnumerateQuery(source, prefixes, issues, "Actor discovery",
+            path => NativeResourceFileRules.IsActorInfoFile(path, prefixes, directory,
+                source.Kind is "local" or "workshop"), new ContentFileRule(directory, "*darkest"));
+
+    internal static string ReadDiscoveredActorId(string relativePath)
+    {
+        // The discovery loader removes the last dot twice, then the directory.
+        // Hero's unescaped second dot also accepts x.seed.infoXdarkest, which
+        // registers x, not x.seed. Canonical OpenFile remains a separate query.
+        var path = relativePath.Replace('\\', '/');
+        for (var index = 0; index < 2; index++)
+            if (path.LastIndexOf('.') is var dot && dot >= 0) path = path[..dot];
+        return path[(path.LastIndexOf('/') + 1)..];
     }
 
     public static IReadOnlyList<EffectiveContentFile> Resolve(

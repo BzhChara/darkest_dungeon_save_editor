@@ -28,6 +28,7 @@ internal static partial class ContractSuite
         VerifyActorReferenceQueryBoundaries(runRoot);
         VerifyItemReferenceContexts(runRoot);
         VerifyActorRecordReferenceBoundaries(runRoot);
+        await VerifyResourceDirectoryQueriesAsync(runRoot, codec);
         foreach (var kind in new[] { "base", "mode", "dlc-feature", "local", "workshop", "dlc-mod" })
         {
             var root = Path.Combine(runRoot, "text-resource-queries", kind);

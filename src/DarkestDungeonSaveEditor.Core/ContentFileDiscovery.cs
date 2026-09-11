@@ -22,6 +22,11 @@ internal static class ContentFileDiscovery
     public static IReadOnlyList<string> Enumerate(ActiveContentSource source,
         IReadOnlyList<string> enabledDlcPrefixes, List<string> issues, string label,
         params ContentFileRule[] rules)
+        => EnumerateQuery(source, enabledDlcPrefixes, issues, label, null, rules);
+
+    internal static IReadOnlyList<string> EnumerateQuery(ActiveContentSource source,
+        IReadOnlyList<string> enabledDlcPrefixes, List<string> issues, string label,
+        Func<string, bool>? eligible, params ContentFileRule[] rules)
     {
         if (!Directory.Exists(source.Directory))
         {
@@ -45,7 +50,7 @@ internal static class ContentFileDiscovery
                     issues.Add($"Ignored {label} manifest path outside its Mod directory: {entry.RawLine.Trim()}");
                     continue;
                 }
-                if (!Matches(relative, prefixes, rules)) continue;
+                if (!Matches(relative, prefixes, rules) || (eligible is not null && !eligible(relative))) continue;
                 if (!File.Exists(path))
                 {
                     issues.Add($"{label} file listed by Mod is missing: {path}");
@@ -62,7 +67,8 @@ internal static class ContentFileDiscovery
                 if (!Directory.Exists(directory)) continue;
                 foreach (var path in NativeDirectoryDiscovery.EnumerateFiles(directory, rule.Pattern,
                              rule.Recursive ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly))
-                    result.Add(Path.GetFullPath(path));
+                    if (eligible is null || eligible(Path.GetRelativePath(source.Directory, path)))
+                        result.Add(Path.GetFullPath(path));
             }
         }
         return result.Order(StringComparer.Ordinal).ToArray();

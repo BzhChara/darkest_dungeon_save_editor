@@ -25,11 +25,11 @@ public static partial class HeroClassCatalog
         IReadOnlyList<string> Files(string directory, string pattern) => SortPaths(
             roots.SelectMany(root => EnumerateFiles(root, directory, pattern))
                 .Distinct(StringComparer.OrdinalIgnoreCase));
-        IReadOnlyList<string> ResourceFiles(string directory, Func<string, IReadOnlyList<string>, bool> eligible) =>
-            Files(directory, "*json").Where(path => eligible(Path.GetRelativePath(source.Directory, path), [])).ToArray();
+        IReadOnlyList<string> ResourceFiles(string directory, Func<string, IReadOnlyList<string>, bool, bool> eligible) =>
+            Files(directory, "*json").Where(path => eligible(Path.GetRelativePath(source.Directory, path), [], false)).ToArray();
 
         return new SourceFileSet(
-            Files("heroes", $"*{HeroInfoSuffix}"),
+            NativeContentFileResolver.EnumerateActorInfoFiles(source, enabledDlcPrefixes, "heroes", issues),
             Files("heroes", $"*{HeroOverrideSuffix}"),
             Files("effects", "*darkest")
                 .Where(path => NativeResourceFileRules.IsEffectFile(Path.GetRelativePath(source.Directory, path), [])).ToArray(),
@@ -76,8 +76,7 @@ public static partial class HeroClassCatalog
 
             var normalizedRelative = relativeToRoot.Replace('\\', '/');
             HashSet<string>? target = null;
-            if (ContentFileOverlay.IsRootOrEnabledDlcPath(normalizedRelative, "heroes", enabledDlcPrefixes) &&
-                normalizedRelative.EndsWith(HeroInfoSuffix, StringComparison.OrdinalIgnoreCase))
+            if (NativeResourceFileRules.IsActorInfoFile(normalizedRelative, enabledDlcPrefixes, "heroes", manifestDirectory: true))
             {
                 target = heroFiles;
             }
@@ -86,32 +85,32 @@ public static partial class HeroClassCatalog
             {
                 target = heroOverrideFiles;
             }
-            else if (NativeResourceFileRules.IsEffectFile(normalizedRelative, enabledDlcPrefixes))
+            else if (NativeResourceFileRules.IsEffectFile(normalizedRelative, enabledDlcPrefixes, manifestDirectory: true))
             {
                 target = effectFiles;
             }
-            else if (NativeResourceFileRules.IsQuirkFile(normalizedRelative, enabledDlcPrefixes))
+            else if (NativeResourceFileRules.IsQuirkFile(normalizedRelative, enabledDlcPrefixes, manifestDirectory: true))
             {
                 target = quirkFiles;
             }
-            else if (NativeResourceFileRules.IsTownEventFile(normalizedRelative, enabledDlcPrefixes))
+            else if (NativeResourceFileRules.IsTownEventFile(normalizedRelative, enabledDlcPrefixes, manifestDirectory: true))
             {
                 target = eventFiles;
             }
-            else if (NativeResourceFileRules.IsBuffFile(normalizedRelative, enabledDlcPrefixes))
+            else if (NativeResourceFileRules.IsBuffFile(normalizedRelative, enabledDlcPrefixes, manifestDirectory: true))
             {
                 target = buffFiles;
             }
-            else if (NativeResourceFileRules.IsCampingSkillFile(normalizedRelative, enabledDlcPrefixes))
+            else if (NativeResourceFileRules.IsCampingSkillFile(normalizedRelative, enabledDlcPrefixes, manifestDirectory: true))
             {
                 target = campingFiles;
             }
-            else if (ContentFileOverlay.IsRootOrEnabledDlcPath(normalizedRelative, "localization", enabledDlcPrefixes) &&
+            else if (NativeResourceFileRules.IsInDirectory(normalizedRelative, "localization", enabledDlcPrefixes, manifestDirectory: true) &&
                      normalizedRelative.EndsWith(".string_table.xml", StringComparison.OrdinalIgnoreCase))
             {
                 target = nameFiles;
             }
-            else if (ContentFileOverlay.IsRootOrEnabledDlcPath(normalizedRelative, "upgrades", enabledDlcPrefixes) &&
+            else if (NativeResourceFileRules.IsInDirectory(normalizedRelative, "upgrades", enabledDlcPrefixes, manifestDirectory: true) &&
                       normalizedRelative.EndsWith(HeroUpgradeSuffix, StringComparison.OrdinalIgnoreCase))
             {
                 target = upgradeFiles;

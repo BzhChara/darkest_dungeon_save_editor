@@ -13,6 +13,28 @@ internal static partial class QuantityItemReferenceAnalyzer
         ref bool scanComplete)
     {
         var enabledDlcPrefixes = ContentFileOverlay.GetEnabledDlcPrefixes(activeContent.Sources);
+        var actorPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var source in activeContent.Sources)
+        {
+            try
+            {
+                foreach (var directory in new[] { "heroes", "monsters" })
+                foreach (var path in NativeContentFileResolver.EnumerateActorInfoFiles(source, enabledDlcPrefixes, directory, issues))
+                {
+                    var id = NativeContentFileResolver.ReadDiscoveredActorId(Path.GetRelativePath(source.Directory, path));
+                    if (directory == "monsters" && id.Length < 2) continue;
+                    var stem = directory == "heroes" ? $"heroes/{id}/{id}" : $"monsters/{id[..^2]}/{id}/{id}";
+                    foreach (var suffix in directory == "heroes"
+                                 ? new[] { ".info.darkest", ".art.darkest", ".override.darkest" }
+                                 : new[] { ".info.darkest", ".art.darkest" }) actorPaths.Add(stem + suffix);
+                }
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                scanComplete = false;
+                issues.Add($"Failed to enumerate actor item consumers in '{source.Directory}': {ex.Message}");
+            }
+        }
         var candidates = new List<ContentFileCandidate>();
         foreach (var source in activeContent.Sources)
         {
@@ -21,10 +43,11 @@ internal static partial class QuantityItemReferenceAnalyzer
                 AuditManifestReferenceFiles(
                     source,
                     enabledDlcPrefixes,
+                    actorPaths,
                     saveContext,
                     issues,
                     ref scanComplete);
-                foreach (var path in EnumerateCandidateFiles(source, enabledDlcPrefixes))
+                foreach (var path in EnumerateCandidateFiles(source, enabledDlcPrefixes, actorPaths))
                 {
                     candidates.Add(new ContentFileCandidate(source, path));
                 }
@@ -73,6 +96,7 @@ internal static partial class QuantityItemReferenceAnalyzer
     private static void AuditManifestReferenceFiles(
         ActiveContentSource source,
         IReadOnlyList<string> enabledDlcPrefixes,
+        IReadOnlySet<string> actorPaths,
         QuantityItemSaveContext saveContext,
         List<string> issues,
         ref bool scanComplete)
@@ -96,9 +120,10 @@ internal static partial class QuantityItemReferenceAnalyzer
 
             var normalized = ContentFileOverlay.NormalizeRelativePath(source, path);
             if (normalized is null ||
-                !IsEligibleReferencePath(normalized, enabledDlcPrefixes) ||
+                !IsEligibleReferencePath(normalized, enabledDlcPrefixes, true, actorPaths) ||
                 !ContentDirectories.Any(directory =>
-                    ContentFileOverlay.IsRootOrEnabledDlcPath(normalized, directory, enabledDlcPrefixes)) ||
+                    NativeResourceFileRules.IsInDirectory(normalized, directory, enabledDlcPrefixes,
+                        directory is not ("heroes" or "monsters"))) ||
                 IsDefinitionOnlyPath(normalized, enabledDlcPrefixes) ||
                 !ReferencePathCanAffectContext(
                     NativeResourceFileRules.MountedPath(normalized, enabledDlcPrefixes), saveContext) ||
@@ -115,7 +140,8 @@ internal static partial class QuantityItemReferenceAnalyzer
 
     private static IEnumerable<string> EnumerateCandidateFiles(
         ActiveContentSource source,
-        IReadOnlyList<string> enabledDlcPrefixes)
+        IReadOnlyList<string> enabledDlcPrefixes,
+        IReadOnlySet<string> actorPaths)
     {
         if (!Directory.Exists(source.Directory))
         {
@@ -130,7 +156,6 @@ internal static partial class QuantityItemReferenceAnalyzer
             paths = ModManifestFile.ReadEntries(manifestPath, "json", ".darkest", "csv")
                 .Select(entry => Path.GetFullPath(Path.Combine(source.Directory, entry.RelativePath)))
                 .Where(path => IsInsideSource(source.Directory, path) && File.Exists(path))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToArray();
         }
 
@@ -150,51 +175,49 @@ internal static partial class QuantityItemReferenceAnalyzer
                     }));
         }
 
+        // Canonical actor opens can use paths excluded from physical discovery.
+        paths = paths.Concat(new[] { "heroes", "monsters" }.SelectMany(directory =>
+            NativeContentFileResolver.EnumerateActorOpenFiles(source, enabledDlcPrefixes, directory, [])));
+        var manifestDirectory = source.Kind is "local" or "workshop";
+        var acceptedPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var path in paths)
         {
             var relativePath = ContentFileOverlay.NormalizeRelativePath(source, path);
             if (relativePath is null ||
                 (!TextExtensions.Contains(Path.GetExtension(path)) &&
-                 !NativeResourceFileRules.IsCurioTypeFile(relativePath, enabledDlcPrefixes) &&
-                 !NativeResourceFileRules.IsLootFile(relativePath, enabledDlcPrefixes) &&
-                 NativeResourceFileRules.ReferenceJsonKind(relativePath, enabledDlcPrefixes) == NativeReferenceJsonKind.None))
+                 !NativeResourceFileRules.IsCurioTypeFile(relativePath, enabledDlcPrefixes, manifestDirectory) &&
+                 !NativeResourceFileRules.IsLootFile(relativePath, enabledDlcPrefixes, manifestDirectory) &&
+                 NativeResourceFileRules.ReferenceJsonKind(relativePath, enabledDlcPrefixes, manifestDirectory) == NativeReferenceJsonKind.None))
             {
                 continue;
             }
 
-            if (!IsEligibleReferencePath(relativePath, enabledDlcPrefixes) ||
+            if (!IsEligibleReferencePath(relativePath, enabledDlcPrefixes, manifestDirectory, actorPaths) ||
                 !ContentDirectories.Any(directory =>
-                    ContentFileOverlay.IsRootOrEnabledDlcPath(relativePath, directory, enabledDlcPrefixes)) ||
+                    NativeResourceFileRules.IsInDirectory(relativePath, directory, enabledDlcPrefixes,
+                        manifestDirectory && directory is not ("heroes" or "monsters"))) ||
                 IsDefinitionOnlyPath(relativePath, enabledDlcPrefixes))
             {
                 continue;
             }
 
-            yield return path;
+            // Raw manifest aliases can have different directory eligibility.
+            // Deduplicate physical paths only after rejecting ineligible names.
+            if (acceptedPaths.Add(path)) yield return path;
         }
     }
 
-    private static bool IsEligibleReferencePath(string path, IReadOnlyList<string> enabledDlcPrefixes)
+    private static bool IsEligibleReferencePath(string path, IReadOnlyList<string> enabledDlcPrefixes,
+        bool manifestDirectory, IReadOnlySet<string> actorPaths)
     {
-        if (!NativeResourceFileRules.IsEligibleReferenceFile(path, enabledDlcPrefixes)) return false;
+        if (!NativeResourceFileRules.IsEligibleReferenceFile(path, enabledDlcPrefixes, manifestDirectory)) return false;
         if (path.EndsWith("csv", StringComparison.OrdinalIgnoreCase))
-            return NativeResourceFileRules.IsCurioTypeFile(path, enabledDlcPrefixes);
-        var prefix = enabledDlcPrefixes.OrderByDescending(value => value.Length)
-            .FirstOrDefault(value => path.StartsWith(value + "/", StringComparison.OrdinalIgnoreCase));
-        var mounted = prefix is null ? path : path[(prefix.Length + 1)..];
-        var suffix = new[] { ".info.darkest", ".art.darkest", ".override.darkest" }
-            .FirstOrDefault(value => mounted.EndsWith(value, StringComparison.OrdinalIgnoreCase));
-        // Actor item/loot references come from canonical definitions. Merely
-        // listing heroes/inventory/README.darkest must not create a consumer.
-        if (suffix is null)
-            return !mounted.StartsWith("heroes/", StringComparison.OrdinalIgnoreCase) &&
-                   !mounted.StartsWith("monsters/", StringComparison.OrdinalIgnoreCase);
-        var id = Path.GetFileName(mounted)[..^suffix.Length];
-        if (mounted.StartsWith("heroes/", StringComparison.OrdinalIgnoreCase))
-            return mounted.Equals($"heroes/{id}/{id}{suffix}", StringComparison.OrdinalIgnoreCase);
-        if (mounted.StartsWith("monsters/", StringComparison.OrdinalIgnoreCase))
-            return id.Length >= 2 && suffix != ".override.darkest" &&
-                mounted.Equals($"monsters/{id[..^2]}/{id}/{id}{suffix}", StringComparison.OrdinalIgnoreCase);
+            return NativeResourceFileRules.IsCurioTypeFile(path, enabledDlcPrefixes, manifestDirectory);
+        // Registered actors open canonical paths, independently of the file
+        // used to discover the ID. Preserve Windows aliases for these opens.
+        var mounted = NativeResourceFileRules.MountedPath(path, enabledDlcPrefixes);
+        if (mounted.StartsWith("heroes/", StringComparison.OrdinalIgnoreCase) ||
+            mounted.StartsWith("monsters/", StringComparison.OrdinalIgnoreCase)) return actorPaths.Contains(mounted);
         return true;
     }
 

@@ -35,8 +35,9 @@ public static partial class HeroClassCatalog
             sourceFiles.Add(new SourceFiles(source, EnumerateSourceFiles(source, enabledDlcPrefixes, issues)));
         }
 
-        var heroIds = sourceFiles.SelectMany(item => item.Files.HeroInfoFiles)
-            .Select(path => ReadHeroClassId(path, HeroInfoSuffix)).Distinct(StringComparer.Ordinal).ToArray();
+        var heroIds = sourceFiles.SelectMany(item => item.Files.HeroInfoFiles.Select(path =>
+                NativeContentFileResolver.ReadDiscoveredActorId(Path.GetRelativePath(item.Source.Directory, path))))
+            .Distinct(StringComparer.Ordinal).ToArray();
         var actorFiles = NativeContentFileResolver.ResolveActorFiles(activeContent.Sources, "heroes", issues);
         var heroFiles = new List<EffectiveContentFile>();
         var heroOverrideFiles = new List<EffectiveContentFile>();

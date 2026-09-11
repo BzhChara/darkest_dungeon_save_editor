@@ -280,7 +280,7 @@ public static class TrinketCatalog
                 continue;
             }
 
-            if (!NativeResourceFileRules.IsTrinketFile(relativeToRoot, enabledDlcPrefixes))
+            if (!NativeResourceFileRules.IsTrinketFile(relativeToRoot, enabledDlcPrefixes, manifestDirectory: true))
             {
                 continue;
             }

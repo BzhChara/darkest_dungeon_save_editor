@@ -10,12 +10,14 @@ public static partial class BattleRoomAttachmentCatalog
         var enabledDlcPrefixes = ContentFileOverlay.GetEnabledDlcPrefixes(sources);
         var files = NativeContentFileResolver.Resolve(sources.SelectMany(source =>
                 EnumeratePropFiles(source, enabledDlcPrefixes, issues, "props", "*json", "json",
-                    path => NativeResourceFileRules.PropResourceStage(path, enabledDlcPrefixes) >= 0)
+                    path => NativeResourceFileRules.PropResourceStage(path, enabledDlcPrefixes,
+                        source.Kind is "local" or "workshop") >= 0)
                     .Select(path => new ContentFileCandidate(source, path))).ToArray(), sources,
             "Map prop resource", issues);
         // 0x1404D87A0 opens the three root paths before the subdirectory searches.
         // Stable ordering preserves native resolver slots within each searched family.
-        return files.OrderBy(file => NativeResourceFileRules.PropResourceStage(file.RelativePath, enabledDlcPrefixes)).ToArray();
+        return files.OrderBy(file => NativeResourceFileRules.PropResourceStage(file.RelativePath, enabledDlcPrefixes,
+            file.Source.Kind is "local" or "workshop")).ToArray();
     }
 
     private static PropResources ReadResources(

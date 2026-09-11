@@ -59,6 +59,10 @@ Close Darkest Dungeon before the suite: save transaction contracts exercise the 
 
 只运行上述物品、容量、Effect、奇物和战斗文件查询两组新契约，包含隔离 DSON 保存与 Bridge 安装；不修改真实档案或活动 Mod。完整套件也包含这两组。构建后可添加 `--no-build` 执行。
 
+其中 `ResourceDirectoryQueryContractTests` 覆盖六种来源的清单／物理目录大小写、Buff 与实际人物 HP、物品堆叠及背包容量的 DSON 往返、饰品／技能／奇物资源、引用消费、DLC 前缀和缺失文件诊断。`ActorDiscoveryQueryContractTests` 覆盖人物／怪物不同的文件名表达式、注册与标准路径打开的区别、饰品职业要求、人物伴生物品、三类战斗编号及自动维护。`EncounterFileQueryContractTests` 额外验证未注册大写怪物文件后的正常战斗替换、Bridge 新建和删除。
+
+资源目录测试还包含 24 组清单别名排列对照：错误大小写条目在合法条目之前或之后时，Loot、Curio、配给 JSON 与 DLC 前缀的有效引用必须一致，防止筛选前去重造成漏读。
+
 ## 持久副本目录验证
 
 `dotnet run --project tests/DarkestDungeonSaveEditor.ContractTests -c Release -- . --raid-paths`
