@@ -141,6 +141,7 @@ public sealed record HeroClassDefinition(
     public IReadOnlyList<HeroGenerationAvailability> GenerationAvailability { get; init; } = [];
     public IReadOnlyDictionary<string, IReadOnlyList<int>> CombatSkillLevels { get; init; } =
         new Dictionary<string, IReadOnlyList<int>>(StringComparer.Ordinal);
+    internal HeroEquipmentDefinition? Equipment { get; init; }
 }
 
 public enum HeroMaxHpModifierKind

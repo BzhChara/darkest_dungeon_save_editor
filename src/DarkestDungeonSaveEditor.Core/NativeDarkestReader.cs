@@ -135,6 +135,15 @@ internal static partial class NativeDarkestReader
         return body[start..end];
     }
 
+    internal static byte? ReadByte(string body, string field)
+    {
+        // GetChar (0x14036CC50) skips whitespace after the last field and
+        // copies one raw byte. In particular, a quote is itself the code.
+        var start = FindValue(body, field);
+        if (start < 0) return null;
+        return start == body.Length ? (byte)0 : Encoding.UTF8.GetBytes(body[start..])[0];
+    }
+
     internal static int? ReadInt(string body, string field)
     {
         var start = FindValue(body, field);

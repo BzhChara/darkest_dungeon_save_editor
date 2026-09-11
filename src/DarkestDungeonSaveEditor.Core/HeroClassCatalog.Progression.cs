@@ -86,7 +86,6 @@ public static partial class HeroClassCatalog
         {
             if (!candidates.TryGetValue(id, out var candidate))
             {
-                if (kind != HeroUpgradeTreeKind.CombatSkill) return;
                 // A computed target can alias an authored ID even when the
                 // authored IDs do not collide with one another. It is not a missing tree.
                 var hash = Loc2LocalizationReader.HashName(id);
@@ -111,8 +110,16 @@ public static partial class HeroClassCatalog
                 UnsupportedReason = candidate.UnsupportedReason
             });
         }
-        AddTree($"{hero.Id}.weapon", HeroUpgradeTreeKind.Weapon);
-        AddTree($"{hero.Id}.armour", HeroUpgradeTreeKind.Armour);
+        try
+        {
+            var targets = HeroSkillPurchaseTargets.Equipment(hero.Id);
+            AddTree(targets["weapon"], HeroUpgradeTreeKind.Weapon);
+            AddTree(targets["armour"], HeroUpgradeTreeKind.Armour);
+        }
+        catch (InvalidOperationException error)
+        {
+            issues.Add($"Hero equipment upgrade targets are unavailable: {error.Message}");
+        }
         try
         {
             foreach (var target in HeroSkillPurchaseTargets.Combat(hero.Id, hero.CombatSkillIds).Values)
@@ -222,9 +229,9 @@ public static partial class HeroClassCatalog
             var prerequisiteLevel = ReadJsonInt(requirement, "prerequisite_resolve_level");
             if (string.IsNullOrWhiteSpace(code) || prerequisiteLevel is null or < 0)
                 throw new InvalidDataException($"Upgrade tree '{treeId}' requirement is missing code or prerequisite_resolve_level.");
-            if (code.Length != 1 || code[0] > 0x7F)
+            if (!DsonSaveCodec.CanRoundTripPurchaseCode(code))
                 throw new InvalidDataException($"Upgrade tree '{treeId}' requirement code '{code}' cannot be represented " +
-                    "losslessly by persist.upgrades; one ASCII character is required.");
+                    "losslessly by the DSON codec; one printable ASCII character excluding double quote and backslash is required.");
 
             if (parsedRequirements.TryGetValue(code, out var existing) && existing != prerequisiteLevel.Value)
                 throw new InvalidDataException($"Upgrade tree '{treeId}' requirement '{code}' has conflicting resolve prerequisites " +
@@ -243,127 +250,82 @@ public static partial class HeroClassCatalog
         HeroUpgradeDefinition? upgrade,
         IReadOnlyList<int> resolveLevelThresholds)
     {
-        var armourRankZero = hero.ArmourRanks.FirstOrDefault(rank => rank.Rank == 0);
-        var levelZeroHp = armourRankZero?.Hp ?? hero.BaseHp;
-        var fallback = levelZeroHp is > 0 and < double.PositiveInfinity
-            ? new[] { new HeroLevelProfile(0, 0, 0, 0, levelZeroHp.Value) }
-            : [];
-        if (levelZeroHp is not (> 0 and < double.PositiveInfinity))
-        {
+        var equipment = CreateEquipmentDefinition(hero);
+        if (equipment.Armour.FirstOrDefault()?.Hp is not (> 0 and < double.PositiveInfinity))
             return new HeroProgressionBuildResult([], "缺少可验证的 0 级护甲 HP");
-        }
 
-        if (resolveLevelThresholds.Count == 0)
+        IReadOnlyDictionary<string, string> targets;
+        try
         {
-            return new HeroProgressionBuildResult(fallback, "缺少有效的 resolve_level_thresholds");
+            targets = HeroSkillPurchaseTargets.Equipment(hero.Id);
+        }
+        catch (InvalidOperationException error)
+        {
+            return new HeroProgressionBuildResult([], error.Message);
         }
 
-        var weapon = BuildEquipmentProgression(
-            "武器",
-            hero.WeaponRanks,
-            upgrade?.WeaponRequirements,
-            requireHp: false);
-        var armour = BuildEquipmentProgression(
-            "护甲",
-            hero.ArmourRanks,
-            upgrade?.ArmourRequirements,
-            requireHp: true);
         var reason = string.Join(
             "；",
-            new[] { weapon.UnsupportedReason, armour.UnsupportedReason }
+            new[]
+            {
+                string.Join("；", (upgrade?.Trees ?? [])
+                    .Where(tree => tree.Kind is HeroUpgradeTreeKind.Weapon or HeroUpgradeTreeKind.Armour)
+                    .Select(tree => tree.UnsupportedReason).Where(value => !string.IsNullOrWhiteSpace(value))),
+                ValidateEquipmentRequirements("武器", equipment.Weapon, upgrade?.WeaponRequirements, false),
+                ValidateEquipmentRequirements("护甲", equipment.Armour, upgrade?.ArmourRequirements, true),
+                resolveLevelThresholds.Count == 0 ? "缺少有效的 resolve_level_thresholds" : string.Empty
+            }
                 .Where(value => !string.IsNullOrWhiteSpace(value)));
-        if (!string.IsNullOrWhiteSpace(reason))
-        {
-            return new HeroProgressionBuildResult(fallback, reason);
-        }
-
-        var profiles = resolveLevelThresholds
+        // Preserve the existing level-zero-only policy for incomplete templates,
+        // but even that profile must reflect free ranks and actual level-zero buys.
+        var thresholds = reason.Length == 0 ? resolveLevelThresholds : new[] { 0 };
+        var profiles = thresholds
             .Select((xp, level) =>
             {
-                var weaponRank = weapon.Ranks
-                    .Where(rank => rank.MinimumResolveLevel <= level)
-                    .MaxBy(rank => rank.Rank)!;
-                var armourRank = armour.Ranks
-                    .Where(rank => rank.MinimumResolveLevel <= level)
-                    .MaxBy(rank => rank.Rank)!;
+                var purchases = (upgrade?.Trees ?? [])
+                    .Where(tree => tree.Kind is HeroUpgradeTreeKind.Weapon or HeroUpgradeTreeKind.Armour)
+                    .SelectMany(tree => tree.Requirements.Where(r => r.PrerequisiteResolveLevel <= level)
+                        .Select(r => new HeroUpgradePurchase(tree.Id, r.Code))).ToArray();
+                var weaponRank = HeroEquipmentProgression.Resolve(equipment.Weapon, targets["weapon"], purchases);
+                var armourRank = HeroEquipmentProgression.Resolve(equipment.Armour, targets["armour"], purchases);
                 return new HeroLevelProfile(
                     level,
                     xp,
                     weaponRank.Rank,
                     armourRank.Rank,
-                    armourRank.Hp!.Value);
+                    armourRank.Hp ?? double.NaN);
             })
+            .Where(profile => profile.ArmourHp is > 0 and < double.PositiveInfinity)
             .ToArray();
-        return new HeroProgressionBuildResult(profiles, string.Empty);
+        return new HeroProgressionBuildResult(profiles, reason);
     }
 
-    private static EquipmentProgressionBuildResult BuildEquipmentProgression(
+    private static HeroEquipmentDefinition CreateEquipmentDefinition(HeroCandidate hero) => new(
+        hero.WeaponRanks.Count == 0 ? [new HeroEquipmentRank(0, 0, null)] : hero.WeaponRanks,
+        hero.ArmourRanks);
+
+    private static string ValidateEquipmentRequirements(
         string label,
-        IReadOnlyList<HeroEquipmentRank> sourceRanks,
+        IReadOnlyList<HeroEquipmentRank> ranks,
         IReadOnlyDictionary<string, int>? requirements,
         bool requireHp)
     {
-        var ranks = sourceRanks.Count == 0 && !requireHp
-            ? new[] { new HeroEquipmentRank(0, string.Empty, null) }
-            : sourceRanks.OrderBy(rank => rank.Rank).ToArray();
-        if (ranks.Length == 0 || ranks[0].Rank != 0)
-        {
-            return new EquipmentProgressionBuildResult([], $"{label}缺少 rank 0 定义");
-        }
-
-        for (var index = 0; index < ranks.Length; index++)
+        for (var index = 0; index < ranks.Count; index++)
         {
             if (ranks[index].Rank != index)
-            {
-                return new EquipmentProgressionBuildResult([], $"{label} rank 必须从 0 连续定义");
-            }
+                return $"{label} rank 必须从 0 连续定义";
 
             if (requireHp && ranks[index].Hp is not (> 0 and < double.PositiveInfinity))
-            {
-                return new EquipmentProgressionBuildResult([], $"{label} rank {index} 缺少有效 HP");
-            }
+                return $"{label} rank {index} 缺少有效 HP";
+
+            var code = ranks[index].RequirementCode;
+            if (code == 0) continue;
+            if (code > 0x7F)
+                return $"{label} rank {index} 的购买码 0x{code:X2} 不能无损写入存档";
+            if (requirements is null || !requirements.ContainsKey(((char)code).ToString()))
+                return $"{label} rank {index} 的 upgradeRequirementCode '{(char)code}' 无法解析";
         }
-
-        if (ranks.Length == 1 && (requirements is null || requirements.Count == 0))
-        {
-            return new EquipmentProgressionBuildResult(
-                [new ResolvedEquipmentRank(0, 0, ranks[0].Hp)],
-                string.Empty);
-        }
-
-        if (requirements is null || requirements.Count == 0)
-        {
-            return new EquipmentProgressionBuildResult([], $"{label}有多个 rank，但缺少有效 upgrade 模板");
-        }
-
-        var resolved = new List<ResolvedEquipmentRank>
-        {
-            new(0, 0, ranks[0].Hp)
-        };
-        var usedCodes = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var rank in ranks.Skip(1))
-        {
-            if (string.IsNullOrWhiteSpace(rank.RequirementCode) ||
-                !requirements.TryGetValue(rank.RequirementCode, out var prerequisiteLevel))
-            {
-                return new EquipmentProgressionBuildResult(
-                    [],
-                    $"{label} rank {rank.Rank} 的 upgradeRequirementCode '{rank.RequirementCode}' 无法解析");
-            }
-
-            usedCodes.Add(rank.RequirementCode);
-            resolved.Add(new ResolvedEquipmentRank(rank.Rank, prerequisiteLevel, rank.Hp));
-        }
-
-        var unusedCodes = requirements.Keys.Where(code => !usedCodes.Contains(code)).ToArray();
-        if (unusedCodes.Length > 0)
-        {
-            return new EquipmentProgressionBuildResult(
-                [],
-                $"{label} upgrade 模板存在未对应 rank 的代码：{string.Join(", ", unusedCodes)}");
-        }
-
-        return new EquipmentProgressionBuildResult(resolved, string.Empty);
+        return string.Empty;
     }
 
 }
