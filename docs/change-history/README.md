@@ -2,6 +2,9 @@
 
 此目录集中保存带有时间和任务范围的修复记录、审查报告、实验过程与结果。后续同类记录继续放在这里；当前有效规则与设计说明保留在上一级 `docs/`。
 
+- [物品引用语义与地区查询修复：2026-09-11](resource-reference-and-region-fixes-2026-09-11.md)
+- [历史修改第十一轮审核：物品引用语义与地区查询，2026-09-11](resource-reference-and-region-audit-2026-09-11.md)
+
 - [物品、战斗、Effect 与奇物资源发现修复：2026-09-10](resource-discovery-fixes-2026-09-10.md)
 - [历史修改第十轮审核：资源发现与错误排除，2026-09-10](resource-discovery-audit-2026-09-10.md)
 

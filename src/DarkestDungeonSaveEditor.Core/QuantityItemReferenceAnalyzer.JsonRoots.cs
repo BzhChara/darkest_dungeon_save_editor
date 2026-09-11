@@ -45,7 +45,7 @@ internal static partial class QuantityItemReferenceAnalyzer
         void Uncertain(JsonElement node)
         {
             if (node.ValueKind is JsonValueKind.Undefined or JsonValueKind.Null ||
-                !ReferencePathCanAffectContext(path, context)) return;
+                !ReferencePathCanAffectContext(file.MountedPath, context)) return;
             // This is valid parsed JSON: equivalent escaped spellings must
             // provide the same uncertainty. Raw-text recovery is only for
             // malformed files whose JSON strings cannot be decoded reliably.

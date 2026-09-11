@@ -56,9 +56,9 @@ public static partial class BattleEncounterCatalog
             return true;
 
         var prefixes = ContentFileOverlay.GetEnabledDlcPrefixes(rows[0].TableGuard.ActiveSources);
-        if (rows.Any(row => !row.SourceRelativePath.StartsWith($"dungeons/{row.OriginDungeonId}/", StringComparison.Ordinal) &&
+        if (rows.Any(row => !row.SourceRelativePath.StartsWith($"dungeons/{row.OriginDungeonId}/", StringComparison.OrdinalIgnoreCase) &&
                 !prefixes.Any(prefix => row.SourceRelativePath.StartsWith(
-                    $"{prefix}/dungeons/{row.OriginDungeonId}/", StringComparison.Ordinal))))
+                    $"{prefix}/dungeons/{row.OriginDungeonId}/", StringComparison.OrdinalIgnoreCase))))
         {
             reason = "该类型由多个文件提供且跨越 DLC 或非标准挂载目录，尚未验证其运行时索引顺序";
             return false;

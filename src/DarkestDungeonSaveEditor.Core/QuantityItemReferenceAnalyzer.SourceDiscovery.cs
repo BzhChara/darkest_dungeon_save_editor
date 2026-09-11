@@ -48,6 +48,7 @@ internal static partial class QuantityItemReferenceAnalyzer
 
                 result.Add(new ScannedContentFile(
                     file,
+                    NativeResourceFileRules.MountedPath(file.RelativePath, enabledDlcPrefixes),
                     NativeResourceFileRules.IsCurioTypeFile(file.RelativePath, enabledDlcPrefixes)
                         ? new UTF8Encoding(false, true).GetString(File.ReadAllBytes(file.Path))
                         : File.ReadAllText(file.Path, Encoding.UTF8),
@@ -57,7 +58,8 @@ internal static partial class QuantityItemReferenceAnalyzer
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or DecoderFallbackException)
             {
-                if (ReferencePathCanAffectContext(file.RelativePath, saveContext))
+                if (ReferencePathCanAffectContext(
+                        NativeResourceFileRules.MountedPath(file.RelativePath, enabledDlcPrefixes), saveContext))
                 {
                     scanComplete = false;
                     issues.Add($"Failed to read quantity-item reference file '{file.Path}': {ex.Message}");
@@ -98,7 +100,8 @@ internal static partial class QuantityItemReferenceAnalyzer
                 !ContentDirectories.Any(directory =>
                     ContentFileOverlay.IsRootOrEnabledDlcPath(normalized, directory, enabledDlcPrefixes)) ||
                 IsDefinitionOnlyPath(normalized, enabledDlcPrefixes) ||
-                !ReferencePathCanAffectContext(normalized, saveContext) ||
+                !ReferencePathCanAffectContext(
+                    NativeResourceFileRules.MountedPath(normalized, enabledDlcPrefixes), saveContext) ||
                 File.Exists(path) ||
                 !reported.Add(path))
             {
@@ -216,15 +219,6 @@ internal static partial class QuantityItemReferenceAnalyzer
                normalized.StartsWith("shared/buffs/", StringComparison.OrdinalIgnoreCase) ||
                normalized.StartsWith("trinkets/", StringComparison.OrdinalIgnoreCase) ||
                normalized.EndsWith(".effects.darkest", StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static bool IsLootPath(string relativePath)
-    {
-        var normalized = $"/{relativePath.Replace('\\', '/').Trim('/')}";
-        // Eligibility has already established the mounted root. This check is
-        // also used for context diagnostics, where a DLC prefix may be present.
-        var lootRoot = normalized.IndexOf("/loot/", StringComparison.OrdinalIgnoreCase);
-        return lootRoot >= 0 && NativeResourceFileRules.IsLootFile(normalized[(lootRoot + 1)..], []);
     }
 
 }

@@ -7,46 +7,46 @@ namespace DarkestDungeonSaveEditor.Core;
 internal static partial class QuantityItemReferenceAnalyzer
 {
     private static bool ReferencePathCanAffectContext(
-        string relativePath,
+        string mountedPath,
         QuantityItemSaveContext saveContext)
     {
-        return IsLootPath(relativePath) ||
-               IsReachableInContext(GetDefaultReachability(relativePath), saveContext) ||
+        return NativeResourceFileRules.IsLootFile(mountedPath, []) ||
+               IsReachableInContext(GetDefaultReachability(mountedPath), saveContext) ||
                saveContext == QuantityItemSaveContext.Town &&
-               MayContainTownReachabilityOverride(relativePath) ||
+               MayContainTownReachabilityOverride(mountedPath) ||
                saveContext == QuantityItemSaveContext.Raid &&
-               MayContainRaidReachabilityOverride(relativePath);
+               MayContainRaidReachabilityOverride(mountedPath);
     }
 
-    private static bool MayContainTownReachabilityOverride(string relativePath)
+    private static bool MayContainTownReachabilityOverride(string mountedPath)
     {
         // Only consumer-eligible files reach this diagnostic. Plot quests can
         // provide both rewards and provisions; unknown quest consumers remain
         // uncertain. Native queries can also accept names ending in Xjson.
-        return relativePath.Contains("campaign/quest/", StringComparison.OrdinalIgnoreCase) &&
-               relativePath.EndsWith("json", StringComparison.OrdinalIgnoreCase);
+        return mountedPath.StartsWith("campaign/quest/", StringComparison.OrdinalIgnoreCase) &&
+               mountedPath.EndsWith("json", StringComparison.OrdinalIgnoreCase);
     }
 
-    private static bool MayContainRaidReachabilityOverride(string relativePath)
+    private static bool MayContainRaidReachabilityOverride(string mountedPath)
     {
-        var normalized = $"/{relativePath.Replace('\\', '/').Trim('/')}";
-        return normalized.Contains("/campaign/town/district", StringComparison.OrdinalIgnoreCase) &&
-               normalized.EndsWith("json", StringComparison.OrdinalIgnoreCase);
+        return mountedPath.StartsWith("campaign/town/districts/", StringComparison.OrdinalIgnoreCase) &&
+               mountedPath.EndsWith("json", StringComparison.OrdinalIgnoreCase);
     }
 
-    private static ReferenceReachability GetDefaultReachability(string relativePath)
+    private static ReferenceReachability GetDefaultReachability(string mountedPath)
     {
-        var normalized = $"/{relativePath.Replace('\\', '/').Trim('/')}";
-        if (normalized.Contains("/campaign/provision/", StringComparison.OrdinalIgnoreCase) ||
-            normalized.Contains("/campaign/town/provision/", StringComparison.OrdinalIgnoreCase))
+        // The DLC mount prefix was removed using the active source inventory.
+        // Only resource roots select a consumer: curios/upgrades/ is still Curio.
+        if (mountedPath.StartsWith("campaign/provision/", StringComparison.OrdinalIgnoreCase) ||
+            mountedPath.StartsWith("campaign/town/provision/", StringComparison.OrdinalIgnoreCase))
         {
             return ReferenceReachability.RaidCapable;
         }
 
-        return normalized.Contains("/campaign/town_events/", StringComparison.OrdinalIgnoreCase) ||
-               normalized.Contains("/campaign/estate/", StringComparison.OrdinalIgnoreCase) ||
-               normalized.Contains("/campaign/town/", StringComparison.OrdinalIgnoreCase) ||
-               normalized.Contains("/upgrades/", StringComparison.OrdinalIgnoreCase)
+        return mountedPath.StartsWith("campaign/town_events/", StringComparison.OrdinalIgnoreCase) ||
+               mountedPath.StartsWith("campaign/estate/", StringComparison.OrdinalIgnoreCase) ||
+               mountedPath.StartsWith("campaign/town/", StringComparison.OrdinalIgnoreCase) ||
+               mountedPath.StartsWith("upgrades/", StringComparison.OrdinalIgnoreCase)
             ? ReferenceReachability.TownOnly
             : ReferenceReachability.RaidCapable;
     }
