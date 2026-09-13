@@ -51,7 +51,8 @@ public static partial class StagecoachHeroCandidateFactory
             selected.Add(quirk);
         }
 
-        var positiveCount = selected.Count(quirk => !quirk.IsDisease && quirk.IsPositive == true);
+        // Native positive and disease predicates overlap (0x1404E0D50 / 0x1404E0BF0).
+        var positiveCount = selected.Count(quirk => quirk.IsPositive == true);
         var negativeCount = selected.Count(quirk => !quirk.IsDisease && quirk.IsPositive == false);
         var diseaseCount = selected.Count(quirk => quirk.IsDisease);
         var limits = catalog.InitialQuirkLimits;

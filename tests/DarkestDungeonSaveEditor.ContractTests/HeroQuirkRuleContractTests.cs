@@ -3,6 +3,9 @@ internal static partial class ContractSuite
     public static async Task RunQuirkRulesOnlyAsync(string repositoryRoot)
     {
         var fixture = BuildContractFixture(repositoryRoot);
+        await VerifyHeroQuirkClassificationAsync(fixture.RunRoot, fixture.Codec);
+        VerifyHeroQuirkProbabilityPrecision(fixture.RunRoot);
+        await VerifyHeroQuirkClassificationGuardsAsync(fixture.RunRoot, fixture.Codec);
         await VerifyHeroQuirkRulesAsync(fixture.RunRoot, fixture.Codec);
         await VerifyHeroQuirkEvolutionDefaultsAsync(fixture.RunRoot, fixture.Codec);
         await VerifyHeroQuirkRuleGuardsAsync(fixture.RunRoot, fixture.Codec);

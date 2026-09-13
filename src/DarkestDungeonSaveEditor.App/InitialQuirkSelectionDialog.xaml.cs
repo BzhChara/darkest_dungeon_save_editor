@@ -290,7 +290,7 @@ public partial class InitialQuirkSelectionDialog : Window
     private void UpdateSelectionSummary()
     {
         var positiveCount = _rows.Count(row =>
-            row.IsSelected && !row.Definition.IsDisease && row.Definition.IsPositive == true);
+            row.IsSelected && row.Definition.IsPositive == true);
         var negativeCount = _rows.Count(row =>
             row.IsSelected && !row.Definition.IsDisease && row.Definition.IsPositive == false);
         var diseaseCount = _rows.Count(row => row.IsSelected && row.Definition.IsDisease);

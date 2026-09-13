@@ -63,7 +63,7 @@ public partial class MainWindow : Window
                 var definition = _heroCatalog.InitialQuirks.FirstOrDefault(
                     quirk => quirk.Id.Equals(id, StringComparison.Ordinal));
                 diseaseCount += definition?.IsDisease == true ? 1 : 0;
-                positiveCount += definition is { IsDisease: false, IsPositive: true } ? 1 : 0;
+                positiveCount += definition is { IsPositive: true } ? 1 : 0;
                 negativeCount += definition is { IsDisease: false, IsPositive: false } ? 1 : 0;
             }
         }
@@ -83,7 +83,7 @@ public partial class MainWindow : Window
 
     private static string FormatSelectedQuirks(IEnumerable<string> quirkIds)
     {
-        var ids = quirkIds.ToArray();
+        var ids = quirkIds.Distinct(StringComparer.Ordinal).ToArray();
         return ids.Length == 0 ? "空白" : string.Join(", ", ids);
     }
 
