@@ -68,6 +68,9 @@ internal static partial class NativeResourceFileRules
     private static partial Regex BuffName();
     [GeneratedRegex(@"quirk_library.json\z", RegexOptions.CultureInvariant)]
     private static partial Regex QuirkName();
+    // Offline shared rules at 0x1404E821E: the separator before json is a wildcard.
+    [GeneratedRegex(@"rules.json\z", RegexOptions.CultureInvariant)]
+    private static partial Regex SharedRuleName();
     [GeneratedRegex(@"camping_skills.json\z", RegexOptions.CultureInvariant)]
     private static partial Regex CampingSkillName();
 
@@ -138,6 +141,12 @@ internal static partial class NativeResourceFileRules
     {
         var mounted = MountedPath(path, enabledDlcPrefixes, manifestDirectory);
         return mounted.StartsWith("shared/quirk/", DirectoryComparison(manifestDirectory)) && QuirkName().IsMatch(mounted);
+    }
+
+    internal static bool IsSharedRuleFile(string path, IReadOnlyList<string> enabledDlcPrefixes, bool manifestDirectory = false)
+    {
+        var mounted = MountedPath(path, enabledDlcPrefixes, manifestDirectory);
+        return mounted.StartsWith("shared/", DirectoryComparison(manifestDirectory)) && SharedRuleName().IsMatch(mounted);
     }
 
     internal static bool IsCampingSkillFile(string path, IReadOnlyList<string> enabledDlcPrefixes, bool manifestDirectory = false)

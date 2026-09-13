@@ -204,6 +204,13 @@ public sealed record HeroInitialQuirkDefinition(
     public bool HasEvolution => Evolution is not null;
 }
 
+public sealed record HeroInitialQuirkLimits(int? Positive, int? Negative, int? Diseases)
+{
+    // Native shared-rule initialization, x64 build 27890, 0x1404E2F06–0x1404E2F1A.
+    // A null value means an effective rule could not be resolved, not this default.
+    public static HeroInitialQuirkLimits Default { get; } = new(5, 5, 3);
+}
+
 public sealed record HeroClassCatalogResult(
     string GameMode,
     IReadOnlyList<int> ResolveLevelThresholds,
@@ -211,7 +218,10 @@ public sealed record HeroClassCatalogResult(
     IReadOnlyList<HeroRecruitEventDefinition> RecruitEvents,
     IReadOnlyList<HeroInitialQuirkDefinition> InitialQuirks,
     IReadOnlyList<string> HeroNames,
-    IReadOnlyList<string> Issues);
+    IReadOnlyList<string> Issues)
+{
+    public HeroInitialQuirkLimits InitialQuirkLimits { get; init; } = HeroInitialQuirkLimits.Default;
+}
 
 public sealed record TrinketDefinition(
     string Id,

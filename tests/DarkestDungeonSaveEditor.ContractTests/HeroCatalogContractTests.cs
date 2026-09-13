@@ -187,15 +187,12 @@ internal static partial class ContractSuite
             heroCatalog.InitialQuirks.Single(item => item.Id == "evolution_conflict_quirk").Evolution is
                 { DurationMin: 90, DurationMax: 120, TargetQuirkId: "evolution_target_b" },
             "Evolution metadata must come entirely from the last native definition.");
+        var decimalEvolution = heroCatalog.InitialQuirks.Single(item => item.Id == "identical_evolution_quirk");
         Assert(
-            heroCatalog.InitialQuirks.Single(item => item.Id == "identical_evolution_quirk") is
-            {
-                HasEvolution: true,
-                Evolution: { DurationMin: 30, DurationMax: 60, TargetQuirkId: "same_target" },
-                WriteStatus: HeroInitialQuirkWriteStatus.Direct
-            } &&
-            heroCatalog.Issues.All(issue => !issue.Contains("identical_evolution_quirk", StringComparison.Ordinal)),
-            "Semantically equal evolution metadata should merge even when JSON numbers use integer and decimal spellings.");
+            decimalEvolution is { Evolution: null, WriteStatus: HeroInitialQuirkWriteStatus.Unverified } &&
+            decimalEvolution.WriteStatusReason.Contains("evolution_duration_min", StringComparison.Ordinal) &&
+            decimalEvolution.WriteStatusReason.Contains("evolution_duration_max", StringComparison.Ordinal),
+            "The last quirk's decimal bounds cannot be coerced to integers or replaced by an earlier integer definition.");
         var semanticPriorityQuirk = heroCatalog.InitialQuirks.Single(item => item.Id == "semantic_priority_quirk");
         Assert(
             semanticPriorityQuirk is { IsPositive: true, Source: "local:Local Test Mod" } &&

@@ -62,6 +62,8 @@ public static partial class HeroClassCatalog
         var nameFiles = ResolveFiles(sourceFiles, files => files.NameFiles, "Hero name definition", issues);
         var upgradeFiles = ResolveFiles(sourceFiles, files => files.HeroUpgradeFiles, "Hero upgrade definition", issues);
         var rosterVariableFiles = ResolveFiles(sourceFiles, files => files.RosterVariableFiles, "Roster variables", issues);
+        var sharedRuleFiles = ResolveFiles(sourceFiles, files => files.SharedRuleFiles, "Shared rules", issues);
+        var initialQuirkLimits = ReadInitialQuirkLimits(sharedRuleFiles, issues);
 
         foreach (var file in heroFiles)
         {
@@ -330,7 +332,10 @@ public static partial class HeroClassCatalog
             recruitEvents,
             initialQuirks,
             heroNames.OrderBy(name => name, StringComparer.Ordinal).ToArray(),
-            issues);
+            issues)
+        {
+            InitialQuirkLimits = initialQuirkLimits
+        };
         var validatedHeroes = heroClasses.Select(hero => hero with
         {
             GenerationAvailability = StagecoachHeroCandidateFactory.GetGenerationAvailability(catalog, hero)

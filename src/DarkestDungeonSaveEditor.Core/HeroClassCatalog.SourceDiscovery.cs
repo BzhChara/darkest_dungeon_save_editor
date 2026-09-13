@@ -40,7 +40,8 @@ public static partial class HeroClassCatalog
             ResourceFiles(Path.Combine("raid", "camping"), NativeResourceFileRules.IsCampingSkillFile),
             Files("localization", "*.string_table.xml"),
             ResourceFiles("upgrades", NativeResourceFileRules.IsUpgradeFile),
-            Files(Path.Combine("campaign", "roster"), "roster.variables.json"));
+            Files(Path.Combine("campaign", "roster"), "roster.variables.json"),
+            ResourceFiles("shared", NativeResourceFileRules.IsSharedRuleFile));
     }
 
     private static SourceFileSet EnumerateManifestFiles(
@@ -59,6 +60,7 @@ public static partial class HeroClassCatalog
         var nameFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var upgradeFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var rosterVariableFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var sharedRuleFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var entry in ModManifestFile.ReadEntries(manifestPath, ExtractManifestPath))
         {
             var rawLine = entry.RawLine;
@@ -92,6 +94,10 @@ public static partial class HeroClassCatalog
             else if (NativeResourceFileRules.IsQuirkFile(normalizedRelative, enabledDlcPrefixes, manifestDirectory: true))
             {
                 target = quirkFiles;
+            }
+            else if (NativeResourceFileRules.IsSharedRuleFile(normalizedRelative, enabledDlcPrefixes, manifestDirectory: true))
+            {
+                target = sharedRuleFiles;
             }
             else if (NativeResourceFileRules.IsTownEventFile(normalizedRelative, enabledDlcPrefixes, manifestDirectory: true))
             {
@@ -128,7 +134,9 @@ public static partial class HeroClassCatalog
             if (!File.Exists(path))
             {
                 issues.Add($"Hero catalog file listed by Mod is missing: {path}");
-                continue;
+                // Keep a missing shared-rule provider in its native slot. Dropping it
+                // would expose an overridden file and invent a known quirk limit.
+                if (target != sharedRuleFiles) continue;
             }
 
             target.Add(path);
@@ -144,7 +152,8 @@ public static partial class HeroClassCatalog
             SortPaths(campingFiles),
             SortPaths(nameFiles),
             SortPaths(upgradeFiles),
-            SortPaths(rosterVariableFiles));
+            SortPaths(rosterVariableFiles),
+            SortPaths(sharedRuleFiles));
     }
 
     private static string? ExtractManifestPath(string rawLine)

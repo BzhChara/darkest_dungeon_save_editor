@@ -320,6 +320,21 @@ public sealed partial class SaveEditService
                 "The generated stagecoach candidate no longer matches the active all-skill upgrade plan.");
         }
         HeroEquipmentProgression.Validate(heroClass, levelProfile, expectedPurchases);
+        var quirks = JsonSupport.RequireObject(generatedCandidate.Candidate, "quirks");
+        StagecoachHeroCandidateFactory.ValidateInitialQuirkSelection(
+            catalog, heroClass, levelProfile.ResolveLevel,
+            quirks.Select(quirk => quirk.Key).ToArray());
+        foreach (var (id, state) in quirks)
+        {
+            var evolution = catalog.InitialQuirks.Single(quirk => quirk.Id.Equals(id, StringComparison.Ordinal)).Evolution;
+            var minimum = evolution?.DurationMin ?? 0;
+            var maximum = evolution?.DurationMax ?? 0;
+            if (state is not JsonObject quirkState ||
+                quirkState["evolution_duration_remaining"] is not JsonValue duration ||
+                !duration.TryGetValue<int>(out var remaining) || remaining < minimum || remaining > maximum)
+                throw new InvalidOperationException(
+                    $"初始怪癖 '{id}' 的进化剩余时间不符合当前配置（{minimum}–{maximum}），请重新生成候选。");
+        }
     }
 
     private static string ComputeHeroCatalogSha256(HeroClassCatalogResult catalog)
@@ -332,6 +347,7 @@ public sealed partial class SaveEditService
             Equipment = catalog.HeroClasses.Select(hero => new { hero.Id, hero.Equipment }),
             catalog.RecruitEvents,
             catalog.InitialQuirks,
+            catalog.InitialQuirkLimits,
             catalog.HeroNames
         }, JsonSupport.SerializerOptions);
         return Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();

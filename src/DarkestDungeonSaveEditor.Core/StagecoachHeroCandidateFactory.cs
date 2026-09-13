@@ -6,9 +6,6 @@ namespace DarkestDungeonSaveEditor.Core;
 public static partial class StagecoachHeroCandidateFactory
 {
     private const double HpSafetyTolerance = 1e-9;
-    public const int MaximumPositiveInitialQuirks = 5;
-    public const int MaximumNegativeInitialQuirks = 5;
-    public const int MaximumInitialDiseases = 3;
 
     public static void ValidateInitialQuirkSelection(
         HeroClassCatalogResult catalog,
@@ -49,7 +46,7 @@ public static partial class StagecoachHeroCandidateFactory
         }
 
         var selectedQuirks = ResolveSelectedQuirks(
-            catalog.InitialQuirks,
+            catalog,
             selectedInitialQuirkIds);
         _ = GetValidatedInitialCurrentHp(heroClass.Id, baseHp, selectedQuirks);
     }
@@ -127,7 +124,7 @@ public static partial class StagecoachHeroCandidateFactory
             random,
             warnings);
         var selectedQuirks = ResolveSelectedQuirks(
-            catalog.InitialQuirks,
+            catalog,
             selectedInitialQuirkIds);
         var initialQuirkStates = selectedQuirks
             .Select(quirk => new InitialQuirkPersistenceState(

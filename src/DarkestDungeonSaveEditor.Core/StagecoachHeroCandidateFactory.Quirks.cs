@@ -6,7 +6,7 @@ namespace DarkestDungeonSaveEditor.Core;
 public static partial class StagecoachHeroCandidateFactory
 {
     private static IReadOnlyList<HeroInitialQuirkDefinition> ResolveSelectedQuirks(
-        IReadOnlyList<HeroInitialQuirkDefinition> allQuirks,
+        HeroClassCatalogResult catalog,
         IReadOnlyCollection<string> selectedIds)
     {
         var uniqueIds = new HashSet<string>(StringComparer.Ordinal);
@@ -23,7 +23,7 @@ public static partial class StagecoachHeroCandidateFactory
                 throw new InvalidOperationException($"初始怪癖 '{id}' 被重复选择。");
             }
 
-            var matches = allQuirks
+            var matches = catalog.InitialQuirks
                 .Where(quirk => quirk.Id.Equals(id, StringComparison.Ordinal))
                 .ToArray();
             if (matches.Length != 1)
@@ -54,13 +54,18 @@ public static partial class StagecoachHeroCandidateFactory
         var positiveCount = selected.Count(quirk => !quirk.IsDisease && quirk.IsPositive == true);
         var negativeCount = selected.Count(quirk => !quirk.IsDisease && quirk.IsPositive == false);
         var diseaseCount = selected.Count(quirk => quirk.IsDisease);
-        if (positiveCount > MaximumPositiveInitialQuirks ||
-            negativeCount > MaximumNegativeInitialQuirks ||
-            diseaseCount > MaximumInitialDiseases)
+        var limits = catalog.InitialQuirkLimits;
+        if ((positiveCount > 0 && limits.Positive is null) ||
+            (negativeCount > 0 && limits.Negative is null) ||
+            (diseaseCount > 0 && limits.Diseases is null))
+            throw new InvalidOperationException("活动 shared 规则中的怪癖上限无法确定，不能添加对应类别的初始怪癖。");
+        if (positiveCount > limits.Positive || negativeCount > limits.Negative || diseaseCount > limits.Diseases)
         {
             throw new InvalidOperationException(
-                $"初始怪癖最多正面 {MaximumPositiveInitialQuirks} 个、负面 {MaximumNegativeInitialQuirks} 个、" +
-                $"疾病 {MaximumInitialDiseases} 个；当前选择为 +{positiveCount}/-{negativeCount}/疾病 {diseaseCount}。");
+                $"初始怪癖最多正面 {limits.Positive?.ToString(CultureInfo.InvariantCulture) ?? "未知"} 个、" +
+                $"负面 {limits.Negative?.ToString(CultureInfo.InvariantCulture) ?? "未知"} 个、" +
+                $"疾病 {limits.Diseases?.ToString(CultureInfo.InvariantCulture) ?? "未知"} 个；" +
+                $"当前选择为 +{positiveCount}/-{negativeCount}/疾病 {diseaseCount}。");
         }
 
         for (var leftIndex = 0; leftIndex < selected.Count; leftIndex++)
