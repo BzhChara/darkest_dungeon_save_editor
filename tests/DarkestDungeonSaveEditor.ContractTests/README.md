@@ -35,6 +35,9 @@ The suite is split by responsibility:
 - `EncounterRecordContractTests.cs`: logical record identity across all three types, same-line and multiline records, raw byte-limited slots, roaming overwrite/clear behavior, direct/Bridge map writes and deletion, generated option placement, and obsolete-package cleanup with ownership/tamper guards;
 - `HeroSkinManifestContractTests.cs`: unlisted skin exclusion in real candidate generation, missing listed texture refresh, and restored continuous colour ranges;
 - `HeroQuirkContractTests.cs`: quirk classification, HP rules, conflicts, and selection boundaries;
+- `HeroQuirkRuleContractTests.cs`: six-source shared-rule queries, active positive/negative/disease limits, zero/default/unresolved values, exact first fields, whole-file replacement and native file slots, plus DSON persistence above former limits;
+- `HeroQuirkEvolutionContractTests.cs`: explicit neutral defaults, ignored notes, empty death targets, countdown DSON persistence, omitted bounds, retained invalid-chain/type guards and separate record/slot-size limits;
+- `HeroQuirkGuardContractTests.cs`: same-size/timestamp/manifest resource refresh, actual stale prepare/commit and candidate-rebinding rejection without save mutations, countdown compatibility after evolution/range changes, semantic-equivalent evolution edits and a successful three-file save;
 - `JsonMemberContractTests.cs`: first exact resource JSON members (including wrong types), repeated Buff occurrences through HP validation and DSON persistence, and raw town-event recruit payload/class binding;
 - `JsonReferenceConsumerContractTests.cs`: native JSON filename/structure filtering, town/raid roots, irrelevant notes, duplicate fields, uncertain loaded structures, refresh of nonliteral suffixes, and real actor-to-nested-loot references;
 - `CatalogFileQueryContractTests.cs`: native trinket/Buff/quirk/camping filename queries across six source types, exact-dot/root exclusions, manifests, same-path priority, missing files, content refresh and generated HP DSON;
@@ -73,3 +76,9 @@ Close Darkest Dungeon before the suite: save transaction contracts exercise the 
 `dotnet run --project tests/DarkestDungeonSaveEditor.ContractTests -c Release -- . --raid-paths`
 
 `NestedRaidSaveContractTests` 覆盖 `raid_save` 子目录读取、背包和地图 DSON 写入、备份、回滚、目录切换保护、自动同步和强制回城。并复用维护契约验证子目录下的直接写入及 Bridge 放置、失效清理、回城和 A→B 后保留引用、两个持久副本共用表时逐图清理，以及中断恢复和外部修改保留。共享表恢复分别验证依赖未变、冻结包改变、未激活地图改变；不会操作真实档案。
+
+## 人物怪癖上限与进化验证
+
+`dotnet run --project tests/DarkestDungeonSaveEditor.ContractTests -c Release -- . --quirk-rules`
+
+运行上述三组怪癖规则测试；完整套件也包含它们。目录矩阵覆盖原版、模式、官方 DLC、本地 Mod、工坊 Mod、带启用 DLC 前缀的 Mod。共 90 个 shared 文件查询对照、36 次 town / roster / upgrades DSON 往返，并验证实际提交与旧预览保护。全部使用隔离数据，不修改真实存档或 Mod。

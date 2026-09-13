@@ -389,60 +389,40 @@ public static partial class HeroClassCatalog
         }
     }
 
-    private static string? ReadEvolutionSignature(JsonElement element)
-    {
-        var fields = element
-            .EnumerateObject()
-            .Where(property => property.Name.StartsWith("evolution_", StringComparison.Ordinal))
-            .GroupBy(property => property.Name, StringComparer.Ordinal).Select(group => group.First())
-            .OrderBy(property => property.Name, StringComparer.Ordinal)
-            .Select(property =>
-                $"{property.Name}={NormalizeSemanticJsonValue(property.Value)}")
-            .ToArray();
-        return fields.Length == 0 ? null : string.Join("|", fields);
-    }
-
     private static ParsedQuirkEvolutionDefinition? ReadEvolutionDefinition(JsonElement element)
     {
-        var signature = ReadEvolutionSignature(element);
-        if (signature is null)
-        {
-            return null;
-        }
-
+        // 0x1404E02E0 initializes these six fields to zero/false. The quirk
+        // loader reads their exact names; an arbitrary evolution_* note has no effect.
         var validationErrors = new List<string>();
         var durationMin = ReadEvolutionInteger(
             element,
             "evolution_duration_min",
-            required: true,
             validationErrors);
         var durationMax = ReadEvolutionInteger(
             element,
             "evolution_duration_max",
-            required: true,
             validationErrors);
         var townProgressionDurationChange = ReadEvolutionInteger(
             element,
             "evolution_town_progression_duration_change",
-            required: false,
             validationErrors);
         var townAttemptUseItemDurationThreshold = ReadEvolutionInteger(
             element,
             "evolution_town_attempt_use_item_duration_threshold",
-            required: false,
             validationErrors);
 
         string? targetQuirkId = null;
         if (NativeJsonReader.TryGetProperty(element, "evolution_class_id", out var targetNode))
         {
-            if (targetNode.ValueKind == JsonValueKind.String &&
-                !string.IsNullOrWhiteSpace(targetNode.GetString()))
+            if (targetNode.ValueKind == JsonValueKind.String)
             {
-                targetQuirkId = targetNode.GetString()!;
+                var target = NativeJsonReader.CString(targetNode.GetString()!);
+                // Empty strings hash to the default target zero (0x1404DF0A3).
+                targetQuirkId = target.Length == 0 ? null : target;
             }
             else
             {
-                validationErrors.Add("进化字段 'evolution_class_id' 必须是非空字符串");
+                validationErrors.Add("进化字段 'evolution_class_id' 必须是字符串；空字符串表示无目标");
             }
         }
 
@@ -459,6 +439,11 @@ public static partial class HeroClassCatalog
             }
         }
 
+        if (validationErrors.Count == 0 && durationMin == 0 && durationMax == 0 &&
+            townProgressionDurationChange == 0 && townAttemptUseItemDurationThreshold == 0 &&
+            targetQuirkId is null && !causesDeath)
+            return null;
+
         if (durationMin is < 0)
         {
             validationErrors.Add("进化字段 'evolution_duration_min' 不能为负数");
@@ -469,7 +454,7 @@ public static partial class HeroClassCatalog
         }
         if (durationMin is { } minimum && durationMax is { } maximum && minimum > maximum)
         {
-            validationErrors.Add("进化持续值下限不能大于上限");
+            validationErrors.Add("进化持续值下限不能大于上限（evolution_duration_min / evolution_duration_max）");
         }
         if (townAttemptUseItemDurationThreshold is < 0)
         {
@@ -482,7 +467,6 @@ public static partial class HeroClassCatalog
         }
 
         return new ParsedQuirkEvolutionDefinition(
-            signature,
             durationMin,
             durationMax,
             townProgressionDurationChange,
@@ -495,68 +479,20 @@ public static partial class HeroClassCatalog
     private static int? ReadEvolutionInteger(
         JsonElement element,
         string propertyName,
-        bool required,
         List<string> validationErrors)
     {
         if (!NativeJsonReader.TryGetProperty(element, propertyName, out var property))
         {
-            if (required)
-            {
-                validationErrors.Add($"进化配置缺少 '{propertyName}'");
-            }
-
-            return null;
+            return 0;
         }
 
-        if (TryReadExactInt32(property, out var value))
+        if (property.ValueKind == JsonValueKind.Number && property.TryGetInt32(out var value))
         {
             return value;
         }
 
         validationErrors.Add($"进化字段 '{propertyName}' 必须是 32 位整数");
         return null;
-    }
-
-    private static bool TryReadExactInt32(JsonElement element, out int value)
-    {
-        if (element.ValueKind != JsonValueKind.Number)
-        {
-            value = default;
-            return false;
-        }
-
-        if (element.TryGetInt32(out value))
-        {
-            return true;
-        }
-
-        if (element.TryGetDecimal(out var decimalValue) &&
-            decimalValue == decimal.Truncate(decimalValue) &&
-            decimalValue >= int.MinValue &&
-            decimalValue <= int.MaxValue)
-        {
-            value = (int)decimalValue;
-            return true;
-        }
-
-        value = default;
-        return false;
-    }
-
-    private static string NormalizeSemanticJsonValue(JsonElement value)
-    {
-        return value.ValueKind switch
-        {
-            JsonValueKind.Number when value.TryGetDecimal(out var number) =>
-                number.ToString("G29", CultureInfo.InvariantCulture),
-            JsonValueKind.Number when value.TryGetDouble(out var number) =>
-                number.ToString("R", CultureInfo.InvariantCulture),
-            JsonValueKind.String => JsonSerializer.Serialize(value.GetString()),
-            JsonValueKind.True => "true",
-            JsonValueKind.False => "false",
-            JsonValueKind.Null => "null",
-            _ => value.GetRawText()
-        };
     }
 
 }

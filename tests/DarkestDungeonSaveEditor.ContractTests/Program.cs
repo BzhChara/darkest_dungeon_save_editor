@@ -1,11 +1,12 @@
 try
 {
-    if (args.Length is < 1 or > 2 || (args.Length == 2 && args[1] is not ("--maintenance" or "--manifests" or "--catalogs" or "--semantics" or "--capacities" or "--map-content" or "--raid-paths" or "--queries")))
+    if (args.Length is < 1 or > 2 || (args.Length == 2 && args[1] is not ("--maintenance" or "--manifests" or "--catalogs" or "--semantics" or "--capacities" or "--map-content" or "--raid-paths" or "--queries" or "--quirk-rules")))
     {
-        throw new InvalidOperationException("Usage: DarkestDungeonSaveEditor.ContractTests <repository-root> [--maintenance|--manifests|--catalogs|--semantics|--capacities|--map-content|--raid-paths|--queries]");
+        throw new InvalidOperationException("Usage: DarkestDungeonSaveEditor.ContractTests <repository-root> [--maintenance|--manifests|--catalogs|--semantics|--capacities|--map-content|--raid-paths|--queries|--quirk-rules]");
     }
 
-    if (args.Length == 2 && args[1] == "--queries") await ContractSuite.RunFileQueriesOnlyAsync(Path.GetFullPath(args[0]));
+    if (args.Length == 2 && args[1] == "--quirk-rules") await ContractSuite.RunQuirkRulesOnlyAsync(Path.GetFullPath(args[0]));
+    else if (args.Length == 2 && args[1] == "--queries") await ContractSuite.RunFileQueriesOnlyAsync(Path.GetFullPath(args[0]));
     else if (args.Length == 2 && args[1] == "--raid-paths") await ContractSuite.RunNestedRaidSavesOnlyAsync(Path.GetFullPath(args[0]));
     else if (args.Length == 2 && args[1] == "--capacities") ContractSuite.RunInventoryCapacitiesOnly(Path.GetFullPath(args[0]));
     else if (args.Length == 2 && args[1] == "--map-content") await ContractSuite.RunMapContentOnlyAsync(Path.GetFullPath(args[0]));

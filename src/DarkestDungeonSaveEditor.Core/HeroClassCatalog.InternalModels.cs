@@ -321,7 +321,6 @@ public static partial class HeroClassCatalog
         IReadOnlyList<string> AllSources);
 
     private sealed record ParsedQuirkEvolutionDefinition(
-        string Signature,
         int? DurationMin,
         int? DurationMax,
         int? TownProgressionDurationChange,
@@ -382,7 +381,8 @@ public static partial class HeroClassCatalog
         IReadOnlyList<string> CampingSkillFiles,
         IReadOnlyList<string> NameFiles,
         IReadOnlyList<string> HeroUpgradeFiles,
-        IReadOnlyList<string> RosterVariableFiles);
+        IReadOnlyList<string> RosterVariableFiles,
+        IReadOnlyList<string> SharedRuleFiles);
 
     private sealed record HeroUpgradeDefinition(
         IReadOnlyDictionary<string, int> WeaponRequirements,

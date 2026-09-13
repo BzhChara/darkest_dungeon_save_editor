@@ -317,7 +317,11 @@ All three temporary files must pass the DSON encode/decode consistency check. If
 - A new candidate may start completely blank; the editor does not need to simulate the game's random natural roll.
 - The user may explicitly select zero or more quirks from the active catalog.
 - Preserve exact quirk IDs through selection, refresh, exclusions, evolution targets, limit counting and JSON/DSON writes. Buff IDs and references also preserve case/spaces; exact repeated definitions still use the last complete object. Search formatting must not alter saved identity. Only exact `shard_hungry` selects the shard recruit pool. See [identity rules](resource-duplicate-semantics.md#11-exact-buff-and-quirk-json-identities).
-- Maximums are 5 positive quirks, 5 negative quirks, and 3 diseases. Diseases have their own quota.
+- Limits come from the active shared rules: `quirks_max_positive`, `quirks_max_negative`, and `quirks_max_diseases`. Diseases have their own quota. Native initialization is 5 / 5 / 3; these are defaults, not hardcoded editor maxima.
+- Shared rules use the offline `shared/` recursive query `.*rules.json`, including its wildcard separator and case-sensitive filename. Mod files must be listed in `modfiles.txt`; enabled DLC prefixes, physical-versus-manifest directory rules, same-path whole-file replacement, and native file slots use the common resolver. Independent files update only their present fields, in query order. Within one object, the first exact JSON member wins.
+- A supported limit is a nonnegative 32-bit JSON integer, including zero. An invalid field makes that category unresolved; an unreadable or missing winning rule file makes all three unresolved until later explicit valid fields establish them. Never expose a replaced baseline or silently fall back to 5 / 5 / 3. Unknown categories cannot be selected; an empty candidate and selections from known categories remain allowed.
+- Count selected records, not `slot_size`: the native acquisition flow's weighted slot consumption is separate from its load-time record-count checks. Zero-slot quirks do not bypass this check; multi-slot quirks are not multiplied here.
+- The selection summary, generation validator and save preflight use the same catalog limits. Effective limit changes invalidate prepared previews even without a manifest change; pairing an old candidate with a refreshed catalog also reruns selection validation before saving. See [implementation and evidence](change-history/hero-quirk-rule-fixes-2026-09-14.md).
 - Quota exhaustion is shown by the summary and click guard, not repeated as an unavailable reason on every catalog row.
 - `incompatible_quirks` remains a hard pairwise exclusion with a specific explanation.
 - Console mode ignores class `incompatible_class_ids`. Any structurally writable quirk may be assigned to any class.
@@ -364,12 +368,13 @@ For positive `roster_limit`:
 
 ### 7.4 Evolving quirks
 
-1. Parse `evolution_duration_min/max`, target quirk, death-on-expiry, town-progression change, and item-use threshold.
+1. Parse only the six exact native fields: `evolution_duration_min/max`, `evolution_class_id`, `evolution_causes_death`, `evolution_town_progression_duration_change`, and `evolution_town_attempt_use_item_duration_threshold`. Integers default to zero, target to none, and death to false. Unknown `evolution_*` notes do not enable evolution. The first exact JSON member wins; a later duplicate does not repair an invalid first value.
 2. Derive a stable integer `evolution_duration_remaining` from the generation seed and quirk ID within the definition's range.
 3. Preserve fixed ranges and author-declared `0–0` exactly.
 4. The game owns subsequent countdown changes, transformation, and effect application. The editor only initializes required persistent fields.
-5. Continue to block definitions with missing, reversed, or non-integer bounds, or with neither a target nor an explicit death result.
+5. All-neutral known fields describe an ordinary quirk and initialize the saved countdown to zero, whether omitted or explicitly written. Empty target strings (including a leading native NUL) mean no target; death-only evolution remains valid with an explicit empty target. Missing integer fields use the native zero default, so an omitted minimum can yield a valid `0–12` range. Explicit non-integer fields (including JSON `3.0`), reversed/negative ranges, and active non-neutral configurations with neither a target nor death remain blocked.
 6. Resolve every target along the active evolution chain uniquely. A missing/conflicting target or an invalid downstream evolution makes the source unavailable for explicit and random generation. Valid authored cycles and death-only outcomes remain supported; this checks definitions without simulating future gameplay.
+7. Save preflight validates the candidate's actual integer countdown against the current definition: zero for an ordinary quirk, or within the inclusive active evolution range. Rebinding an old candidate to a fresh catalog cannot bypass this check after evolution is introduced, removed, or its range narrowed. Compatible countdowns remain valid; this does not advance, reset or migrate existing saved quirks.
 
 Evolving quirks have persisted and transformed during user testing. Duration values must come from each Mod definition; they must never be replaced by a universal `3–15` guess.
 

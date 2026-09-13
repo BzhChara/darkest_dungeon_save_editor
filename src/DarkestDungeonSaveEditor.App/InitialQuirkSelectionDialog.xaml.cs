@@ -243,8 +243,8 @@ public partial class InitialQuirkSelectionDialog : Window
             }
 
             // The counters above the grid already communicate the three independent quotas.
-            // Keep row-level dynamic reasons for actual quirk incompatibilities only; a sixth
-            // positive/negative quirk or fourth disease is rejected when the user clicks it.
+            // Keep row-level dynamic reasons for actual quirk incompatibilities only;
+            // the active shared-rule limit is checked when the user clicks a row.
             row.SetAvailability(true, row.ContextReason);
         }
 
@@ -294,10 +294,12 @@ public partial class InitialQuirkSelectionDialog : Window
         var negativeCount = _rows.Count(row =>
             row.IsSelected && !row.Definition.IsDisease && row.Definition.IsPositive == false);
         var diseaseCount = _rows.Count(row => row.IsSelected && row.Definition.IsDisease);
+        var limits = _catalog.InitialQuirkLimits;
+        static string Limit(int? value) => value?.ToString(CultureInfo.InvariantCulture) ?? "未知";
         SelectionSummaryTextBlock.Text =
-            $"已选 +{positiveCount}/{StagecoachHeroCandidateFactory.MaximumPositiveInitialQuirks} " +
-            $"-{negativeCount}/{StagecoachHeroCandidateFactory.MaximumNegativeInitialQuirks} " +
-            $"疾病 {diseaseCount}/{StagecoachHeroCandidateFactory.MaximumInitialDiseases}";
+            $"已选 +{positiveCount}/{Limit(limits.Positive)} " +
+            $"-{negativeCount}/{Limit(limits.Negative)} " +
+            $"疾病 {diseaseCount}/{Limit(limits.Diseases)}";
     }
 
     private sealed class QuirkChoiceRow : INotifyPropertyChanged
