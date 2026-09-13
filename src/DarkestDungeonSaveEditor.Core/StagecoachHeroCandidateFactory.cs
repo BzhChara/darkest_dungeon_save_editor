@@ -151,7 +151,7 @@ public static partial class StagecoachHeroCandidateFactory
         var name = catalog.HeroNames[random.Next(catalog.HeroNames.Count)];
         var colourVariation = random.Next(heroClass.ColourVariationCount);
         var positiveQuirks = selectedQuirks
-            .Where(quirk => !quirk.IsDisease && quirk.IsPositive == true)
+            .Where(quirk => quirk.IsPositive == true)
             .Select(quirk => quirk.Id)
             .ToArray();
         var negativeQuirks = selectedQuirks

@@ -86,6 +86,7 @@
                                  TextChanged="SearchTextBox_TextChanged"
                                  ToolTip="按怪癖 ID、中英文名、类别、来源或 HP 规则筛选" />
                         <TextBlock x:Name="SelectionSummaryTextBlock" Grid.Column="2"
+                                   ToolTip="正面疾病同时计入正面和疾病上限；每个怪癖只写入一次。"
                                    Margin="18,0,4,0" VerticalAlignment="Center"
                                    TextAlignment="Right" TextWrapping="Wrap"
                                    Foreground="{StaticResource GoldBrush}"

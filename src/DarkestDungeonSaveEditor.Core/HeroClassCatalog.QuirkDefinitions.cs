@@ -257,13 +257,11 @@ public static partial class HeroClassCatalog
                 continue;
             }
 
-            double? randomChance = null;
-            if (NativeJsonReader.TryGetProperty(item, "random_chance", out var chanceNode) &&
-                chanceNode.ValueKind == JsonValueKind.Number &&
-                chanceNode.TryGetDouble(out var chance))
-            {
-                randomChance = chance;
-            }
+            // Native probability storage is float32 (0x1404DE5E7). Overflow is
+            // unresolved, not zero, and must not put infinity into catalog JSON.
+            var randomChance = ReadJsonFloat(item, "random_chance");
+            if (randomChance is { } chance && !double.IsFinite(chance))
+                randomChance = null;
 
             bool? isPositive = null;
             if (NativeJsonReader.TryGetProperty(item, "is_positive", out var positiveNode) &&
