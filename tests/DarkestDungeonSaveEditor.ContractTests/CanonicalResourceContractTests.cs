@@ -73,9 +73,30 @@ internal static partial class ContractSuite
             foreach (var request in new[] { "arena", "ARENA" })
             {
                 var arena = BattleRoomAttachmentCatalog.Load(QueryContent(root, sources), request);
-                Assert(arena.GetCandidates(BattleRoomAttachmentKind.Trap, request).Count == 0 &&
-                       arena.SelectRegionalContent(BattleRoomAttachmentKind.Trap, request, 0) is null,
-                    "Explicit current-region requests must retain the existing arena pool exclusion.");
+                // Dungeon::Load compares the literal with strncmp (64 bytes).
+                // Only the exact native arena ID skips loading ordinary props.
+                var expected = request == "arena" ? 0 : 1;
+                Assert(arena.GetCandidates(BattleRoomAttachmentKind.Trap, request).Count == expected &&
+                       (arena.SelectRegionalContent(BattleRoomAttachmentKind.Trap, request, 0)?.Id == "alias_trap") == (expected == 1),
+                    "Only exact arena is excluded; a case-distinct region may open a physical pool alias.");
+            }
+        }
+        foreach (var kind in new[] { "local", "workshop" })
+        foreach (var key in new[] { "arena", "ARENA" })
+        {
+            var root = Path.Combine(runRoot, "canonical-arena-key", kind, key == "arena" ? "lower-key" : "upper-key");
+            var source = Path.Combine(root, "mod");
+            var baseline = Path.Combine(root, "base");
+            WriteMultiMash(source, $"dungeons/{key}/{key}.props.darkest", "traps: .chance 1 .types exact_trap\n");
+            WriteMultiMash(baseline, "props/trap_definitions.json", """{"props":[{"name":"exact_trap","default_data":{"instance_type":"trap"}}]}""");
+            WriteFixtureManifest(source);
+            var content = QueryContent(root, [new("base", "Base", "base", baseline, 0), new("mod", "Mod", kind, source, 0)]);
+            foreach (var request in new[] { "arena", "ARENA" })
+            {
+                var catalog = BattleRoomAttachmentCatalog.Load(content, request);
+                Assert(catalog.GetCandidates(BattleRoomAttachmentKind.Trap, request).Count ==
+                       (request == "ARENA" && key == request ? 1 : 0),
+                    $"The exact arena exclusion does not relax case-sensitive Mod manifest eligibility ({kind}, key={key}, request={request}).");
             }
         }
         Console.WriteLine("PASS: canonical region IDs, case-distinct pools and independent automatic-selection weights.");

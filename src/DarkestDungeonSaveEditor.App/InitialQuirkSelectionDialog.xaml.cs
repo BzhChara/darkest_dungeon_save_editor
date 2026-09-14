@@ -428,7 +428,7 @@ public partial class InitialQuirkSelectionDialog : Window
             var amount = modifier.Kind == HeroMaxHpModifierKind.Percentage
                 ? FormatSignedPercent(modifier.Amount)
                 : modifier.Amount.ToString("+0.###;-0.###;0", CultureInfo.InvariantCulture);
-            var condition = modifier.RuleType.ToLowerInvariant() switch
+            var condition = modifier.RuleType switch
             {
                 "always" => modifier.IsFalseRule ? "永不生效" : "常驻",
                 "no_trinkets" => modifier.IsFalseRule ? "有饰品时" : "无饰品时",

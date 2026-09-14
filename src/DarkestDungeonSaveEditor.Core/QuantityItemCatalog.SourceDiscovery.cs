@@ -32,7 +32,7 @@ public static partial class QuantityItemCatalog
         var manifestPath = Path.Combine(source.Directory, "modfiles.txt");
         ModManifestFile.Require(manifestPath);
 
-        var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var result = new HashSet<string>(StringComparer.Ordinal);
         foreach (var entry in ModManifestFile.ReadEntries(manifestPath, "darkest"))
         {
             var rawLine = entry.RawLine;

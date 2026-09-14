@@ -40,14 +40,8 @@ internal static class InventorySystemConfigCatalog
             {
                 // Parse and fingerprint the same captured bytes for preview/commit guards.
                 var bytes = File.ReadAllBytes(file.Path);
-                // Native LineReader/field functions terminate at NUL. Do not let
-                // managed text parsing adopt assignments past that boundary.
-                if (bytes.Contains((byte)0))
-                {
-                    issues.Add($"Inventory system config contains a NUL byte; capacity editing is disabled: {file.Path}");
-                    unresolved = true;
-                    continue;
-                }
+                // The shared reader stops at NUL while retaining earlier records.
+                // Fingerprint all bytes, including the unread tail, for save guards.
                 var sha256 = Convert.ToHexString(SHA256.HashData(bytes));
                 foreach (var (kind, body) in NativeDarkestReader.ReadRecordsFromText(Encoding.UTF8.GetString(bytes)))
                 {
@@ -104,7 +98,7 @@ internal static class InventorySystemConfigCatalog
 
         var manifest = Path.Combine(source.Directory, "modfiles.txt");
         ModManifestFile.Require(manifest);
-        var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var result = new HashSet<string>(StringComparer.Ordinal);
         foreach (var entry in ModManifestFile.ReadEntries(manifest, "darkest"))
         {
             var path = Path.GetFullPath(Path.Combine(source.Directory, entry.RelativePath));

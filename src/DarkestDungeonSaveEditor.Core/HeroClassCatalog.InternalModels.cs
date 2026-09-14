@@ -108,7 +108,7 @@ public static partial class HeroClassCatalog
         public int? SelectedCombatSkillsMax { get; set; }
         public double? BaseHp { get; private set; }
         public int ColourVariationCount { get; set; }
-        public HashSet<string> IncompatibleInitialQuirkIds { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public HashSet<string> IncompatibleInitialQuirkIds { get; } = new(StringComparer.Ordinal);
 
         public void AddCombatSkill(string id, int level)
         {

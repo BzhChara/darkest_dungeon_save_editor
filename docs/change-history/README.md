@@ -2,6 +2,10 @@
 
 此目录集中保存带有时间和任务范围的修复记录、审查报告、实验过程与结果。后续同类记录继续放在这里；当前有效规则与设计说明保留在上一级 `docs/`。
 
+- [容量旧保护与资源大小写集中修复：2026-09-14](case-policy-and-capacity-fixes-2026-09-14.md)
+
+- [历史修改第二十三轮审核：容量旧保护与 Bridge 地区身份，2026-09-14](capacity-and-bridge-identity-audit-2026-09-14.md)
+
 - [遭遇集合查询、重复来源与空组合修复：2026-09-14](encounter-query-and-validation-fixes-2026-09-14.md)
 
 - [历史修改第二十二轮审核：遭遇集合查询与旧校验假设，2026-09-14](encounter-query-and-validation-audit-2026-09-14.md)

@@ -146,13 +146,13 @@ public sealed partial class ManagedBattleEncounterBridgeService
         }
 
         var contentFingerprint = ComputeContentFingerprint(activeContent.Sources);
-        var tableTarget = BattleEncounterCatalog.ResolveAppendTarget(catalog, encounter.MashType, packageDirectory);
         var table = manifest.Tables.SingleOrDefault(candidate =>
-            candidate.DungeonId.Equals(catalog.DungeonId, StringComparison.OrdinalIgnoreCase) &&
-            candidate.Difficulty == catalog.Difficulty &&
-            candidate.RelativeMashPath.Equals(
-                tableTarget.RelativeMashPath,
-                StringComparison.OrdinalIgnoreCase));
+            candidate.DungeonId.Equals(catalog.DungeonId, StringComparison.Ordinal) &&
+            candidate.Difficulty == catalog.Difficulty);
+        var relativeMashPath = table?.RelativeMashPath ?? AllocateMashPath(
+            manifest, stagedPackage, catalog.DungeonId, catalog.Difficulty);
+        var tableTarget = BattleEncounterCatalog.ResolveAppendTarget(
+            catalog, encounter.MashType, packageDirectory, relativeMashPath);
         var stagedMashPath = Path.Combine(
             stagedPackage,
             tableTarget.RelativeMashPath.Replace('/', Path.DirectorySeparatorChar));
@@ -421,7 +421,7 @@ public sealed partial class ManagedBattleEncounterBridgeService
             throw new InvalidOperationException("地图、活动内容与所选档案不属于同一个 Profile。");
         }
 
-        if (!catalog.DungeonId.Equals(snapshot.DungeonId, StringComparison.OrdinalIgnoreCase) ||
+        if (!catalog.DungeonId.Equals(snapshot.DungeonId, StringComparison.Ordinal) ||
             catalog.Difficulty != snapshot.Difficulty ||
             !encounter.TableGuard.Fingerprint.Equals(
                 catalog.TableGuard.Fingerprint,
@@ -446,7 +446,7 @@ public sealed partial class ManagedBattleEncounterBridgeService
         BattleEncounterCatalogResult catalog)
     {
         foreach (var table in manifest.Tables.Where(table =>
-                     table.DungeonId.Equals(catalog.DungeonId, StringComparison.OrdinalIgnoreCase) &&
+                     table.DungeonId.Equals(catalog.DungeonId, StringComparison.Ordinal) &&
                      table.Difficulty == catalog.Difficulty))
         {
             var path = Path.GetFullPath(Path.Combine(packageDirectory, table.RelativeMashPath));
@@ -773,7 +773,7 @@ public sealed partial class ManagedBattleEncounterBridgeService
                 table.Difficulty < 0 ||
                 table.DungeonId.Any(character => !char.IsAsciiLetterOrDigit(character) && character is not '_' and not '-') ||
                 !IsSafeRelativePath(table.RelativeMashPath) ||
-                table.RelativeMashPath != BattleEncounterCatalog.DedicatedMashPath(table.DungeonId, table.Difficulty) ||
+                !BattleEncounterCatalog.IsDedicatedMashPath(table.RelativeMashPath, table.DungeonId, table.Difficulty) ||
                 string.IsNullOrWhiteSpace(table.ContentFingerprint) ||
                 string.IsNullOrWhiteSpace(table.GeneratedMashSha256) ||
                 table.Entries is null ||
@@ -795,6 +795,8 @@ public sealed partial class ManagedBattleEncounterBridgeService
                 throw new InvalidDataException("托管 Encounter Bridge 清单包含重复的完整遭遇。");
             }
         }
+        if (manifest.Tables.GroupBy(table => (table.DungeonId, table.Difficulty)).Any(group => group.Count() > 1))
+            throw new InvalidDataException("托管 Encounter Bridge 清单包含重复的地区与难度。");
         if (manifest.Tables
             .GroupBy(
                 table => table.RelativeMashPath,
@@ -802,6 +804,19 @@ public sealed partial class ManagedBattleEncounterBridgeService
             .Any(group => group.Count() > 1))
         {
             throw new InvalidDataException("托管 Encounter Bridge 清单包含重复的遭遇表路径。");
+        }
+    }
+
+    private static string AllocateMashPath(ManagedBridgeManifest manifest, string package, string dungeonId, int difficulty)
+    {
+        // Region IDs are exact; their physical Windows paths are not. Assign a
+        // distinct carrier name on collision and keep that mapping in the table.
+        var occupied = manifest.Tables.Select(table => table.RelativeMashPath).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        for (var number = 0; ; number = checked(number + 1))
+        {
+            var relative = BattleEncounterCatalog.DedicatedMashPath(dungeonId, difficulty, number);
+            var path = Path.Combine(package, relative);
+            if (!occupied.Contains(relative) && !File.Exists(path) && !Directory.Exists(path)) return relative;
         }
     }
 

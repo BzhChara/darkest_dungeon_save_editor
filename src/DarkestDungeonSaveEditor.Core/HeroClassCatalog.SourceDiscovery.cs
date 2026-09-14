@@ -50,17 +50,18 @@ public static partial class HeroClassCatalog
         IReadOnlyList<string> enabledDlcPrefixes,
         List<string> issues)
     {
-        var heroFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var heroOverrideFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var effectFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var quirkFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var eventFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var buffFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var campingFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var nameFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var upgradeFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var rosterVariableFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var sharedRuleFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        // Preserve raw manifest requests until their consumer resolves them.
+        var heroFiles = new HashSet<string>(StringComparer.Ordinal);
+        var heroOverrideFiles = new HashSet<string>(StringComparer.Ordinal);
+        var effectFiles = new HashSet<string>(StringComparer.Ordinal);
+        var quirkFiles = new HashSet<string>(StringComparer.Ordinal);
+        var eventFiles = new HashSet<string>(StringComparer.Ordinal);
+        var buffFiles = new HashSet<string>(StringComparer.Ordinal);
+        var campingFiles = new HashSet<string>(StringComparer.Ordinal);
+        var nameFiles = new HashSet<string>(StringComparer.Ordinal);
+        var upgradeFiles = new HashSet<string>(StringComparer.Ordinal);
+        var rosterVariableFiles = new HashSet<string>(StringComparer.Ordinal);
+        var sharedRuleFiles = new HashSet<string>(StringComparer.Ordinal);
         foreach (var entry in ModManifestFile.ReadEntries(manifestPath, ExtractManifestPath))
         {
             var rawLine = entry.RawLine;

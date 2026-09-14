@@ -2,7 +2,7 @@
 
 This document is the durable record of the Darkest Dungeon Save Editor's confirmed content-resolution, hero-generation, quirk, trinket, and save-write rules. It separates behavior proven by the game or real saves from implementation conclusions and remaining live-test requirements, so later work does not turn one example Mod into a hard-coded special case.
 
-- Last updated: 2026-09-08
+- Last updated: 2026-09-14
 - Persistent expedition path rule updated: 2026-09-10
 - Historical audit baseline: `profile_1` (the counts and hash below are a snapshot, not live state)
 - Baseline `persist.game.json` SHA-256: `f0f707d734a93b9e04c9792d47490acbc8bbc046edd51ee8b2c108ca712e6b17`
@@ -108,6 +108,27 @@ This is the user's adopted experiment, not proof that an originally manifest-fre
 - Effective catalog readers share an eager manifest reader. A manifest that is locked/unreadable, is a directory rather than a file, or contains an unparsable selected resource path causes that catalog request to fail with the manifest path and, for an invalid resource path, the line number. It must not produce a partial catalog or select manifest-free fallback. A readable empty manifest remains authoritative. Existing missing listed-file diagnostics and path-containment/DLC/type checks are retained.
 - This is bounded error reporting, not automatic manifest repair, content promotion, or a guarantee that every malformed/semantically wrong package can be detected. Diagnostic inventory remains independent; it may report incomplete observations without returning an effective catalog. Unrelated workflows that do not require the failed catalog are not given a new global prohibition.
 - The discovery fixes themselves did not remove localization compatibility. The later approved removal of XML supplementation/recovery and addition of legacy LOC support are recorded below and in [the compatibility inventory](change-history/content-compatibility-audit-2026-09-06.md). Ordinary nested-directory discovery is not a deliberate fallback to old files and was not changed by those removals.
+
+### 2.8 Case handling follows the identity being compared
+
+There is no global case-folding switch. Preserve the distinction through discovery, catalog grouping, selection, save preflight, persistence and maintenance:
+
+| Value | Comparison rule |
+| --- | --- |
+| Supported resource IDs, record/field names, inventory types, hero classes, quirks, skills, Buff/Effect names, region IDs | Exact case, followed by each consumer's byte limits and native-hash collision checks. Case-distinct resources must not merge in later catalog grouping or UI summaries. |
+| Mod manifest directory trees and canonical requested paths | Original spelling. A differently cased manifest entry cannot authorize a request merely because Windows could open its physical file. |
+| Native enumeration and overlay keys | The specific consumer's verified query/ordering/matching rule; no blanket lowercasing or path deduplication. |
+| Windows physical paths, file locks, package paths and profile paths | Windows path identity; ordinary case aliases refer to the same physical file. This does not redefine the requested resource ID. |
+| Map area/tile JSON keys and game/raid region consistency | Exact case. Selection, party/entrance/final-room checks and mutations must address the same key. |
+| Search text and hexadecimal file hashes | Existing case-insensitive matching remains appropriate; neither operation merges resource identities. |
+
+Hero candidates and info/art override groups retain separate `selection` and `Selection` IDs. Class natural-generation quirk exclusions retain both `ban` and `Ban`; manual console-style assignment keeps the independent policy in section 7 and does not newly enforce that class list. HP-rule display and runtime-quirk summaries retain exact rule/quirk identities.
+
+Two eligible case-distinct keys in the same manifest remain two requests even when they open one Windows file. Keep both through actor registration, query discovery and native file-slot replay. Native resolvers request exact path grouping from the common overlay; diagnostic physical-file inventories and the existing localization/unverified-consumer policies remain separate. A same-manifest pair follows its exact tree keys and native ordinal sort rather than triggering the cross-provider case-competition warning.
+
+Bridge table identity is `(exact dungeon ID, difficulty)`, with three independent type indexes. Windows filename collisions receive a distinct carrier filename recorded in the manifest; allocation, reuse, classification and automatic cleanup preserve exact region identity. See the [Bridge contract](encounter-runtime-order.md#bridge-contract).
+
+The ordinary room-prop exclusion is the exact literal `arena`, not every case variant: native `strncmp` is used. The saved no-dungeon sentinel is handled as exact `none`; a case-distinct custom region is not silently treated as town. Internal source identifiers, local Mod-title mapping, language aliases and heuristic display categories are separate metadata; this review does not claim a newly verified native case rule for each of them. Validation and scope are recorded in the [case-policy fix](change-history/case-policy-and-capacity-fixes-2026-09-14.md).
 
 ## 3. Localization
 

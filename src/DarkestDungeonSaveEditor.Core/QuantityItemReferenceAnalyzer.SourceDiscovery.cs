@@ -225,7 +225,7 @@ internal static partial class QuantityItemReferenceAnalyzer
         paths = paths.Concat(new[] { "heroes", "monsters" }.SelectMany(directory =>
             NativeContentFileResolver.EnumerateActorOpenFiles(source, enabledDlcPrefixes, directory, [])));
         var manifestDirectory = source.Kind is "local" or "workshop";
-        var acceptedPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var acceptedPaths = new HashSet<string>(manifestDirectory ? StringComparer.Ordinal : StringComparer.OrdinalIgnoreCase);
         foreach (var path in paths)
         {
             var relativePath = ContentFileOverlay.NormalizeRelativePath(source, path);
@@ -247,8 +247,8 @@ internal static partial class QuantityItemReferenceAnalyzer
                 continue;
             }
 
-            // Raw manifest aliases can have different directory eligibility.
-            // Deduplicate physical paths only after rejecting ineligible names.
+            // Raw manifest aliases can have different directory eligibility
+            // and native result slots. Only physical discovery folds case.
             if (acceptedPaths.Add(path)) yield return path;
         }
     }

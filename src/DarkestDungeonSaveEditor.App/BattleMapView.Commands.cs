@@ -110,7 +110,7 @@ public partial class BattleMapView : UserControl
                           string.Equals(
                               cell.SourceAreaId,
                               _currentSnapshot.FinalRoomId,
-                              StringComparison.OrdinalIgnoreCase);
+                              StringComparison.Ordinal);
         if (!isFinalRoom)
         {
             battleMenu.Items.Add(CreateEncounterPickerItem(
@@ -165,11 +165,11 @@ public partial class BattleMapView : UserControl
         !string.Equals(
             cell.SourceAreaId,
             _currentSnapshot.EntranceAreaId,
-            StringComparison.OrdinalIgnoreCase) &&
+            StringComparison.Ordinal) &&
         !string.Equals(
             cell.SourceAreaId,
             _currentSnapshot.FinalRoomId,
-            StringComparison.OrdinalIgnoreCase) &&
+            StringComparison.Ordinal) &&
         cell.RawContent is
             (int)BattleMapTileContent.Battle or
             (int)BattleMapTileContent.GuardedCurio or
@@ -313,7 +313,7 @@ public partial class BattleMapView : UserControl
             _encounterCatalog is null ||
             !_encounterCatalog.DungeonId.Equals(
                 _currentSnapshot.DungeonId,
-                StringComparison.OrdinalIgnoreCase) ||
+                StringComparison.Ordinal) ||
             _encounterCatalog.Difficulty != _currentSnapshot.Difficulty)
         {
             return null;
@@ -517,7 +517,7 @@ public partial class BattleMapView : UserControl
         var specialWarning = string.Equals(
             target.SourceAreaId,
             snapshot.FinalRoomId,
-            StringComparison.OrdinalIgnoreCase)
+            StringComparison.Ordinal)
             ? Environment.NewLine + "这是当前最终房间；删除其内容可能使任务无法完成。"
             : string.Empty;
         var contentDescription = target.RawContent == 0

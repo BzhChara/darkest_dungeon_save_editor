@@ -102,7 +102,7 @@ public sealed partial class ManagedBattleEncounterBridgeService
                             candidate.MashType == entry.MashType && candidate.SourceLine == entry.SourceLine &&
                             (entry.SourceRecordIndex is null || candidate.SourceRecordIndex == entry.SourceRecordIndex) &&
                             candidate.OriginDifficulty == entry.OriginDifficulty &&
-                            candidate.OriginDungeonId.Equals(entry.OriginDungeonId, StringComparison.OrdinalIgnoreCase) &&
+                            candidate.OriginDungeonId.Equals(entry.OriginDungeonId, StringComparison.Ordinal) &&
                             candidate.SourceRelativePath.Equals(entry.SourceRelativePath, StringComparison.OrdinalIgnoreCase) &&
                             candidate.MonsterIds.SequenceEqual(entry.MonsterIds, StringComparer.Ordinal))
                         .Select(candidate => candidate.Classification).Distinct().ToArray();

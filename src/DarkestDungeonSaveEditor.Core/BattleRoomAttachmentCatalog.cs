@@ -386,8 +386,9 @@ public static partial class BattleRoomAttachmentCatalog
             var region = mounted.Split('/')[1];
             return $"dungeons/{region}/{region}.props.darkest";
         }).ToList();
-        // Dungeon::Load skips ordinary props for arena (0x1404AF1CF-0x1404AF1E6).
-        if (!string.IsNullOrWhiteSpace(dungeonId) && !dungeonId.Equals("arena", StringComparison.OrdinalIgnoreCase))
+        // Dungeon::Load skips exact "arena" via strncmp, not _stricmp
+        // (0x1404AF1CF-0x1404AF1E6, IAT 0x140C63378).
+        if (!string.IsNullOrWhiteSpace(dungeonId) && !dungeonId.Equals("arena", StringComparison.Ordinal))
         {
             if (dungeonId is "." or ".." || dungeonId.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
                 throw new InvalidDataException("副本区域 ID 不是有效的资源路径名称。");
@@ -415,7 +416,7 @@ public static partial class BattleRoomAttachmentCatalog
         // Dungeon::Load opens this constructed path (build 27890, 0x1404AF1F2).
         // It never enumerates arbitrary names or classification subdirectories.
         return parts.Length == 3 && parts[0].Equals("dungeons", StringComparison.OrdinalIgnoreCase) &&
-            !parts[1].Equals("arena", StringComparison.OrdinalIgnoreCase) &&
+            !parts[1].Equals("arena", StringComparison.Ordinal) &&
             parts[2].Equals(parts[1] + ".props.darkest", StringComparison.OrdinalIgnoreCase);
     }
 
@@ -476,7 +477,7 @@ public static partial class BattleRoomAttachmentCatalog
         string extension,
         Func<string, bool>? eligible)
     {
-        var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var result = new HashSet<string>(StringComparer.Ordinal);
         try
         {
             foreach (var entry in ModManifestFile.ReadEntries(manifestPath, extension))

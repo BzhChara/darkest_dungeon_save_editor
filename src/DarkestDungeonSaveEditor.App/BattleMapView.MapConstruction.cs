@@ -66,13 +66,13 @@ public partial class BattleMapView : UserControl
                 var content = ConvertContent(tile.Content);
                 var contentLabel = FormatSnapshotContent(tile.Content, tile.RawContent);
                 if (kind == PrototypeCellKind.Room &&
-                    string.Equals(area.AreaId, snapshot.EntranceAreaId, StringComparison.OrdinalIgnoreCase))
+                    string.Equals(area.AreaId, snapshot.EntranceAreaId, StringComparison.Ordinal))
                 {
                     content = PrototypeContent.Entrance;
                     contentLabel = "入口";
                 }
                 else if (kind == PrototypeCellKind.Room &&
-                         string.Equals(area.AreaId, snapshot.FinalRoomId, StringComparison.OrdinalIgnoreCase))
+                         string.Equals(area.AreaId, snapshot.FinalRoomId, StringComparison.Ordinal))
                 {
                     content = PrototypeContent.Boss;
                     contentLabel = "首领房间";
@@ -86,7 +86,7 @@ public partial class BattleMapView : UserControl
                     _ => $"走廊格 {area.AreaId}.{tile.TileId}"
                 };
                 var hasParty =
-                    string.Equals(area.AreaId, snapshot.PartyAreaId, StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(area.AreaId, snapshot.PartyAreaId, StringComparison.Ordinal) &&
                     snapshot.PartyTileIndex == tile.TileIndex;
                 stagedCells.Add(CreateCell(
                     $"{area.AreaId}.{tile.TileId}",
@@ -166,7 +166,7 @@ public partial class BattleMapView : UserControl
 
     private static string FormatDungeon(string dungeonId)
     {
-        var name = dungeonId.ToLowerInvariant() switch
+        var name = dungeonId switch
         {
             "ruins" => "遗迹",
             "warrens" => "兽窟",

@@ -87,7 +87,7 @@ internal static partial class BattleMapSaveEditor
         ArgumentNullException.ThrowIfNull(snapshot);
         var (area, tile) = ResolveEditableTile(snapshot, areaId, tileId);
         ValidateStationaryRaidState(raidDocument);
-        if (string.Equals(snapshot.PartyAreaId, area.AreaId, StringComparison.OrdinalIgnoreCase) &&
+        if (string.Equals(snapshot.PartyAreaId, area.AreaId, StringComparison.Ordinal) &&
             snapshot.PartyTileIndex == tile.TileIndex)
         {
             throw new InvalidOperationException("队伍已经位于所选地图格。");
@@ -99,7 +99,7 @@ internal static partial class BattleMapSaveEditor
         {
             var physicalOrdinal = Array.FindIndex(
                 area.Tiles.ToArray(),
-                candidate => candidate.TileId.Equals(tile.TileId, StringComparison.OrdinalIgnoreCase));
+                candidate => candidate.TileId.Equals(tile.TileId, StringComparison.Ordinal));
             if (physicalOrdinal < 0)
             {
                 throw new InvalidDataException(
@@ -170,7 +170,7 @@ internal static partial class BattleMapSaveEditor
         }
         if (!encounter.TableGuard.DungeonId.Equals(
                 snapshot.DungeonId,
-                StringComparison.OrdinalIgnoreCase) ||
+                StringComparison.Ordinal) ||
             encounter.TableGuard.Difficulty != snapshot.Difficulty)
         {
             throw new InvalidOperationException("所选遭遇不属于当前副本及难度的有效遭遇表。");
@@ -219,11 +219,11 @@ internal static partial class BattleMapSaveEditor
                     ? "走廊遭遇只能写入普通可见走廊格。"
                     : "房间或首领遭遇只能写入房间。");
         }
-        if (string.Equals(area.AreaId, snapshot.EntranceAreaId, StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(area.AreaId, snapshot.EntranceAreaId, StringComparison.Ordinal))
         {
             throw new InvalidOperationException("出生房间不能新建、替换或删除地图内容。");
         }
-        if (string.Equals(area.AreaId, snapshot.FinalRoomId, StringComparison.OrdinalIgnoreCase) &&
+        if (string.Equals(area.AreaId, snapshot.FinalRoomId, StringComparison.Ordinal) &&
             mashType != 2)
         {
             throw new InvalidOperationException("最终房间目前只允许写入已验证的首领遭遇。");
@@ -353,11 +353,11 @@ internal static partial class BattleMapSaveEditor
         {
             throw new InvalidOperationException("战斗附加内容只能用于普通房间战斗。");
         }
-        if (string.Equals(area.AreaId, snapshot.EntranceAreaId, StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(area.AreaId, snapshot.EntranceAreaId, StringComparison.Ordinal))
         {
             throw new InvalidOperationException("出生房间不能修改战斗附加内容。");
         }
-        if (string.Equals(area.AreaId, snapshot.FinalRoomId, StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(area.AreaId, snapshot.FinalRoomId, StringComparison.Ordinal))
         {
             throw new InvalidOperationException("最终房间不能修改战斗附加内容。");
         }
@@ -414,7 +414,7 @@ internal static partial class BattleMapSaveEditor
         ArgumentException.ThrowIfNullOrWhiteSpace(areaId);
         ArgumentException.ThrowIfNullOrWhiteSpace(tileId);
         var area = snapshot.Areas.SingleOrDefault(candidate =>
-            candidate.AreaId.Equals(areaId, StringComparison.OrdinalIgnoreCase))
+            candidate.AreaId.Equals(areaId, StringComparison.Ordinal))
             ?? throw new InvalidOperationException($"地图区域“{areaId}”已经不存在。");
         if (area.Kind is not (BattleMapAreaKind.Room or BattleMapAreaKind.Corridor))
         {
@@ -422,7 +422,7 @@ internal static partial class BattleMapSaveEditor
         }
 
         var tile = area.Tiles.SingleOrDefault(candidate =>
-            candidate.TileId.Equals(tileId, StringComparison.OrdinalIgnoreCase))
+            candidate.TileId.Equals(tileId, StringComparison.Ordinal))
             ?? throw new InvalidOperationException(
                 $"地图格“{area.AreaId}.{tileId}”已经不存在。");
         if (area.Kind == BattleMapAreaKind.Corridor && tile.StaticType != 1)
