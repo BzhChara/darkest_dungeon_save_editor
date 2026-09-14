@@ -60,7 +60,31 @@ internal static partial class QuantityItemReferenceAnalyzer
         }
 
         var result = new List<ScannedContentFile>();
-        foreach (var file in NativeContentFileResolver.Resolve(candidates, activeContent.Sources, "Quantity-item reference", issues))
+        string QueryKey(ContentFileCandidate candidate)
+        {
+            var path = ContentFileOverlay.NormalizeRelativePath(candidate.Source, candidate.Path)!;
+            var mounted = NativeResourceFileRules.MountedPath(path, enabledDlcPrefixes);
+            var manifest = candidate.Source.Kind is "local" or "workshop";
+            if (actorPaths.Contains(mounted)) return "open";
+            if (NativeResourceFileRules.IsCurioTypeFile(path, enabledDlcPrefixes, manifest)) return "curio";
+            if (NativeResourceFileRules.IsLootFile(path, enabledDlcPrefixes, manifest)) return "loot";
+            var kind = NativeResourceFileRules.ReferenceJsonKind(path, enabledDlcPrefixes, manifest);
+            return kind switch
+            {
+                NativeReferenceJsonKind.Building => "building:" + mounted.Split('/')[3],
+                // Fixed paths and unmodeled reference consumers keep full-path
+                // overlays; do not invent a shared enumeration for them.
+                NativeReferenceJsonKind.None or NativeReferenceJsonKind.Unverified => "open",
+                _ => "json:" + kind
+            };
+        }
+        var fileGroups = candidates.GroupBy(QueryKey);
+        foreach (var file in fileGroups.SelectMany(group => group.Key switch
+                 {
+                     "open" => NativeContentFileResolver.ResolveOpenedFiles(group.ToArray(), activeContent.Sources, "Quantity-item reference", issues),
+                     "curio" => NativeContentFileResolver.ResolveAdditiveFiles(group.ToArray(), activeContent.Sources, "Quantity-item reference", issues),
+                     _ => NativeContentFileResolver.Resolve(group.ToArray(), activeContent.Sources, "Quantity-item reference", issues)
+                 }))
         {
             try
             {

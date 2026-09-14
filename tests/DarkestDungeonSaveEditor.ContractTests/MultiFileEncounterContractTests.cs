@@ -308,9 +308,14 @@ internal static partial class ContractSuite
                 new ActiveContentSource("local:case", "case", "local", caseMod, 1000)]
         }, snapshot);
         Assert(caseCatalog.TableGuard.EffectiveFiles.Select(file => Path.GetFileName(file.RelativePath))
-                   .SequenceEqual(["z.cove.2.mash.darkest", "a.cove.2.mash.darkest"]) &&
+                   .SequenceEqual(["Z.cove.2.mash.darkest", "a.cove.2.mash.darkest", "z.cove.2.mash.darkest"]) &&
                caseCatalog.DirectEncounters.Count == 0 &&
                caseCatalog.Issues.Any(issue => issue.Contains("大小写", StringComparison.Ordinal)),
-            "An override must retain the first provider's case-sensitive sort slot; case-only overlay collisions stay guarded until native matching is proven.");
+            "The case-sensitive enumeration match must retain Z and append z; competing-case file-open semantics still withhold direct indexes.");
+        Assert(await CaptureSaveFailureAsync(() =>
+        {
+            BattleEncounterCatalog.ResolveAppendTarget(caseCatalog, 0);
+            return Task.CompletedTask;
+        }) is InvalidOperationException, "A known enumeration list must not bypass the unresolved case-only provider guard for Bridge append.");
     }
 }

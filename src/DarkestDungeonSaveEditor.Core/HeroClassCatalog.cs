@@ -61,7 +61,7 @@ public static partial class HeroClassCatalog
         var campingFiles = ResolveFiles(sourceFiles, files => files.CampingSkillFiles, "Camping skill definition", issues);
         var nameFiles = ResolveFiles(sourceFiles, files => files.NameFiles, "Hero name definition", issues);
         var upgradeFiles = ResolveFiles(sourceFiles, files => files.HeroUpgradeFiles, "Hero upgrade definition", issues);
-        var rosterVariableFiles = ResolveFiles(sourceFiles, files => files.RosterVariableFiles, "Roster variables", issues);
+        var rosterVariableFiles = ResolveFiles(sourceFiles, files => files.RosterVariableFiles, "Roster variables", issues, directOpen: true);
         var sharedRuleFiles = ResolveFiles(sourceFiles, files => files.SharedRuleFiles, "Shared rules", issues);
         var initialQuirkLimits = ReadInitialQuirkLimits(sharedRuleFiles, issues);
 

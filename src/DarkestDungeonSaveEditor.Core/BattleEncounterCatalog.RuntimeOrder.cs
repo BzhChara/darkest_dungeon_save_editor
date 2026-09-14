@@ -41,7 +41,16 @@ public static partial class BattleEncounterCatalog
                 .Distinct(StringComparer.OrdinalIgnoreCase).Skip(1).Any())
                 issues.Add($"同一地区/难度跨越多个 DLC 挂载目录，尚未验证这些挂载之间的顺序：{group.Key.dungeon}/{group.Key.difficulty}");
         }
-        return NativeContentFileResolver.Resolve(candidates, activeSources, "Encounter mash", issues);
+        // Each native region/difficulty/collection query starts with its own
+        // result list. Global Bridge discovery must not merge different queries.
+        return candidates.GroupBy(candidate =>
+            {
+                TryDescribeMashFile(ContentFileOverlay.NormalizeRelativePath(candidate.Source, candidate.Path)!,
+                    out var dungeon, out var difficulty, candidate.Source.Kind is "local" or "workshop");
+                return (dungeon, difficulty, Kind: ClassifyFile(candidate.Path));
+            })
+            .SelectMany(group => NativeContentFileResolver.Resolve(group.ToArray(), activeSources, "Encounter mash", issues))
+            .ToArray();
     }
 
     private static bool HasIndexedTableDeclarations(string path) =>

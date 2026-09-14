@@ -6,14 +6,15 @@ public static partial class HeroClassCatalog
         IReadOnlyList<SourceFiles> sourceFiles,
         Func<SourceFileSet, IReadOnlyList<string>> selectFiles,
         string contentLabel,
-        List<string> issues)
+        List<string> issues,
+        bool directOpen = false)
     {
-        return NativeContentFileResolver.Resolve(
-            sourceFiles.SelectMany(item =>
-                selectFiles(item.Files).Select(path => new ContentFileCandidate(item.Source, path))).ToArray(),
-            sourceFiles.Select(item => item.Source).ToArray(),
-            contentLabel,
-            issues);
+        var candidates = sourceFiles.SelectMany(item =>
+            selectFiles(item.Files).Select(path => new ContentFileCandidate(item.Source, path))).ToArray();
+        var sources = sourceFiles.Select(item => item.Source).ToArray();
+        return directOpen
+            ? NativeContentFileResolver.ResolveOpenedFiles(candidates, sources, contentLabel, issues)
+            : NativeContentFileResolver.Resolve(candidates, sources, contentLabel, issues);
     }
 
     private static void AddCandidate<T>(

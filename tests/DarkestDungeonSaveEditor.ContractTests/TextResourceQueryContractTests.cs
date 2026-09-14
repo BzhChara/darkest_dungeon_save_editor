@@ -46,7 +46,7 @@ internal static partial class ContractSuite
             Write("effects/query.effectsXdarkest", "effect: .name QUERY .disease runtime_q\n");
             Write("curios/query_curio_type_libraryXcsv", QueryTypeCsv);
             Write("curios/query_curio_propsXcsv", QueryPropCsv);
-            Write("props/prop_definitions.json", """{"props":[{"name":"curio_default","default_data":{"instance_type":"curio"}}]}""");
+            Write("props/support/prop_definitions.json", """{"props":[{"name":"curio_default","default_data":{"instance_type":"curio"}}]}""");
             Write("dungeons/cove/cove.props.darkest", "room_curios: .chance 1 .types query_curio\n");
             Write("loot/inventory/query.loot.json", QueryLootJson);
             foreach (var excluded in new[] { "README.md", "inventory/README.txt", "inventory/readme.darkest",

@@ -2,6 +2,9 @@
 
 此目录集中保存带有时间和任务范围的修复记录、审查报告、实验过程与结果。后续同类记录继续放在这里；当前有效规则与设计说明保留在上一级 `docs/`。
 
+- [公共资源合并与战斗编号修复：2026-09-14](resource-overlay-slot-fixes-2026-09-14.md)
+
+- [历史修改第二十轮审核：公共资源合并与战斗编号，2026-09-14](resource-overlay-slot-audit-2026-09-14.md)
 - [人物皮肤与初始技能选择修复：2026-09-14](hero-generation-selection-fixes-2026-09-14.md)
 - [历史修改第十九轮审核：人物皮肤与初始技能选择，2026-09-14](hero-generation-selection-audit-2026-09-14.md)
 - [怪癖计数与概率精度修复：2026-09-14](hero-quirk-classification-fixes-2026-09-14.md)

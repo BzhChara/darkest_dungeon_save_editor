@@ -8,16 +8,23 @@ public static partial class BattleRoomAttachmentCatalog
         IReadOnlyList<ActiveContentSource> sources, List<string> issues)
     {
         var enabledDlcPrefixes = ContentFileOverlay.GetEnabledDlcPrefixes(sources);
-        var files = NativeContentFileResolver.Resolve(sources.SelectMany(source =>
+        var candidates = sources.SelectMany(source =>
                 EnumeratePropFiles(source, enabledDlcPrefixes, issues, "props", "*json", "json",
                     path => NativeResourceFileRules.PropResourceStage(path, enabledDlcPrefixes,
-                        source.Kind is "local" or "workshop") >= 0)
-                    .Select(path => new ContentFileCandidate(source, path))).ToArray(), sources,
-            "Map prop resource", issues);
-        // 0x1404D87A0 opens the three root paths before the subdirectory searches.
+                        source.Kind is "local" or "workshop") is var stage &&
+                        (stage >= 3 || stage >= 0 && source.Kind == "base"))
+                    .Select(path => new ContentFileCandidate(source, path))).ToArray();
+        // 0x1404D87A0 opens >props/... before the subdirectory searches.
+        // The leading '>' bypasses alternate mounts (0x140248051/0x14024812E),
+        // so only the three Base root files supply these initial defaults.
         // Stable ordering preserves native resolver slots within each searched family.
-        return files.OrderBy(file => NativeResourceFileRules.PropResourceStage(file.RelativePath, enabledDlcPrefixes,
-            file.Source.Kind is "local" or "workshop")).ToArray();
+        return candidates.GroupBy(candidate => NativeResourceFileRules.PropResourceStage(
+                ContentFileOverlay.NormalizeRelativePath(candidate.Source, candidate.Path)!, enabledDlcPrefixes,
+                candidate.Source.Kind is "local" or "workshop"))
+            .OrderBy(group => group.Key)
+            .SelectMany(group => group.Key < 3
+                ? NativeContentFileResolver.ResolveOpenedFiles(group.ToArray(), sources, "Map prop resource", issues)
+                : NativeContentFileResolver.ResolveAdditiveFiles(group.ToArray(), sources, "Map prop resource", issues)).ToArray();
     }
 
     private static PropResources ReadResources(

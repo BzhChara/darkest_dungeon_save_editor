@@ -1,6 +1,6 @@
 namespace DarkestDungeonSaveEditor.Core;
 
-// Windows x64 build 27890, StorageManager::IO_FindFiles(flags=0).
+// Windows x64 build 27890, consumer-specific IO_FindFiles and canonical opens.
 // This is file enumeration/overlay order; individual resource lookup policies
 // (inventory first match, quirk last match, etc.) are applied by the consumers.
 // DLC application positions still come from ActiveContentSource; see the
@@ -27,7 +27,7 @@ internal static class NativeContentFileResolver
         var prefixes = ContentFileOverlay.GetEnabledDlcPrefixes(sources);
         var candidates = sources.SelectMany(source => EnumerateActorOpenFiles(source, prefixes, directory, issues)
             .Select(path => new ContentFileCandidate(source, path))).ToArray();
-        return Resolve(candidates, sources, "Actor definition", issues, reportCaseDifferences: false).ToDictionary(file =>
+        return ResolveOpenedFiles(candidates, sources, "Actor definition", issues, reportCaseDifferences: false).ToDictionary(file =>
         {
             var prefix = prefixes.OrderByDescending(value => value.Length).FirstOrDefault(value =>
                 file.RelativePath.StartsWith(value + "/", StringComparison.OrdinalIgnoreCase));
@@ -79,6 +79,38 @@ internal static class NativeContentFileResolver
         string contentLabel,
         List<string> issues,
         bool reportCaseDifferences = true)
+        => ResolveCore(candidates, activeSources, contentLabel, issues, reportCaseDifferences, exactPaths: false, appendOnly: false);
+
+    // Constructed OpenFile paths do not consume an IO_FindFiles result list.
+    // Keep their Windows path aliases and mounted same-path provider election.
+    internal static IReadOnlyList<EffectiveContentFile> ResolveOpenedFiles(
+        IReadOnlyList<ContentFileCandidate> candidates,
+        IReadOnlyList<ActiveContentSource> activeSources,
+        string contentLabel,
+        List<string> issues,
+        bool reportCaseDifferences = true)
+        => ResolveCore(candidates, activeSources, contentLabel, issues, reportCaseDifferences, exactPaths: true, appendOnly: false);
+
+    // PropLibrary uses mode 1, flags 9 (0x1404D87F7 / 0x1404D8A0A).
+    // Bit 8 prefixes Base paths with '>'; alternate paths retain their mount
+    // prefix. Bit 1 only erases an offset-zero match, so a contained relative
+    // tail appends these concrete providers instead of replacing a prior slot.
+    internal static IReadOnlyList<EffectiveContentFile> ResolveAdditiveFiles(
+        IReadOnlyList<ContentFileCandidate> candidates,
+        IReadOnlyList<ActiveContentSource> activeSources,
+        string contentLabel,
+        List<string> issues)
+        => ResolveCore(candidates, activeSources, contentLabel, issues, reportCaseDifferences: true,
+            exactPaths: false, appendOnly: true);
+
+    private static IReadOnlyList<EffectiveContentFile> ResolveCore(
+        IReadOnlyList<ContentFileCandidate> candidates,
+        IReadOnlyList<ActiveContentSource> activeSources,
+        string contentLabel,
+        List<string> issues,
+        bool reportCaseDifferences,
+        bool exactPaths,
+        bool appendOnly)
     {
         var sources = candidates.Select(candidate => candidate.Source)
             .DistinctBy(source => source.Id, StringComparer.OrdinalIgnoreCase)
@@ -113,23 +145,30 @@ internal static class NativeContentFileResolver
             .ThenByDescending(file => SlotPath(file).Count(character => character == '/'))
             .ThenBy(SlotPath, StringComparer.Ordinal)
             .ToArray();
-        // IO_FindFiles compares paths relative to the alternate mount. A root
-        // Mod's dungeons/x/file overrides DLC-prefix/dungeons/x/file in place.
-        // Preserve the authored winning path for Bridge output and provenance.
-        var slots = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        // Mode 1, flags 0: 0x140247C0A calls case-sensitive strstr on each
+        // existing path, then replaces the FIRST match in place. A nested
+        // path can contain the entire new relative path without equalling it.
+        // Base establishes the initial list directly; only alternate mounts
+        // execute this merge. Keep canonical opens on their separate rule.
+        var spellings = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var result = new List<EffectiveContentFile>();
         foreach (var file in ordered)
         {
             var path = MountedPath(file.RelativePath);
-            if (!slots.TryGetValue(path, out var slot))
+            if (reportCaseDifferences && spellings.TryGetValue(path, out var spelling) &&
+                !spelling.Equals(path, StringComparison.Ordinal))
+                issues.Add($"{contentLabel} mount paths differ only in case; native matching is unverified: {path}");
+            spellings[path] = path;
+            var slot = exactPaths
+                ? result.FindIndex(existing => MountedPath(existing.RelativePath).Equals(path, StringComparison.OrdinalIgnoreCase))
+                : appendOnly || MountSource(file).Kind == "base" ? -1
+                : result.FindIndex(existing => existing.RelativePath.Contains(path, StringComparison.Ordinal));
+            if (slot < 0)
             {
-                slots.Add(path, result.Count);
                 result.Add(file);
                 continue;
             }
             var prior = result[slot];
-            if (reportCaseDifferences && !MountedPath(prior.RelativePath).Equals(path, StringComparison.Ordinal))
-                issues.Add($"{contentLabel} mount paths differ only in case; native matching is unverified: {path}");
             var providers = prior.Providers.Concat(file.Providers)
                 .DistinctBy(provider => $"{provider.SourceId}\n{provider.Path}", StringComparer.OrdinalIgnoreCase).ToArray();
             result[slot] = file with
@@ -138,6 +177,32 @@ internal static class NativeContentFileResolver
                 ProviderSources = providers.Select(provider => provider.SourceId).Distinct(StringComparer.OrdinalIgnoreCase).ToArray(),
                 ProviderPaths = providers.Select(provider => provider.Path).Distinct(StringComparer.OrdinalIgnoreCase).ToArray()
             };
+        }
+        if (!exactPaths && !appendOnly && result.Any(file => file.Source.Kind == "base"))
+        {
+            // Flags 0 leaves Base paths unprefixed. OpenFile subsequently
+            // searches alternate mounts (0x140248051-0x14024812C), even when
+            // that mount replaced a different, containing enumeration slot.
+            // Preserve the slots, including repeated reads of the same bytes.
+            var openCandidates = candidates.Select(candidate =>
+                    (Candidate: candidate, Path: ContentFileOverlay.NormalizeRelativePath(candidate.Source, candidate.Path)))
+                .Where(entry => entry.Path is not null)
+                .GroupBy(entry => MountedPath(entry.Path!), StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(group => group.Key, group => group.ToArray(), StringComparer.OrdinalIgnoreCase);
+            for (var index = 0; index < result.Count; index++)
+            {
+                var prior = result[index];
+                if (prior.Source.Kind != "base" || !openCandidates.TryGetValue(prior.RelativePath, out var matches)) continue;
+                // 0x1402480DC/0x1402393C0 uses the original request against
+                // case-sensitive Mod manifest keys. A DLC-prefixed Mod path
+                // cannot answer a root request; physical DLC/mode fallback
+                // still uses the Windows directory device.
+                var eligible = matches.Where(entry => entry.Candidate.Source.Kind is not ("local" or "workshop") ||
+                        entry.Path!.Equals(prior.RelativePath, StringComparison.Ordinal))
+                    .Select(entry => entry.Candidate).ToArray();
+                var opened = ResolveOpenedFiles(eligible, activeSources, contentLabel, issues, reportCaseDifferences: false);
+                if (opened.Count == 1) result[index] = opened[0];
+            }
         }
         return result;
     }

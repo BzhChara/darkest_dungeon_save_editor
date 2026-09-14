@@ -8,7 +8,9 @@ internal static partial class ContractSuite
         {
             var root = Path.Combine(runRoot, "resource-directory-query", kind, variant);
             var baseline = Path.Combine(root, "baseline");
-            var source = Path.Combine(root, "overlay");
+            // Base has one initial device, not two independent base mounts.
+            // Exercise physical aliases by updating files inside that device.
+            var source = kind == "base" ? baseline : Path.Combine(root, "overlay");
             var prefix = kind == "dlc-mod" ? "dlc/rq_feature/" : "";
             var isMod = kind is "local" or "workshop" or "dlc-mod";
             var accepted = !isMod || variant != "upper";
@@ -36,7 +38,8 @@ internal static partial class ContractSuite
             Write("effects/query.effects.darkest", "effect: .name QUERY .disease runtime_q\n");
             Write("curios/query_curio_type_library.csv", QueryTypeCsv);
             Write("curios/query_curio_props.csv", QueryPropCsv);
-            var sources = new[] { new ActiveContentSource("base", "Base", "base", baseline, 0) }
+            var sources = (kind == "base" ? Array.Empty<ActiveContentSource>() :
+                    new[] { new ActiveContentSource("base", "Base", "base", baseline, 0) })
                 .Concat(QuerySources(source, kind).Select(s => s.Kind is "local" or "workshop" ? s with { LoadOrder = -1000 } : s)).ToArray();
             if (isMod)
             {
