@@ -97,11 +97,11 @@ internal static partial class ContractSuite
         Assert(!unchanged.Changed && !unchanged.Deferred && ComputeSha256(nativePath) == nativeHash,
             "Valid empty native slots must not trigger automatic cleanup or alter source files.");
 
-        // A missing .types declaration still has no verified parse/index rule.
-        File.AppendAllText(nativePath, "\nhall: .chance 1\n");
+        // A byte-truncated ID that ends inside UTF-8 is still unproven.
+        File.AppendAllText(nativePath, $"\nhall: .chance 1 .types {new string('界', 11)}\n");
         var uncertain = BattleEncounterCatalog.Load(content, snapshot);
         Assert(uncertain.Encounters.Where(row => row.MashType == 0).All(row => !row.CanPlaceDirectly),
-            "Supporting explicit empty actors must not remove the guard for genuinely unparsed declarations.");
+            "Supporting empty actors must not remove the guard for unproven byte-truncated IDs.");
         var selected = uncertain.BridgeEncounters.Single(row => row.OriginDungeonId == "ruins" && row.MashType == 0);
         var failure = await CaptureSaveFailureAsync(() => bridge.EnsureEncounterAsync(profile, snapshot, content, uncertain, selected, game, null, mods));
         Assert(failure is InvalidOperationException, "Bridge preflight must still reject uncertain native row counts.");
