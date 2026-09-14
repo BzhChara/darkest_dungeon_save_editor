@@ -113,7 +113,8 @@ public partial class MainWindow : Window
             : $"正面 {FormatRange(generation.PositiveQuirksMin, generation.PositiveQuirksMax)} / " +
               $"负面 {FormatRange(generation.NegativeQuirksMin, generation.NegativeQuirksMax)}";
         public string CombatSkillSummary =>
-            $"定义 {Definition.CombatSkillIds.Count} / 必选 {Definition.GuaranteedCombatSkillIds.Count} / " +
+            $"定义 {Definition.CombatSkillIds.Count} / 标记 {Definition.GuaranteedCombatSkillIds.Count}" +
+            (Definition.GuaranteedCombatSkillIds.Count > 0 ? "（至少选一项） / " : " / ") +
             $"选择上限 {Definition.SelectedCombatSkillsMax?.ToString(CultureInfo.InvariantCulture) ?? "未知"}";
         public string CampingSkillSummary =>
             $"职业 {Definition.ClassCampingSkillIds.Count} / 共享 {Definition.SharedCampingSkillIds.Count}";

@@ -14,6 +14,8 @@ internal static partial class ContractSuite
         JsonObject rosterHeroesSeed)
     {
         var catalog = VerifyHeroCatalogContracts(activeContent, activeCatalog, localModRoot);
+        await VerifyHeroGenerationSelectionAsync(runRoot, codec);
+        await VerifyHeroSkinDirectoriesAsync(runRoot, codec);
         await VerifyHeroQuirkClassificationAsync(runRoot, codec);
         VerifyHeroQuirkProbabilityPrecision(runRoot);
         await VerifyHeroQuirkClassificationGuardsAsync(runRoot, codec);

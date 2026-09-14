@@ -11,7 +11,6 @@ public static partial class HeroClassCatalog
     private static HeroClassDefinition MergeHeroClass(
         IReadOnlyList<HeroCandidate> candidates,
         IReadOnlyList<EffectiveContentFile> overrideFiles,
-        IReadOnlyDictionary<string, ActiveContentSource> sourcesById,
         IReadOnlyDictionary<uint, IReadOnlyList<HeroRecruitEventDefinition>> eventsByClass,
         IReadOnlyDictionary<string, EffectQuirkAssignment> effectiveEffects,
         IReadOnlyDictionary<string, QuirkDefinition> effectiveQuirks,
@@ -64,7 +63,7 @@ public static partial class HeroClassCatalog
                 sources);
         }
 
-        var selected = ApplyHeroOverrides(ordered[0], overrideFiles, sourcesById);
+        var selected = ApplyHeroOverrides(ordered[0], overrideFiles);
         sources = sources
             .Concat(selected.ProviderSources)
             .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -135,8 +134,7 @@ public static partial class HeroClassCatalog
 
     private static HeroCandidate ApplyHeroOverrides(
         HeroCandidate selected,
-        IReadOnlyList<EffectiveContentFile> overrideFiles,
-        IReadOnlyDictionary<string, ActiveContentSource> sourcesById)
+        IReadOnlyList<EffectiveContentFile> overrideFiles)
     {
         if (overrideFiles.Count == 0)
         {
@@ -163,18 +161,10 @@ public static partial class HeroClassCatalog
             ApplyHeroDefinitionFile(builder, file.Path);
         }
 
-        builder.ColourVariationCount = Math.Max(
-            builder.ColourVariationCount,
-            applicableOverrides
-                .SelectMany(file => file.Providers)
-                .Select(provider => CountColourVariations(provider.Path, selected.Id, sourcesById[provider.SourceId]))
-                .DefaultIfEmpty(0)
-                .Max());
         return builder.Build();
     }
 
-    private static HeroCandidate ReadHeroInfo(EffectiveContentFile file,
-        IReadOnlyDictionary<string, ActiveContentSource> sourcesById)
+    private static HeroCandidate ReadHeroInfo(EffectiveContentFile file, int colourVariationCount)
     {
         var path = file.Path;
         var id = ReadHeroClassId(path, HeroInfoSuffix);
@@ -184,10 +174,7 @@ public static partial class HeroClassCatalog
             Path.GetFullPath(path),
             file.ProviderSources);
         ApplyHeroDefinitionFile(builder, path);
-        builder.ColourVariationCount = file.Providers
-            .Select(provider => CountColourVariations(provider.Path, id, sourcesById[provider.SourceId]))
-            .DefaultIfEmpty(0)
-            .Max();
+        builder.ColourVariationCount = colourVariationCount;
         return builder.Build();
     }
 
@@ -259,46 +246,4 @@ public static partial class HeroClassCatalog
         }
     }
 
-    private static int CountColourVariations(string heroInfoPath, string heroClass, ActiveContentSource source)
-    {
-        var directory = Path.GetDirectoryName(heroInfoPath);
-        if (directory is null || !Directory.Exists(directory))
-        {
-            return 0;
-        }
-
-        IEnumerable<string?> names;
-        if (source.Kind is "local" or "workshop")
-        {
-            // A physical skin folder alone is not an active Mod resource. Keep
-            // only folders containing an existing texture listed in its manifest.
-            var manifestPath = Path.Combine(source.Directory, "modfiles.txt");
-            ModManifestFile.Require(manifestPath);
-            names = ModManifestFile.ReadEntries(manifestPath, ".png")
-                .Select(entry => Path.GetFullPath(Path.Combine(source.Directory, entry.RelativePath)))
-                .Where(File.Exists)
-                .Select(path => Path.GetRelativePath(directory, path).Replace('\\', '/'))
-                .Where(path => !Path.IsPathRooted(path) && !path.StartsWith("../", StringComparison.Ordinal) && path.Contains('/'))
-                .Select(path => path.Split('/')[0]);
-        }
-        else
-        {
-            names = Directory.EnumerateDirectories(directory, $"{heroClass}_*", SearchOption.TopDirectoryOnly)
-                .Select(Path.GetFileName);
-        }
-        var suffixes = names
-            .Where(name => name is not null &&
-                           name.Length == heroClass.Length + 2 &&
-                           name.StartsWith($"{heroClass}_", StringComparison.OrdinalIgnoreCase))
-            .Select(name => char.ToUpperInvariant(name![^1]))
-            .Where(value => value is >= 'A' and <= 'Z')
-            .ToHashSet();
-        var count = 0;
-        while (suffixes.Contains((char)('A' + count)))
-        {
-            count++;
-        }
-
-        return count;
-    }
 }

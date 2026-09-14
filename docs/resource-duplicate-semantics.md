@@ -187,6 +187,8 @@ These are separate field helpers, not a universal instruction to take the last f
 
 ### 8.2 Skill lists have limits and explicit entry conditions
 
+Initial equipped-skill selection is a separate consumer: `generation_guaranteed` means at least one marked skill, and an exhausted pool yields fewer skills instead of rejecting the hero. See [hero generation selection](hero-generation-selection.md) for the native branches, mounted skin directory query and current editor behavior.
+
 `0x140480CA0` reads ordinary `.effect` into sixteen 64-byte buffers. The consumer at `0x140481550`–`0x1404815FA` stops at the first empty or dot-prefixed token, including a quoted token. Each nonempty matching Effect appends to the existing skill list. An empty list does not clear previous declarations. This differs from the encounter parser, whose empty raw monster positions must remain counted.
 
 Mode effects are not every field whose name ends in `_effects`. The same native function first reads up to eight `.valid_modes` (`0x140481651` onward), then looks for `.<mode>_effects` for each mode named in that declaration (`0x1404817A3`). Empty/dot-prefixed mode slots are skipped, not terminal: the branch at `0x140481753` / `0x14048175B` reaches the increment at `0x140481AAB`. They still consume slots in the eight-token limit. In contrast, each mode's effect list reads at most twelve tokens, stops on empty/dot-prefixed tokens, and appends (`0x140481A36`–`0x140481A60`). A standalone `.orphan_effects` without that mode in the current declaration does not enter this branch. Missing/empty later mode-effect lists retain prior references.

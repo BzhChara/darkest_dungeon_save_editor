@@ -89,7 +89,7 @@ public static partial class StagecoachHeroCandidateFactory
         var baseHp = levelProfile.ArmourHp;
         if (heroClass.ColourVariationCount <= 0)
         {
-            throw new InvalidOperationException($"职业 '{heroClass.Id}' 没有连续且从 A 开始的皮肤目录，无法安全写入 colour_variation。");
+            throw new InvalidOperationException($"职业 '{heroClass.Id}' 没有匹配游戏查询规则的活动皮肤目录，无法安全写入 colour_variation。");
         }
 
         if (catalog.HeroNames.Count == 0)
@@ -116,7 +116,7 @@ public static partial class StagecoachHeroCandidateFactory
             warnings.Add($"该职业声明城镇事件依赖：{generation.TownEventDependency}；手动候选不会触发该事件。");
         }
 
-        var combatSkills = SelectCombatSkills(heroClass, generation, random);
+        var combatSkills = SelectCombatSkills(heroClass, generation, random, warnings);
         var campingSkills = SelectCampingSkills(
             heroClass,
             classCampingCount,

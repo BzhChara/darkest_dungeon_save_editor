@@ -2,6 +2,8 @@
 
 此目录集中保存带有时间和任务范围的修复记录、审查报告、实验过程与结果。后续同类记录继续放在这里；当前有效规则与设计说明保留在上一级 `docs/`。
 
+- [人物皮肤与初始技能选择修复：2026-09-14](hero-generation-selection-fixes-2026-09-14.md)
+- [历史修改第十九轮审核：人物皮肤与初始技能选择，2026-09-14](hero-generation-selection-audit-2026-09-14.md)
 - [怪癖计数与概率精度修复：2026-09-14](hero-quirk-classification-fixes-2026-09-14.md)
 - [历史修改第十八轮审核：怪癖计数、概率分类与候选保存边界，2026-09-14](hero-quirk-classification-audit-2026-09-14.md)
 - [人物怪癖活动上限与进化默认值修复：2026-09-14](hero-quirk-rule-fixes-2026-09-14.md)
