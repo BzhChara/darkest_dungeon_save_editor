@@ -54,6 +54,7 @@ The suite is split by responsibility:
 - `ReferenceContextContractTests.cs`: Curio subdirectory context, actor record/field eligibility, normal companion/monster loot, mounted DLC paths, missing/unreadable references and unchanged-manifest content refresh;
 - `MapPropJsonContractTests.cs`: first nested JSON members, inherited defaults, difficulty fields, root/nested query stages, missing-path diagnostics and stale-choice guards across six source types;
 - `HeroCandidateContractTests.cs`: candidate serialization, progression, full skill unlocks, and initial quirks;
+- `HeroInitialHpConditionContractTests.cs`: initial HP from known unafflicted/unequipped state across six source kinds, inverse and raid-context conditions, mixed/repeated Buff references, unknown/non-positive HP guards and ordinary/shard DSON persistence (`--semantics` and the full suite);
 - `StagecoachHeroSaveContractTests.cs`: ordinary/shard pool routing, GUID/upgrade append, stale guards, and multi-file transactions;
 - `RealModLocalizationContractTests.cs`: optional read-only probes selected by `DDSE_SCHINESE_LOC_PROBE_MOD_ROOT` (Workshop 1143685298: 43 invalid values skipped while known valid names remain), `DDSE_RULER_LOC_PROBE_MOD_ROOT`, `DDSE_LOC2_PROBE_MOD_ROOT` (Eos_Nyx), and `DDSE_RURUTIA_LOC2_PROBE_MOD_ROOT`;
 - `ContractTestSupport.cs`: shared assertions and binary/image/localization helpers.
