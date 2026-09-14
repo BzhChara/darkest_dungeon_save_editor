@@ -58,15 +58,20 @@ internal static partial class ContractSuite
             var prefix = kind == "dlc-mod" ? "dlc/rq_feature/" : "";
             void Resource(string path, string text) => WriteMapContentFixture(sourceRoot, prefix + path, text);
             Resource("dungeons/query/query.props.darkest", "traps: .chance 1 .types alpha\nobstacles: .chance 1 .types stone\n");
-            Resource("props/prop_definitions.json", """{"props":[{"name":"root_parent","default_data":{"instance_type":"trap"}}]}""");
-            Resource("props/obstacle_definitions.json", """{"props":[{"name":"root_parent","default_data":{"instance_type":"obstacle"}}]}""");
+            var baseline = kind == "base" ? sourceRoot : Path.Combine(root, kind + "-base");
+            WriteMapContentFixture(baseline, "props/prop_definitions.json", """{"props":[{"name":"root_parent","default_data":{"instance_type":"trap"}}]}""");
+            WriteMapContentFixture(baseline, "props/obstacle_definitions.json", """{"props":[{"name":"root_parent","default_data":{"instance_type":"obstacle"}}]}""");
+            if (kind != "base")
+                foreach (var name in new[] { "prop", "trap", "obstacle" })
+                    Resource($"props/{name}_definitions.json", "{ invalid alternate root must be ignored");
             Resource("props/z_parent/prop_definitionsXjson", """{"props":[{"name":"nested_parent","default_data":{"inherits_from":{"prop_type_name":"root_parent"}}}]}""");
             Resource("props/a_child/trap_definitionsXjson", """{"props":[{"name":"alpha","default_data":{"inherits_from":{"prop_type_name":"nested_parent"}}}]}""");
             Resource("props/a_stone/obstacle_definitionsXjson", """{"props":[{"name":"stone","default_data":{"inherits_from":{"prop_type_name":"nested_parent"},"instance_type":"obstacle"}}]}""");
             foreach (var ignored in new[] { "props/trap_definitionsXjson", "props/notes.json", "props/nested/notes.json" })
                 Resource(ignored, "{ broken");
             if (kind is "local" or "workshop" or "dlc-mod") WriteFixtureManifest(sourceRoot);
-            var sources = QuerySources(sourceRoot, kind);
+            var sources = kind == "base" ? QuerySources(sourceRoot, kind) :
+                new[] { new ActiveContentSource("base", "Base", "base", baseline, 0) }.Concat(QuerySources(sourceRoot, kind)).ToArray();
             var queryContent = template with { Sources = sources };
             var query = BattleRoomAttachmentCatalog.Load(queryContent);
             var alpha = query.GetCandidates(BattleRoomAttachmentKind.Trap, "query").Single();

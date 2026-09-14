@@ -6,12 +6,17 @@ public static partial class BattleRoomAttachmentCatalog
         IReadOnlyList<ActiveContentSource> sources, List<string> issues)
     {
         var enabledDlcPrefixes = ContentFileOverlay.GetEnabledDlcPrefixes(sources);
-        return NativeContentFileResolver.Resolve(sources.SelectMany(source =>
+        var candidates = sources.SelectMany(source =>
                 EnumeratePropFiles(source, enabledDlcPrefixes, issues, "curios", "*csv", "csv",
                     path => NativeResourceFileRules.IsCurioTypeFile(path, enabledDlcPrefixes, source.Kind is "local" or "workshop") ||
                         NativeResourceFileRules.IsCurioPropFile(path, enabledDlcPrefixes, source.Kind is "local" or "workshop"))
-                    .Select(path => new ContentFileCandidate(source, path))).ToArray(), sources,
-            "Curio resource", issues);
+                    .Select(path => new ContentFileCandidate(source, path))).ToArray();
+        // Type libraries and mappings are independent flags-9 searches.
+        return candidates.GroupBy(candidate => NativeResourceFileRules.IsCurioTypeFile(
+                ContentFileOverlay.NormalizeRelativePath(candidate.Source, candidate.Path)!, enabledDlcPrefixes,
+                candidate.Source.Kind is "local" or "workshop"))
+            .SelectMany(group => NativeContentFileResolver.ResolveAdditiveFiles(group.ToArray(), sources,
+                "Curio resource", issues)).ToArray();
     }
 
     private static CurioResources ReadCurioResources(

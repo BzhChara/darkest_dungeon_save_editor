@@ -375,7 +375,7 @@ public static partial class BattleRoomAttachmentCatalog
             }
         }
 
-        return NativeContentFileResolver.Resolve(candidates, sources, "Room prop", issues);
+        return NativeContentFileResolver.ResolveOpenedFiles(candidates, sources, "Room prop", issues);
     }
 
     internal static IReadOnlyList<string> EnumerateCanonicalPropFiles(ActiveContentSource source,

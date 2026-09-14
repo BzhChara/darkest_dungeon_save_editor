@@ -129,8 +129,9 @@ internal static partial class ContractSuite
             """);
         Write("curios/block_curio_props.csv", "header\nblock_first,sprite,block_first,sprite\n" +
             "not_a_new_type,sprite,not_a_new_type,sprite\nlowercase_header,sprite,lowercase_header,sprite\nblock_next,sprite,block_next,sprite\n");
-        // Same-path overlay retains the base slot. A lower Mod's distinct file then updates the object.
-        WriteMapContentFixture(highRoot, "curios/a_curio_props.csv", File.ReadAllText(curioFiles.Props));
+        // Flags 9 retains each explicit provider: Base, low Mod, then high Mod.
+        // The high Mod's same-path CSV updates the object after the low Mod.
+        var higherMapping = WriteMapContentFixture(highRoot, "curios/a_curio_props.csv", File.ReadAllText(curioFiles.Props));
         var lowerMapping = WriteMapContentFixture(lowRoot, "curios/z_curio_props.csv", "header\npriority_curio,sprite,behavior,new_name\n");
         WriteFixtureManifest(highRoot);
         WriteFixtureManifest(lowRoot);
@@ -168,8 +169,8 @@ internal static partial class ContractSuite
         string Name(string id) => catalog.Curios.Single(row => row.Id == id).EnglishName;
         Assert(new[] { "control", "three", "blank", "fresh", "after_chunk", "quotetoggle" }.All(id => Name(id) == "Sprite name") &&
                new[] { "keep_name", "seeded_ui", "short_target", "skip_empty_type", "physical" }.All(id => Name(id) == "Old name") &&
-               Name("duplicate") == "New name" && Name("priority_curio") == "New name",
-            "Explicit UI names update; empty cells preserve JSON/previous CSV names, first empty names use sprites, and file order controls updates after overlay.");
+               Name("duplicate") == "New name" && Name("priority_curio") == "Old name",
+            "Explicit UI names update; empty cells retain previous names, first empty names use sprites, and flags-9 provider order controls the final mapping.");
         foreach (var definition in catalog.Definitions) BattleRoomAttachmentCatalog.ValidateDefinition(definition);
         foreach (var id in new[] { "root_first", asciiPrefix, unicodePrefix })
         {
@@ -192,8 +193,15 @@ internal static partial class ContractSuite
         File.WriteAllText(lowerMapping, "header\npriority_curio,sprite,missing_type,new_name\n");
         var rejected = false;
         try { BattleRoomAttachmentCatalog.ValidateDefinition(selection); } catch (InvalidOperationException) { rejected = true; }
+        var refreshed = BattleRoomAttachmentCatalog.Load(content);
+        Assert(rejected && refreshed.Curios.Single(row => row.Id == "priority_curio").EnglishName == "Old name",
+            "Changing an earlier provider must invalidate the old guard while preserving the later valid mapping.");
+        selection = refreshed.Curios.Single(row => row.Id == "priority_curio");
+        File.AppendAllText(higherMapping, "priority_curio,sprite,missing_type,new_name\n");
+        rejected = false;
+        try { BattleRoomAttachmentCatalog.ValidateDefinition(selection); } catch (InvalidOperationException) { rejected = true; }
         Assert(rejected && !BattleRoomAttachmentCatalog.Load(content).Curios.Any(row => row.Id == "priority_curio"),
-            "A changed final mapping must invalidate an old choice and must not revive an earlier valid mapping.");
+            "A changed final provider must reject the old choice and must not revive an earlier valid mapping.");
         var invalidCsv = Write("curios/invalid_curio_props.csv", "header\n" + new string('x', 512) + ",sprite,behavior\n");
         void RejectCatalog(string message)
         {
