@@ -182,12 +182,6 @@ internal static partial class QuantityItemReferenceAnalyzer
                 }
                 break;
 
-            case NativeReferenceJsonKind.Upgrades:
-                if (town)
-                    foreach (var tree in List(root, "trees"))
-                        foreach (var requirement in List(tree, "requirements")) Currencies(requirement);
-                break;
-
             case NativeReferenceJsonKind.Building:
                 // Per-building data is interpreted by different LoadInternal
                 // implementations. Preserve uncertainty rather than invent a

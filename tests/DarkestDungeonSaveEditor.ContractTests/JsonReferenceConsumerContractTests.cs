@@ -45,7 +45,7 @@ internal static partial class ContractSuite
             ("event-first-type", "campaign/town_events/jc.town_events.events.json", eventText.Replace("\"type\":", "\"type\":null,\"type\":"), false, false, false),
             ("event-first-result", "campaign/town_events/jc.town_events.events.json", eventText.Replace("\"events\":[", "\"events\":[{\"id\":\"jc_event\",\"data\":[]},"), false, false, false),
             ("estate-currency", "campaign/estate/jc.estate.json", """{"currencies":[{"id":"jc_token"}]}""", true, false, false),
-            ("upgrade-cost", "upgrades/building/jc.upgrades.json", """{"trees":[{"requirements":[{"currency_cost":[{"type":"jc_token","amount":1}]}]}]}""", true, false, false),
+            ("upgrade-cost", "upgrades/building/jc.upgrades.json", """{"trees":[{"id":"jc.upgrade","requirements":[{"code":"0","prerequisite_resolve_level":0,"currency_cost":[{"type":"jc_token","amount":1}]}]}]}""", true, false, false),
             ("district-estate", "campaign/town/districts/jc.districts.json", """{"buildings":[{"buff_list":[{"type":"DistrictSupplyBuffData","target_inventory":"estate","item_type":"estate","item_name":"jc_token","range_min":1,"range_max":1}]}]}""", true, false, false),
             ("district-provision", "campaign/town/districts/jc.districts.json", """{"buildings":[{"buff_list":[{"type":"DistrictSupplyBuffData","target_inventory":"provision","item_type":"estate","item_name":"jc_token","range_min":1,"range_max":1}]}]}""", false, true, false),
             ("district-replacement", "campaign/town/districts/jc.districts.json", """{"buildings":[{"buff_list":[{"type":"DistrictReplacementInventoryEffectBuffData","item_type":"estate","item_id":"jc_token"}]}]}""", false, true, false),

@@ -5,6 +5,7 @@
 The suite is split by responsibility:
 
 - `ContractFixture.cs`: isolated game, Mod, profile, localization, and DSON fixtures;
+- `UpgradeReferenceContractTests.cs`: final complete upgrade trees and per-code requirements, generation/purchase DSON, town currency references, same-path slots, local/Workshop/DLC manifests, first JSON members, code bytes, missing/malformed files, independent uses and content-only refresh (`--upgrade-references`, also in the full suite);
 - `CaseIdentityContractTests.cs` and `BridgeCaseIdentityContractTests.cs`: case-distinct hero catalogs/overrides and DSON generation, exact map selectors, all three Bridge types across `cove`/`Cove`/`COVE`, collision-free carrier allocation/reuse, invalid-source region isolation, and pre-NUL capacities through actual quantity/trinket commits (`--case-identities`);
 - `ManifestCaseAliasContractTests.cs`: one local/Workshop manifest containing both case spellings of a physical file, both line orders, actor registration, region pools, `B,a,b` first/last resource values, HP DSON and all-type append counts; the Bridge cases additionally persist these aliases through actual placement/maintenance/deletion (also `--case-identities`);
 - `CanonicalResourceContractTests.cs`: original-request manifest matching versus physical aliases, DLC root fallback, missing winners, hero HP/XP and actor loot, regional pools, Effect flags-1 order, District flags-9 town/raid references, all three battle types and direct/Bridge DSON writes, maintenance and deletion (`--canonical-resources`);
