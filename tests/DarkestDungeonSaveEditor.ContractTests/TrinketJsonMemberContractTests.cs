@@ -31,8 +31,8 @@ internal static partial class ContractSuite
                catalog.Trinkets.Select(t => t.Id).Order().SequenceEqual(new[] { "tj_bad_counter", "tj_bad_number", "tj_counter" }),
             "Trinket root arrays, IDs, requirements, numbers and provenance must take first JSON members; repeated definition IDs still select the first entry.");
         Assert(catalog.Trinkets.Single(t => t.Id == "tj_bad_number") is { Limit: null, Price: null } &&
-               catalog.Trinkets.Single(t => t.Id == "tj_bad_counter").UnsupportedStateFields.Count == 2,
-            "Wrong-typed/invalid first fields must not use later valid members or abort the rest of the trinket file.");
+               catalog.Trinkets.Single(t => t.Id == "tj_bad_counter") is { QuestUses: null, TriggerLimit: -1 },
+            "Wrong-typed first fields keep the default and negative integers are retained; later valid members must not replace them.");
 
         var estate = JsonNode.Parse("""{"base_root":{"version":1,"trinkets":{"items":{}}}}""")!.AsObject();
         var (updated, _) = TrinketSaveEditor.AddCopies(estate, counter, 2, 100);
@@ -46,10 +46,10 @@ internal static partial class ContractSuite
         Assert(items.Count == 2 && items.All(pair => pair.Value!["id"]!.GetValue<string>() == "tj_counter" &&
                pair.Value["quest_uses_remaining"]!.GetValue<int>() == 2 && pair.Value["triggers_remaining"]!.GetValue<int>() == 3),
             "Every created trinket instance must persist first-field counters through actual DSON encoding and decoding.");
-        var rejected = false;
-        try { TrinketSaveEditor.AddCopies(estate, catalog.Trinkets.Single(t => t.Id == "tj_bad_counter"), 1, 100); }
-        catch (InvalidOperationException) { rejected = true; }
-        Assert(rejected, "An invalid first counter must still prevent pristine instance creation.");
+        var defaulted = TrinketSaveEditor.AddCopies(estate, catalog.Trinkets.Single(t => t.Id == "tj_bad_counter"), 1, 100).UpdatedRoot;
+        var instance = defaulted["base_root"]!["trinkets"]!["items"]!["0"]!.AsObject();
+        Assert(!instance.ContainsKey("quest_uses_remaining") && !instance.ContainsKey("triggers_remaining"),
+            "Optional fields ignored by the loader and negative counters must not block creation or invent saved counters.");
 
         WriteMultiMash(high, path, """{"entries":null,"entries":[{"id":"tj_later_root"}]}""");
         Assert(TrinketCatalog.Load(content).Trinkets.Count == 0,

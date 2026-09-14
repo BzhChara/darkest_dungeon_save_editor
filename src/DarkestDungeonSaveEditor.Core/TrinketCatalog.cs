@@ -50,7 +50,8 @@ public static class TrinketCatalog
             definitions.Keys.SelectMany(ContentLocalizationCatalog.GetTrinketKeys));
         issues.AddRange(localization.Issues);
 
-        var collisionIds = NativeResourceIdentity.FindCollisions(definitions.Values.SelectMany(group => group).Select(item => item.Id));
+        var collisionIds = NativeResourceIdentity.FindCollisions(definitions.Values.SelectMany(group => group),
+            item => item.Id, item => Loc2LocalizationReader.HashName(NativeJsonReader.CString(item.Id)));
         if (collisionIds.Count > 0) issues.Add("Trinket IDs share native hashes and cannot be selected safely: " + string.Join(", ", collisionIds));
         var merged = definitions.Values
             .Select(MergeDefinitions)
@@ -66,6 +67,8 @@ public static class TrinketCatalog
             })
             .OrderBy(definition => definition.Id, StringComparer.OrdinalIgnoreCase)
             .ToArray();
+        foreach (var definition in merged.Where(item => item.SaveIdentityIssue.Length > 0))
+            issues.Add($"Trinket '{definition.Id}' ({definition.SourcePath}): {definition.SaveIdentityIssue}");
         var storageCatalog = TrinketStorageCatalog.Load(activeContent);
         issues.AddRange(storageCatalog.Issues);
         return new TrinketCatalogResult(
@@ -132,21 +135,11 @@ public static class TrinketCatalog
                     .Where(name => NativeJsonReader.TryGetProperty(entry, name, out _))
                     .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
                     .ToArray();
-                var unsupportedStateFields = new List<string>();
-                var questUses = ReadPositiveInstanceCounter(
-                    entry,
-                    "quest_uses",
-                    id,
-                    path,
-                    unsupportedStateFields,
-                    issues);
-                var triggerLimit = ReadPositiveInstanceCounter(
-                    entry,
-                    "trigger_limit",
-                    id,
-                    path,
-                    unsupportedStateFields,
-                    issues);
+                // 0x1404F3D7D / 0x1404F4012: optional signed Int32 fields.
+                // A wrong-typed first member leaves the native default (-1);
+                // zero is a real count, and later duplicate members are ignored.
+                var questUses = ReadInt(entry, "quest_uses");
+                var triggerLimit = ReadInt(entry, "trigger_limit");
                 var definition = new TrinketDefinition(
                     id,
                     ReadString(entry, "rarity"),
@@ -160,8 +153,7 @@ public static class TrinketCatalog
                     providerSources)
                 {
                     QuestUses = questUses,
-                    TriggerLimit = triggerLimit,
-                    UnsupportedStateFields = unsupportedStateFields.ToArray()
+                    TriggerLimit = triggerLimit
                 };
 
                 if (!definitions.TryGetValue(id, out var candidates))
@@ -325,30 +317,4 @@ public static class TrinketCatalog
             : null;
     }
 
-    private static int? ReadPositiveInstanceCounter(
-        JsonElement entry,
-        string fieldName,
-        string trinketId,
-        string sourcePath,
-        List<string> unsupportedStateFields,
-        List<string> issues)
-    {
-        if (!NativeJsonReader.TryGetProperty(entry, fieldName, out var node))
-        {
-            return null;
-        }
-
-        if (node.ValueKind == JsonValueKind.Number &&
-            node.TryGetInt32(out var value) &&
-            value > 0)
-        {
-            return value;
-        }
-
-        unsupportedStateFields.Add(fieldName);
-        issues.Add(
-            $"Trinket '{trinketId}' has an invalid {fieldName} value in '{sourcePath}'; " +
-            "pristine instance creation is disabled for this definition.");
-        return null;
-    }
 }

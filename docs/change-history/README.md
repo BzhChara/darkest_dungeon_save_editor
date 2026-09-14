@@ -2,6 +2,10 @@
 
 此目录集中保存带有时间和任务范围的修复记录、审查报告、实验过程与结果。后续同类记录继续放在这里；当前有效规则与设计说明保留在上一级 `docs/`。
 
+- [物品保存身份与饰品次数修复：2026-09-14](inventory-persistence-fixes-2026-09-14.md)
+
+- [历史修改第二十四轮审核：饰品次数与物品保存身份，2026-09-14](trinket-counter-and-save-identity-audit-2026-09-14.md)
+
 - [容量旧保护与资源大小写集中修复：2026-09-14](case-policy-and-capacity-fixes-2026-09-14.md)
 
 - [历史修改第二十三轮审核：容量旧保护与 Bridge 地区身份，2026-09-14](capacity-and-bridge-identity-audit-2026-09-14.md)

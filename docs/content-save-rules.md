@@ -170,6 +170,8 @@ Catalog membership is contextual, not mutually exclusive. The same exact definit
 
 ### 4.2 Catalog identity and reachability
 
+Inventory save `type` and `id` fields must fit unchanged in 63 UTF-8 bytes. Catalogs retain the complete authored ID; an overlong, NUL-containing or non-UTF-8-representable saved identity is read-only with a reason in the UI. Preflight and the direct mutation APIs enforce the same rule, including save-only quantity entries. They never truncate a selected definition into a different item. Wallets validate the actual persisted `type` (the heirloom ID for heirlooms); an unused definition ID is not a wallet save field. This is separate from definition hashing, manifest eligibility and reference reachability. See [inventory persistence boundaries](resource-duplicate-semantics.md#23-inventory-save-identities-and-optional-trinket-counters-2026-09-14).
+
 The catalog merges effective active-content definitions with the selected save. Official definitions remain visible. Mod definitions are classified by a typed, directional reference graph built across the complete active-content overlay: registered gameplay roots may reference an item directly or through one or more loot tables. Localization, icons, manifests, inventory definitions, standalone effects and an otherwise unreachable loot table are not gameplay roots and cannot make an orphan definition self-validating.
 
 Manifest eligibility is followed by the resource-specific loader rule. In particular, quantity references in hero/monster info/art/override files are eligible only at the same canonical actor paths used by the hero and encounter catalogs; a listed classification-folder copy cannot prove a gameplay reference. Independent provision JSON retains its own discovery rule. Darkest reference fields use native record/comment/last-field parsing, including bare strings, multiline records and NUL termination. See [the detailed actor/reference rules](resource-duplicate-semantics.md#85-manifest-eligibility-and-actor-definition-lookup-are-separate).
@@ -253,16 +255,18 @@ Total capacity uses the same native config loader as the raid bag, with exact ty
 
 ### 5.3 Pristine stateful trinket creation
 
-The editor creates only brand-new, unconsumed trinket instances. It does not expose remaining-use or transformation controls.
+The editor creates brand-new trinket instances initialized from the effective definition, including definitions that start with zero uses. It does not expose remaining-use or transformation controls.
 
 - Every new trinket receives the native common fields with `added_buffs=0`, an empty hero and previous-trinket ID, `did_transform=false`, and `trinkets_gained_count=0`.
-- Definition `quest_uses=N` becomes `quest_uses_remaining=N` plus `used_during_quest=false`.
-- Definition `trigger_limit=N` becomes `triggers_remaining=N`.
+- Definition `quest_uses=N`, for `N >= 0`, becomes `quest_uses_remaining=N` plus `used_during_quest=false`.
+- Definition `trigger_limit=N`, for `N >= 0`, becomes `triggers_remaining=N`.
 - Progressive art, trigger exhaustion transformation/destruction, slot blocking, and quest-complete effects remain definition-driven; they are not duplicated into the instance.
 - Multiple requested copies are separate pristine instances, each starting at the full definition count.
-- A present counter that is not a positive integer is invalid and blocks creation. Definition-only lifecycle fields do not by themselves make a trinket read-only.
+- Each optional counter takes the first JSON member only when it is a signed Int32 integer. Missing/wrong-typed members (including strings, booleans, fractions/exponents and integers outside Int32) leave the native default `-1`; later duplicate members do not rescue them. Explicit signed negatives are retained in the catalog. Negative/default counters are omitted from new instances, so the game loads the definition value. Zero is explicitly serialized and never treated as absent. These cases do not make the whole trinket read-only. Definition-only lifecycle fields also do not block creation.
 
 These mappings are backed by naturally generated `tinker_box`, `rw_pyro_accelerant`, and `lifestyle_guide` save instances. Runtime decrement, art progression, transformation, and destruction remain game responsibilities after creation.
+
+Zero, signed boundaries and ignored optional fields were additionally checked against build 27890's JSON parser flags, trinket loader and item restore/save code, with executable isolated DSON contracts. This is static native evidence plus editor tests, not a new in-game lifecycle experiment. See [the detailed counter evidence](resource-duplicate-semantics.md#23-inventory-save-identities-and-optional-trinket-counters-2026-09-14).
 
 ### 5.4 Preview invalidation
 

@@ -19,7 +19,7 @@ internal static partial class ContractSuite
         var definitionDrivenStateful = state.DefinitionDrivenStateful;
         var dualCounterStateful = state.DualCounterStateful;
         var invalidCapacityContent = state.InvalidCapacityContent;
-        var invalidCounterStateful = state.InvalidCounterStateful;
+        var zeroCounterStateful = state.ZeroCounterStateful;
         var ordinary = state.Ordinary;
         var stateful = state.Stateful;
         var triggerStateful = state.TriggerStateful;
@@ -361,22 +361,10 @@ internal static partial class ContractSuite
             definitionDrivenShape["did_transform"]?.GetValue<bool>() == false,
             "Definition-only lifecycle behavior must create a normal pristine instance without invented counters.");
 
-        var invalidStatefulBlocked = false;
-        try
-        {
-            _ = await service.PrepareTrinketEditAsync(
-                profile,
-                invalidCounterStateful,
-                1,
-                activeCatalog.Storage,
-                activeContent);
-        }
-        catch (InvalidOperationException ex) when (ex.Message.Contains("次数定义无效", StringComparison.Ordinal))
-        {
-            invalidStatefulBlocked = true;
-        }
-
-        Assert(invalidStatefulBlocked, "An invalid state counter must fail closed before creating an instance.");
+        var zeroPreview = await service.PrepareTrinketEditAsync(
+            profile, zeroCounterStateful, 1, activeCatalog.Storage, activeContent);
+        Assert(zeroPreview.Trinket.QuestUses == 0,
+            "A zero-use trinket must pass the real save preview with its explicit zero count.");
 
         var contentRaceWriteBlocked = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         SaveCommitResult? guardedCommit = null;

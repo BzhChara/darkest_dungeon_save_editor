@@ -13,6 +13,7 @@ public static class RaidInventorySaveEditor
     {
         ArgumentNullException.ThrowIfNull(raidRoot);
         ArgumentNullException.ThrowIfNull(definition);
+        NativeInventoryIdentity.RequireWritable(definition.SaveIdentityIssue);
         if (definition.StorageKind != QuantityItemStorageKind.RaidInventory)
         {
             throw new ArgumentException("The selected item does not target the expedition inventory.", nameof(definition));

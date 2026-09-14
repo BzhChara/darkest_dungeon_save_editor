@@ -95,6 +95,23 @@ public partial class MainWindow : Window
             PreviewWarningTextBlock.Visibility = Visibility.Collapsed;
         }
         UpdateHeroGenerationAvailability();
+        UpdateInventoryIdentityWarning();
+    }
+
+    private string SelectedInventoryIdentityIssue => CatalogTabs?.SelectedIndex switch
+    {
+        0 when ItemGrid?.SelectedItem is ItemRow row => row.Definition.SaveIdentityIssue,
+        1 when TrinketGrid?.SelectedItem is TrinketRow row => row.Definition.SaveIdentityIssue,
+        _ => string.Empty
+    };
+
+    private void UpdateInventoryIdentityWarning()
+    {
+        if (PreviewWarningTextBlock is not null && SelectedInventoryIdentityIssue is { Length: > 0 } issue)
+        {
+            PreviewWarningTextBlock.Text = issue;
+            PreviewWarningTextBlock.Visibility = Visibility.Visible;
+        }
     }
 
     private HeroGenerationAvailability? SelectedHeroGenerationAvailability =>
@@ -146,6 +163,7 @@ public partial class MainWindow : Window
             _heroCatalog is not null &&
             HeroGrid.SelectedItem is HeroRow;
         PreviewButton.IsEnabled = !busy && CanPreviewCurrentTab();
+        UpdateInventoryIdentityWarning();
         ApplyButton.IsEnabled = !busy && _syncReady &&
             (_preparedQuantityItemEdit is not null ||
              _preparedTrinketEdit is not null ||
@@ -225,8 +243,8 @@ public partial class MainWindow : Window
 
         return CatalogTabs.SelectedIndex switch
         {
-            0 => ItemGrid.SelectedItem is ItemRow,
-            1 => TrinketGrid.SelectedItem is TrinketRow,
+            0 => ItemGrid.SelectedItem is ItemRow && SelectedInventoryIdentityIssue.Length == 0,
+            1 => TrinketGrid.SelectedItem is TrinketRow && SelectedInventoryIdentityIssue.Length == 0,
             2 => _heroCatalog is not null &&
                  SelectedHeroGenerationAvailability is { CanGenerate: true },
             _ => false

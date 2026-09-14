@@ -18,19 +18,13 @@ public sealed partial class SaveEditService
     {
         ArgumentNullException.ThrowIfNull(profile);
         ArgumentNullException.ThrowIfNull(trinket);
+        NativeInventoryIdentity.RequireWritable(trinket.SaveIdentityIssue);
         _codec.ValidateAvailability();
         ValidateProfile(profile);
         if (trinket.HasProviderConflict)
         {
             throw new InvalidOperationException(
                 $"Trinket '{trinket.Id}' has unresolved definitions from different content paths and is read-only.");
-        }
-
-        if (trinket.UnsupportedStateFields.Count > 0)
-        {
-            throw new InvalidOperationException(
-                $"饰品“{trinket.Id}”的次数定义无效（{string.Join(", ", trinket.UnsupportedStateFields)}），" +
-                "无法安全生成初始状态。");
         }
 
         if (expectedStorage is null)
@@ -61,7 +55,7 @@ public sealed partial class SaveEditService
         var currentTrinket = currentCatalog.Trinkets.SingleOrDefault(item =>
             item.Id.Equals(trinket.Id, StringComparison.Ordinal));
         if (currentTrinket is null ||
-            currentTrinket.UnsupportedStateFields.Count > 0 ||
+            currentTrinket.SaveIdentityIssue.Length > 0 ||
             currentTrinket.HasProviderConflict ||
             !TrinketDefinitionMatches(currentTrinket, trinket))
         {
@@ -347,7 +341,7 @@ public sealed partial class SaveEditService
         var currentTrinket = currentCatalog.Trinkets.SingleOrDefault(item =>
             item.Id.Equals(prepared.Trinket.Id, StringComparison.Ordinal));
         if (currentTrinket is null ||
-            currentTrinket.UnsupportedStateFields.Count > 0 ||
+            currentTrinket.SaveIdentityIssue.Length > 0 ||
             currentTrinket.HasProviderConflict ||
             !TrinketDefinitionMatches(currentTrinket, prepared.Trinket) ||
             !Path.GetFullPath(currentTrinket.SourcePath).Equals(
@@ -391,9 +385,6 @@ public sealed partial class SaveEditService
                left.StatefulFields.SequenceEqual(right.StatefulFields, StringComparer.OrdinalIgnoreCase) &&
                left.QuestUses == right.QuestUses &&
                left.TriggerLimit == right.TriggerLimit &&
-               left.UnsupportedStateFields.SequenceEqual(
-                   right.UnsupportedStateFields,
-                   StringComparer.OrdinalIgnoreCase) &&
                left.HasProviderConflict == right.HasProviderConflict &&
                left.AllSources.SequenceEqual(right.AllSources, StringComparer.OrdinalIgnoreCase) &&
                left.LocalizedName == right.LocalizedName;
