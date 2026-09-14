@@ -56,6 +56,11 @@ internal static partial class ContractSuite
                 localizedProbes.ToDictionary(pair => pair.Key, pair => prefix == enabled ? pair.Value.English : "Excluded"));
         }
 
+        // Actor and regional-pool constructors request root paths; the other
+        // probes intentionally keep their enabled-DLC enumeration paths.
+        WriteProbe("monsters/enabled_pro/enabled_probe/enabled_probe.info.darkest", "display: .size 1\ntag: .id boss\n");
+        WriteProbe("dungeons/probe/probe.props.darkest",
+            "room_curios: .chance 1 .types enabled_probe_curio\nroom_treasures: .chance 1 .types enabled_probe_chest\n");
         var nestedLocalization = Path.Combine(root, enabled, "localization", "backup");
         Directory.CreateDirectory(nestedLocalization);
         var excludedNames = localizedProbes.ToDictionary(pair => pair.Key, _ => "Excluded");
@@ -81,13 +86,13 @@ internal static partial class ContractSuite
             var heroes = HeroClassCatalog.Load(content);
             var dlcHero = heroes.HeroClasses.Single(hero => hero.Id == "dlc_shared_hero");
             Assert(
-                dlcHero.CombatSkillIds.SequenceEqual(["modded_dlc_skill"]) &&
+                dlcHero.CombatSkillIds.SequenceEqual(["shared_dlc_skill"]) &&
                 dlcHero.RuntimeQuirkSignals.Single().QuirkId == "dlc_top_quirk" &&
                 dlcHero.RecruitEvents.Single().Count == 6 &&
                 heroes.HeroClasses.Single(hero => hero.Id == "enabled_dlc_hero")
-                    .CombatSkillIds.SequenceEqual(["modded_enabled_dlc_skill"]) &&
+                    .CombatSkillIds.SequenceEqual(["enabled_dlc_skill"]) &&
                 heroes.HeroClasses.All(hero => hero.Id is not ("disabled_mod_hero" or "backup_hero")),
-                "Manifest-listed DLC roots must preserve hero, effect, quirk, and town-event overlays.");
+                "Canonical heroes use physical DLC fallback while Effect, quirk and event queries retain their prefixed Mod overlays.");
             var items = QuantityItemCatalog.Load(content, JsonNode.Parse(File.ReadAllText(fixture.DecodedSeedPath))!.AsObject());
             Assert(items.Items.Any(item => item.ItemId == "enabled_probe") &&
                    items.Items.All(item => item.ItemId != "excluded_probe"),
@@ -135,7 +140,7 @@ internal static partial class ContractSuite
         File.WriteAllText(builtinPath, "room_curios: .chance 1 .types original_dlc_curio\n");
         File.WriteAllText(modPath, "room_curios: .chance 1 .types mod_dlc_curio\nroom_treasures: .chance 1 .types mod_dlc_chest\n");
         WriteMapCurioFixtures(builtinRoot, "probe", "original_dlc_curio");
-        WriteMapCurioFixtures(Path.Combine(modRoot, prefix), "probe", "mod_dlc_curio", "mod_dlc_chest");
+        WriteMapCurioFixtures(Path.Combine(modRoot, prefix), "probe", "original_dlc_curio", "mod_dlc_curio", "mod_dlc_chest");
         var content = activeContent with
         {
             Sources =
@@ -154,10 +159,16 @@ internal static partial class ContractSuite
         File.WriteAllText(Path.Combine(modRoot, "modfiles.txt"), $"{prefix}/{relativePath} {new FileInfo(modPath).Length}\n" +
             $"{prefix}/curios/probe_curio_props.csv 1\n{prefix}/curios/probe_curio_type_library.csv 1\n");
         var withManifest = BattleRoomAttachmentCatalog.Load(content);
+        Assert(withManifest.Definitions.Single().Id == "original_dlc_curio" &&
+               withManifest.Guard.EffectiveFiles.Single(file => file.RelativePath.EndsWith(".props.darkest", StringComparison.Ordinal)).SourceId == "dlc-feature:enabled_feature",
+            "A prefixed Mod pool cannot answer the canonical root request; the guard must retain the physical DLC pool.");
+        WriteMapContentFixture(modRoot, relativePath, File.ReadAllText(modPath));
+        File.AppendAllText(Path.Combine(modRoot, "modfiles.txt"), relativePath + "\n");
+        var withRootKey = BattleRoomAttachmentCatalog.Load(content);
         Assert(
-            withManifest.Definitions.Select(item => item.Id).Order().SequenceEqual(["mod_dlc_chest", "mod_dlc_curio"]) &&
-            withManifest.Guard.EffectiveFiles.Count == 3 &&
-            withManifest.Guard.EffectiveFiles.All(file => file.SourceId == "local:prop-probe"),
-            "The manifest-listed enabled-DLC room prop overlay must replace its builtin provider, including its write-guard provenance.");
+            withRootKey.Definitions.Select(item => item.Id).Order().SequenceEqual(["mod_dlc_chest", "mod_dlc_curio"]) &&
+            withRootKey.Guard.EffectiveFiles.Count == 3 &&
+            withRootKey.Guard.EffectiveFiles.All(file => file.SourceId == "local:prop-probe"),
+            "A matching root Mod pool replaces its physical DLC provider, while prefixed Curio queries retain their own guard provenance.");
     }
 }

@@ -53,7 +53,7 @@ public sealed partial record BattleRoomAttachmentCatalogResult
         // their guards without rebuilding the unchanged pool. Never retain old guards here.
         var definitions = GetCandidates(kind, dungeonId).ToDictionary(item => item.Id, StringComparer.Ordinal);
         return RegionalPool.Where(choice => choice.Kind == kind &&
-                choice.DungeonId.Equals(dungeonId, StringComparison.OrdinalIgnoreCase) &&
+                choice.DungeonId.Equals(dungeonId, StringComparison.Ordinal) &&
                 double.IsFinite(choice.Weight) && choice.Weight > 0 && definitions.ContainsKey(choice.Id))
             .Select(choice => (definitions[choice.Id], choice.Weight));
     }
@@ -63,7 +63,7 @@ public static partial class BattleRoomAttachmentCatalog
 {
     private static string DefinitionKey(BattleRoomAttachmentDefinition definition) =>
         $"{definition.Kind}\n{definition.Id}\n" +
-        (definition.IsRegionBound ? definition.OriginDungeonId.ToLowerInvariant() : string.Empty);
+        (definition.IsRegionBound ? definition.OriginDungeonId : string.Empty);
 
     private static IReadOnlyList<RegionalMapContentChoice> BuildRegionalPool(
         IReadOnlyList<ParsedAttachment> parsed,

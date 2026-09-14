@@ -29,7 +29,8 @@ internal static partial class ContractSuite
             "skill_selection: .can_select_combat_skills true .number_of_selected_combat_skills_max 4\n" +
             $"generation: .is_generation_enabled true .number_of_random_combat_skills {target} " +
             $".number_of_class_specific_camping_skills {classCamp} .number_of_shared_camping_skills {sharedCamp}\n";
-        SelectionResource(f, "heroes/selection/selection.info.darkest", info);
+        // Keep the canonical hero template separate from the mounted skill/skin queries.
+        SelectionResource(f with { Prefix = "" }, "heroes/selection/selection.info.darkest", info);
         return f;
     }
 

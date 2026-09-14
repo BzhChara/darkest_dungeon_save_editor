@@ -22,7 +22,8 @@ internal static partial class ContractSuite
             "generation: .is_generation_enabled true .number_of_positive_quirks_min 0 .number_of_positive_quirks_max 0 " +
             ".number_of_negative_quirks_min 0 .number_of_negative_quirks_max 0 .number_of_random_combat_skills 1 " +
             ".number_of_class_specific_camping_skills 0 .number_of_shared_camping_skills 0\n";
-        var info = WriteMultiMash(source, prefix + $"heroes/{sample.HeroId}/{sample.HeroId}.info.darkest", text);
+        // The hero's canonical root open is separate from the mounted upgrade-tree query.
+        var info = WriteMultiMash(source, $"heroes/{sample.HeroId}/{sample.HeroId}.info.darkest", text);
         WriteMultiMash(source, prefix + $"heroes/{sample.HeroId}/{sample.HeroId}_A/skin.png", "fixture");
         var trees = new List<JsonObject>();
         foreach (var suffix in new[] { "weapon", "armour" })

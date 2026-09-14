@@ -2,6 +2,10 @@
 
 此目录集中保存带有时间和任务范围的修复记录、审查报告、实验过程与结果。后续同类记录继续放在这里；当前有效规则与设计说明保留在上一级 `docs/`。
 
+- [固定路径打开、Effect 与 District 查询修复：2026-09-14](canonical-open-and-query-flags-fixes-2026-09-14.md)
+
+- [历史修改第二十一轮审核：固定路径打开与资源查询参数，2026-09-14](canonical-open-and-query-flags-audit-2026-09-14.md)
+
 - [公共资源合并与战斗编号修复：2026-09-14](resource-overlay-slot-fixes-2026-09-14.md)
 
 - [历史修改第二十轮审核：公共资源合并与战斗编号，2026-09-14](resource-overlay-slot-audit-2026-09-14.md)

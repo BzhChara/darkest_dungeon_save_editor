@@ -24,8 +24,12 @@ internal static partial class ContractSuite
         var low = new ActiveContentSource("low", "Low", "local", Path.Combine(root, "low"), 1);
         var high = new ActiveContentSource("high", "High", "local", Path.Combine(root, "high"), 0);
         const string key = "inventory/a.inventory.items.darkest";
-        ContentFileCandidate File(ActiveContentSource source, string path) =>
-            new(source, WriteMultiMash(source.Directory, path, "fixture"));
+        ContentFileCandidate File(ActiveContentSource source, string path)
+        {
+            var file = new ContentFileCandidate(source, WriteMultiMash(source.Directory, path, "fixture"));
+            if (source.Kind == "local") WriteFixtureManifest(source.Directory);
+            return file;
+        }
         var first = File(baseline, "inventory/deeper/archive/" + key);
         var second = File(baseline, "inventory/archive/" + key);
         var exact = File(baseline, key);
@@ -37,7 +41,8 @@ internal static partial class ContractSuite
             "Each alternate replaces only the first matching slot; a surviving unprefixed Base path reopens through the highest mounted provider without removing its slot.");
         Assert(files[0].Providers.Select(p => p.SourceId).SequenceEqual(["base", "low", "high"]),
             "Slot replacement retains the provider chain needed for provenance and Bridge collision checks.");
-        var opened = NativeContentFileResolver.ResolveOpenedFiles([exact, second, first, final, overlay], [baseline, low, high], "Open", issues);
+        var opened = NativeContentFileResolver.ResolveOpenedFiles([baseline, low, high],
+            ["inventory/deeper/archive/" + key, "inventory/archive/" + key, key], "Open", issues);
         Assert(opened.Select(f => f.Path).SequenceEqual([first.Path, second.Path, final.Path]),
             "Constructed OpenFile paths must retain their full-path provider election instead of substring slot replacement.");
         var additive = NativeContentFileResolver.ResolveAdditiveFiles([exact, second, first, final, overlay],
@@ -55,6 +60,7 @@ internal static partial class ContractSuite
             { VirtualPathPrefix = "dlc/feature" };
         var physicalDlc = File(dlc, key);
         var prefixedMod = File(low, "dlc/feature/" + key);
+        System.IO.File.WriteAllText(Path.Combine(low.Directory, "modfiles.txt"), "dlc/feature/" + key);
         files = NativeContentFileResolver.Resolve([first, exact, physicalDlc, prefixedMod],
             [baseline, dlc, low], "Reopened DLC", []);
         Assert(files.Select(f => f.Path).SequenceEqual([prefixedMod.Path, physicalDlc.Path]),
@@ -206,8 +212,15 @@ internal static partial class ContractSuite
             WriteFixtureManifest(source);
             var baseline = Path.Combine(root, "baseline");
             WriteMultiMash(baseline, "props/prop_definitions.json", """{"props":[{"name":"root_parent","default_data":{"instance_type":"trap"}}]}""");
-            var content = QueryContent(root, new[] { new ActiveContentSource("base", "Base", "base", baseline, 0) }
-                .Concat(QuerySources(source, kind)).ToArray());
+            var sources = new[] { new ActiveContentSource("base", "Base", "base", baseline, 0) }
+                .Concat(QuerySources(source, kind)).ToArray();
+            if (kind == "dlc-mod")
+                // These consumers make root requests; the prefixed Mod supplies
+                // nested resources while the physical DLC supplies fixed files.
+                foreach (var path in new[] { "heroes/query/query.info.darkest", "monsters/alpha/alpha_A/alpha_A.info.darkest",
+                             "campaign/roster/roster.variables.json", "dungeons/query/query.props.darkest" })
+                    WriteMultiMash(sources.Single(s => s.Kind == "dlc-feature").Directory, path, File.ReadAllText(Path.Combine(source, prefix + path)));
+            var content = QueryContent(root, sources);
             var heroes = HeroClassCatalog.Load(content);
             Assert(heroes.HeroClasses.Single().BaseHp == 20 && heroes.ResolveLevelThresholds.SequenceEqual(Enumerable.Range(0, 7).Select(i => i * 7)),
                 "Canonical hero/roster opens must not consume nested decoys.");
@@ -243,7 +256,8 @@ internal static partial class ContractSuite
             Write("curios/a_curio_type_library.csv", QueryTypeCsv.Replace("query_curio", "other_curio").Replace("query_loot", "other_loot"));
             Write("curios/query_curio_props.csv", QueryPropCsv);
             Write("props/support/prop_definitions.json", """{"props":[{"name":"curio_default","default_data":{"instance_type":"curio"}}]}""");
-            Write("dungeons/cove/cove.props.darkest", "room_curios: .chance 1 .types query_curio base_only_curio\n");
+            // The pool is a root OpenFile request, independent of the prefixed Curio query.
+            WriteMultiMash(source, "dungeons/cove/cove.props.darkest", "room_curios: .chance 1 .types query_curio base_only_curio\n");
             WriteFixtureManifest(source);
             var baseline = Path.Combine(root, "baseline");
             WriteMultiMash(baseline, "curios/a_curio_type_library.csv",

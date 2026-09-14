@@ -20,7 +20,7 @@ internal static partial class ContractSuite
             // Windows directory matching must not relax the requested query.
             WriteMultiMash(source, prefix + $"dungeons/{folder}/0.{table.ToUpperInvariant()}.2.mash.darkest", QueryMashes("alpha_A"));
             foreach (var id in new[] { "alpha_A", "bravo_A", "charlie_A" })
-                WriteMultiMash(source, prefix + $"monsters/{id[..^2]}/{id}/{id}.info.darkest", "display: .size 1\n");
+                WriteMultiMash(source, $"monsters/{id[..^2]}/{id}/{id}.info.darkest", "display: .size 1\n");
             var sources = QuerySources(source, kind);
             if (kind == "dlc-mod")
             {

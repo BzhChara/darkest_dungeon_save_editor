@@ -94,8 +94,8 @@ internal static partial class ContractSuite
         Ids("identity", "alpha", "ALPHA", " alpha ", ".dot");
         Ids("long_id", longId);
         Ids("overlay", "beta");
-        Ids("dlc_pool", "beta");
-        foreach (var region in new[] { "arena", "hidden", "unlisted", "collision", "invalid_utf8" }) Ids(region);
+        // A prefixed Mod key cannot answer the region's unprefixed canonical request.
+        foreach (var region in new[] { "dlc_pool", "arena", "hidden", "unlisted", "collision", "invalid_utf8" }) Ids(region);
         Assert(catalog.Issues.Any(issue => issue.Contains("UTF-8", StringComparison.Ordinal)) &&
                catalog.Issues.Any(issue => issue.Contains("hash collision", StringComparison.Ordinal)),
             "A split UTF-8 native token and a true native hash collision must remain diagnosed and unavailable.");

@@ -24,7 +24,10 @@ public sealed record BattleRoomAttachmentCatalogGuard(
     string GameSaveSha256,
     IReadOnlyList<ActiveContentSource> ActiveSources,
     IReadOnlyList<BattleRoomAttachmentFileFingerprint> EffectiveFiles,
-    string Fingerprint);
+    string Fingerprint)
+{
+    public string? RequestedDungeonId { get; init; }
+}
 
 public sealed record BattleRoomAttachmentDefinition(
     string Id,
@@ -56,7 +59,7 @@ public sealed record BattleRoomAttachmentDefinition(
 
     public bool IsAvailableInDungeon(string? dungeonId) => !IsRegionBound ||
         (!string.IsNullOrWhiteSpace(OriginDungeonId) &&
-         OriginDungeonId.Equals(dungeonId, StringComparison.OrdinalIgnoreCase));
+         OriginDungeonId.Equals(dungeonId, StringComparison.Ordinal));
 
     // The original room-attachment catalog is shared with standalone map content.
     // Keep hall and room curios distinct even when they reference the same prop ID.
@@ -130,7 +133,7 @@ public static partial class BattleRoomAttachmentCatalog
 {
     private static readonly UTF8Encoding StrictUtf8 = new(false, true);
 
-    public static BattleRoomAttachmentCatalogResult Load(ActiveContentSnapshot activeContent)
+    public static BattleRoomAttachmentCatalogResult Load(ActiveContentSnapshot activeContent, string? dungeonId = null)
     {
         ArgumentNullException.ThrowIfNull(activeContent);
         var profileDirectory = Path.GetFullPath(activeContent.Profile.ProfileDirectory);
@@ -148,7 +151,7 @@ public static partial class BattleRoomAttachmentCatalog
         }
 
         var issues = new List<string>();
-        var effectiveFiles = ResolveEffectivePropFiles(activeContent.Sources, issues);
+        var effectiveFiles = ResolveEffectivePropFiles(activeContent.Sources, issues, dungeonId);
         var resourceFiles = ResolveEffectiveResourceFiles(activeContent.Sources, issues);
         var resources = ReadResources(resourceFiles);
         var curioFiles = ResolveEffectiveCurioFiles(activeContent.Sources, issues);
@@ -172,7 +175,7 @@ public static partial class BattleRoomAttachmentCatalog
             activeContent.SourceGameSha256,
             activeContent.Sources.ToArray(),
             fingerprints,
-            ComputeCatalogFingerprint(fingerprints));
+            ComputeCatalogFingerprint(fingerprints)) { RequestedDungeonId = dungeonId };
 
         var parsed = effectiveFiles
             .SelectMany(file => ParseFile(file, activeContent.Sources, guard, issues))
@@ -258,7 +261,7 @@ public static partial class BattleRoomAttachmentCatalog
         }
 
         var issues = new List<string>();
-        var currentFiles = ResolveEffectivePropFiles(guard.ActiveSources, issues)
+        var currentFiles = ResolveEffectivePropFiles(guard.ActiveSources, issues, guard.RequestedDungeonId)
             .Concat(ResolveEffectiveResourceFiles(guard.ActiveSources, issues))
             .Concat(ResolveEffectiveCurioFiles(guard.ActiveSources, issues))
             .Select(file => new BattleRoomAttachmentFileFingerprint(
@@ -290,7 +293,7 @@ public static partial class BattleRoomAttachmentCatalog
         }
 
         var issues = new List<string>();
-        var parsed = ResolveEffectivePropFiles(definition.CatalogGuard.ActiveSources, issues)
+        var parsed = ResolveEffectivePropFiles(definition.CatalogGuard.ActiveSources, issues, definition.CatalogGuard.RequestedDungeonId)
             .SelectMany(file => ParseFile(
                 file,
                 definition.CatalogGuard.ActiveSources,
@@ -363,7 +366,8 @@ public static partial class BattleRoomAttachmentCatalog
 
     private static IReadOnlyList<EffectiveContentFile> ResolveEffectivePropFiles(
         IReadOnlyList<ActiveContentSource> sources,
-        List<string> issues)
+        List<string> issues,
+        string? dungeonId = null)
     {
         var enabledDlcPrefixes = ContentFileOverlay.GetEnabledDlcPrefixes(sources);
         var candidates = new List<ContentFileCandidate>();
@@ -375,7 +379,23 @@ public static partial class BattleRoomAttachmentCatalog
             }
         }
 
-        return NativeContentFileResolver.ResolveOpenedFiles(candidates, sources, "Room prop", issues);
+        var requests = candidates.Select(candidate =>
+        {
+            var mounted = NativeResourceFileRules.MountedPath(
+                ContentFileOverlay.NormalizeRelativePath(candidate.Source, candidate.Path)!, enabledDlcPrefixes);
+            var region = mounted.Split('/')[1];
+            return $"dungeons/{region}/{region}.props.darkest";
+        }).ToList();
+        // Dungeon::Load skips ordinary props for arena (0x1404AF1CF-0x1404AF1E6).
+        if (!string.IsNullOrWhiteSpace(dungeonId) && !dungeonId.Equals("arena", StringComparison.OrdinalIgnoreCase))
+        {
+            if (dungeonId is "." or ".." || dungeonId.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
+                throw new InvalidDataException("副本区域 ID 不是有效的资源路径名称。");
+            // Dungeon::Load uses the current dungeon ID, which need not have
+            // the spelling of a directory returned by physical discovery.
+            requests.Add($"dungeons/{dungeonId}/{dungeonId}.props.darkest");
+        }
+        return NativeContentFileResolver.ResolveOpenedFiles(sources, requests, "Room prop", issues);
     }
 
     internal static IReadOnlyList<string> EnumerateCanonicalPropFiles(ActiveContentSource source,

@@ -63,13 +63,14 @@ internal static partial class ContractSuite
             ] }
             """);
         WriteFixtureManifest(modRoot);
-        var catalog = BattleRoomAttachmentCatalog.Load(template with
+        var content = template with
         {
             Sources = [new ActiveContentSource("base", "Base", "base", baseRoot, 0),
                 new ActiveContentSource("local:weighted", "Weighted", "local", modRoot, 1000)],
             SourceGameSha256 = ComputeSha256(Path.Combine(template.Profile.ProfileDirectory, "persist.game.json"))
-        });
-        Assert(catalog.GetRegionalCandidates(BattleRoomAttachmentKind.Trap, "WEALD")
+        };
+        var catalog = BattleRoomAttachmentCatalog.Load(content);
+        Assert(BattleRoomAttachmentCatalog.Load(content, "WEALD").GetRegionalCandidates(BattleRoomAttachmentKind.Trap, "WEALD")
                    .Select(item => item.Id).ToHashSet().SetEquals(["alpha", "beta", "duplicate"]) &&
                catalog.Issues.Count(issue => issue.StartsWith("地图区域资源未参与自动选择：", StringComparison.Ordinal)) == 3,
             "Automatic regional choices must reject zero/invalid weights and missing/scripted resources, without guessing another region.");

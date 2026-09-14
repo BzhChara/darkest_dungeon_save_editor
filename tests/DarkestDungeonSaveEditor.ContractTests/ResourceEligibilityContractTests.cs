@@ -33,7 +33,7 @@ internal static partial class ContractSuite
             var resourceRoot = Path.Combine(root, kind, path.Replace('/', '_'));
             var prefix = kind == "dlc-mod" ? "dlc/rf_feature/" : "";
             WriteMultiMash(resourceRoot, prefix + path, isEvent ? eventText : lootText);
-            if (!isEvent) WriteMultiMash(resourceRoot, prefix + "heroes/rf/rf.info.darkest", "extra_battle_loot: .code rf_loot\n");
+            if (!isEvent) WriteMultiMash(resourceRoot, "heroes/rf/rf.info.darkest", "extra_battle_loot: .code rf_loot\n");
             if (kind is "local" or "dlc-mod") WriteFixtureManifest(resourceRoot);
             var resourceSource = new ActiveContentSource("resource:rf", "Reference resources", kind == "dlc-mod" ? "local" : kind, resourceRoot, -2301)
             { VirtualPathPrefix = kind == "dlc" ? "dlc/rf_feature" : "" };

@@ -86,10 +86,10 @@ internal static partial class ContractSuite
         content = await ActiveContentResolver.ResolveAsync(profile, game, null, codec, locations.WorkspaceDirectory);
         catalog = BattleEncounterCatalog.Load(content, snapshot);
         var sizes = BattleEncounterCatalog.ReadMaintenanceMonsterSizes(content.Sources);
-        Assert(sizes["large_A"] == 1 && sizes["large_a"] == 1 &&
+        Assert(sizes["large_A"] == 3 && sizes["large_a"] == 1 &&
                catalog.DirectEncounters.Single(row => row.MashType == 0 && row.MashIndex == 0) is { ContainsBossMonster: false } &&
-               catalog.DirectEncounters.Single(row => row.MashType == 0 && row.MashIndex == 2) is { ContainsBossMonster: false },
-            "Case-distinct actor IDs remain distinct, while their canonical Windows paths can resolve to the same Mod bytes.");
+               catalog.DirectEncounters.Single(row => row.MashType == 0 && row.MashIndex == 2) is { ContainsBossMonster: true },
+            "A lowercase Mod manifest key cannot answer the uppercase actor's request; it retains the Base size and Boss tag.");
         var lowerSource = catalog.BridgeEncounters.Single(row => row.OriginDungeonId == "ruins" && row.MashType == 0 &&
             row.MonsterIds.SequenceEqual(["foreign_a"]));
         var lower = await bridge.EnsureEncounterAsync(profile, snapshot, content, catalog, lowerSource, game, null, null);

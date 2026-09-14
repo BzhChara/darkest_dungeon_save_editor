@@ -22,7 +22,16 @@ internal static partial class ContractSuite
             const string mash = "dungeons/cove/a.cove.2.mash.darkest";
             WriteMultiMash(source, prefix + mash, QueryMashes("alpha_A alpha_A") + QueryMashes("bravo_A"));
             var sources = QuerySources(source, kind);
-            if (kind == "dlc-mod") WriteMultiMash(sources[1].Directory, mash, QueryMashes("bravo_A"));
+            if (kind == "dlc-mod")
+            {
+                WriteMultiMash(sources[1].Directory, mash, QueryMashes("bravo_A"));
+                // Registration still comes from the Mod query. These uppercase
+                // physical filenames cannot register query/alpha by themselves,
+                // but supply the root open when that registration succeeds.
+                WriteMultiMash(sources[1].Directory, "heroes/query/query.info.DARKEST", "armour: .name coat .hp 20\nextra_battle_loot: .code query_loot\n");
+                WriteMultiMash(sources[1].Directory, "monsters/alpha/alpha_A/alpha_A.info.DARKEST", "display: .size 3\nloot: .code query_loot\n");
+                WriteMultiMash(sources[1].Directory, "monsters/bravo/bravo_A/bravo_A.info.darkest", "display: .size 1\n");
+            }
             if (isMod)
             {
                 WriteFixtureManifest(source);
@@ -90,8 +99,16 @@ internal static partial class ContractSuite
             WriteMultiMash(root, "trinkets/query.entries.trinkets.json", """{"entries":[{"id":"restricted","hero_class_requirements":["query"]}]}""");
             if (kind != "base") WriteFixtureManifest(root);
             var content = QueryContent(Path.Combine(root, "context"), QuerySources(root, kind));
-            Assert(HeroClassCatalog.Load(content).HeroClasses.Single().Id == "query" && TrinketCatalog.Load(content).Trinkets.Count == 1,
-                "Hero discovery must honor the native wildcard dot and two-dot ID extraction, followed by canonical Windows open.");
+            Assert(HeroClassCatalog.Load(content).HeroClasses.Any(h => h.Id == "query") == (kind == "base") &&
+                TrinketCatalog.Load(content).Trinkets.Count == 1,
+                "The wildcard seed registers the ID, but uppercase-only Mod keys cannot answer its canonical info request.");
+            if (kind != "base")
+            {
+                var manifest = Path.Combine(root, "modfiles.txt");
+                File.WriteAllText(manifest, File.ReadAllText(manifest).Replace("query.info.DARKEST", "query.info.darkest", StringComparison.Ordinal));
+                Assert(HeroClassCatalog.Load(content).HeroClasses.Single().BaseHp == 27,
+                    "A matching manifest key permits the uppercase Windows physical filename.");
+            }
             Assert(!NativeContentFileResolver.DiscoverActorIds(content.Sources, "monsters", []).Contains("alpha_A"),
                 "The monster query escapes both dots; hero wildcard semantics must not leak into monster registration.");
         }

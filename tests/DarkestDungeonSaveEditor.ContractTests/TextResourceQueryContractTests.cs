@@ -35,7 +35,10 @@ internal static partial class ContractSuite
             var root = Path.Combine(runRoot, "text-resource-queries", kind);
             var sourceRoot = Path.Combine(root, "source");
             var prefix = kind == "dlc-mod" ? "dlc/rq_feature/" : "";
-            void Write(string path, string text) => WriteMultiMash(sourceRoot, prefix + path, text);
+            // Actor and regional pool loaders make root requests, independently
+            // of the DLC-prefixed resource families exercised here.
+            void Write(string path, string text) => WriteMultiMash(sourceRoot,
+                (path.StartsWith("heroes/", StringComparison.Ordinal) || path == "dungeons/cove/cove.props.darkest" ? "" : prefix) + path, text);
             Write("inventory/a.inventoryXitems.darkest", "inventory_item: .type estate .id query_token .base_stack_limit 2\n");
             Write("inventory/b.inventory.items.darkest",
                 "inventory_item: .type estate .id query_token .base_stack_limit 9\ninventory_item: .type estate .id single .base_stack_limit 1\n");
@@ -180,8 +183,9 @@ internal static partial class ContractSuite
             var content = QueryContent(Path.Combine(root, "context"), QuerySources(root, kind));
             var raid = JsonNode.Parse("""{"base_root":{"party":{"inventory":{"items":{}}}}}""")!.AsObject();
             var item = QuantityItemCatalog.LoadRaid(content, raid).Items.Single();
-            var expected = consumed ? QuantityItemReferenceStatus.ConfirmedActive : QuantityItemReferenceStatus.SuspectedUnused;
-            Assert(item.ReferenceStatus == expected && item.IsHiddenByDefault != consumed,
+            var active = consumed && kind != "dlc-mod";
+            var expected = active ? QuantityItemReferenceStatus.ConfirmedActive : QuantityItemReferenceStatus.SuspectedUnused;
+            Assert(item.ReferenceStatus == expected && item.IsHiddenByDefault != active,
                 $"{kind}/{path}: only canonical actor item consumers may establish references; expected {expected}, found {item.ReferenceStatus}.");
             if (consumed) continue;
             File.Delete(actorPath);

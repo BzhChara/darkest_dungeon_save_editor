@@ -52,7 +52,7 @@ public static partial class HeroClassCatalog
             foreach (var suffix in new[] { HeroArtSuffix, HeroOverrideSuffix })
                 if (actorFiles.TryGetValue($"heroes/{id}/{id}{suffix}", out var file)) heroOverrideFiles.Add(file);
         }
-        var effectFiles = ResolveFiles(sourceFiles, files => files.EffectFiles, "Effect definition", issues);
+        var effectFiles = ResolveFiles(sourceFiles, files => files.EffectFiles, "Effect definition", issues, effects: true);
         var quirkFiles = NativeContentFileResolver.Resolve(sourceFiles.SelectMany(item =>
             item.Files.QuirkFiles.Select(path => new ContentFileCandidate(item.Source, path))).ToArray(),
             activeContent.Sources, "Quirk definition", issues);
@@ -61,7 +61,8 @@ public static partial class HeroClassCatalog
         var campingFiles = ResolveFiles(sourceFiles, files => files.CampingSkillFiles, "Camping skill definition", issues);
         var nameFiles = ResolveFiles(sourceFiles, files => files.NameFiles, "Hero name definition", issues);
         var upgradeFiles = ResolveFiles(sourceFiles, files => files.HeroUpgradeFiles, "Hero upgrade definition", issues);
-        var rosterVariableFiles = ResolveFiles(sourceFiles, files => files.RosterVariableFiles, "Roster variables", issues, directOpen: true);
+        var rosterVariableFiles = ResolveFiles(sourceFiles, files => files.RosterVariableFiles, "Roster variables", issues,
+            openPath: "campaign/roster/roster.variables.json");
         var sharedRuleFiles = ResolveFiles(sourceFiles, files => files.SharedRuleFiles, "Shared rules", issues);
         var initialQuirkLimits = ReadInitialQuirkLimits(sharedRuleFiles, issues);
 

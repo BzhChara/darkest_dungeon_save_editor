@@ -157,13 +157,13 @@ internal static partial class ContractSuite
             var source = Path.Combine(root, "source");
             var prefix = kind == "dlc-mod" ? "dlc/rq_feature/" : "";
             WriteMultiMash(source, prefix + "inventory/query.inventory.items.darkest", "inventory_item: .type estate .id query_token .base_stack_limit 2\n");
-            WriteMultiMash(source, prefix + "heroes/query/query.info.darkest", "extra_battle_loot: .code query_loot\n");
+            WriteMultiMash(source, "heroes/query/query.info.darkest", "extra_battle_loot: .code query_loot\n");
             if (!path.StartsWith("loot/", StringComparison.Ordinal)) WriteMultiMash(source, prefix + "loot/query.loot.json", QueryLootJson);
             var queried = path.Contains("provision/", StringComparison.Ordinal) ? path.Replace("provision/", "Provision/", StringComparison.Ordinal)
                 : char.ToUpperInvariant(path[0]) + path[1..];
             WriteMultiMash(source, prefix + queried, value);
             // Do not let the hero establish the reference when testing the CSV/provision root itself.
-            if (!path.StartsWith("loot/", StringComparison.Ordinal)) File.WriteAllText(Path.Combine(source, prefix + "heroes/query/query.info.darkest"), "// registration only\n");
+            if (!path.StartsWith("loot/", StringComparison.Ordinal)) File.WriteAllText(Path.Combine(source, "heroes/query/query.info.darkest"), "// registration only\n");
             WriteFixtureManifest(source);
             var content = QueryContent(root, QuerySources(source, kind));
             var raid = JsonNode.Parse("""{"base_root":{"party":{"inventory":{"items":{}}}}}""")!.AsObject();
@@ -196,7 +196,7 @@ internal static partial class ContractSuite
             var accepted = prefix + path;
             var rejected = prefixAlias ? "Dlc/rq_feature/" + path : prefix + char.ToUpperInvariant(path[0]) + path[1..];
             WriteMultiMash(source, prefix + "inventory/query.inventory.items.darkest", "inventory_item: .type estate .id query_token .base_stack_limit 2\n");
-            WriteMultiMash(source, prefix + "heroes/query/query.info.darkest", path.StartsWith("loot/", StringComparison.Ordinal)
+            WriteMultiMash(source, "heroes/query/query.info.darkest", path.StartsWith("loot/", StringComparison.Ordinal)
                 ? "extra_battle_loot: .code query_loot\n" : "// registration only\n");
             if (path.StartsWith("curios/", StringComparison.Ordinal)) WriteMultiMash(source, prefix + "loot/query.loot.json", QueryLootJson);
             WriteMultiMash(source, accepted, value);
