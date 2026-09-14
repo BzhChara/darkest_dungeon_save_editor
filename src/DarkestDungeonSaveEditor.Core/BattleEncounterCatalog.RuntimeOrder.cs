@@ -93,16 +93,30 @@ public static partial class BattleEncounterCatalog
         IEnumerable<BattleEncounterDefinition> rows, AvailableMonsterDefinitions monsters) =>
         rows.Where(row => !IsNativeSkippedRow(row, monsters)).ToArray();
 
-    internal static string DedicatedMashPath(string dungeonId, int difficulty)
+    internal static string DedicatedMashPath(string dungeonId, int difficulty, int fileNumber = 0)
     {
-        if (string.IsNullOrWhiteSpace(dungeonId) || difficulty < 0 ||
+        if (string.IsNullOrWhiteSpace(dungeonId) || difficulty < 0 || fileNumber < 0 ||
             dungeonId.Any(character => !char.IsAsciiLetterOrDigit(character) && character is not '_' and not '-'))
             throw new InvalidOperationException("地区或难度不能用于生成专用遭遇文件。");
-        return $"dungeons/{dungeonId}/ddse_managed.{dungeonId}.{difficulty.ToString(System.Globalization.CultureInfo.InvariantCulture)}.mash.darkest";
+        var discriminator = fileNumber == 0 ? string.Empty : "_" + fileNumber.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        return $"dungeons/{dungeonId}/ddse_managed{discriminator}.{dungeonId}.{difficulty.ToString(System.Globalization.CultureInfo.InvariantCulture)}.mash.darkest";
+    }
+
+    internal static bool IsDedicatedMashPath(string path, string dungeonId, int difficulty)
+    {
+        if (path == DedicatedMashPath(dungeonId, difficulty)) return true;
+        var prefix = $"dungeons/{dungeonId}/ddse_managed_";
+        var suffix = $".{dungeonId}.{difficulty.ToString(System.Globalization.CultureInfo.InvariantCulture)}.mash.darkest";
+        if (!path.StartsWith(prefix, StringComparison.Ordinal) || !path.EndsWith(suffix, StringComparison.Ordinal) ||
+            path.Length <= prefix.Length + suffix.Length) return false;
+        return int.TryParse(path.AsSpan(prefix.Length, path.Length - prefix.Length - suffix.Length),
+                System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var number) &&
+            number > 0 && path == DedicatedMashPath(dungeonId, difficulty, number);
     }
 
     internal static BattleEncounterAppendTarget ResolveAppendTarget(
-        BattleEncounterCatalogResult catalog, int mashType, string? managedPackageDirectory = null)
+        BattleEncounterCatalogResult catalog, int mashType, string? managedPackageDirectory = null,
+        string? dedicatedRelativePath = null)
     {
         ValidateGuard(catalog.TableGuard);
         if (mashType is < 0 or > 2)
@@ -120,7 +134,9 @@ public static partial class BattleEncounterCatalog
                 row.MashIndex == index && SameEncounterIdentity(row, rows[index])).All(matches => matches))
             throw new InvalidOperationException("当前类型没有连续且可证明的标准遭遇索引，不能更新 Bridge。");
 
-        var relativePath = DedicatedMashPath(catalog.DungeonId, catalog.Difficulty);
+        var relativePath = dedicatedRelativePath ?? DedicatedMashPath(catalog.DungeonId, catalog.Difficulty);
+        if (!IsDedicatedMashPath(relativePath, catalog.DungeonId, catalog.Difficulty))
+            throw new InvalidDataException("专用 Bridge 路径与当前地区或难度不一致。");
         var expectedPath = managedPackageDirectory is null ? null :
             Path.GetFullPath(Path.Combine(managedPackageDirectory, relativePath));
         var aliases = ResolveEffectiveMashFiles(catalog.TableGuard.ActiveSources, catalog.DungeonId,

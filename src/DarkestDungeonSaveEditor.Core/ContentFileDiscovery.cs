@@ -36,7 +36,8 @@ internal static class ContentFileDiscovery
         var isMod = source.Kind is "workshop" or "local";
         var prefixes = isMod ? enabledDlcPrefixes : [];
         var manifestPath = Path.Combine(source.Directory, "modfiles.txt");
-        var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        // Manifest keys are requests, even when Windows opens the same file.
+        var result = new HashSet<string>(isMod ? StringComparer.Ordinal : StringComparer.OrdinalIgnoreCase);
         if (isMod)
         {
             ModManifestFile.Require(manifestPath);

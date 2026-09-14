@@ -103,7 +103,7 @@ public static partial class BattleEncounterCatalog
         IReadOnlyList<string> enabledDlcPrefixes,
         List<string> issues)
     {
-        var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var result = new HashSet<string>(StringComparer.Ordinal);
         try
         {
             foreach (var entry in ModManifestFile.ReadEntries(manifestPath, "darkest"))

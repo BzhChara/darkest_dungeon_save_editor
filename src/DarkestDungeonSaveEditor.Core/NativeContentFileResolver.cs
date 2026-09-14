@@ -182,7 +182,7 @@ internal static class NativeContentFileResolver
             .DistinctBy(source => source.Id, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(source => source.Id, StringComparer.OrdinalIgnoreCase);
         var sourceComparer = Comparer<ActiveContentSource>.Create(ContentFileOverlay.ComparePriority);
-        var files = ContentFileOverlay.Resolve(candidates, contentLabel, issues);
+        var files = ContentFileOverlay.Resolve(candidates, contentLabel, issues, preservePathCase: true);
         var dlcPrefixes = ContentFileOverlay.GetEnabledDlcPrefixes(activeSources);
         string? MountPrefix(string path) => dlcPrefixes.OrderByDescending(prefix => prefix.Length)
             .FirstOrDefault(prefix => path.StartsWith(prefix + "/", StringComparison.OrdinalIgnoreCase));
@@ -216,15 +216,20 @@ internal static class NativeContentFileResolver
         // path can contain the entire new relative path without equalling it.
         // Base establishes the initial list directly; only alternate mounts
         // execute this merge. Keep canonical opens on their separate rule.
-        var spellings = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var spellings = new Dictionary<string, (string Path, string SourceId, bool IsManifest)>(StringComparer.OrdinalIgnoreCase);
         var result = new List<EffectiveContentFile>();
         foreach (var file in ordered)
         {
             var path = MountedPath(file.RelativePath);
+            var isManifest = file.Source.Kind is "local" or "workshop";
             if (reportCaseDifferences && spellings.TryGetValue(path, out var spelling) &&
-                !spelling.Equals(path, StringComparison.Ordinal))
+                !spelling.Path.Equals(path, StringComparison.Ordinal) &&
+                !(isManifest && spelling.IsManifest && spelling.SourceId.Equals(file.Source.Id, StringComparison.OrdinalIgnoreCase)))
                 issues.Add($"{contentLabel} mount paths differ only in case; native matching is unverified: {path}");
-            spellings[path] = path;
+            // One manifest has exact tree keys and strcmp ordering. Its aliases
+            // remain distinct requests; cross-provider case competition retains
+            // the existing uncertainty diagnostic.
+            spellings[path] = (path, file.Source.Id, isManifest);
             var slot = flags == 9 || MountSource(file).Kind == "base" ? -1
                 : result.FindIndex(existing => existing.RelativePath.Contains(path, StringComparison.Ordinal));
             if (flags == 1 && slot >= 0)

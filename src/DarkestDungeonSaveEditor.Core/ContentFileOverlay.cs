@@ -59,12 +59,16 @@ internal static class ContentFileOverlay
     public static IReadOnlyList<EffectiveContentFile> Resolve(
         IEnumerable<ContentFileCandidate> candidates,
         string contentLabel,
-        List<string> issues)
+        List<string> issues,
+        bool preservePathCase = false)
     {
         ArgumentNullException.ThrowIfNull(candidates);
         ArgumentNullException.ThrowIfNull(issues);
 
-        var byRelativePath = new Dictionary<string, List<ResolvedCandidate>>(StringComparer.OrdinalIgnoreCase);
+        // Native query slots retain case-distinct virtual requests, including
+        // aliases inside one Mod. Other consumers keep their existing policy.
+        var pathComparer = preservePathCase ? StringComparer.Ordinal : StringComparer.OrdinalIgnoreCase;
+        var byRelativePath = new Dictionary<string, List<ResolvedCandidate>>(pathComparer);
         foreach (var candidate in candidates)
         {
             var fullPath = Path.GetFullPath(candidate.Path);
@@ -85,7 +89,7 @@ internal static class ContentFileOverlay
         }
 
         var effectiveFiles = new List<EffectiveContentFile>();
-        foreach (var pair in byRelativePath.OrderBy(pair => pair.Key, StringComparer.OrdinalIgnoreCase))
+        foreach (var pair in byRelativePath.OrderBy(pair => pair.Key, pathComparer))
         {
             var highestPriority = pair.Value
                 .Select(candidate => GetPriority(candidate.Source))
@@ -93,7 +97,7 @@ internal static class ContentFileOverlay
             var winners = pair.Value
                 .Where(candidate => GetPriority(candidate.Source) == highestPriority)
                 .OrderBy(candidate => candidate.Source.Id, StringComparer.OrdinalIgnoreCase)
-                .ThenBy(candidate => candidate.Path, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(candidate => candidate.Path, pathComparer)
                 .ToArray();
             if (winners
                     .Select(candidate => candidate.Source.Id)
@@ -111,11 +115,11 @@ internal static class ContentFileOverlay
             var providers = pair.Value
                 .OrderBy(candidate => GetApplicationOrder(candidate.Source))
                 .ThenBy(candidate => candidate.Source.Id, StringComparer.OrdinalIgnoreCase)
-                .ThenBy(candidate => candidate.Path, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(candidate => candidate.Path, pathComparer)
                 .Select(candidate => new ContentFileProvider(candidate.Source.Id, candidate.Path))
                 .DistinctBy(
                     provider => $"{provider.SourceId}\n{provider.Path}",
-                    StringComparer.OrdinalIgnoreCase)
+                    pathComparer)
                 .ToArray();
             var providerSources = providers
                 .Select(provider => provider.SourceId)

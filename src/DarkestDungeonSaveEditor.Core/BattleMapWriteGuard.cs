@@ -62,9 +62,9 @@ internal sealed class BattleMapWriteGuard : IDisposable
                 game["raiddungeon"] is not JsonValue dungeon || !dungeon.TryGetValue<string>(out var dungeonId) ||
                 string.IsNullOrWhiteSpace(dungeonId))
                 throw new InvalidDataException("persist.game.json 缺少有效的小镇／副本状态，不能修改地图。");
-            if (!isInRaid || dungeonId.Equals("none", StringComparison.OrdinalIgnoreCase))
+            if (!isInRaid || dungeonId.Equals("none", StringComparison.Ordinal))
                 throw new InvalidOperationException("所选档案已经不在副本中，不能修改残留地图。");
-            if (!dungeonId.Equals(guard.Snapshot.DungeonId, StringComparison.OrdinalIgnoreCase))
+            if (!dungeonId.Equals(guard.Snapshot.DungeonId, StringComparison.Ordinal))
                 throw new InvalidOperationException("游戏入口与地图副本不一致，请等待完整存档后重试。");
             BattleMapSaveEditor.ValidateStationaryRaidState(guard.RaidDocument);
             guard.GameSha256 = hashes["persist.game.json"];

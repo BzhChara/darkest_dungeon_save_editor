@@ -123,7 +123,7 @@ public partial class MainWindow : Window
             ", ",
             Definition.RuntimeQuirkSignals
                 .Select(item => item.QuirkId)
-                .Distinct(StringComparer.OrdinalIgnoreCase));
+                .Distinct(StringComparer.Ordinal));
 
         private static string FormatRange(int? minimum, int? maximum)
         {

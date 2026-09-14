@@ -84,8 +84,16 @@ internal static partial class ContractSuite
         })
         {
             WriteMultiMash(baseRoot, lastPath, nulText);
-            Expect(content, null, "A NUL-terminated native input must never expose a larger post-NUL capacity.");
+            Expect(content, 2, "NUL ends this file; preserve preceding assignments and never expose post-NUL capacity.");
         }
+        WriteMultiMash(baseRoot, lastPath, "\0" + Both(".max_slots 100"));
+        Expect(content, 2, "An empty terminated file must not invalidate a preceding independent file.", first);
+        WriteMultiMash(baseRoot, lastPath, "inventory_system_config: .type loot .max_slots 9\n\0");
+        Expect(content, 2, "NUL after another inventory type must not invalidate raid or trinket capacity.", first);
+        WriteMultiMash(baseRoot, firstPath, Both(".max_slots 2") + "\0" + Both(".max_slots 100"));
+        WriteMultiMash(baseRoot, lastPath, Both(".max_slots 6"));
+        Expect(content, 6, "A later independent file remains loadable after an earlier file terminates.", last);
+        WriteMultiMash(baseRoot, firstPath, Both(".max_slots 2"));
         WriteMultiMash(baseRoot, lastPath, string.Empty);
 
         var highRoot = Path.Combine(root, "high");

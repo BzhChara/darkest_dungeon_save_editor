@@ -543,7 +543,7 @@ public static partial class BattleEncounterCatalog
             StringComparison.OrdinalIgnoreCase) &&
         left.OriginDungeonId.Equals(
             right.OriginDungeonId,
-            StringComparison.OrdinalIgnoreCase) &&
+            StringComparison.Ordinal) &&
         left.OriginDifficulty == right.OriginDifficulty &&
         string.Equals(left.RoamingId, right.RoamingId, StringComparison.Ordinal) &&
         Nullable.Equals(left.Weight, right.Weight) &&

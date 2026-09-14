@@ -264,7 +264,7 @@ public static class TrinketCatalog
         var manifestPath = Path.Combine(root, "modfiles.txt");
         ModManifestFile.Require(manifestPath);
 
-        var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var result = new HashSet<string>(StringComparer.Ordinal);
         foreach (var entry in ModManifestFile.ReadEntries(manifestPath, "json"))
         {
             var rawLine = entry.RawLine;

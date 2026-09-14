@@ -282,7 +282,7 @@ public sealed class BattleMapSnapshotReader(DsonSaveCodec codec)
         }
 
         var area = areas.FirstOrDefault(candidate =>
-            candidate.AreaId.Equals(partyAreaId, StringComparison.OrdinalIgnoreCase));
+            candidate.AreaId.Equals(partyAreaId, StringComparison.Ordinal));
         if (area is null || area.Tiles.Count == 0)
         {
             issues.Add($"The raid party area {partyAreaId} has no readable map tiles.");

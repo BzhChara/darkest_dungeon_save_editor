@@ -28,7 +28,7 @@ internal sealed record QuantityItemSaveScene(QuantityItemSaveContext Context, bo
 
         var location = RaidSaveLocation.FromGame(content.Profile.ProfileDirectory, game);
         var hasRaid = File.Exists(location.RaidPath);
-        var hasDungeon = !dungeon.Equals("none", StringComparison.OrdinalIgnoreCase);
+        var hasDungeon = !dungeon.Equals("none", StringComparison.Ordinal);
         if (inRaid != hasDungeon)
         {
             throw new InvalidDataException("当前档案的小镇／副本状态不一致，请在游戏中完成过渡并保存后重新加载。");

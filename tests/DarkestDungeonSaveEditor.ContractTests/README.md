@@ -5,6 +5,8 @@
 The suite is split by responsibility:
 
 - `ContractFixture.cs`: isolated game, Mod, profile, localization, and DSON fixtures;
+- `CaseIdentityContractTests.cs` and `BridgeCaseIdentityContractTests.cs`: case-distinct hero catalogs/overrides and DSON generation, exact map selectors, all three Bridge types across `cove`/`Cove`/`COVE`, collision-free carrier allocation/reuse, invalid-source region isolation, and pre-NUL capacities through actual quantity/trinket commits (`--case-identities`);
+- `ManifestCaseAliasContractTests.cs`: one local/Workshop manifest containing both case spellings of a physical file, both line orders, actor registration, region pools, `B,a,b` first/last resource values, HP DSON and all-type append counts; the Bridge cases additionally persist these aliases through actual placement/maintenance/deletion (also `--case-identities`);
 - `CanonicalResourceContractTests.cs`: original-request manifest matching versus physical aliases, DLC root fallback, missing winners, hero HP/XP and actor loot, regional pools, Effect flags-1 order, District flags-9 town/raid references, all three battle types and direct/Bridge DSON writes, maintenance and deletion (`--canonical-resources`);
 - `UiContractTests.cs`: XAML, theme, asset, and UI source contracts;
 - `UiLayoutContractTests.cs`: fixed load footer, selected-row details for all three catalogs, responsive tab headers, minimal quirk layout, and themed checkbox contracts;
@@ -64,6 +66,8 @@ dotnet run --project tests\DarkestDungeonSaveEditor.ContractTests\DarkestDungeon
 Close Darkest Dungeon before the suite: save transaction contracts exercise the real process guard even with isolated fixtures. `--catalogs` selects the catalog/save group, `--maintenance` selects encounter maintenance, `--manifests` selects manifest preparation, `--semantics` selects duplicate Buff/Effect/skill/event rules, exact identities, shared record/curio consumers, empty encounter slots and logical encounter/Bridge contracts, and `--map-content` selects the battle-map group including standalone JSON/DSON placements and native prop pools; these partial runs do not replace the complete suite. Set `DDSE_TEST_GAME_DIRECTORY` to the installed game root to additionally exercise the verified official uploader against isolated samples.
 
 ## 资源文件查询验证
+
+大小写专项：`dotnet run --project tests/DarkestDungeonSaveEditor.ContractTests -c Release -- . --case-identities`。同时运行既有容量矩阵。完整套件还运行 `CanonicalResourceContractTests` 中原生 `arena` 精确排除、`ARENA` 物理别名及 Mod 清单对照；此部分也可用 `--canonical-resources` 单独执行。专项不能替代整套测试。
 
 `dotnet run --project tests/DarkestDungeonSaveEditor.ContractTests -c Release -- . --queries`
 

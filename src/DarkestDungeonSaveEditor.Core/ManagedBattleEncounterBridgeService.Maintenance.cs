@@ -128,10 +128,10 @@ public sealed partial class ManagedBattleEncounterBridgeService
             ValidateManifestIdentity(manifest, profile, title);
             foreach (var table in manifest.Tables)
             foreach (var type in table.Entries.GroupBy(entry => entry.MashType))
-                allBridgeBindings[(table.DungeonId.ToLowerInvariant(), table.Difficulty, type.Key)] =
+                allBridgeBindings[(table.DungeonId, table.Difficulty, type.Key)] =
                     type.Select(entry => entry.MashIndex).ToHashSet();
             if (snapshot is not null)
-                foreach (var table in manifest.Tables.Where(table => table.DungeonId.Equals(snapshot.DungeonId, StringComparison.OrdinalIgnoreCase) &&
+                foreach (var table in manifest.Tables.Where(table => table.DungeonId.Equals(snapshot.DungeonId, StringComparison.Ordinal) &&
                     table.Difficulty == snapshot.Difficulty))
                     foreach (var entry in table.Entries) oldBridgeBindings.Add((entry.MashType, entry.MashIndex));
             var stage = Path.Combine(Workspace(), "package");
@@ -183,7 +183,7 @@ public sealed partial class ManagedBattleEncounterBridgeService
                 {
                     if (obsoleteEntries.Contains(entry))
                     {
-                        affectedBridgeTables.Add((table.DungeonId.ToLowerInvariant(), table.Difficulty, entry.MashType));
+                        affectedBridgeTables.Add((table.DungeonId, table.Difficulty, entry.MashType));
                         removed++;
                         invalidated = true;
                         reasons.Add($"{table.DungeonId}/{table.Difficulty}/{entry.MashType}/{entry.MashIndex}：旧版 Bridge 的实际怪物槽与记录不同，清除旧记录后可重新放置");
@@ -194,7 +194,7 @@ public sealed partial class ManagedBattleEncounterBridgeService
                         throw new InvalidOperationException("战斗自动清理暂缓，怪物体型尚无法确认：" + string.Join(", ", entry.MonsterIds));
                     if (missing.Length > 0 || entry.MonsterIds.Count > 4 || entry.MonsterIds.Sum(id => monsters[id] ?? 0) > 4)
                     {
-                        affectedBridgeTables.Add((table.DungeonId.ToLowerInvariant(), table.Difficulty, entry.MashType));
+                        affectedBridgeTables.Add((table.DungeonId, table.Difficulty, entry.MashType));
                         removed++;
                         invalidated = true;
                         reasons.Add($"{table.DungeonId}/{table.Difficulty}/{entry.MashType}/{entry.MashIndex}：" +
@@ -240,7 +240,7 @@ public sealed partial class ManagedBattleEncounterBridgeService
                         throw new InvalidOperationException("战斗自动清理暂缓，重建的专用文件未得到可验证的运行时编号。");
                     if (entry.MashIndex != row.MashIndex)
                     {
-                        affectedBridgeTables.Add((table.DungeonId.ToLowerInvariant(), table.Difficulty, type));
+                        affectedBridgeTables.Add((table.DungeonId, table.Difficulty, type));
                         reasons.Add($"{table.DungeonId}/{table.Difficulty}/{type}：{entry.MashIndex} → {row.MashIndex}");
                         entry.MashIndex = row.MashIndex!.Value;
                         reindexed++;
@@ -293,8 +293,8 @@ public sealed partial class ManagedBattleEncounterBridgeService
                 retainedGuards[retained.RaidSavePath] = retained.RaidSha256;
                 if (retained.Areas.SelectMany(area => area.Tiles).Any(tile =>
                     EditorBattleHistory.IsBattle(tile.Content) &&
-                    affectedBridgeTables.Contains((retained.DungeonId.ToLowerInvariant(), retained.Difficulty, tile.MashType)) &&
-                    allBridgeBindings[(retained.DungeonId.ToLowerInvariant(), retained.Difficulty, tile.MashType)].Contains(tile.MashIndex)))
+                    affectedBridgeTables.Contains((retained.DungeonId, retained.Difficulty, tile.MashType)) &&
+                    allBridgeBindings[(retained.DungeonId, retained.Difficulty, tile.MashType)].Contains(tile.MashIndex)))
                     pendingRaids.Add(relative);
             }
         }

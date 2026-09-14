@@ -23,11 +23,11 @@ internal static partial class BattleMapSaveEditor
         {
             throw new InvalidOperationException("陷阱和障碍只能使用当前副本区域的资源，请重新选择。");
         }
-        if (string.Equals(area.AreaId, snapshot.EntranceAreaId, StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(area.AreaId, snapshot.EntranceAreaId, StringComparison.Ordinal))
         {
             throw new InvalidOperationException("出生房间不能新建或替换地图内容。");
         }
-        if (string.Equals(area.AreaId, snapshot.FinalRoomId, StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(area.AreaId, snapshot.FinalRoomId, StringComparison.Ordinal))
         {
             throw new InvalidOperationException("最终房间不能替换为普通奇物、宝箱、陷阱或障碍。");
         }
