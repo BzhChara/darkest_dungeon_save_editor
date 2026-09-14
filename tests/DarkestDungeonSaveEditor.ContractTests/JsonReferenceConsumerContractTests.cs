@@ -82,8 +82,8 @@ internal static partial class ContractSuite
         // the old fictitious DistrictSupplyBuffData.loot_table_code fixture.
         var graph = Path.Combine(root, "loot-graph");
         WriteMultiMash(graph, "loot/jc.loot.json", """
-            {"loot_tables":[{"id":"jc_root","entries":[{"type":"table","data":{"table":"jc_nested"}}]},
-              {"id":"jc_nested","entries":[{"type":"item","data":{"type":"estate","id":"jc_token"}}]}]}
+            {"loot_tables":[{"id":"jc_root","entries":[{"type":"table","chances":1,"data":{"table":"jc_nested"}}]},
+              {"id":"jc_nested","entries":[{"type":"item","chances":1,"data":{"type":"estate","id":"jc_token"}}]}]}
             """);
         WriteMultiMash(graph, "heroes/jc/jc.info.darkest", "extra_battle_loot: .code jc_root\n");
         WriteFixtureManifest(graph);

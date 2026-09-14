@@ -9,7 +9,7 @@ internal static partial class QuantityItemReferenceAnalyzer
     private static bool ParseLootFile(
         ScannedContentFile file,
         QuantityItemIndex index,
-        Dictionary<string, LootTableNode> lootTables,
+        LootTableLibrary lootTables,
         Dictionary<string, List<string>> incompleteEvidence,
         List<string> issues)
     {
@@ -41,17 +41,17 @@ internal static partial class QuantityItemReferenceAnalyzer
                     continue;
                 }
 
-                var tableId = ReadString(tableNode, "id");
-                if (string.IsNullOrWhiteSpace(tableId))
-                {
-                    continue;
-                }
-
-                if (!lootTables.TryGetValue(tableId, out var table))
-                {
-                    table = new LootTableNode();
-                    lootTables[tableId] = table;
-                }
+                // Native tables keep ordered variants per hash. Their name buffer
+                // is 64 bytes, and the hash is calculated after that copy.
+                var rawId = NativeJsonReader.ReadString(tableNode, "id");
+                var code = ReadLootCode(rawId, 63);
+                lootTables.Codes.Add(rawId);
+                lootTables.Codes.Add(code.Name);
+                if (!lootTables.Tables.TryGetValue(code.Hash, out var variants))
+                    lootTables.Tables[code.Hash] = variants = [];
+                var table = new LootTableVariant(ReadLootContext(tableNode), file.File.RelativePath);
+                // Even an empty/zero-weight first variant can shadow later ones.
+                variants.Add(table);
 
                 if (!TryGetProperty(tableNode, "entries", out var entries) ||
                     entries.ValueKind != JsonValueKind.Array)
@@ -66,6 +66,8 @@ internal static partial class QuantityItemReferenceAnalyzer
                         continue;
                     }
 
+                    var usable = ReadLootWeight(entry);
+                    if (usable == false) continue;
                     var entryType = ReadString(entry, "type");
                     if (!TryGetProperty(entry, "data", out var data) ||
                         data.ValueKind != JsonValueKind.Object)
@@ -79,7 +81,7 @@ internal static partial class QuantityItemReferenceAnalyzer
                         var itemId = ReadString(data, "id");
                         foreach (var key in index.Resolve(itemType, itemId))
                         {
-                            table.ItemKeys.Add(key);
+                            (usable == true ? table.ItemKeys : table.UncertainItemKeys).Add(key);
                         }
                     }
                     else if (entryType.Equals("table", StringComparison.Ordinal))
@@ -87,7 +89,7 @@ internal static partial class QuantityItemReferenceAnalyzer
                         var nested = ReadString(data, "table");
                         if (!string.IsNullOrWhiteSpace(nested))
                         {
-                            table.NestedTables.Add(nested);
+                            (usable == true ? table.NestedTables : table.UncertainNestedTables).Add(ReadLootCode(nested, 63));
                         }
                     }
                 }
@@ -111,40 +113,45 @@ internal static partial class QuantityItemReferenceAnalyzer
         issues.Add($"Quantity-item reference scan could not parse active loot file: {file.File.Path}");
     }
 
-    private static void TraverseLootRoots(
-        IReadOnlyDictionary<string, LootTableNode> lootTables,
-        IReadOnlyDictionary<string, List<string>> rootLootEvidence,
-        Dictionary<string, List<string>> activeEvidence)
+    private static bool? ReadLootWeight(JsonElement entry)
     {
-        var queue = new Queue<(string TableId, string Evidence)>();
-        foreach (var pair in rootLootEvidence)
-        {
-            foreach (var evidence in pair.Value)
-            {
-                queue.Enqueue((pair.Key, evidence));
-            }
-        }
+        // 0x14044333B..0x1404433DA: first member, number -> float32,
+        // skip missing/nonpositive weights before creating an entry.
+        if (!NativeJsonReader.TryGetProperty(entry, "chances", out _)) return false;
+        var weight = NativeJsonReader.ReadFloat(entry, "chances");
+        if (weight is not { } number) return null;
+        // Negative overflow becomes -infinity and still takes the native skip
+        // branch. Positive overflow remains insufficient evidence of a roll.
+        if (number <= 0) return false;
+        return double.IsFinite(number) ? true : null;
+    }
 
-        var visited = new HashSet<string>(StringComparer.Ordinal);
-        while (queue.Count > 0)
-        {
-            var (tableId, evidence) = queue.Dequeue();
-            if (!visited.Add(tableId) || !lootTables.TryGetValue(tableId, out var table))
-            {
-                continue;
-            }
+    private static LootContext ReadLootContext(JsonElement table)
+    {
+        // Unsigned fields retain these native constructor defaults when absent
+        // or of another JSON type (including floating-point spellings).
+        // The native integer parser tags -0 as unsigned zero as well; a direct
+        // TryGetUInt32 would reject that spelling and retain the wrong default.
+        static uint UInt(JsonElement node, string key, uint defaultValue = 0) =>
+            NativeJsonReader.TryGetProperty(node, key, out var value) &&
+            value.ValueKind == JsonValueKind.Number && value.TryGetInt64(out var number) && number is >= 0 and <= uint.MaxValue
+                ? (uint)number : defaultValue;
+        static LootRange Filter(uint value) => value == 0 ? LootRange.Any : new(value, value);
+        return new(Filter(UInt(table, "difficulty")),
+            Filter(ReadLootCode(NativeJsonReader.ReadCString(table, "dungeon")).Hash),
+            Filter(ReadLootCode(NativeJsonReader.ReadCString(table, "infestation_sequence_element")).Hash),
+            new(UInt(table, "week_min"), UInt(table, "week_max", uint.MaxValue)));
+    }
 
-            var chain = $"{evidence} → 掉落表 {tableId}";
-            foreach (var key in table.ItemKeys)
-            {
-                AddEvidence(activeEvidence, key, chain);
-            }
-
-            foreach (var nested in table.NestedTables)
-            {
-                queue.Enqueue((nested, chain));
-            }
-        }
+    private static LootCode ReadLootCode(string value, int maximumBytes = int.MaxValue)
+    {
+        var bytes = Encoding.UTF8.GetBytes(NativeJsonReader.CString(value));
+        var count = Math.Min(bytes.Length, maximumBytes);
+        var hash = 0u;
+        for (var i = 0; i < count; i++) hash = unchecked(hash * 53u + bytes[i]);
+        // Hash raw bytes even if a native truncation splits a UTF-8 character.
+        // Name is diagnostic text only; it is never used for native lookup.
+        return new(hash, Encoding.UTF8.GetString(bytes, 0, count));
     }
 
 }

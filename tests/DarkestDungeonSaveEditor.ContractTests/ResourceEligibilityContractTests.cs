@@ -84,9 +84,9 @@ internal static partial class ContractSuite
         WriteMultiMash(uncertain, "inventory/u.inventory.system_configs.darkest", "inventory_system_config: .type raid .max_slots 16\n");
         WriteMultiMash(uncertain, "loot/u.loot.json", """
             {"loot_tables":[
-              {"id":"rf_root","entries":[{"type":"table","data":{"table":"rf_nested"}}]},
-              {"id":"rf_nested","entries":[{"type":"item","data":{"type":"estate","id":"rf_token"}},{"type":"table","data":{"table":"rf_root"}}]},
-              {"id":"rf_known","entries":[{"type":"item","data":{"type":"estate","id":"rf_known"}}]}
+              {"id":"rf_root","entries":[{"type":"table","chances":1,"data":{"table":"rf_nested"}}]},
+              {"id":"rf_nested","entries":[{"type":"item","chances":1,"data":{"type":"estate","id":"rf_token"}},{"type":"table","chances":1,"data":{"table":"rf_root"}}]},
+              {"id":"rf_known","entries":[{"type":"item","chances":1,"data":{"type":"estate","id":"rf_known"}}]}
             ]}
             """);
         WriteMultiMash(uncertain, "campaign/quest/quest.plot_quests.json", "{ broken_json \"rf_root\" \"rf_known\" ");

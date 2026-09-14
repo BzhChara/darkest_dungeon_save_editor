@@ -43,7 +43,7 @@ internal static partial class QuantityItemReferenceAnalyzer
         var index = new QuantityItemIndex(definitions);
         var activeEvidence = new Dictionary<string, List<string>>(StringComparer.Ordinal);
         var incompleteEvidence = new Dictionary<string, List<string>>(StringComparer.Ordinal);
-        var lootTables = new Dictionary<string, LootTableNode>(StringComparer.Ordinal);
+        var lootTables = new LootTableLibrary();
         var rootLootEvidence = new Dictionary<string, List<string>>(StringComparer.Ordinal);
         var uncertainLootEvidence = new Dictionary<string, List<string>>(StringComparer.Ordinal);
         var scanComplete = true;
@@ -71,7 +71,7 @@ internal static partial class QuantityItemReferenceAnalyzer
             scanComplete &= ParseRootFile(
                 file,
                 index,
-                lootTables.Keys,
+                lootTables.Codes,
                 saveContext,
                 activeEvidence,
                 rootLootEvidence,
@@ -82,8 +82,7 @@ internal static partial class QuantityItemReferenceAnalyzer
                     ? eventIds : null);
         }
 
-        TraverseLootRoots(lootTables, rootLootEvidence, activeEvidence);
-        TraverseLootRoots(lootTables, uncertainLootEvidence, incompleteEvidence);
+        TraverseLootRoots(lootTables, rootLootEvidence, uncertainLootEvidence, activeEvidence, incompleteEvidence);
 
         var sourcesById = activeContent.Sources.ToDictionary(
             source => source.Id,

@@ -43,6 +43,7 @@ internal static partial class ContractSuite
         await RunCanonicalResourceContractsAsync(runRoot, codec);
         await RunResourceOverlaySlotContractsAsync(runRoot, codec);
         await RunTextResourceQueryContractsAsync(runRoot, codec);
+        await RunLootReferenceContractsAsync(runRoot, codec);
 
         if (includeBattle)
         {
