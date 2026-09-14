@@ -144,8 +144,7 @@ internal static partial class ContractSuite
                      Tree(alpha, ("too_long", 0)),
                      Tree(alpha, (" a ", 0)),
                      new() { ["id"] = alpha },
-                     new() { ["id"] = alpha, ["requirements"] = new JsonArray(JsonValue.Create(7)) },
-                     Tree(alpha, ("0", 0), ("0", 2))
+                     new() { ["id"] = alpha, ["requirements"] = new JsonArray(JsonValue.Create(7)) }
                  })
         {
             WriteTrees(laterPath, malformed, Tree(otherId + ".alpha", ("0", 0), ("1", 2)));

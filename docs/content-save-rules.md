@@ -190,6 +190,8 @@ Definition-backed names use `str_inventory_title_<type><id>` and the observed un
 
 ### 4.3 Town write rules
 
+Upgrade costs supply town references only from the last complete tree matching the native ID hash and the last requirement for each native purchase-code byte. Empty winning trees/cost lists clear older references. Unknown replacement identities keep upgrade evidence uncertain; independent confirmed uses remain active. Content-only refresh recomputes these results. Hero generation shares the final-requirement selector and validates the winning authored code for DSON persistence. See [upgrade requirement and cost selection](resource-duplicate-semantics.md#25-upgrade-requirement-overwrite-and-currency-references-2026-09-15).
+
 | Content definition | Persistent identity | Town location |
 | --- | --- | --- |
 | `.type "gold" .id ""` | `type=gold` | `wallet` |

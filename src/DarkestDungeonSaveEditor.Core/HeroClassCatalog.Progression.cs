@@ -213,16 +213,9 @@ public static partial class HeroClassCatalog
 
     private static IReadOnlyList<HeroUpgradeRequirementDefinition> ReadHeroUpgradeRequirements(JsonElement tree, string treeId)
     {
-        if (!NativeJsonReader.TryGetProperty(tree, "requirements", out var requirements) || requirements.ValueKind != JsonValueKind.Array)
-        {
-            throw new InvalidDataException($"Upgrade tree '{treeId}' is missing its requirements array.");
-        }
-
         var parsedRequirements = new Dictionary<string, int>(StringComparer.Ordinal);
-        foreach (var requirement in requirements.EnumerateArray())
+        foreach (var requirement in NativeUpgradeRequirements.Read(tree, treeId))
         {
-            if (requirement.ValueKind != JsonValueKind.Object)
-                throw new InvalidDataException($"Upgrade tree '{treeId}' contains a non-object requirement.");
             var code = NativeJsonReader.TryGetProperty(requirement, "code", out var codeNode) && codeNode.ValueKind == JsonValueKind.String
                 ? codeNode.GetString() ?? string.Empty
                 : string.Empty;
@@ -233,9 +226,6 @@ public static partial class HeroClassCatalog
                 throw new InvalidDataException($"Upgrade tree '{treeId}' requirement code '{code}' cannot be represented " +
                     "losslessly by the DSON codec; one printable ASCII character excluding double quote and backslash is required.");
 
-            if (parsedRequirements.TryGetValue(code, out var existing) && existing != prerequisiteLevel.Value)
-                throw new InvalidDataException($"Upgrade tree '{treeId}' requirement '{code}' has conflicting resolve prerequisites " +
-                    $"{existing} and {prerequisiteLevel.Value}.");
             parsedRequirements[code] = prerequisiteLevel.Value;
         }
 

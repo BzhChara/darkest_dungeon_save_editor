@@ -47,7 +47,8 @@ internal static partial class QuantityItemReferenceAnalyzer
         var rootLootEvidence = new Dictionary<string, List<string>>(StringComparer.Ordinal);
         var uncertainLootEvidence = new Dictionary<string, List<string>>(StringComparer.Ordinal);
         var scanComplete = true;
-        var files = LoadEffectiveFiles(activeContent, saveContext, issues, ref scanComplete);
+        var upgradeFilesComplete = true;
+        var files = LoadEffectiveFiles(activeContent, saveContext, issues, ref scanComplete, ref upgradeFilesComplete);
         var eventIds = new Dictionary<uint, string>();
         var dlcPrefixes = ContentFileOverlay.GetEnabledDlcPrefixes(activeContent.Sources);
 
@@ -66,7 +67,10 @@ internal static partial class QuantityItemReferenceAnalyzer
             scanComplete &= ParseLootFile(file, index, lootTables, incompleteEvidence, issues);
         }
 
-        foreach (var file in files.Where(file => !file.IsLootFile))
+        if (saveContext == QuantityItemSaveContext.Town)
+            scanComplete &= ParseUpgradeReferences(files, index, activeEvidence, incompleteEvidence, issues, upgradeFilesComplete);
+
+        foreach (var file in files.Where(file => !file.IsLootFile && file.JsonKind != NativeReferenceJsonKind.Upgrades))
         {
             scanComplete &= ParseRootFile(
                 file,

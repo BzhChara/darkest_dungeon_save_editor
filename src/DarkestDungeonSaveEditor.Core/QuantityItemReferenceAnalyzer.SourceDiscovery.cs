@@ -10,7 +10,8 @@ internal static partial class QuantityItemReferenceAnalyzer
         ActiveContentSnapshot activeContent,
         QuantityItemSaveContext saveContext,
         List<string> issues,
-        ref bool scanComplete)
+        ref bool scanComplete,
+        ref bool upgradeFilesComplete)
     {
         var enabledDlcPrefixes = ContentFileOverlay.GetEnabledDlcPrefixes(activeContent.Sources);
         var actorRequests = new HashSet<string>(StringComparer.Ordinal);
@@ -45,7 +46,8 @@ internal static partial class QuantityItemReferenceAnalyzer
                     actorPaths,
                     saveContext,
                     issues,
-                    ref scanComplete);
+                    ref scanComplete,
+                    ref upgradeFilesComplete);
                 foreach (var path in EnumerateCandidateFiles(source, enabledDlcPrefixes, actorPaths))
                 {
                     candidates.Add(new ContentFileCandidate(source, path));
@@ -54,6 +56,7 @@ internal static partial class QuantityItemReferenceAnalyzer
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
                 scanComplete = false;
+                upgradeFilesComplete = false;
                 issues.Add($"Failed to enumerate quantity-item reference files in '{source.Directory}': {ex.Message}");
             }
         }
@@ -111,6 +114,8 @@ internal static partial class QuantityItemReferenceAnalyzer
                         NativeResourceFileRules.MountedPath(file.RelativePath, enabledDlcPrefixes), saveContext))
                 {
                     scanComplete = false;
+                    if (NativeResourceFileRules.ReferenceJsonKind(file.RelativePath, enabledDlcPrefixes) == NativeReferenceJsonKind.Upgrades)
+                        upgradeFilesComplete = false;
                     issues.Add($"Failed to read quantity-item reference file '{file.Path}': {ex.Message}");
                 }
             }
@@ -145,7 +150,8 @@ internal static partial class QuantityItemReferenceAnalyzer
         IReadOnlySet<string> actorPaths,
         QuantityItemSaveContext saveContext,
         List<string> issues,
-        ref bool scanComplete)
+        ref bool scanComplete,
+        ref bool upgradeFilesComplete)
     {
         var manifestPath = Path.Combine(source.Directory, "modfiles.txt");
         if (source.Kind is not ("workshop" or "local"))
@@ -180,6 +186,8 @@ internal static partial class QuantityItemReferenceAnalyzer
             }
 
             scanComplete = false;
+            if (NativeResourceFileRules.ReferenceJsonKind(normalized, enabledDlcPrefixes, true) == NativeReferenceJsonKind.Upgrades)
+                upgradeFilesComplete = false;
             issues.Add($"Quantity-item reference file listed by active Mod is missing: {path}");
         }
     }
