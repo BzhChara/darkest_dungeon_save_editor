@@ -25,7 +25,7 @@ internal static partial class ContractSuite
                 Write(ignored, QueryMashes("missing_A"));
             Write("dungeons/ruins/a.ruinsX2.mash.darkest", QueryMashes("bravo_A"));
             foreach (var id in new[] { "alpha_A", "bravo_A" })
-                Write($"monsters/{id[..^2]}/{id}/{id}.info.darkest", "display: .size 1\n");
+                WriteMultiMash(sourceRoot, $"monsters/{id[..^2]}/{id}/{id}.info.darkest", "display: .size 1\n");
             WriteMultiMash(sourceRoot, "dlc/disabled/dungeons/cove/disabled.cove.2.mash.darkest", QueryMashes("missing_A"));
             var sources = QuerySources(sourceRoot, kind);
             if (kind == "dlc-mod")

@@ -131,7 +131,7 @@ internal static partial class ContractSuite
             if (kind is "local" or "workshop" or "dlc-mod")
                 File.WriteAllText(Path.Combine(source, "modfiles.txt"), variant == "physical-alias" ? relative.ToLowerInvariant() : relative);
             var catalog = HeroClassCatalog.Load(content);
-            var step = variant == "nested" ? 10 : 7;
+            var step = variant == "nested" || kind == "dlc-mod" ? 10 : 7;
             Assert(catalog.ResolveLevelThresholds.SequenceEqual(Enumerable.Range(0, 7).Select(i => i * step)) &&
                    catalog.HeroClasses.Single().GenerationAvailability.All(l => l.CanGenerate) &&
                    catalog.Issues.All(i => variant == "physical-alias" && kind is "base" or "mode" or "dlc-feature" &&
@@ -160,6 +160,8 @@ internal static partial class ContractSuite
         Assert(GenerateProgressionHero(HeroClassCatalog.Load(content)).Preview.ResolveXp == 10,
             "An unlisted DLC roster override must not replace the baseline.");
         File.WriteAllText(Path.Combine(source, "modfiles.txt"), relative);
+        Assert(GenerateProgressionHero(HeroClassCatalog.Load(content)).Preview.ResolveXp == 10,
+            "A listed DLC-prefixed Mod entry cannot answer the roster's root request, even with the DLC enabled.");
         var disabled = content with { Sources = content.Sources.Where(s => s.Kind != "dlc-feature").ToArray() };
         Assert(GenerateProgressionHero(HeroClassCatalog.Load(disabled)).Preview.ResolveXp == 10,
             "A listed path in a disabled DLC mount must not replace the baseline.");
@@ -169,13 +171,15 @@ internal static partial class ContractSuite
         var overridden = content with { Sources = content.Sources.Append(new ActiveContentSource("local:root", "Root", "local", rootMod, -1000)).ToArray() };
         Assert(GenerateProgressionHero(HeroClassCatalog.Load(overridden)).Preview.ResolveXp == 3,
             "A root Mod must retain priority over the mounted DLC-relative roster alias.");
+        path = WriteMultiMash(source, "campaign/roster/roster.variables.json", RosterThresholds(7));
+        File.AppendAllText(Path.Combine(source, "modfiles.txt"), "\ncampaign/roster/roster.variables.json\n");
         foreach (var json in new[] { "{}", """{"resolve_level_thresholds":[0,7,7]}""", """{"resolve_level_thresholds":[0,1.5]}""", "invalid JSON" })
         {
             File.WriteAllText(path, json);
             var catalog = HeroClassCatalog.Load(content);
             Assert(catalog.ResolveLevelThresholds.Count == 0 && catalog.Issues.Any(i => i.Contains(path, StringComparison.OrdinalIgnoreCase)) &&
                    catalog.Issues.All(i => !i.StartsWith("No effective campaign/roster/roster.variables.json", StringComparison.Ordinal)),
-                "An invalid winning DLC roster file must retain its diagnostic source and cannot fall back to a valid baseline.");
+                "An invalid winning root roster file must retain its diagnostic source and cannot fall back to a valid baseline.");
             Assert(catalog.HeroClasses.Single().GenerationAvailability.Single().ResolveLevel == 0,
                 "Invalid thresholds must retain the existing level-zero-only boundary.");
         }

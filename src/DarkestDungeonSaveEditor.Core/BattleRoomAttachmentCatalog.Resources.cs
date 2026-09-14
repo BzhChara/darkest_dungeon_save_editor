@@ -23,7 +23,12 @@ public static partial class BattleRoomAttachmentCatalog
                 candidate.Source.Kind is "local" or "workshop"))
             .OrderBy(group => group.Key)
             .SelectMany(group => group.Key < 3
-                ? NativeContentFileResolver.ResolveOpenedFiles(group.ToArray(), sources, "Map prop resource", issues)
+                ? NativeContentFileResolver.ResolveOpenedFiles(sources, [group.Key switch
+                {
+                    0 => ">props/prop_definitions.json",
+                    1 => ">props/obstacle_definitions.json",
+                    _ => ">props/trap_definitions.json"
+                }], "Map prop resource", issues)
                 : NativeContentFileResolver.ResolveAdditiveFiles(group.ToArray(), sources, "Map prop resource", issues)).ToArray();
     }
 

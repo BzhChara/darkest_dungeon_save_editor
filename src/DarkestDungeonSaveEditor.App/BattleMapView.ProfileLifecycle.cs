@@ -155,7 +155,7 @@ public partial class BattleMapView : UserControl
                     try
                     {
                         _roomAttachmentCatalog = await Task.Run(
-                            () => BattleRoomAttachmentCatalog.Load(activeContent),
+                            () => BattleRoomAttachmentCatalog.Load(activeContent, snapshot.DungeonId),
                             cancellationToken);
                         diagnosticBatch.Add("地图内容", _roomAttachmentCatalog.Issues);
                         CrashDiagnostics.RecordStatus(

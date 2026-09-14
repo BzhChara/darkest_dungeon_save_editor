@@ -78,7 +78,9 @@ internal static partial class ContractSuite
                     "inventory_item: .type estate .id query_token .base_stack_limit 2 .estate_can_be_provision false\n");
                 WriteMultiMash(source, prefix + "inventory/query.inventory.system_configs.darkest", QueryCapacity(2));
                 WriteMultiMash(source, prefix + "loot/query.loot.json", QueryLootJson);
-                var actorPath = WriteMultiMash(source, prefix + actor, text + "\n");
+                // The actor file is opened at root; its loot table may come
+                // from the independently enumerated DLC-prefixed library.
+                var actorPath = WriteMultiMash(source, actor, text + "\n");
                 WriteFixtureManifest(source);
                 var content = QueryContent(root, QuerySources(source, kind));
                 var raid = JsonNode.Parse("""{"base_root":{"party":{"inventory":{"items":{}}}}}""")!.AsObject();

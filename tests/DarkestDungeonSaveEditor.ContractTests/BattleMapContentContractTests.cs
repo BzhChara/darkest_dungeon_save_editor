@@ -82,7 +82,7 @@ internal static partial class ContractSuite
             { "props": [ { "name": "ignored_json_trap", "default_data": { "inherits_from": { "prop_type_name": "trap" } } } ] }
             """);
         // A canonical override supplies the complete pool; an extra basename cannot extend it.
-        poolPath = WriteMapContentFixture(modRoot, "dlc/enabled/dungeons/cove/cove.props.darkest", File.ReadAllText(poolPath) + "\n" + """
+        poolPath = WriteMapContentFixture(modRoot, "dungeons/cove/cove.props.darkest", File.ReadAllText(poolPath) + "\n" + """
             hall_curios: .chance 1 .types enabled_dlc_curio
             traps: .chance 1 .types dlc_trap
             """);
@@ -117,7 +117,7 @@ internal static partial class ContractSuite
         catch (InvalidDataException error) when (error.Message.Contains("modfiles.txt", StringComparison.Ordinal)) { missingRejected = true; }
         Assert(missingRejected, "Missing manifests must prevent room attachment discovery before preparation.");
         WriteMapContentFixture(modRoot, "modfiles.txt", """
-            dlc/enabled/dungeons/cove/cove.props.darkest 1
+            dungeons/cove/cove.props.darkest 1
             dlc/enabled/props/cove/trap_definitions.json 1
             dlc/enabled/curios/enabled_curio_props.csv 1
             dlc/enabled/curios/enabled_curio_type_library.csv 1

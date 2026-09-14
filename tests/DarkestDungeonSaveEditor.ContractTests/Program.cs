@@ -1,11 +1,12 @@
 try
 {
-    if (args.Length is < 1 or > 2 || (args.Length == 2 && args[1] is not ("--maintenance" or "--manifests" or "--catalogs" or "--semantics" or "--capacities" or "--map-content" or "--raid-paths" or "--queries" or "--quirk-rules" or "--hero-selection" or "--overlay-slots")))
+    if (args.Length is < 1 or > 2 || (args.Length == 2 && args[1] is not ("--maintenance" or "--manifests" or "--catalogs" or "--semantics" or "--capacities" or "--map-content" or "--raid-paths" or "--queries" or "--quirk-rules" or "--hero-selection" or "--overlay-slots" or "--canonical-resources")))
     {
-        throw new InvalidOperationException("Usage: DarkestDungeonSaveEditor.ContractTests <repository-root> [--maintenance|--manifests|--catalogs|--semantics|--capacities|--map-content|--raid-paths|--queries|--quirk-rules|--hero-selection|--overlay-slots]");
+        throw new InvalidOperationException("Usage: DarkestDungeonSaveEditor.ContractTests <repository-root> [--maintenance|--manifests|--catalogs|--semantics|--capacities|--map-content|--raid-paths|--queries|--quirk-rules|--hero-selection|--overlay-slots|--canonical-resources]");
     }
 
-    if (args.Length == 2 && args[1] == "--overlay-slots") await ContractSuite.RunResourceOverlaySlotsOnlyAsync(Path.GetFullPath(args[0]));
+    if (args.Length == 2 && args[1] == "--canonical-resources") await ContractSuite.RunCanonicalResourcesOnlyAsync(Path.GetFullPath(args[0]));
+    else if (args.Length == 2 && args[1] == "--overlay-slots") await ContractSuite.RunResourceOverlaySlotsOnlyAsync(Path.GetFullPath(args[0]));
     else if (args.Length == 2 && args[1] == "--hero-selection") await ContractSuite.RunHeroSelectionOnlyAsync(Path.GetFullPath(args[0]));
     else if (args.Length == 2 && args[1] == "--quirk-rules") await ContractSuite.RunQuirkRulesOnlyAsync(Path.GetFullPath(args[0]));
     else if (args.Length == 2 && args[1] == "--queries") await ContractSuite.RunFileQueriesOnlyAsync(Path.GetFullPath(args[0]));

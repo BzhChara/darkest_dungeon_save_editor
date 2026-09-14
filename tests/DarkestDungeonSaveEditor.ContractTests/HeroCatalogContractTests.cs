@@ -21,8 +21,8 @@ internal static partial class ContractSuite
             "An official-style hero .override.darkest file must patch its active base .info.darkest definition without replacing the rest of the class template.");
         Assert(
             officialOverrideHero.SourceLabel.Contains("官方 DLC：", StringComparison.Ordinal) &&
-            officialOverrideHero.SourceLabel.Contains("创意工坊 Mod：111", StringComparison.Ordinal),
-            "A Mod that supplies only an .override.darkest file must be named as the current provider without hiding the hero's official origin.");
+            !officialOverrideHero.SourceLabel.Contains("创意工坊 Mod：111", StringComparison.Ordinal),
+            "A DLC-prefixed Mod override cannot answer the hero's root request or appear as its current provider.");
         Assert(heroCatalog.HeroClasses.Any(item => item.Id == "enabled_dlc_hero"), "Enabled DLC feature hero is missing.");
         Assert(heroCatalog.HeroClasses.All(item => item.Id != "disabled_dlc_hero"), "A disabled DLC feature hero must not be scanned.");
         Assert(heroCatalog.HeroClasses.All(item => item.Id != "backup_hero"), "A manifest backup path must not enter the active hero catalog.");
@@ -32,11 +32,11 @@ internal static partial class ContractSuite
         var overriddenDlcHero = heroCatalog.HeroClasses.Single(item => item.Id == "dlc_shared_hero");
         var overriddenDlcFeatureHero = heroCatalog.HeroClasses.Single(item => item.Id == "enabled_dlc_hero");
         Assert(
-            overriddenDlcHero.Source == "workshop:111" &&
-            overriddenDlcHero.AllSources.Count == 2 &&
+            overriddenDlcHero.Source == "dlc-package:feature_pack" &&
+            overriddenDlcHero.AllSources.Count == 1 &&
             !overriddenDlcHero.HasProviderConflict &&
-            overriddenDlcHero.CombatSkillIds.SequenceEqual(["modded_dlc_skill"]),
-            "A Mod manifest DLC path should override the matching DLC hero file.");
+            overriddenDlcHero.CombatSkillIds.SequenceEqual(["shared_dlc_skill"]),
+            "The hero's root request falls back to the physical DLC when the Mod lists only a prefixed key.");
         Assert(
             overriddenDlcHero.RuntimeQuirkSignals.Single().QuirkId == "dlc_top_quirk",
             "Mod manifest DLC paths should be classified for effect and quirk overlays.");
@@ -44,11 +44,11 @@ internal static partial class ContractSuite
             overriddenDlcHero.RecruitEvents.Single().Count == 6.0,
             "Mod manifest DLC paths should be classified for town-event overlays.");
         Assert(
-            overriddenDlcFeatureHero.Source == "workshop:111" &&
-            overriddenDlcFeatureHero.AllSources.Count == 2 &&
+            overriddenDlcFeatureHero.Source == "dlc-feature:enabled_feature" &&
+            overriddenDlcFeatureHero.AllSources.Count == 1 &&
             !overriddenDlcFeatureHero.HasProviderConflict &&
-            overriddenDlcFeatureHero.CombatSkillIds.SequenceEqual(["modded_enabled_dlc_skill"]),
-            "A Mod should override an enabled DLC feature hero through its full virtual path.");
+            overriddenDlcFeatureHero.CombatSkillIds.SequenceEqual(["enabled_dlc_skill"]),
+            "An enabled DLC feature's physical hero remains active when no root Mod key matches.");
 
         var overriddenHero = heroCatalog.HeroClasses.Single(item => item.Id == "base_hero");
         Assert(overriddenHero.Source == "workshop:111", "A Mod should override the base game at the same relative hero path.");

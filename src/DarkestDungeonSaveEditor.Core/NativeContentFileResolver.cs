@@ -24,15 +24,18 @@ internal static class NativeContentFileResolver
         // ActorClass opens a constructed path, not the path that discovered its
         // ID. A manifest still limits eligible Mod providers for that lookup
         // (also verified by the existing-hero manifest A/B game experiment).
-        var prefixes = ContentFileOverlay.GetEnabledDlcPrefixes(sources);
-        var candidates = sources.SelectMany(source => EnumerateActorOpenFiles(source, prefixes, directory, issues)
-            .Select(path => new ContentFileCandidate(source, path))).ToArray();
-        return ResolveOpenedFiles(candidates, sources, "Actor definition", issues, reportCaseDifferences: false).ToDictionary(file =>
-        {
-            var prefix = prefixes.OrderByDescending(value => value.Length).FirstOrDefault(value =>
-                file.RelativePath.StartsWith(value + "/", StringComparison.OrdinalIgnoreCase));
-            return prefix is null ? file.RelativePath : file.RelativePath[(prefix.Length + 1)..];
-        }, StringComparer.OrdinalIgnoreCase);
+        var requests = DiscoverActorIds(sources, directory, issues)
+            .SelectMany(id => ActorOpenPaths(directory, id)).ToArray();
+        return ResolveOpenRequests(sources, requests, "Actor definition", issues);
+    }
+
+    internal static IEnumerable<string> ActorOpenPaths(string directory, string id)
+    {
+        if (directory == "monsters" && id.Length < 2) yield break;
+        var stem = directory == "heroes" ? $"heroes/{id}/{id}" : $"monsters/{id[..^2]}/{id}/{id}";
+        foreach (var suffix in directory == "heroes"
+                     ? new[] { ".info.darkest", ".art.darkest", ".override.darkest" }
+                     : new[] { ".info.darkest", ".art.darkest" }) yield return stem + suffix;
     }
 
     internal static IReadOnlyList<string> EnumerateActorOpenFiles(ActiveContentSource source,
@@ -79,19 +82,83 @@ internal static class NativeContentFileResolver
         string contentLabel,
         List<string> issues,
         bool reportCaseDifferences = true)
-        => ResolveCore(candidates, activeSources, contentLabel, issues, reportCaseDifferences, exactPaths: false, appendOnly: false);
+        => ResolveCore(candidates, activeSources, contentLabel, issues, reportCaseDifferences, flags: 0);
 
-    // Constructed OpenFile paths do not consume an IO_FindFiles result list.
-    // Keep their Windows path aliases and mounted same-path provider election.
+    // OpenFile (0x140248040) tests the ORIGINAL request against each Mod's
+    // case-sensitive manifest keys. Only physical directory devices use Windows
+    // aliases. A DLC-prefixed Mod key cannot answer an unprefixed root request.
     internal static IReadOnlyList<EffectiveContentFile> ResolveOpenedFiles(
+        IReadOnlyList<ActiveContentSource> sources,
+        IEnumerable<string> requests,
+        string contentLabel,
+        List<string> issues)
+        => ResolveOpenRequests(sources, requests, contentLabel, issues).Values.ToArray();
+
+    private static IReadOnlyDictionary<string, EffectiveContentFile> ResolveOpenRequests(
+        IReadOnlyList<ActiveContentSource> sources,
+        IEnumerable<string> requests,
+        string contentLabel,
+        List<string> issues)
+    {
+        var comparer = Comparer<ActiveContentSource>.Create(ContentFileOverlay.ComparePriority);
+        var ordered = sources.DistinctBy(source => source.Id, StringComparer.OrdinalIgnoreCase)
+            .OrderBy(source => source, comparer).ToArray();
+        var requestList = requests.Distinct(StringComparer.Ordinal).ToArray();
+        var manifestRequests = requestList.Where(request => !request.StartsWith('>')).ToHashSet(StringComparer.Ordinal);
+        var manifests = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+        bool CanOpen(ActiveContentSource source, string path)
+        {
+            if (source.Kind is not ("local" or "workshop")) return File.Exists(Path.Combine(source.Directory, path));
+            if (!manifests.TryGetValue(source.Id, out var keys))
+            {
+                var manifest = Path.Combine(source.Directory, "modfiles.txt");
+                ModManifestFile.Require(manifest);
+                keys = ModManifestFile.ReadEntries(manifest, raw =>
+                    ModManifestPath.Extract(raw, "") is { } entry && manifestRequests.Contains(entry.Replace('\\', '/')) ? entry : null)
+                    .Select(entry => entry.RelativePath.Replace('\\', '/')).ToHashSet(StringComparer.Ordinal);
+                manifests.Add(source.Id, keys);
+            }
+            // A listed missing winner must remain selected so its consumer
+            // reports the failure; do not silently revive lower definitions.
+            return keys.Contains(path);
+        }
+        var result = new Dictionary<string, EffectiveContentFile>(StringComparer.Ordinal);
+        foreach (var request in requestList)
+        {
+            var baseOnly = request.StartsWith('>');
+            var path = baseOnly ? request[1..] : request;
+            var eligible = ordered.Where(source => (!baseOnly || source.Kind == "base") && CanOpen(source, path)).ToArray();
+            if (eligible.Length == 0) continue;
+            var winner = eligible[^1];
+            if (eligible.Length > 1 && comparer.Compare(eligible[^2], winner) == 0)
+            {
+                issues.Add($"{contentLabel} request '{request}' has multiple providers at the same unverified priority and was ignored.");
+                continue;
+            }
+            // Preserve the requested spelling for actor IDs, even when Windows
+            // opens a differently cased physical filename behind this path.
+            var openedPath = Path.GetFullPath(Path.Combine(winner.Directory, path));
+            var providers = eligible.Select(source => new ContentFileProvider(source.Id, Path.GetFullPath(Path.Combine(source.Directory, path)))).ToArray();
+            result.Add(request, new EffectiveContentFile(winner, openedPath,
+                ContentFileOverlay.NormalizeRelativePath(winner, openedPath)!,
+                providers.Select(provider => provider.SourceId).ToArray(),
+                providers.Select(provider => provider.Path).ToArray(), providers));
+        }
+        return result;
+    }
+
+    // EffectLibrary uses mode 1, flags 1 (0x1404E494D). An offset-zero
+    // match is erased, then the new provider is appended at the END. A match
+    // inside an already-prefixed provider appends without erasing that provider.
+    internal static IReadOnlyList<EffectiveContentFile> ResolveEffectFiles(
         IReadOnlyList<ContentFileCandidate> candidates,
         IReadOnlyList<ActiveContentSource> activeSources,
         string contentLabel,
-        List<string> issues,
-        bool reportCaseDifferences = true)
-        => ResolveCore(candidates, activeSources, contentLabel, issues, reportCaseDifferences, exactPaths: true, appendOnly: false);
+        List<string> issues)
+        => ResolveCore(candidates, activeSources, contentLabel, issues, reportCaseDifferences: true, flags: 1);
 
-    // PropLibrary uses mode 1, flags 9 (0x1404D87F7 / 0x1404D8A0A).
+    // PropLibrary (0x1404D87F7 / 0x1404D8A0A) and District (0x140559EB3)
+    // use mode 1, flags 9.
     // Bit 8 prefixes Base paths with '>'; alternate paths retain their mount
     // prefix. Bit 1 only erases an offset-zero match, so a contained relative
     // tail appends these concrete providers instead of replacing a prior slot.
@@ -101,7 +168,7 @@ internal static class NativeContentFileResolver
         string contentLabel,
         List<string> issues)
         => ResolveCore(candidates, activeSources, contentLabel, issues, reportCaseDifferences: true,
-            exactPaths: false, appendOnly: true);
+            flags: 9);
 
     private static IReadOnlyList<EffectiveContentFile> ResolveCore(
         IReadOnlyList<ContentFileCandidate> candidates,
@@ -109,8 +176,7 @@ internal static class NativeContentFileResolver
         string contentLabel,
         List<string> issues,
         bool reportCaseDifferences,
-        bool exactPaths,
-        bool appendOnly)
+        int flags)
     {
         var sources = candidates.Select(candidate => candidate.Source)
             .DistinctBy(source => source.Id, StringComparer.OrdinalIgnoreCase)
@@ -159,10 +225,16 @@ internal static class NativeContentFileResolver
                 !spelling.Equals(path, StringComparison.Ordinal))
                 issues.Add($"{contentLabel} mount paths differ only in case; native matching is unverified: {path}");
             spellings[path] = path;
-            var slot = exactPaths
-                ? result.FindIndex(existing => MountedPath(existing.RelativePath).Equals(path, StringComparison.OrdinalIgnoreCase))
-                : appendOnly || MountSource(file).Kind == "base" ? -1
+            var slot = flags == 9 || MountSource(file).Kind == "base" ? -1
                 : result.FindIndex(existing => existing.RelativePath.Contains(path, StringComparison.Ordinal));
+            if (flags == 1 && slot >= 0)
+            {
+                // Base has an unprefixed request; other results have a native
+                // device/mount prefix, making their matching offset positive.
+                if (MountSource(result[slot]).Kind == "base" &&
+                    result[slot].RelativePath.StartsWith(path, StringComparison.Ordinal)) result.RemoveAt(slot);
+                slot = -1;
+            }
             if (slot < 0)
             {
                 result.Add(file);
@@ -178,30 +250,19 @@ internal static class NativeContentFileResolver
                 ProviderPaths = providers.Select(provider => provider.Path).Distinct(StringComparer.OrdinalIgnoreCase).ToArray()
             };
         }
-        if (!exactPaths && !appendOnly && result.Any(file => file.Source.Kind == "base"))
+        if (flags != 9 && result.Any(file => file.Source.Kind == "base"))
         {
-            // Flags 0 leaves Base paths unprefixed. OpenFile subsequently
+            // Flags 0 and 1 leave Base paths unprefixed. OpenFile subsequently
             // searches alternate mounts (0x140248051-0x14024812C), even when
             // that mount replaced a different, containing enumeration slot.
             // Preserve the slots, including repeated reads of the same bytes.
-            var openCandidates = candidates.Select(candidate =>
-                    (Candidate: candidate, Path: ContentFileOverlay.NormalizeRelativePath(candidate.Source, candidate.Path)))
-                .Where(entry => entry.Path is not null)
-                .GroupBy(entry => MountedPath(entry.Path!), StringComparer.OrdinalIgnoreCase)
-                .ToDictionary(group => group.Key, group => group.ToArray(), StringComparer.OrdinalIgnoreCase);
+            var opened = ResolveOpenRequests(activeSources,
+                result.Where(file => file.Source.Kind == "base").Select(file => file.RelativePath), contentLabel, issues);
             for (var index = 0; index < result.Count; index++)
             {
                 var prior = result[index];
-                if (prior.Source.Kind != "base" || !openCandidates.TryGetValue(prior.RelativePath, out var matches)) continue;
-                // 0x1402480DC/0x1402393C0 uses the original request against
-                // case-sensitive Mod manifest keys. A DLC-prefixed Mod path
-                // cannot answer a root request; physical DLC/mode fallback
-                // still uses the Windows directory device.
-                var eligible = matches.Where(entry => entry.Candidate.Source.Kind is not ("local" or "workshop") ||
-                        entry.Path!.Equals(prior.RelativePath, StringComparison.Ordinal))
-                    .Select(entry => entry.Candidate).ToArray();
-                var opened = ResolveOpenedFiles(eligible, activeSources, contentLabel, issues, reportCaseDifferences: false);
-                if (opened.Count == 1) result[index] = opened[0];
+                if (prior.Source.Kind != "base") continue;
+                if (opened.TryGetValue(prior.RelativePath, out var file)) result[index] = file;
             }
         }
         return result;

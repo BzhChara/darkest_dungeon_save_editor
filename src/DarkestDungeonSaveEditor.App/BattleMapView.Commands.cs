@@ -458,10 +458,11 @@ public partial class BattleMapView : UserControl
 
     private async Task ReloadRoomAttachmentCatalogAsync(ActiveContentSnapshot activeContent)
     {
+        var dungeonId = _currentSnapshot?.DungeonId;
         try
         {
             _roomAttachmentCatalog = await Task.Run(
-                () => BattleRoomAttachmentCatalog.Load(activeContent));
+                () => BattleRoomAttachmentCatalog.Load(activeContent, dungeonId));
         }
         catch (Exception ex)
         {

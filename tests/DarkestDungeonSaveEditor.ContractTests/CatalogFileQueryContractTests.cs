@@ -9,7 +9,7 @@ internal static partial class ContractSuite
             var sourceRoot = Path.Combine(root, kind);
             var prefix = kind == "dlc-mod" ? "dlc/rq_feature/" : "";
             void Write(string path, string text) => WriteMultiMash(sourceRoot, prefix + path, text);
-            Write("heroes/rq/rq.info.darkest", "armour: .name rq.armour.0 .hp 20\n");
+            WriteMultiMash(sourceRoot, "heroes/rq/rq.info.darkest", "armour: .name rq.armour.0 .hp 20\n");
             Write("shared/buffs/a.buffs.json", QueryBuff(.25));
             Write("shared/buffs/z.buffsXjson", QueryBuff(.75));
             Write("shared/quirk/rq.quirk_libraryXjson", """{"quirks":[{"id":"rq_hp","is_positive":true,"buffs":["rq_hp"]}]}""");

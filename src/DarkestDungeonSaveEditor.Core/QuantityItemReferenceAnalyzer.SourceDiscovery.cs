@@ -13,7 +13,7 @@ internal static partial class QuantityItemReferenceAnalyzer
         ref bool scanComplete)
     {
         var enabledDlcPrefixes = ContentFileOverlay.GetEnabledDlcPrefixes(activeContent.Sources);
-        var actorPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var actorRequests = new HashSet<string>(StringComparer.Ordinal);
         foreach (var source in activeContent.Sources)
         {
             try
@@ -22,11 +22,7 @@ internal static partial class QuantityItemReferenceAnalyzer
                 foreach (var path in NativeContentFileResolver.EnumerateActorInfoFiles(source, enabledDlcPrefixes, directory, issues))
                 {
                     var id = NativeContentFileResolver.ReadDiscoveredActorId(Path.GetRelativePath(source.Directory, path));
-                    if (directory == "monsters" && id.Length < 2) continue;
-                    var stem = directory == "heroes" ? $"heroes/{id}/{id}" : $"monsters/{id[..^2]}/{id}/{id}";
-                    foreach (var suffix in directory == "heroes"
-                                 ? new[] { ".info.darkest", ".art.darkest", ".override.darkest" }
-                                 : new[] { ".info.darkest", ".art.darkest" }) actorPaths.Add(stem + suffix);
+                    foreach (var request in NativeContentFileResolver.ActorOpenPaths(directory, id)) actorRequests.Add(request);
                 }
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -35,6 +31,9 @@ internal static partial class QuantityItemReferenceAnalyzer
                 issues.Add($"Failed to enumerate actor item consumers in '{source.Directory}': {ex.Message}");
             }
         }
+        // Candidate discovery admits Windows aliases; provider lookup retains
+        // the exact actor request and separately checks the manifest key.
+        var actorPaths = actorRequests.ToHashSet(StringComparer.OrdinalIgnoreCase);
         var candidates = new List<ContentFileCandidate>();
         foreach (var source in activeContent.Sources)
         {
@@ -65,7 +64,7 @@ internal static partial class QuantityItemReferenceAnalyzer
             var path = ContentFileOverlay.NormalizeRelativePath(candidate.Source, candidate.Path)!;
             var mounted = NativeResourceFileRules.MountedPath(path, enabledDlcPrefixes);
             var manifest = candidate.Source.Kind is "local" or "workshop";
-            if (actorPaths.Contains(mounted)) return "open";
+            if (actorPaths.Contains(mounted)) return "actor";
             if (NativeResourceFileRules.IsCurioTypeFile(path, enabledDlcPrefixes, manifest)) return "curio";
             if (NativeResourceFileRules.IsLootFile(path, enabledDlcPrefixes, manifest)) return "loot";
             var kind = NativeResourceFileRules.ReferenceJsonKind(path, enabledDlcPrefixes, manifest);
@@ -78,13 +77,16 @@ internal static partial class QuantityItemReferenceAnalyzer
                 _ => "json:" + kind
             };
         }
-        var fileGroups = candidates.GroupBy(QueryKey);
-        foreach (var file in fileGroups.SelectMany(group => group.Key switch
+        var fileGroups = candidates.GroupBy(QueryKey).Where(group => group.Key != "actor");
+        var actorFiles = NativeContentFileResolver.ResolveOpenedFiles(activeContent.Sources, actorRequests, "Quantity-item reference", issues);
+        foreach (var file in actorFiles.Concat(fileGroups.SelectMany(group => group.Key switch
                  {
-                     "open" => NativeContentFileResolver.ResolveOpenedFiles(group.ToArray(), activeContent.Sources, "Quantity-item reference", issues),
-                     "curio" => NativeContentFileResolver.ResolveAdditiveFiles(group.ToArray(), activeContent.Sources, "Quantity-item reference", issues),
+                     // Unknown consumers retain their conservative full-path
+                     // overlay analysis; they are not proven canonical opens.
+                     "open" => ResolveUnverifiedReferenceFiles(group.ToArray(), activeContent.Sources, enabledDlcPrefixes, issues),
+                     "curio" or "json:Districts" => NativeContentFileResolver.ResolveAdditiveFiles(group.ToArray(), activeContent.Sources, "Quantity-item reference", issues),
                      _ => NativeContentFileResolver.Resolve(group.ToArray(), activeContent.Sources, "Quantity-item reference", issues)
-                 }))
+                 })))
         {
             try
             {
@@ -115,6 +117,26 @@ internal static partial class QuantityItemReferenceAnalyzer
         }
 
         return result;
+    }
+
+    private static IReadOnlyList<EffectiveContentFile> ResolveUnverifiedReferenceFiles(
+        IReadOnlyList<ContentFileCandidate> candidates, IReadOnlyList<ActiveContentSource> sources,
+        IReadOnlyList<string> prefixes, List<string> issues)
+    {
+        // Preserve the existing conservative overlay for unknown consumers.
+        // No canonical request or enumeration flags have been proven for them.
+        ActiveContentSource Position(EffectiveContentFile file)
+        {
+            var prefix = prefixes.OrderByDescending(value => value.Length).FirstOrDefault(value =>
+                file.RelativePath.StartsWith(value + "/", StringComparison.OrdinalIgnoreCase));
+            return prefix is null ? file.Source : sources.First(source => source.VirtualPathPrefix.Equals(prefix, StringComparison.OrdinalIgnoreCase));
+        }
+        return ContentFileOverlay.Resolve(candidates, "Quantity-item reference", issues)
+            .OrderBy(Position, Comparer<ActiveContentSource>.Create(ContentFileOverlay.ComparePriority))
+            .ThenByDescending(file => file.RelativePath.Count(c => c == '/'))
+            .ThenBy(file => file.RelativePath, StringComparer.Ordinal)
+            .GroupBy(file => NativeResourceFileRules.MountedPath(file.RelativePath, prefixes), StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.Last()).ToArray();
     }
 
     private static void AuditManifestReferenceFiles(

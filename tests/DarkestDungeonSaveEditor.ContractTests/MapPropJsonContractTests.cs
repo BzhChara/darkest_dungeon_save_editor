@@ -57,7 +57,8 @@ internal static partial class ContractSuite
             var sourceRoot = Path.Combine(root, kind);
             var prefix = kind == "dlc-mod" ? "dlc/rq_feature/" : "";
             void Resource(string path, string text) => WriteMapContentFixture(sourceRoot, prefix + path, text);
-            Resource("dungeons/query/query.props.darkest", "traps: .chance 1 .types alpha\nobstacles: .chance 1 .types stone\n");
+            // Regional pools use canonical root opens; the JSON fixtures below use staged queries.
+            WriteMapContentFixture(sourceRoot, "dungeons/query/query.props.darkest", "traps: .chance 1 .types alpha\nobstacles: .chance 1 .types stone\n");
             var baseline = kind == "base" ? sourceRoot : Path.Combine(root, kind + "-base");
             WriteMapContentFixture(baseline, "props/prop_definitions.json", """{"props":[{"name":"root_parent","default_data":{"instance_type":"trap"}}]}""");
             WriteMapContentFixture(baseline, "props/obstacle_definitions.json", """{"props":[{"name":"root_parent","default_data":{"instance_type":"obstacle"}}]}""");

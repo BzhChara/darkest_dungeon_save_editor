@@ -5,6 +5,7 @@
 The suite is split by responsibility:
 
 - `ContractFixture.cs`: isolated game, Mod, profile, localization, and DSON fixtures;
+- `CanonicalResourceContractTests.cs`: original-request manifest matching versus physical aliases, DLC root fallback, missing winners, hero HP/XP and actor loot, regional pools, Effect flags-1 order, District flags-9 town/raid references, all three battle types and direct/Bridge DSON writes, maintenance and deletion (`--canonical-resources`);
 - `UiContractTests.cs`: XAML, theme, asset, and UI source contracts;
 - `UiLayoutContractTests.cs`: fixed load footer, selected-row details for all three catalogs, responsive tab headers, minimal quirk layout, and themed checkbox contracts;
 - `ContentDiscoveryContractTests.cs`: manifest-listed enabled-DLC root discovery, missing-manifest rejection, overlay dependencies, XML/loc2 names, capacities, and exclusion of disabled/backup content;

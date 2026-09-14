@@ -7,13 +7,15 @@ public static partial class HeroClassCatalog
         Func<SourceFileSet, IReadOnlyList<string>> selectFiles,
         string contentLabel,
         List<string> issues,
-        bool directOpen = false)
+        string? openPath = null,
+        bool effects = false)
     {
         var candidates = sourceFiles.SelectMany(item =>
             selectFiles(item.Files).Select(path => new ContentFileCandidate(item.Source, path))).ToArray();
         var sources = sourceFiles.Select(item => item.Source).ToArray();
-        return directOpen
-            ? NativeContentFileResolver.ResolveOpenedFiles(candidates, sources, contentLabel, issues)
+        return openPath is not null
+            ? NativeContentFileResolver.ResolveOpenedFiles(sources, [openPath], contentLabel, issues)
+            : effects ? NativeContentFileResolver.ResolveEffectFiles(candidates, sources, contentLabel, issues)
             : NativeContentFileResolver.Resolve(candidates, sources, contentLabel, issues);
     }
 

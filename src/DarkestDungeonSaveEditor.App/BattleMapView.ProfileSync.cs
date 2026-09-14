@@ -73,8 +73,8 @@ public partial class BattleMapView : UserControl
                 encounters = await Task.Run(() => BattleEncounterCatalog.Load(content, snapshot), cancellationToken);
             }
             var attachments = _roomAttachmentCatalog;
-            if (contentChanged || attachments is null)
-                attachments = await Task.Run(() => BattleRoomAttachmentCatalog.Load(content), cancellationToken);
+            if (contentChanged || attachments is null || attachments.Guard.RequestedDungeonId != snapshot.DungeonId)
+                attachments = await Task.Run(() => BattleRoomAttachmentCatalog.Load(content, snapshot.DungeonId), cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
             if (generation != _profileGeneration) return;
 
