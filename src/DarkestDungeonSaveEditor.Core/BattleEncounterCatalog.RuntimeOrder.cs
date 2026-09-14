@@ -6,9 +6,10 @@ public static partial class BattleEncounterCatalog
     // path in place, and appends new paths in each mount's depth/strcmp order.
     // Sorting only the final winners loses the slot established by a base file
     // or a lower-priority Mod. See docs/encounter-runtime-order.md.
-    private static IReadOnlyList<EffectiveContentFile> ResolveRuntimeFileOrder(
+    private static IReadOnlyList<EffectiveMashFile> ResolveRuntimeFileOrder(
         IReadOnlyList<ContentFileCandidate> candidates,
         IReadOnlyList<ActiveContentSource> activeSources,
+        MashQuery query,
         List<string> issues)
     {
         var sources = candidates.Select(candidate => candidate.Source)
@@ -20,7 +21,7 @@ public static partial class BattleEncounterCatalog
             .FirstOrDefault(prefix => path.StartsWith(prefix + "/", StringComparison.OrdinalIgnoreCase));
         string ProviderPath(ContentFileProvider provider) => ContentFileOverlay.NormalizeRelativePath(
             sources[provider.SourceId], provider.Path)!;
-        var indexedFiles = files.Where(file => ClassifyFile(file.Path) == BattleEncounterSourceKind.Standard &&
+        var indexedFiles = files.Where(file => query.SourceKind == BattleEncounterSourceKind.Standard &&
             HasIndexedTableDeclarations(file.Path)).ToArray();
         foreach (var file in indexedFiles)
         {
@@ -30,26 +31,13 @@ public static partial class BattleEncounterCatalog
                 file.Providers.All(provider => sources[provider.SourceId].Kind is "local" or "workshop"))
                 issues.Add($"仅 Mod 提供的 DLC 子目录新增遭遇文件尚未验证原生发现规则：{file.RelativePath}");
         }
-        foreach (var group in indexedFiles
-                     .GroupBy(file =>
-                     {
-                         TryDescribeMashFile(file.RelativePath, out var dungeon, out var difficulty);
-                         return (dungeon, difficulty);
-                     }))
-        {
-            if (group.Select(file => MountPrefix(file.RelativePath)).Where(prefix => prefix is not null)
-                .Distinct(StringComparer.OrdinalIgnoreCase).Skip(1).Any())
-                issues.Add($"同一地区/难度跨越多个 DLC 挂载目录，尚未验证这些挂载之间的顺序：{group.Key.dungeon}/{group.Key.difficulty}");
-        }
+        if (indexedFiles.Select(file => MountPrefix(file.RelativePath)).Where(prefix => prefix is not null)
+            .Distinct(StringComparer.OrdinalIgnoreCase).Skip(1).Any())
+            issues.Add($"同一地区/难度跨越多个 DLC 挂载目录，尚未验证这些挂载之间的顺序：{query.DungeonId}/{query.Difficulty}");
         // Each native region/difficulty/collection query starts with its own
         // result list. Global Bridge discovery must not merge different queries.
-        return candidates.GroupBy(candidate =>
-            {
-                TryDescribeMashFile(ContentFileOverlay.NormalizeRelativePath(candidate.Source, candidate.Path)!,
-                    out var dungeon, out var difficulty, candidate.Source.Kind is "local" or "workshop");
-                return (dungeon, difficulty, Kind: ClassifyFile(candidate.Path));
-            })
-            .SelectMany(group => NativeContentFileResolver.Resolve(group.ToArray(), activeSources, "Encounter mash", issues))
+        return NativeContentFileResolver.Resolve(candidates, activeSources, "Encounter mash", issues)
+            .Select(file => new EffectiveMashFile(file, query))
             .ToArray();
     }
 

@@ -259,7 +259,7 @@ internal static partial class ContractSuite
             }
             if (scenario == "unknown")
             {
-                File.AppendAllText(nativeMash, "hall: .chance 1 .types\n");
+                File.AppendAllText(nativeMash, $"hall: .chance 1 .types {new string('界', 11)}\n");
                 var error = await CaptureSaveFailureAsync(() => bridge.ReconcileAsync(content, game, mods));
                 Assert(error is not null && ComputeSha256(mapPath) == beforeMap && bridgeBefore!.All(pair => ComputeSha256(pair.Key) == pair.Value),
                     "Unparseable index tables must defer without turning uncertainty into deletions.");

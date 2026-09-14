@@ -391,13 +391,11 @@ public static partial class BattleEncounterCatalog
 
         ValidateGuard(encounter.TableGuard);
         var matches = ParseGuardedFiles(encounter.TableGuard)
-            .Where(candidate =>
+            .Any(candidate =>
                 candidate.SourceKind is
                     BattleEncounterSourceKind.Conditional or BattleEncounterSourceKind.Additional &&
-                SameEncounterIdentity(encounter, candidate))
-            .Take(2)
-            .Count();
-        if (matches != 1)
+                SameEncounterIdentity(encounter, candidate));
+        if (!matches)
         {
             throw new InvalidOperationException(
                 "所选特殊遭遇已变化、消失或存在歧义，请重新加载内容目录。");
@@ -418,29 +416,34 @@ public static partial class BattleEncounterCatalog
         ValidateGuard(encounter.TableGuard);
         ValidateMonsterDefinitions(encounter);
         var issues = new List<string>();
-        var matchingFile = ResolveGlobalEffectiveMashFiles(
+        var matchingFiles = ResolveEffectiveMashFiles(
                 encounter.TableGuard.ActiveSources,
+                encounter.OriginDungeonId,
+                encounter.OriginDifficulty,
                 issues)
-            .SingleOrDefault(file =>
+            .Where(file => file.Query.SourceKind == encounter.SourceKind &&
+                file.Query.Difficulty == encounter.OriginDifficulty &&
+                file.Query.DungeonId.Equals(encounter.OriginDungeonId, StringComparison.Ordinal) &&
+                Path.GetFullPath(file.Path).Equals(Path.GetFullPath(encounter.SourcePath), StringComparison.OrdinalIgnoreCase) &&
                 file.RelativePath.Equals(
                     encounter.SourceRelativePath,
-                    StringComparison.OrdinalIgnoreCase));
-        if (matchingFile is null)
+                    StringComparison.Ordinal))
+            .ToArray();
+        if (matchingFiles.Length == 0)
         {
             throw new InvalidOperationException(
                 "所选遭遇的有效来源文件已经消失或被其他内容覆盖，请重新加载内容目录。");
         }
 
-        var matches = ParseFile(
-                matchingFile,
+        // Reopened files may occupy more than one native result slot. The full
+        // query/file/hash/record identity proves the source, not its multiplicity.
+        var matches = matchingFiles.SelectMany(file => ParseFile(
+                file,
                 encounter.TableGuard.ActiveSources,
                 encounter.TableGuard,
-                issues)
-            .Where(candidate => IsBridgeCandidate(candidate) &&
-                                SameEncounterIdentity(encounter, candidate))
-            .Take(2)
-            .Count();
-        if (matches != 1)
+                issues))
+            .Any(candidate => IsBridgeCandidate(candidate) && SameEncounterIdentity(encounter, candidate));
+        if (!matches)
         {
             throw new InvalidOperationException(
                 "所选遭遇已变化、消失或存在歧义，请重新加载内容目录。");
@@ -469,7 +472,7 @@ public static partial class BattleEncounterCatalog
             throw new InvalidOperationException(reason);
     }
 
-    private static IReadOnlyList<EffectiveContentFile> ResolveEffectiveMashFiles(
+    private static IReadOnlyList<EffectiveMashFile> ResolveEffectiveMashFiles(
         IReadOnlyList<ActiveContentSource> sources,
         string dungeonId,
         int difficulty,
@@ -483,8 +486,7 @@ public static partial class BattleEncounterCatalog
             foreach (var path in EnumerateMashFiles(source, enabledDlcPrefixes, discoveryIssues))
             {
                 var relativePath = ContentFileOverlay.NormalizeRelativePath(source, path);
-                if (relativePath is not null &&
-                    IsCurrentDungeonDifficultyFile(relativePath, dungeonId, difficulty, source.Kind is "local" or "workshop"))
+                if (relativePath is not null)
                 {
                     candidates.Add(new ContentFileCandidate(source, path));
                 }
@@ -496,7 +498,8 @@ public static partial class BattleEncounterCatalog
                 issue.StartsWith("Encounter Mod manifest could not be read:", StringComparison.Ordinal)));
         }
 
-        return ResolveRuntimeFileOrder(candidates, sources, issues);
+        return Enum.GetValues<BattleEncounterSourceKind>().SelectMany(kind =>
+            ResolveMashQuery(candidates, sources, new MashQuery(dungeonId, difficulty, kind), issues)).ToArray();
     }
 
     private static IReadOnlyList<BattleEncounterDefinition> ParseGuardedFiles(
@@ -511,7 +514,7 @@ public static partial class BattleEncounterCatalog
             guard.Difficulty,
             issues);
         var parsed = effectiveFiles
-            .Where(file => sourceKind is null || ClassifyFile(file.Path) == sourceKind)
+            .Where(file => sourceKind is null || file.Query.SourceKind == sourceKind)
             .SelectMany(file => ParseFile(file, guard.ActiveSources, guard, issues,
                 reportNativeAdjustments: false, onlyMashType: mashType))
             .ToArray();
@@ -588,19 +591,8 @@ public static partial class BattleEncounterCatalog
                 .ToArray()
         };
 
-    private static bool IsCurrentDungeonDifficultyFile(
-        string relativePath,
-        string dungeonId,
-        int difficulty,
-        bool manifestDirectory)
-    {
-        return TryDescribeMashFile(relativePath, out var originDungeon, out var originDifficulty, manifestDirectory) &&
-               originDungeon.Equals(dungeonId, manifestDirectory || ClassifyFile(relativePath) == BattleEncounterSourceKind.Standard
-                   ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase) && originDifficulty == difficulty;
-    }
-
     private static IEnumerable<BattleEncounterDefinition> ParseFile(
-        EffectiveContentFile file,
+        EffectiveMashFile file,
         IReadOnlyList<ActiveContentSource> activeSources,
         BattleEncounterTableGuard guard,
         List<string> issues,
@@ -620,16 +612,7 @@ public static partial class BattleEncounterCatalog
             yield break;
         }
 
-        if (!TryDescribeMashFile(
-                file.RelativePath,
-                out var originDungeonId,
-                out var originDifficulty))
-        {
-            issues.Add($"Encounter mash path has no dungeon/difficulty identity: {file.Path}");
-            yield break;
-        }
-
-        var sourceKind = ClassifyFile(file.Path);
+        var sourceKind = file.Query.SourceKind;
         var sourceHash = ComputeSha256(file.Path);
         var sourceLabel = ContentSourceLabelFormatter.Format(
             file.Source.Id,
@@ -649,12 +632,6 @@ public static partial class BattleEncounterCatalog
                 continue;
             }
 
-            if (NativeDarkestReader.FindValue(record.Body, ".types") < 0)
-            {
-                if (sourceKind == BattleEncounterSourceKind.Standard) unparsedTypes?.Add(mashType);
-                issues.Add($"遭遇行缺少怪物列表（.types），已跳过：{file.Path}:{record.SourceLine}");
-                continue;
-            }
             var actorSlots = NativeDarkestReader.ReadRawStringSlots(record.Body, ".types", 5).ToArray();
             // Empty quoted actors still occupy native slots. Limit the raw
             // slots before removing empty actors from the displayed formation.
@@ -673,14 +650,9 @@ public static partial class BattleEncounterCatalog
                 issues.Add($"遭遇字符串截断后不是完整 UTF-8，无法确认编号：{file.Path}:{record.SourceLine}");
                 continue;
             }
-            if (monsters.Length == 0 && actorSlots.Length == 0)
-            {
-                if (sourceKind == BattleEncounterSourceKind.Standard) unparsedTypes?.Add(mashType);
-                issues.Add($"遭遇行的怪物列表（.types）没有值，已跳过：{file.Path}:{record.SourceLine}");
-                continue;
-            }
-            // Explicit empty actors still produce a native table slot. Keep
-            // the row for index/append/maintenance calculations, not placement.
+            // MashGuide zero-initializes all four actors before the optional
+            // .types read. Missing, bare and quoted-empty lists all retain a
+            // native slot for index/append/maintenance, but cannot be placed.
             if (monsters.Length == 0 && reportNativeAdjustments)
                 issues.Add($"空遭遇保留编号，不影响后续索引，不能放置：{file.Path}:{record.SourceLine}");
             // MashGuide's .types parser copies exactly four 32-byte slots;
@@ -707,30 +679,13 @@ public static partial class BattleEncounterCatalog
                 string.Empty,
                 guard)
             {
-                OriginDungeonId = originDungeonId,
-                OriginDifficulty = originDifficulty,
+                OriginDungeonId = file.Query.DungeonId,
+                OriginDifficulty = file.Query.Difficulty,
                 SourceRelativePath = file.RelativePath,
                 SourceRecordIndex = record.RecordIndex,
                 RoamingId = roamingId
             };
         }
-    }
-
-    internal static BattleEncounterSourceKind ClassifyFile(string path)
-    {
-        var fileName = Path.GetFileName(path);
-        if (fileName.Contains(".conditional.", StringComparison.OrdinalIgnoreCase) ||
-            fileName.StartsWith("conditional.", StringComparison.OrdinalIgnoreCase))
-        {
-            return BattleEncounterSourceKind.Conditional;
-        }
-        if (fileName.Contains(".additional.", StringComparison.OrdinalIgnoreCase) ||
-            fileName.StartsWith("additional.", StringComparison.OrdinalIgnoreCase))
-        {
-            return BattleEncounterSourceKind.Additional;
-        }
-
-        return BattleEncounterSourceKind.Standard;
     }
 
     private static string ComputeTableFingerprint(

@@ -78,21 +78,19 @@ internal static partial class ContractSuite
             "hall: .chance 1\n" +
             "room: .chance 1 .types\n" +
             "boss: .chance 1 .types literal_B.limit\n", new UTF8Encoding(false));
-        var malformedMashHash = ComputeSha256(mashPath);
-        var malformedCatalog = BattleEncounterCatalog.Load(isolated, snapshot);
-        var malformedLogs = CatalogLogDiagnostics.Summarize([("战斗遭遇", malformedCatalog.Issues)]);
-        Assert(malformedLogs.Count == 2 &&
-               malformedLogs.All(entry => entry.Level == DiagnosticLogLevel.Warning) &&
-               malformedLogs.Any(entry => entry.Message ==
-                   $"目录警告：遭遇行缺少怪物列表（.types），已跳过：{mashPath}:1；报告模块=战斗遭遇") &&
-               malformedLogs.Any(entry => entry.Message ==
-                   $"目录警告：遭遇行的怪物列表（.types）没有值，已跳过：{mashPath}:2；报告模块=战斗遭遇"),
-            "Missing and valueless monster-list warnings must use distinct Chinese reasons and retain the source path, line, module, and warning severity.");
-        Assert(malformedCatalog.Encounters.Count == 1 && malformedCatalog.DirectEncounters.Count == 1 &&
-               malformedCatalog.BridgeEncounters.Count == 1 &&
-               malformedCatalog.DirectEncounters.Single().MashIndex == 0 &&
-               malformedCatalog.DirectEncounters.Single().SourceLine == 3 &&
-               malformedMashHash == ComputeSha256(mashPath) && gameHash == ComputeSha256(gamePath),
-            "Localized warnings must still skip only malformed rows without changing valid encounter indexes, source files, or saves.");
+        var emptyMashHash = ComputeSha256(mashPath);
+        var emptyCatalog = BattleEncounterCatalog.Load(isolated, snapshot);
+        var emptyLogs = CatalogLogDiagnostics.Summarize([("战斗遭遇", emptyCatalog.Issues)]);
+        Assert(emptyLogs.Count == 2 &&
+               emptyLogs.All(entry => entry.Level == DiagnosticLogLevel.Warning) &&
+               new[] { 1, 2 }.All(line => emptyLogs.Any(entry => entry.Message ==
+                   $"目录警告：空遭遇保留编号，不影响后续索引，不能放置：{mashPath}:{line}；报告模块=战斗遭遇")),
+            "Missing and valueless lists must report retained empty slots with source path, line, module and severity.");
+        Assert(emptyCatalog.Encounters.Count == 3 && emptyCatalog.DirectEncounters.Count == 1 &&
+               emptyCatalog.Encounters.All(row => row.MashIndex == 0) &&
+               emptyCatalog.BridgeEncounters.Count == 1 &&
+               emptyCatalog.DirectEncounters.Single().SourceLine == 3 &&
+               emptyMashHash == ComputeSha256(mashPath) && gameHash == ComputeSha256(gamePath),
+            "Each independent type retains its own zero slot; empty rows stay unavailable without changing source files or saves.");
     }
 }

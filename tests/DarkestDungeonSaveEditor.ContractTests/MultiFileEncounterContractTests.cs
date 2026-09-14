@@ -219,7 +219,7 @@ internal static partial class ContractSuite
             "Native atoi reads a quoted size as zero, retaining the row rather than skipping it as size 3.");
         File.WriteAllText(sizePath, "display: .size 3\n");
         File.WriteAllBytes(path, original);
-        foreach (var suffix in new[] { "hall: .chance 1\n" })
+        foreach (var suffix in new[] { $"hall: .chance 1 .types {new string('界', 11)}\n" })
         {
             File.AppendAllText(path, suffix);
             var invalid = BattleEncounterCatalog.Load(content, snapshot);
@@ -258,7 +258,7 @@ internal static partial class ContractSuite
         var conditionalPath = WriteMultiMash(game, "dungeons/cove/cove.conditional.2.mash.darkest", "hall: .chance 1\n");
         var separateCollections = BattleEncounterCatalog.Load(content, snapshot);
         Assert(separateCollections.DirectEncounters.Count(row => row.MashType == 0) == 6,
-            "Malformed conditional rows must not affect the independent standard hall table.");
+            "Empty conditional rows must not affect the independent standard hall table.");
         BattleEncounterCatalog.ValidateDirectEncounter(separateCollections.DirectEncounters.First(row => row.MashType == 0));
         File.Delete(conditionalPath);
 
@@ -286,14 +286,11 @@ internal static partial class ContractSuite
         {
             Sources = [new ActiveContentSource("base", "base", "base", emptyRoot, 0)]
         }, snapshot);
-        var emptyOutput = Path.Combine(root, "unproven-empty-type");
-        var emptyFailure = await CaptureSaveFailureAsync(() =>
-        {
-            BattleEncounterBridgeBuilder.Build(emptyCatalog, emptyCatalog.BridgeEncounters.Single(row => row.MashType == 1), emptyOutput);
-            return Task.CompletedTask;
-        });
-        Assert(emptyFailure is InvalidOperationException && !Directory.Exists(emptyOutput),
-            "A skipped malformed row must not make native index zero appear available for the first Bridge entry.");
+        var emptyOutput = Path.Combine(root, "retained-empty-type");
+        BattleEncounterBridgeBuilder.Build(emptyCatalog, emptyCatalog.BridgeEncounters.Single(row => row.MashType == 1), emptyOutput);
+        Assert(emptyCatalog.Encounters.Single(row => row.MashType == 1).MashIndex == 0 &&
+               BattleEncounterCatalog.ResolveAppendTarget(emptyCatalog, 1).NextMashIndex == 1 && Directory.Exists(emptyOutput),
+            "An omitted .types row retains index zero; the first Bridge entry must append at index one.");
 
         var caseRoot = Path.Combine(root, "case-order-game");
         var caseMod = Path.Combine(root, "case-order-mod");

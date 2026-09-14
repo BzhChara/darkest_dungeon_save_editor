@@ -46,6 +46,7 @@ internal static partial class ContractSuite
 
         if (includeBattle)
         {
+            await RunEncounterCollectionQueryContractsAsync(runRoot, codec);
             await RunEncounterFileQueryContractsAsync(runRoot, codec);
             await RunNestedRaidSaveContractsAsync(fixture);
             await RunEncounterMaintenanceContractsAsync(runRoot, codec, nested: true);

@@ -9,7 +9,20 @@ public static partial class BattleEncounterCatalog
     // regex wildcards; %d supplies a canonical decimal rather than leading zeros.
     private const string MashDifficultyQuery = @".(?<difficulty>-?(?:0|[1-9][0-9]*)).mash.darkest\z";
 
-    private static IReadOnlyList<EffectiveContentFile> ResolveGlobalEffectiveMashFiles(
+    private sealed record MashQuery(string DungeonId, int Difficulty, BattleEncounterSourceKind SourceKind);
+
+    // Keep the native query identity even when IO_FindFiles reopens a different
+    // provider or returns the same physical file in multiple result slots.
+    private sealed record EffectiveMashFile(EffectiveContentFile File, MashQuery Query)
+    {
+        public ActiveContentSource Source => File.Source;
+        public string Path => File.Path;
+        public string RelativePath => File.RelativePath;
+        public IReadOnlyList<string> ProviderSources => File.ProviderSources;
+        public IReadOnlyList<string> ProviderPaths => File.ProviderPaths;
+    }
+
+    private static IReadOnlyList<EffectiveMashFile> ResolveGlobalEffectiveMashFiles(
         IReadOnlyList<ActiveContentSource> sources,
         List<string> issues)
     {
@@ -20,16 +33,27 @@ public static partial class BattleEncounterCatalog
             foreach (var path in EnumerateMashFiles(source, enabledDlcPrefixes, issues))
             {
                 var relativePath = ContentFileOverlay.NormalizeRelativePath(source, path);
-                if (relativePath is not null &&
-                    TryDescribeMashFile(relativePath, out _, out _))
+                if (relativePath is not null)
                 {
                     candidates.Add(new ContentFileCandidate(source, path));
                 }
             }
         }
 
-        return ResolveRuntimeFileOrder(candidates, sources, issues);
+        var queries = candidates.SelectMany(candidate => DescribeMashQueries(
+                ContentFileOverlay.NormalizeRelativePath(candidate.Source, candidate.Path)!,
+                candidate.Source.Kind is "local" or "workshop"))
+            .Distinct();
+        return queries.SelectMany(query => ResolveMashQuery(candidates, sources, query, issues)).ToArray();
     }
+
+    private static IReadOnlyList<EffectiveMashFile> ResolveMashQuery(
+        IReadOnlyList<ContentFileCandidate> candidates,
+        IReadOnlyList<ActiveContentSource> sources,
+        MashQuery query,
+        List<string> issues) => ResolveRuntimeFileOrder(candidates.Where(candidate => MatchesMashQuery(
+                ContentFileOverlay.NormalizeRelativePath(candidate.Source, candidate.Path)!, query,
+                candidate.Source.Kind is "local" or "workshop")).ToArray(), sources, query, issues);
 
     private static IReadOnlyList<string> EnumerateMashFiles(
         ActiveContentSource source,
@@ -60,7 +84,7 @@ public static partial class BattleEncounterCatalog
                 .Where(Directory.Exists)
                 .SelectMany(directory => NativeDirectoryDiscovery.EnumerateFiles(
                     directory, "*darkest", SearchOption.AllDirectories))
-                .Where(path => TryDescribeMashFile(Path.GetRelativePath(source.Directory, path), out _, out _))
+                .Where(path => DescribeMashQueries(Path.GetRelativePath(source.Directory, path), false).Any())
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
                 .ToArray();
@@ -109,7 +133,7 @@ public static partial class BattleEncounterCatalog
                 {
                     continue;
                 }
-                if (!TryDescribeMashFile(relativeToRoot, out _, out _, manifestDirectory: true)) continue;
+                if (!DescribeMashQueries(relativeToRoot, true).Any()) continue;
                 if (!File.Exists(path))
                 {
                     issues.Add($"Encounter mash listed by Mod is missing: {path}");
@@ -217,14 +241,14 @@ public static partial class BattleEncounterCatalog
         }
     }
 
-    private static bool TryDescribeMashFile(
+    private static bool TryReadMashDirectory(
         string relativePath,
+        bool manifestDirectory,
         out string dungeonId,
-        out int difficulty,
-        bool manifestDirectory = false)
+        out string fileName)
     {
         dungeonId = string.Empty;
-        difficulty = 0;
+        fileName = string.Empty;
         var normalized = $"/{relativePath.Replace('\\', '/').TrimStart('/')}";
         const string marker = "/dungeons/";
         var markerIndex = normalized.IndexOf(marker,
@@ -241,27 +265,49 @@ public static partial class BattleEncounterCatalog
             return false;
         }
         dungeonId = normalized[dungeonStart..dungeonEnd];
+        fileName = normalized[(normalized.LastIndexOf('/') + 1)..];
+        return true;
+    }
+
+    private static IEnumerable<MashQuery> DescribeMashQueries(string relativePath, bool manifestDirectory)
+    {
+        if (!TryReadMashDirectory(relativePath, manifestDirectory, out var dungeonId, out var fileName)) yield break;
 
         // The physical directory is a Windows path, not the table ID passed to
         // MashGuide. Infer the authored table spelling from the filename while
         // allowing its directory alias (Cove/a.cove.2.mash.darkest). The actual
         // requested table is still compared ordinally by the current-table query.
         // Manifest discovery instead matches the original directory-tree bytes.
-        // Keep the suffix regex and conditional/additional collections unchanged.
-        var standard = ClassifyFile(relativePath) == BattleEncounterSourceKind.Standard;
         var directory = Regex.Escape(dungeonId);
-        var table = standard
-            ? $"(?<table>{(manifestDirectory ? directory : $"(?i:{directory})")})" : string.Empty;
-        var match = Regex.Match(normalized, table + MashDifficultyQuery, RegexOptions.CultureInvariant);
-        if (standard && match.Success) dungeonId = match.Groups["table"].Value;
-        return match.Success &&
-               int.TryParse(
-                   match.Groups["difficulty"].Value,
-                   NumberStyles.Integer,
-                   CultureInfo.InvariantCulture,
-               out difficulty) &&
-               match.Groups["difficulty"].Value == difficulty.ToString(CultureInfo.InvariantCulture);
+        foreach (var kind in Enum.GetValues<BattleEncounterSourceKind>())
+        {
+            var table = kind == BattleEncounterSourceKind.Standard
+                ? $"(?<table>{(manifestDirectory ? directory : $"(?i:{directory})")})"
+                : QueryTableName(dungeonId, kind);
+            var match = Regex.Match(fileName, table + MashDifficultyQuery, RegexOptions.CultureInvariant);
+            if (match.Success && int.TryParse(match.Groups["difficulty"].Value, NumberStyles.Integer,
+                    CultureInfo.InvariantCulture, out var difficulty) &&
+                match.Groups["difficulty"].Value == difficulty.ToString(CultureInfo.InvariantCulture))
+            {
+                yield return new MashQuery(kind == BattleEncounterSourceKind.Standard
+                    ? match.Groups["table"].Value : dungeonId, difficulty, kind);
+            }
+        }
     }
+
+    private static bool MatchesMashQuery(string relativePath, MashQuery query, bool manifestDirectory) =>
+        TryReadMashDirectory(relativePath, manifestDirectory, out var dungeonId, out var fileName) &&
+        dungeonId.Equals(query.DungeonId, manifestDirectory ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase) &&
+        Regex.IsMatch(fileName, Regex.Escape(QueryTableName(query.DungeonId, query.SourceKind)) +
+            "." + query.Difficulty.ToString(CultureInfo.InvariantCulture) + @".mash.darkest\z", RegexOptions.CultureInvariant);
+
+    private static string QueryTableName(string dungeonId, BattleEncounterSourceKind kind) => kind switch
+    {
+        BattleEncounterSourceKind.Standard => dungeonId,
+        BattleEncounterSourceKind.Conditional => "conditional",
+        BattleEncounterSourceKind.Additional => "additional",
+        _ => throw new ArgumentOutOfRangeException(nameof(kind))
+    };
 
     private sealed record AvailableMonsterDefinitions(
         HashSet<string> Ids,
