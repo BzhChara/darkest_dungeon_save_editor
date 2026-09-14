@@ -122,11 +122,10 @@ internal static partial class ContractSuite
         // Inspect the parsed list before the public UI's deliberate signal deduplication.
         // The acceptance list is the native experiment's append order, including Shared twice.
         var files = NativeContentFileResolver.ResolveActorFiles(content.Sources, "heroes", []);
-        var sources = content.Sources.ToDictionary(source => source.Id, StringComparer.OrdinalIgnoreCase);
         var candidate = typeof(HeroClassCatalog).GetMethod("ReadHeroInfo", BindingFlags.Static | BindingFlags.NonPublic)!
-            .Invoke(null, [files[heroPath + ".info.darkest"], sources])!;
+            .Invoke(null, [files[heroPath + ".info.darkest"], hero.ColourVariationCount])!;
         candidate = typeof(HeroClassCatalog).GetMethod("ApplyHeroOverrides", BindingFlags.Static | BindingFlags.NonPublic)!
-            .Invoke(null, [candidate, new[] { files[heroPath + ".override.darkest"] }, sources])!;
+            .Invoke(null, [candidate, new[] { files[heroPath + ".override.darkest"] }])!;
         var refs = ((IEnumerable)candidate.GetType().GetProperty("SkillEffects")!.GetValue(candidate)!).Cast<object>()
             .Where(row => (string)row.GetType().GetProperty("SkillId")!.GetValue(row)! == "semantics_probe")
             .Select(row => (string)row.GetType().GetProperty("EffectName")!.GetValue(row)!).ToArray();

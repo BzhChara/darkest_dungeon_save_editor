@@ -26,14 +26,14 @@ public static partial class HeroClassCatalog
         var heroNames = new HashSet<string>(StringComparer.Ordinal);
         var sourceFiles = new List<SourceFiles>();
         var enabledDlcPrefixes = ContentFileOverlay.GetEnabledDlcPrefixes(activeContent.Sources);
-        var sourcesById = activeContent.Sources.ToDictionary(
-            source => source.Id,
-            StringComparer.OrdinalIgnoreCase);
 
         foreach (var source in activeContent.Sources.OrderBy(item => item.LoadOrder))
         {
             sourceFiles.Add(new SourceFiles(source, EnumerateSourceFiles(source, enabledDlcPrefixes, issues)));
         }
+        var skinDirectories = activeContent.Sources.SelectMany(source =>
+            HeroSkinDirectoryDiscovery.Enumerate(source, enabledDlcPrefixes, issues)
+                .Select(path => new ContentFileCandidate(source, path))).ToArray();
 
         var heroIds = sourceFiles.SelectMany(item => item.Files.HeroInfoFiles.Select(path =>
                 NativeContentFileResolver.ReadDiscoveredActorId(Path.GetRelativePath(item.Source.Directory, path))))
@@ -69,7 +69,8 @@ public static partial class HeroClassCatalog
         {
             try
             {
-                var candidate = ReadHeroInfo(file, sourcesById);
+                var candidate = ReadHeroInfo(file, HeroSkinDirectoryDiscovery.Count(
+                    ReadHeroClassId(file.Path, HeroInfoSuffix), skinDirectories, activeContent.Sources));
                 if (!candidates.TryGetValue(candidate.Id, out var classCandidates))
                 {
                     classCandidates = [];
@@ -277,7 +278,6 @@ public static partial class HeroClassCatalog
                 heroOverridesByClass.TryGetValue(classCandidates[0].Id, out var classOverrides)
                     ? classOverrides
                     : [],
-                sourcesById,
                 eventsByClass,
                 effectiveEffects,
                 effectiveQuirks,

@@ -21,9 +21,9 @@ internal static partial class ContractSuite
             var before = ProfileCatalogContentFingerprint.Capture(content.Sources);
             File.Delete(skin);
             var after = ProfileCatalogContentFingerprint.Capture(content.Sources);
-            Assert(before != after, "Removing a listed skin texture must invalidate the catalog fingerprint.");
-            Assert(HeroClassCatalog.Load(content).HeroClasses.Single(item => item.Id == "local_hero").ColourVariationCount == 1,
-                "A missing listed texture must not keep its physical folder eligible for selection.");
+            Assert(before == after, "Removing a texture without changing the virtual directory tree does not change the skin selection range.");
+            Assert(HeroClassCatalog.Load(content).HeroClasses.Single(item => item.Id == "local_hero").ColourVariationCount == 2,
+                "A missing physical payload must not erase the skin slot still present in the manifest directory tree.");
         }
         finally
         {
@@ -31,7 +31,7 @@ internal static partial class ContractSuite
             File.WriteAllBytes(manifest, original);
         }
         Assert(HeroClassCatalog.Load(content).HeroClasses.Single(item => item.Id == "local_hero").ColourVariationCount == 2,
-            "Restoring the listed B texture must restore the original A/B selection range.");
-        Console.WriteLine("PASS: manifest-only hero skin selection and missing-texture refresh");
+            "The A/B directory selection range is independent of texture payload availability.");
+        Console.WriteLine("PASS: manifest-only hero skin directory selection, independent of texture payload existence");
     }
 }

@@ -159,7 +159,7 @@ internal static partial class ContractSuite
                compatibleHighLevelCandidate.UpgradePurchases.Where(purchase => purchase.TreeId == "compatible_upgrade_hero.implicit_command")
                    .Select(purchase => purchase.RequirementCode).SequenceEqual(["0", "1"]),
             "Real catalog resolution, availability, and generation must agree on selectable tree-less skill progression.");
-        Assert(localHero.ColourVariationCount == 2, "Only the continuous A/B skin directories should be available for random colour selection.");
+        Assert(localHero.ColourVariationCount == 2, "The two mounted A/B skin directories should be available for random colour selection.");
         VerifyManifestSkinSelection(activeContent, localModRoot);
         Assert(localHero.ClassCampingSkillIds.Count == 2 && localHero.SharedCampingSkillIds.Count == 2, "Class and shared camping skills were not separated by the camping configuration.");
         Assert(localHero.IncompatibleInitialQuirkIds.Contains("excluded_quirk"), "Class-level incompatible initial quirks were not parsed.");

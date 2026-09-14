@@ -139,7 +139,8 @@ public static partial class StagecoachHeroCandidateFactory
     private static IReadOnlyList<string> SelectCombatSkills(
         HeroClassDefinition heroClass,
         HeroGenerationDefinition generation,
-        Random random)
+        Random random,
+        List<string> warnings)
     {
         if (heroClass.CombatSkillIds.Count == 0)
         {
@@ -159,7 +160,7 @@ public static partial class StagecoachHeroCandidateFactory
 
         var generatedSkillCount = generation.RandomCombatSkills ??
             throw new InvalidOperationException($"职业 '{heroClass.Id}' 缺少 number_of_random_combat_skills。");
-        if (generatedSkillCount <= 0 || generatedSkillCount > heroClass.CombatSkillIds.Count)
+        if (generatedSkillCount <= 0)
         {
             throw new InvalidOperationException(
                 $"职业 '{heroClass.Id}' 要求生成 {generatedSkillCount} 个战斗技能，但只有 {heroClass.CombatSkillIds.Count} 个 0 级技能。");
@@ -174,21 +175,29 @@ public static partial class StagecoachHeroCandidateFactory
                 $"职业 '{heroClass.Id}' 的可选战斗技能上限无效：{target}。");
         }
 
-        if (heroClass.GuaranteedCombatSkillIds.Count > target)
+        if (generatedSkillCount > heroClass.CombatSkillIds.Count)
         {
-            throw new InvalidOperationException(
-                $"职业 '{heroClass.Id}' 有 {heroClass.GuaranteedCombatSkillIds.Count} 个必选技能，但生成总数只有 {target}。");
+            warnings.Add($"战斗技能要求 {generatedSkillCount} 个、活动内容仅有 {heroClass.CombatSkillIds.Count} 个；装备数量按实际技能池和选择上限确定。");
         }
+        target = Math.Min(target, heroClass.CombatSkillIds.Count);
 
-        var selected = heroClass.GuaranteedCombatSkillIds.ToHashSet(StringComparer.Ordinal);
-        var remaining = heroClass.CombatSkillIds.Where(skill => !selected.Contains(skill)).ToList();
+        var guaranteed = heroClass.GuaranteedCombatSkillIds.ToHashSet(StringComparer.Ordinal);
+        var remaining = heroClass.CombatSkillIds.ToList();
         Shuffle(remaining, random);
-        foreach (var skill in remaining.Take(target - selected.Count))
+        var selected = remaining.Take(target).ToList();
+        // Native initial generation (0x1405C7CF0): at least one marked
+        // skill, not every marked skill. If the first draw misses all marks,
+        // continue without replacement, replacing the first selection slot.
+        if (guaranteed.Count > 0 && !selected.Any(guaranteed.Contains))
         {
-            selected.Add(skill);
+            foreach (var skill in remaining.Skip(target))
+            {
+                selected[0] = skill;
+                if (guaranteed.Contains(skill)) break;
+            }
         }
 
-        return heroClass.CombatSkillIds.Where(selected.Contains).ToArray();
+        return heroClass.CombatSkillIds.Where(skill => selected.Contains(skill, StringComparer.Ordinal)).ToArray();
     }
 
     private static IReadOnlyList<string> SelectCampingSkills(
@@ -198,13 +207,14 @@ public static partial class StagecoachHeroCandidateFactory
         Random random,
         List<string> warnings)
     {
-        if (classSpecificCount > heroClass.ClassCampingSkillIds.Count)
+        var actualClassCount = Math.Min(classSpecificCount, heroClass.ClassCampingSkillIds.Count);
+        if (actualClassCount < classSpecificCount)
         {
-            throw new InvalidOperationException(
-                $"职业 '{heroClass.Id}' 要求 {classSpecificCount} 个职业露营技能，但活动内容中只有 {heroClass.ClassCampingSkillIds.Count} 个。");
+            warnings.Add(
+                $"职业露营技能要求 {classSpecificCount} 个、活动内容仅有 {heroClass.ClassCampingSkillIds.Count} 个；按实际技能池少取，不用共享技能补位。");
         }
 
-        var selectedClass = TakeRandom(heroClass.ClassCampingSkillIds, classSpecificCount, random);
+        var selectedClass = TakeRandom(heroClass.ClassCampingSkillIds, actualClassCount, random);
         var actualSharedCount = Math.Min(sharedCount, heroClass.SharedCampingSkillIds.Count);
         if (actualSharedCount < sharedCount)
         {

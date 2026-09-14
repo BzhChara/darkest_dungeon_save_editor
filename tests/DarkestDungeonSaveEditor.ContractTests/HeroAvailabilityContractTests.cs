@@ -44,8 +44,16 @@ internal static partial class ContractSuite
         }
         var missingCamping = hero with { ClassCampingSkillIds = [] };
         Assert(StagecoachHeroCandidateFactory.GetGenerationAvailability(catalog, missingCamping)
-                .All(level => !level.CanGenerate && level.UnavailableReason.Contains("职业露营技能", StringComparison.Ordinal)),
-            "Incomplete required camping skills must make the displayed generation ability unavailable.");
+                .All(level => level.CanGenerate),
+            "An exhausted class camping pool must not disable otherwise valid generation levels.");
+        foreach (var level in hero.LevelProfiles)
+        {
+            var generated = StagecoachHeroCandidateFactory.Generate(catalog, missingCamping, 1729, level.ResolveLevel, []);
+            Assert(generated.Preview.CampingSkills.Count == Math.Min(hero.Generation!.SharedCampingSkills ?? 0, hero.SharedCampingSkillIds.Count) &&
+                   generated.Preview.CampingSkills.All(hero.SharedCampingSkillIds.Contains) &&
+                   generated.Preview.Warnings.Any(warning => warning.Contains("职业露营技能要求", StringComparison.Ordinal)),
+                "Class-pool exhaustion must preserve shared selection and report the shortage at every available level.");
+        }
         var delayedSkill = hero with
         {
             UpgradeTrees = hero.UpgradeTrees.Select(tree => tree.Id == "local_hero.local_skill_two"

@@ -44,11 +44,10 @@ public static class ProfileCatalogContentFingerprint
                 using var stream = File.OpenRead(path);
                 Add($"{Path.GetFullPath(path)}|{Convert.ToHexString(SHA256.HashData(stream))}");
             }
-            // Skin eligibility depends on listed textures existing, not their
-            // pixel content. Track paths without hashing large image payloads.
-            foreach (var path in ContentFileDiscovery.Enumerate(source, prefixes, issues,
-                         "Hero skin", new ContentFileRule("heroes", "*.png")))
-                Add($"Hero texture: {Path.GetFullPath(path)}");
+            // The native skin list depends on directories, including empty
+            // physical directories and virtual ones built from manifest entries.
+            foreach (var path in HeroSkinDirectoryDiscovery.Enumerate(source, prefixes, issues))
+                Add($"Hero skin directory: {Path.GetFullPath(path)}");
         }
         foreach (var issue in issues.Distinct().Order(StringComparer.Ordinal)) Add(issue);
         return Convert.ToHexString(hash.GetHashAndReset());
