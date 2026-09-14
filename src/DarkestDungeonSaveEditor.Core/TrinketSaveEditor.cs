@@ -42,12 +42,7 @@ public static class TrinketSaveEditor
             throw new ArgumentOutOfRangeException(nameof(copies), "Copies must be between 1 and 999.");
         }
 
-        if (definition.UnsupportedStateFields.Count > 0)
-        {
-            throw new InvalidOperationException(
-                $"饰品“{definition.Id}”的次数定义无效（{string.Join(", ", definition.UnsupportedStateFields)}），" +
-                "无法安全生成初始状态。");
-        }
+        NativeInventoryIdentity.RequireWritable(definition.SaveIdentityIssue);
 
         var updated = estateRoot.DeepClone() as JsonObject
             ?? throw new InvalidDataException("Failed to clone decoded estate save.");
@@ -122,12 +117,6 @@ public static class TrinketSaveEditor
 
     private static JsonObject CreatePristineInstance(TrinketDefinition definition)
     {
-        if (definition.QuestUses is <= 0 || definition.TriggerLimit is <= 0)
-        {
-            throw new InvalidOperationException(
-                $"饰品“{definition.Id}”的初始次数必须为正整数，无法安全生成。");
-        }
-
         var instance = new JsonObject
         {
             ["id"] = definition.Id,
@@ -140,13 +129,15 @@ public static class TrinketSaveEditor
             ["trinkets_gained_count"] = 0
         };
 
-        if (definition.QuestUses is int questUses)
+        // Native save (0x1405D0820) emits only nonnegative counters. Omitted
+        // counters load from the definition; do not turn negative defaults into 0.
+        if (definition.QuestUses is >= 0 and int questUses)
         {
             instance["quest_uses_remaining"] = questUses;
             instance["used_during_quest"] = false;
         }
 
-        if (definition.TriggerLimit is int triggerLimit)
+        if (definition.TriggerLimit is >= 0 and int triggerLimit)
         {
             instance["triggers_remaining"] = triggerLimit;
         }

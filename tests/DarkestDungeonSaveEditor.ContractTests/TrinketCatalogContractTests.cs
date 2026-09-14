@@ -7,7 +7,7 @@ internal static partial class ContractSuite
         TrinketDefinition DefinitionDrivenStateful,
         TrinketDefinition DualCounterStateful,
         ActiveContentSnapshot InvalidCapacityContent,
-        TrinketDefinition InvalidCounterStateful,
+        TrinketDefinition ZeroCounterStateful,
         TrinketDefinition Ordinary,
         TrinketDefinition Stateful,
         TrinketDefinition TriggerStateful,
@@ -155,7 +155,7 @@ internal static partial class ContractSuite
         var triggerStateful = activeCatalog.Trinkets.Single(item => item.Id == "trigger_probe");
         var dualCounterStateful = activeCatalog.Trinkets.Single(item => item.Id == "dual_counter_probe");
         var definitionDrivenStateful = activeCatalog.Trinkets.Single(item => item.Id == "definition_driven_probe");
-        var invalidCounterStateful = activeCatalog.Trinkets.Single(item => item.Id == "invalid_counter_probe");
+        var zeroCounterStateful = activeCatalog.Trinkets.Single(item => item.Id == "zero_counter_probe");
         var prioritizedTrinket = activeCatalog.Trinkets.Single(item => item.Id == "local_mod_trinket");
         var originProbeTrinket = activeCatalog.Trinkets.Single(item => item.Id == "origin_probe_trinket");
         var modOnlyOverrideFileTrinket = activeCatalog.Trinkets.Single(item =>
@@ -172,27 +172,23 @@ internal static partial class ContractSuite
         Assert(stateful.IsStateful && stateful.StatefulFields.Contains("quest_uses"), "fire_probe should be stateful.");
         Assert(
             stateful.QuestUses == 3 &&
-            stateful.TriggerLimit is null &&
-            stateful.UnsupportedStateFields.Count == 0,
+            stateful.TriggerLimit is null,
             "A valid quest-use counter should be available for pristine instance construction.");
         Assert(
             triggerStateful.TriggerLimit == 4 &&
-            triggerStateful.QuestUses is null &&
-            triggerStateful.UnsupportedStateFields.Count == 0,
+            triggerStateful.QuestUses is null,
             "A valid trigger counter should be available for pristine instance construction.");
         Assert(
-            dualCounterStateful is { QuestUses: 2, TriggerLimit: 3 } &&
-            dualCounterStateful.UnsupportedStateFields.Count == 0,
+            dualCounterStateful is { QuestUses: 2, TriggerLimit: 3 },
             "A definition carrying both supported counters should remain writable.");
         Assert(
             definitionDrivenStateful.IsStateful &&
             definitionDrivenStateful.QuestUses is null &&
-            definitionDrivenStateful.TriggerLimit is null &&
-            definitionDrivenStateful.UnsupportedStateFields.Count == 0,
+            definitionDrivenStateful.TriggerLimit is null,
             "Definition-driven lifecycle fields must not block pristine creation.");
         Assert(
-            invalidCounterStateful.UnsupportedStateFields.SequenceEqual(["quest_uses"]),
-            "A non-positive instance counter must be retained as a creation blocker.");
+            zeroCounterStateful is { QuestUses: 0, TriggerLimit: null },
+            "Zero is an explicit initial count, not an unsupported definition or an absent counter.");
         Assert(
             stateful.LocalizedName == BilingualContentName.Empty &&
             activeCatalog.Issues.Any(issue => issue.Contains("Failed to read localization", StringComparison.Ordinal) &&
@@ -267,7 +263,7 @@ internal static partial class ContractSuite
             definitionDrivenStateful,
             dualCounterStateful,
             invalidCapacityContent,
-            invalidCounterStateful,
+            zeroCounterStateful,
             ordinary,
             stateful,
             triggerStateful,

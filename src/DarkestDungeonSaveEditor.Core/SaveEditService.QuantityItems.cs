@@ -17,6 +17,7 @@ public sealed partial class SaveEditService
     {
         ArgumentNullException.ThrowIfNull(profile);
         ArgumentNullException.ThrowIfNull(item);
+        NativeInventoryIdentity.RequireWritable(item.SaveIdentityIssue);
         if (targetAmount < 0)
         {
             throw new ArgumentOutOfRangeException(nameof(targetAmount), "Target amount cannot be negative.");
@@ -358,6 +359,7 @@ public sealed partial class SaveEditService
         ValidateManifestFingerprints(
             prepared.ContentGuard.ManifestFingerprints,
             "after preview; prepare a new preview");
+        NativeInventoryIdentity.RequireWritable(prepared.Item.SaveIdentityIssue);
         var currentSnapshot = new ActiveContentSnapshot(
             prepared.Profile,
             string.Empty,

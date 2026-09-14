@@ -36,14 +36,18 @@ public static partial class QuantityItemCatalog
         }
 
         var collisionKeys = NativeResourceIdentity.FindCollisions(definitions.Values.SelectMany(group => group),
-            item => item.CatalogKey, item => (Loc2LocalizationReader.HashName(item.InventoryType), Loc2LocalizationReader.HashName(item.ItemId)));
+            item => item.CatalogKey, item => (Loc2LocalizationReader.HashName(NativeJsonReader.CString(item.InventoryType)),
+                Loc2LocalizationReader.HashName(NativeJsonReader.CString(item.ItemId))));
         if (collisionKeys.Count > 0) issues.Add("Inventory keys share native hashes and cannot be selected safely: " + string.Join(", ", collisionKeys));
-        return definitions.Values
+        var merged = definitions.Values
             .Select(group => MergeDefinitions(group, issues))
             .Select(definition => collisionKeys.Contains(definition.CatalogKey)
                 ? definition with { HasProviderConflict = true, Source = "unresolved" } : definition)
             .OrderBy(definition => definition.DisplayId, StringComparer.OrdinalIgnoreCase)
             .ToArray();
+        foreach (var definition in merged.Where(item => item.SaveIdentityIssue.Length > 0))
+            issues.Add($"Quantity item '{definition.DisplayId}' ({definition.SourcePath}): {definition.SaveIdentityIssue}");
+        return merged;
     }
 
     private static void ScanFile(

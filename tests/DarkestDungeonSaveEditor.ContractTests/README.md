@@ -24,7 +24,8 @@ The suite is split by responsibility:
 - `QuantityItemCatalogContractTests.cs`: town/raid item discovery and direct mutations;
 - `QuantityItemSaveContractTests.cs`: guarded quantity preview and commit transactions;
 - `TrinketCatalogContractTests.cs`: trinket overlays, localization, limits, and state definitions;
-- `TrinketJsonMemberContractTests.cs`: first JSON members, invalid first values, provider attribution and actual trinket-counter DSON roundtrips;
+- `TrinketJsonMemberContractTests.cs`: first JSON members, optional counter defaults, provider attribution and actual trinket-counter DSON roundtrips;
+- `InventoryPersistenceContractTests.cs`: Base/local/Workshop save identities, ASCII/CJK/supplementary UTF-8 boundaries, NUL aliases, wallet persisted-type mapping, save-only refresh, signed/zero/default counter matrix, exact town/raid/trinket DSON commits and definition-change guards (`--inventory-persistence`);
 - `TrinketSaveContractTests.cs`: pristine trinket construction and guarded commits;
 - `HeroContractTests.cs`: orchestration of the following hero-related modules;
 - `EquipmentProgressionContractTests.cs`: six-source equipment byte codes, sequential purchase reachability, free upper ranks/level-zero fallback, unused requirements, bounded targets and actual town/roster/upgrades DSON persistence;

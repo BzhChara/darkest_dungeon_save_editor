@@ -239,7 +239,7 @@ public sealed record TrinketDefinition(
     public string SourceLabel { get; init; } = string.Empty;
     public int? QuestUses { get; init; }
     public int? TriggerLimit { get; init; }
-    public IReadOnlyList<string> UnsupportedStateFields { get; init; } = [];
+    public string SaveIdentityIssue => NativeInventoryIdentity.GetSaveIssue("trinket", Id);
 }
 
 public sealed record TrinketCatalogResult(
@@ -300,6 +300,7 @@ public sealed record QuantityItemDefinition(
         ? ItemId
         : string.Empty;
     public string CatalogKey => CreateCatalogKey(StorageKind, PersistedType, PersistedId);
+    public string SaveIdentityIssue => NativeInventoryIdentity.GetSaveIssue(PersistedType, PersistedId);
     // This is an editor key, not a game hash. Length-prefix the type so ':' in
     // an authored type or ID cannot make two different storage entries alias.
     internal static string CreateCatalogKey(QuantityItemStorageKind kind, string type, string id) =>

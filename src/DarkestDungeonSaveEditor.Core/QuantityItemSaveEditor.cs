@@ -12,6 +12,7 @@ public static class QuantityItemSaveEditor
     {
         ArgumentNullException.ThrowIfNull(estateRoot);
         ArgumentNullException.ThrowIfNull(definition);
+        NativeInventoryIdentity.RequireWritable(definition.SaveIdentityIssue);
         if (targetAmount < 0)
         {
             throw new ArgumentOutOfRangeException(nameof(targetAmount), "Target amount cannot be negative.");

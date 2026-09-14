@@ -425,7 +425,7 @@ internal static partial class ContractSuite
           "id": "definition_driven_probe", "rarity": "rare",
           "on_quest_complete_additional_effects": ["contract_effect"]
         },
-        { "id": "invalid_counter_probe", "rarity": "rare", "quest_uses": 0 },
+        { "id": "zero_counter_probe", "rarity": "rare", "quest_uses": 0 },
         { "id": "ambiguous_trinketAz", "rarity": "common", "price": 100 }
       ]
     }
