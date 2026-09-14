@@ -20,10 +20,22 @@ internal static partial class QuantityItemReferenceAnalyzer
         RaidCapable
     }
 
-    private sealed class LootTableNode
+    private sealed class LootTableLibrary
     {
+        public Dictionary<uint, List<LootTableVariant>> Tables { get; } = [];
+        public HashSet<string> Codes { get; } = new(StringComparer.Ordinal);
+    }
+
+    private readonly record struct LootCode(uint Hash, string Name);
+
+    private sealed class LootTableVariant(LootContext context, string source)
+    {
+        public LootContext Context { get; } = context;
+        public string Source { get; } = source;
         public HashSet<string> ItemKeys { get; } = new(StringComparer.Ordinal);
-        public HashSet<string> NestedTables { get; } = new(StringComparer.Ordinal);
+        public HashSet<LootCode> NestedTables { get; } = [];
+        public HashSet<string> UncertainItemKeys { get; } = new(StringComparer.Ordinal);
+        public HashSet<LootCode> UncertainNestedTables { get; } = [];
     }
 
     private sealed class QuantityItemIndex

@@ -542,3 +542,33 @@ The two optional trinket counters use the first exact JSON member and the signed
 New instances serialize counters only for `N >= 0`, matching `0x1405D0820–0x1405D0874`. Omitted counters restore from the definition (`0x1405D0D9C–0x1405D0DE5`); omission and zero must not be collapsed. There is no longer a `ReadPositiveInstanceCounter` or `UnsupportedStateFields` creation blocker. This does not change total storage capacity, per-ID limit warnings, manifest/order resolution or prepared-save content guards.
 
 Evidence uses the same fixed x64 build 27890, SHA-256 `35e5a653279992564809ff8406febd5a02a7d6961044781b1296b38a7096f59b`. See the [original audit](change-history/trinket-counter-and-save-identity-audit-2026-09-14.md), [fix record](change-history/inventory-persistence-fixes-2026-09-14.md) and [additional native fragments](../workspaces/inventory-persistence-fix-20260914/native-evidence.json). Formal coverage is `InventoryPersistenceContractTests.cs` (`--inventory-persistence`), the corrected first-member tests and the complete suite. These are isolated editor/DSON tests with static native corroboration; exhausted-trinket lifecycle effects and malformed whole JSON documents are not newly claimed as live-tested.
+
+## 24. Loot entry weights and ordered table variants (2026-09-15)
+
+File eligibility and provider order are resolved before loot-table parsing. The same native file resolver still supplies the ordered effective files; this change does not replace `modfiles.txt`, same-path provider election or native result-slot order with a new Mod-priority rule.
+
+LootTable loading at `0x140442EA0` looks up the **first exact `chances` member** before constructing an item or subtable entry. A missing member advances to the next entry (`0x1404433AF`). Numeric values are converted to float32 (`0x1404433D3`) and nonpositive values are skipped (`0x1404433DA`). Thus `0`, `-1`, `-1e50` (negative overflow) and `1e-50` provide no reference; `0.25` does. A duplicate `chances:0, chances:9` does not revive the entry. Wrong JSON types and positive nonfinite values do not establish a confirmed path in the editor; their reachable item/subtable edges remain analysis-incomplete. They do not make unrelated or unreachable items active.
+
+Registration appends complete table variants to a vector keyed by the native ID hash (`0x14044179A–0x1404418CE`). Query `0x140441960–0x140441A53` returns the first variant satisfying all four conditions:
+
+| Field | Native match/default |
+| --- | --- |
+| `difficulty` | Exact UInt32, or zero for any difficulty; default zero |
+| `dungeon` | Exact C-string hash, or hash zero for any dungeon; default zero |
+| `infestation_sequence_element` | Exact C-string hash, or hash zero for any phase; default zero |
+| `week_min`, `week_max` | Inclusive UInt32 interval; defaults zero and `4294967295` |
+
+The first exact member controls each field. Unsigned fields with the wrong JSON type, including floating-point spelling such as `3.0`, leave the native defaults; integer spelling `-0` is accepted as zero (`0x14024E0F3–0x14024E11B`). Reversed week bounds never match. String case and whitespace remain significant. Native names and child-table codes copy at most 63 UTF-8 bytes before lookup; table hashes use unsigned bytes with multiplier 53 and UInt32 wraparound. C-string NUL termination and hash aliases are handled at this consumer, without changing saved inventory identities. A truncation that splits a UTF-8 character is hashed as raw bytes; the diagnostic display name does not decide identity. Child-code loading is `0x140443CA0–0x140443D4B`.
+
+Examples with positive entries and no other roots:
+
+- Generic `T → A` followed by generic `T → B`: only A is reachable through T.
+- Difficulty-1 `T → A` followed by difficulty-3 `T → B`: both remain potentially reachable, each under its own conditions.
+- An empty generic T followed by `T → B`: neither provides an item. After selecting the empty table, `0x14043F3E9` exits that roll instead of selecting a later T.
+- Difficulty-1 `T → U` followed by difficulty-3 `U → A`: A has no compatible path through this chain.
+
+The editor represents possible contexts as disjoint ranges, subtracts contexts consumed by earlier variants and propagates only the selected contexts to child tables. Confirmed and uncertain paths are visited separately; cycles terminate without discarding a later compatible or confirmed path. It does not enumerate guessed dungeon IDs or restrict the catalog to today's expedition. This remains a reference/reachability analysis: it does not simulate every root's trigger conditions, reward amounts, random-roll probability, inventory-dependent special reward or complete quest/event lifecycle.
+
+Changes affect reference status/evidence and default hidden-item filtering on load/refresh. Existing saved items remain visible, and the explicit manual write path still uses its quantity, identity, capacity and content guards. The distinct zero-weight Bridge encounter rule is unchanged. Official item classification and direct non-loot references remain in force.
+
+Evidence uses the fixed x64 build 27890 and executable hash from section 23, with static native control-flow checks and isolated editor/DSON execution. `LootReferenceContractTests.cs` (`--loot-references`, also included in the full suite) covers 58 cases for each of local, Workshop and DLC-prefixed Mod resources; 32 seeded graphs per source kind are independently checked over 216 concrete contexts with distinct item identities. It also covers same-path overlays, unlisted files, content-only refresh, persisted hidden items and DSON previews. See the [original audit](change-history/loot-reference-consumer-audit-2026-09-14.md) and [fix/validation record](change-history/loot-reference-fixes-2026-09-15.md). No new live-game drop experiment is claimed.

@@ -44,6 +44,7 @@ The suite is split by responsibility:
 - `HeroQuirkGuardContractTests.cs`: same-size/timestamp/manifest resource refresh, actual stale prepare/commit and candidate-rebinding rejection without save mutations, countdown compatibility after evolution/range changes, semantic-equivalent evolution edits and a successful three-file save;
 - `JsonMemberContractTests.cs`: first exact resource JSON members (including wrong types), repeated Buff occurrences through HP validation and DSON persistence, and raw town-event recruit payload/class binding;
 - `JsonReferenceConsumerContractTests.cs`: native JSON filename/structure filtering, town/raid roots, irrelevant notes, duplicate fields, uncertain loaded structures, refresh of nonliteral suffixes, and real actor-to-nested-loot references;
+- `LootReferenceContractTests.cs`: first-member float32 weights, ordered conditional loot variants, compatible nested/cyclic paths, native table hashes/buffers, a concrete-context selection oracle, Mod overlays, refresh, saved hidden items and manual DSON previews (`--loot-references`);
 - `CatalogFileQueryContractTests.cs`: native trinket/Buff/quirk/camping filename queries across six source types, exact-dot/root exclusions, manifests, same-path priority, missing files, content refresh and generated HP DSON;
 - `TextResourceQueryContractTests.cs`: native inventory/capacity/Effect/Curio filename queries across six source types, mounted-root reference exclusions, actor-documentation rejection with canonical actor controls, manifests, overlays, missing diagnostics, same-size content refresh, curio preflight and capacity-limited DSON;
 - `EncounterCollectionQueryContractTests.cs`: six-source independent Standard/Conditional/Additional queries, keyword decoys and wildcard suffixes, overlapping query identities, repeated local/Workshop Bridge sources, full source identity guards, omitted/bare/whitespace/quoted-empty slots, and 12 DSON create/replace/delete/maintenance scenarios. Run these plus existing filename/empty-slot regressions with `--encounter-queries`;
@@ -89,3 +90,9 @@ Close Darkest Dungeon before the suite: save transaction contracts exercise the 
 `dotnet run --project tests/DarkestDungeonSaveEditor.ContractTests -c Release -- . --quirk-rules`
 
 运行上述三组怪癖规则测试；完整套件也包含它们。目录矩阵覆盖原版、模式、官方 DLC、本地 Mod、工坊 Mod、带启用 DLC 前缀的 Mod。共 90 个 shared 文件查询对照、36 次 town / roster / upgrades DSON 往返，并验证实际提交与旧预览保护。全部使用隔离数据，不修改真实存档或 Mod。
+
+## 掉落引用验证
+
+`dotnet run --project tests/DarkestDungeonSaveEditor.ContractTests -c Release -- . --loot-references`
+
+本地、工坊和 DLC 前缀 Mod 各运行 58 个权重／同名表／条件与子表对照；另以 32 个随机种子固定的掉落图分别枚举 216 个具体条件，独立对照范围算法。每条表使用独立物品 ID，避免不同错误路径被同一个物品结果掩盖。还验证同路径覆盖、不同路径先匹配、未列清单文件、清单不变时的内容刷新、已有隐藏物品可见，以及 3 次保留 ID 和堆叠的真实 DSON 写入预览。只使用隔离资源和存档；完整套件也包含这些测试。
