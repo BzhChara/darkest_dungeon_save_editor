@@ -427,7 +427,7 @@ Selection validation has two safety layers:
 1. the actually active generation-time formula must be greater than zero;
 2. every reachable combination of recognized conditional HP effects and constant effects must also keep maximum HP greater than zero.
 
-The second layer is required even though conditional buffs do not contribute to initial `current_hp`. Otherwise the positive quirk `Ailuoli_Quirk2`, whose active condition applies `-50%`, can combine with other negative-HP quirks and drive the runtime multiplier to zero or below. Block the dangerous combination, not the individual quirk.
+The second layer is required even for conditional buffs that are inactive at generation. Otherwise the positive quirk `Ailuoli_Quirk2`, whose active condition applies `-50%`, can combine with other negative-HP quirks and drive the runtime multiplier to zero or below. Block the dangerous combination, not the individual quirk.
 
 Treat additive terms, multipliers, or results within `1e-9` of zero as non-positive. This prevents decimal definitions such as `-50% -20% -20% -10%` from becoming a tiny positive multiplier only because of binary floating-point summation.
 
@@ -438,11 +438,23 @@ Evidence:
 - B: active Mod definitions explicitly declare `combat_stat_add`, `combat_stat_multiply`, their values, and their rules.
 - C: the independent [Darkest-Dungeon-Unity](https://github.com/Reinisch/Darkest-Dungeon-Unity) reverse-engineered implementation uses `(RawValue + FlatAddition) * Multiplier` and applies/reverts conditional buffs. This corroborates the ordering but is not official source code.
 
-`always` is active at generation. `no_trinkets` is also active for an unequipped stagecoach candidate. The game handles later equip/unequip changes; the editor does not serialize quirk buffs into `buff_group`.
+New stagecoach candidates are unequipped and unafflicted, with no raid mode or light context. Initial HP uses the same recognized-condition evaluator as reachable-state validation, passing these known initial values:
+
+| HP Buff rule | Raw condition at generation | Active without inversion | Active with `is_false_rule: true` |
+| --- | --- | --- | --- |
+| `always` | true | yes | no |
+| `no_trinkets` | true | yes | no |
+| `afflicted` | false | no | yes |
+| `in_mode` | missing required context | no | no |
+| `lightabove` | missing required context | no | no |
+
+Inversion applies to a known condition value; it does not make a rule with missing required context applicable. Unknown HP rules remain Unverified. With base HP 20, an inverted `afflicted` Buff of +50%, −25%, or flat +4 gives initial full HP 30, 15, or 24 respectively. The game handles later state changes; the editor does not serialize quirk buffs into `buff_group`.
+
+The inverse-affliction rule was added on 2026-09-15 using the pinned game's static applicability/inversion branches and isolated editor preview/DSON tests. These values express the editor's full-health policy, not a new live-game candidate capture. See [the audit](change-history/initial-hp-condition-audit-2026-09-15.md) and [fix record](change-history/initial-hp-condition-fixes-2026-09-15.md).
 
 ### 8.2 Implemented model and historical catalog result
 
-The application now retains every recognized `max_hp` Buff on a quirk, distinguishes `combat_stat_add` from `combat_stat_multiply`, preserves `rule_data.float`/`string`, and supports `always`, `no_trinkets`, `afflicted`, `in_mode`, and `lightabove` with `is_false_rule`. Constant effects determine the stagecoach candidate's full-health `current_hp`; runtime-only conditions are left inactive at generation and are evaluated only for reachable-state safety. Unknown HP operations, conditions, or malformed condition data remain Unverified.
+The application now retains every recognized `max_hp` Buff on a quirk, distinguishes `combat_stat_add` from `combat_stat_multiply`, preserves `rule_data.float`/`string`, and supports `always`, `no_trinkets`, `afflicted`, `in_mode`, and `lightabove` with `is_false_rule`. Effects active under the initial states in section 8.1 determine the stagecoach candidate's full-health `current_hp`, including inverse `afflicted`. Mode/light conditions require raid context and are evaluated only for reachable-state safety during generation. Unknown HP operations, conditions, or malformed condition data remain Unverified.
 
 Since 2026-09-10, Buff amount and rule thresholds first adopt native single-precision values; stat/rule strings keep their native case, whitespace and bounded bytes. `in_mode` conditions compare native hashes, so case-distinct modes cannot falsely cancel HP changes. The existing formula and preview calculation order remain; candidate serialization rounds final HP to the DSON float value. DSON round-trip validation compares only the new candidate's HP by exact float bits to accommodate Java-version decimal differences; all other fields, existing heroes and plain-JSON saves retain strict equality. Final HP outside the finite float range is rejected before generation. See [the scalar, identity and reference rules](resource-duplicate-semantics.md#14-buff-scalarcondition-identities-and-resource-eligibility-2026-09-10). This does not change the save schema or claim full native HP arithmetic emulation.
 
@@ -503,7 +515,7 @@ Audit conclusion: multiple HP buffs are not an unknown shape once represented as
 | `Kaltsit_Quirk` (大地守望者 / —) | a mode exists and is not `KaltsitA`: flat `+20` | No active stagecoach mode; do not pre-add 20 |
 | `Ailuoli_Quirk2` (黑夜骑士 / Knight of the Night) | `lightabove 1`: `-50%` | No raid-light condition in the stagecoach; do not pre-subtract 50% |
 
-Audit conclusion: write the quirk record but not an initial HP adjustment or `actor.buff_group` entry. The game applies/reverts the effect when affliction, mode, or light changes. A class with no mode can carry `Kaltsit_Quirk`, but its +20 effect will not activate. Before writing, all reachable conditional HP combinations still participate in the non-positive-HP safety check, especially `Ailuoli_Quirk2` combined with other negative-HP quirks.
+Audit conclusion for these three declared conditions: write the quirk record but not an initial HP adjustment or `actor.buff_group` entry. This does not apply to inverse `afflicted`, which is active for a fresh unafflicted hero as specified in section 8.1. The game applies/reverts the effect when affliction, mode, or light changes. A class with no mode can carry `Kaltsit_Quirk`, but its +20 effect will not activate. Before writing, all reachable conditional HP combinations still participate in the non-positive-HP safety check, especially `Ailuoli_Quirk2` combined with other negative-HP quirks.
 
 The corpus proves structural persistence for `Octopus_Quirk5` and `Kaltsit_Quirk`; it has no `Ailuoli_Quirk2` instance. Existing conditional samples are injured or at 1 HP and cannot prove a full-health formula.
 

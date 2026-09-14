@@ -155,13 +155,13 @@ public static partial class StagecoachHeroCandidateFactory
 
     private static bool IsActiveAtGeneration(HeroMaxHpModifier modifier)
     {
-        var rawCondition = modifier.RuleType switch
-        {
-            "always" => true,
-            "no_trinkets" => true,
-            _ => false
-        };
-        return rawCondition && !modifier.IsFalseRule;
+        // A fresh hero has a known affliction/equipment state, but no raid mode or light context.
+        return IsActiveAtRuntime(
+            modifier,
+            hasTrinkets: false,
+            isAfflicted: false,
+            mode: null,
+            lightLevel: null);
     }
 
     private static bool IsActiveAtRuntime(

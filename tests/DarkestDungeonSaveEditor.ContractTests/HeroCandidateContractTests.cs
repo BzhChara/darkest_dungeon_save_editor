@@ -307,7 +307,7 @@ internal static partial class ContractSuite
         Assert(
             Math.Abs(runtimeConditionalHpCandidate.Preview.CurrentHp - 20.0) < 0.000001 &&
             ((JsonObject)runtimeConditionalHpCandidate.Candidate["actor"]!["buff_group"]!).Count == 0,
-            "Runtime-only affliction, mode, and light modifiers should not be pre-applied to a stagecoach candidate.");
+            "Positive afflicted conditions and mode/light conditions without raid context must remain inactive at generation.");
 
         var mutuallyExclusiveModeCandidate = StagecoachHeroCandidateFactory.Generate(
             heroCatalog,

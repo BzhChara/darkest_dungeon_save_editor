@@ -6,6 +6,7 @@ internal static partial class ContractSuite
     public static async Task RunResourceSemanticsOnlyAsync(string repositoryRoot)
     {
         var fixture = BuildContractFixture(repositoryRoot);
+        await RunInitialHpConditionContractsAsync(fixture.RunRoot, fixture.Codec);
         await VerifyEquipmentProgressionAsync(fixture.RunRoot, fixture.Codec);
         await VerifyEquipmentProgressionGuardsAsync(fixture.RunRoot, fixture.Codec);
         await VerifyCampingPurchaseIdentitiesAsync(fixture.RunRoot, fixture.Codec);

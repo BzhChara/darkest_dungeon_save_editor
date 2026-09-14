@@ -45,6 +45,7 @@ internal static partial class ContractSuite
         await RunTextResourceQueryContractsAsync(runRoot, codec);
         await RunLootReferenceContractsAsync(runRoot, codec);
         await RunUpgradeReferenceContractsAsync(runRoot, codec);
+        await RunInitialHpConditionContractsAsync(runRoot, codec);
 
         if (includeBattle)
         {
