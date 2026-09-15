@@ -160,6 +160,7 @@ public sealed partial class SaveEditService
                 itemSourceSha256,
                 manifestFingerprints)
             {
+                Resolution = activeContent.Resolution,
                 SaveContext = saveContext,
                 RaidInventoryCapacity = raidStorage?.MaxSlots,
                 RaidStorageSourcePath = raidStorage?.SourcePath ?? string.Empty,
@@ -345,6 +346,7 @@ public sealed partial class SaveEditService
 
     private static void ValidateQuantityItemContentGuard(PreparedQuantityItemEdit prepared)
     {
+        ActiveContentResolver.ValidateSourceBindings(prepared.ContentGuard.Resolution, prepared.ContentGuard.Sources);
         ValidateQuantityItemSaveContext(prepared.Profile, prepared.ContentGuard.SaveContext);
         var gameSavePath = Path.Combine(prepared.Profile.ProfileDirectory, "persist.game.json");
         if (!File.Exists(gameSavePath) ||

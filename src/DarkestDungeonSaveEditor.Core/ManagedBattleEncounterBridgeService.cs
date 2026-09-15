@@ -410,6 +410,7 @@ public sealed partial class ManagedBattleEncounterBridgeService
         BattleEncounterCatalogResult catalog,
         BattleEncounterDefinition encounter)
     {
+        ActiveContentResolver.ValidateSourceBindings(activeContent.Resolution, activeContent.Sources);
         var profileDirectory = Path.GetFullPath(profile.ProfileDirectory);
         if (!Path.GetFullPath(snapshot.ProfileDirectory).Equals(
                 profileDirectory,

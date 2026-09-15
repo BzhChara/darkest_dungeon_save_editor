@@ -100,6 +100,42 @@ public static class ActiveContentResolver
         var root = JsonSupport.ReadObject(decodedGamePath);
         profile = RaidSaveLocation.FromGame(profile.ProfileDirectory, root).Bind(profile);
         var baseRoot = JsonSupport.RequireObject(root, "base_root");
+        var resolved = ResolveSources(baseRoot, gameDirectory, workshopDirectory,
+            normalizedAdditionalLocalModDirectory, cancellationToken);
+        return new ActiveContentSnapshot(profile, resolved.GameMode, resolved.Sources, resolved.Issues,
+            workspace, decodedGamePath, resolved.AppliedModCount, originalHash)
+        {
+            Resolution = new(gameDirectory,
+                string.IsNullOrWhiteSpace(workshopDirectory) ? null : Path.GetFullPath(workshopDirectory),
+                normalizedAdditionalLocalModDirectory, ProfileContentConfiguration.Capture(root).ToJsonString())
+        };
+    }
+
+    public static void ValidateSourceBindings(ActiveContentResolution? resolution,
+        IReadOnlyList<ActiveContentSource> expectedSources, CancellationToken cancellationToken = default)
+    {
+        // Explicit source lists are also used by standalone catalog consumers. They do not
+        // claim a saved Mod-title mapping. Every ResolveAsync/ResolveDecoded snapshot does.
+        if (resolution is null) return;
+        var configuration = JsonNode.Parse(resolution.ConfigurationJson)!.AsObject();
+        var current = ResolveSources(configuration, resolution.GameDirectory, resolution.WorkshopDirectory,
+            resolution.AdditionalLocalModDirectory, cancellationToken);
+        if (current.Sources.Count != expectedSources.Count ||
+            current.Sources.Where((source, index) => !SameBinding(source, expectedSources[index])).Any() ||
+            current.Sources.Any(source => !Directory.Exists(source.Directory)))
+            throw new InvalidOperationException("活动 Mod/DLC 的来源映射已变化，请重新加载内容目录并重新生成预览。");
+    }
+
+    private static bool SameBinding(ActiveContentSource left, ActiveContentSource right) =>
+        left.Id == right.Id && left.Kind == right.Kind && left.LoadOrder == right.LoadOrder &&
+        Path.GetFullPath(left.Directory).Equals(Path.GetFullPath(right.Directory), StringComparison.OrdinalIgnoreCase) &&
+        left.VirtualPathPrefix.Equals(right.VirtualPathPrefix, StringComparison.OrdinalIgnoreCase);
+
+    private static (string GameMode, IReadOnlyList<ActiveContentSource> Sources,
+        IReadOnlyList<string> Issues, int AppliedModCount) ResolveSources(JsonObject baseRoot,
+        string gameDirectory, string? workshopDirectory, string? normalizedAdditionalLocalModDirectory,
+        CancellationToken cancellationToken)
+    {
         var gameMode = JsonSupport.ReadString(baseRoot, "game_mode");
         if (string.IsNullOrWhiteSpace(gameMode))
         {
@@ -199,15 +235,7 @@ public static class ActiveContentResolver
             sources.Add(new ActiveContentSource(id, entry.Name, kind, directory, 1000 + entry.Order));
         }
 
-        return new ActiveContentSnapshot(
-            profile,
-            gameMode,
-            sources.OrderBy(source => source.LoadOrder).ToArray(),
-            issues,
-            workspace,
-            decodedGamePath,
-            appliedEntries.Count,
-            originalHash);
+        return (gameMode, sources.OrderBy(source => source.LoadOrder).ToArray(), issues, appliedEntries.Count);
     }
 
     private static void AddGameModeSource(

@@ -48,7 +48,7 @@ public static partial class BattleEncounterCatalog
             Path.GetFullPath(file.Path), file.RelativePath, ComputeSha256(file.Path))).ToArray();
         var guard = new BattleEncounterTableGuard(dungeonId, difficulty,
             Path.Combine(content.Profile.ProfileDirectory, "persist.game.json"), content.SourceGameSha256,
-            content.Sources, fingerprints, ComputeTableFingerprint(fingerprints));
+            content.Sources, fingerprints, ComputeTableFingerprint(fingerprints)) { Resolution = content.Resolution };
         var unparsed = new HashSet<int>();
         var rows = files.SelectMany(file => ParseFile(file, content.Sources, guard, issues, unparsed))
             .Where(row => row.SourceKind == BattleEncounterSourceKind.Standard && row.MashType == mashType).ToArray();

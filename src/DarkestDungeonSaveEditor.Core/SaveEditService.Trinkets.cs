@@ -138,7 +138,7 @@ public sealed partial class SaveEditService
                 currentStorage.SourceSha256,
                 currentTrinket.SourcePath,
                 currentTrinketSourceSha256,
-                manifestFingerprints),
+                manifestFingerprints) { Resolution = activeContent.Resolution },
             originalSummary,
             resultSummary,
             workspace,
@@ -298,6 +298,7 @@ public sealed partial class SaveEditService
 
     private static void ValidateTrinketContentGuard(PreparedTrinketEdit prepared)
     {
+        ActiveContentResolver.ValidateSourceBindings(prepared.ContentGuard.Resolution, prepared.ContentGuard.Sources);
         var gameSavePath = Path.Combine(prepared.Profile.ProfileDirectory, "persist.game.json");
         if (!File.Exists(gameSavePath) ||
             !ComputeSha256(gameSavePath).Equals(

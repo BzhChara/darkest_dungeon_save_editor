@@ -4,10 +4,12 @@ namespace DarkestDungeonSaveEditor.Core;
 
 public sealed partial class ManagedBattleEncounterBridgeService
 {
-    private async Task RecoverInterruptedMaintenanceAsync(SaveProfile profile, string gameDirectory, string? localModDirectory, CancellationToken cancellationToken)
+    private async Task<bool> RecoverInterruptedMaintenanceAsync(SaveProfile profile, string gameDirectory,
+        string? localModDirectory, CancellationToken cancellationToken, bool inspectOnly)
     {
+        var recovered = false;
         var journalRoot = Path.Combine(_locations.BackupDirectory, SanitizeSegment(profile.SteamUserId, 48), SanitizeSegment(profile.ProfileId, 48));
-        if (!Directory.Exists(journalRoot)) return;
+        if (!Directory.Exists(journalRoot)) return false;
         var installRoot = Path.GetFullPath(string.IsNullOrWhiteSpace(localModDirectory) ||
             File.Exists(Path.Combine(localModDirectory, "project.xml")) ? Path.Combine(gameDirectory, "mods") : localModDirectory);
         var package = Path.Combine(installRoot, GetPackageDirectoryName(profile));
@@ -24,10 +26,11 @@ public sealed partial class ManagedBattleEncounterBridgeService
                     .Equals(Path.GetFullPath(profile.ProfileDirectory), StringComparison.OrdinalIgnoreCase)) continue;
             EnsureGameIsNotRunning();
             profile = (await RaidSaveLocation.ReadAsync(profile.ProfileDirectory, _codec, cancellationToken).ConfigureAwait(false)).Bind(profile);
+            var sharing = inspectOnly ? FileShare.ReadWrite | FileShare.Delete : FileShare.Read;
             using var gameLock = new FileStream(Path.Combine(profile.ProfileDirectory, "persist.game.json"),
-                FileMode.Open, FileAccess.Read, FileShare.Read);
+                FileMode.Open, FileAccess.Read, sharing);
             var raidPath = profile.RaidSavePath;
-            using var raidLock = File.Exists(raidPath) ? new FileStream(raidPath, FileMode.Open, FileAccess.Read, FileShare.Read) : null;
+            using var raidLock = File.Exists(raidPath) ? new FileStream(raidPath, FileMode.Open, FileAccess.Read, sharing) : null;
             if (ComputeSha256(Path.Combine(profile.ProfileDirectory, "persist.game.json")) != JsonSupport.ReadString(manifest, "GameSha256") ||
                 (File.Exists(raidPath) ? ComputeSha256(raidPath) : null) != manifest["RaidSha256"]?.GetValue<string>())
                 throw new IOException($"存档在清理中断后已变化，不能自动恢复旧地图；请检查备份：{backup}");
@@ -76,13 +79,18 @@ public sealed partial class ManagedBattleEncounterBridgeService
                             throw new InvalidDataException($"中断清理包含无效的只读依赖路径：{target}");
                         if (IsWithinDirectory(target, package))
                             _ = RaidSaveLocation.ResolvePath(package, Path.GetRelativePath(package, target));
-                        var stream = new FileStream(target, FileMode.Open, FileAccess.Read, FileShare.Read);
+                        var stream = new FileStream(target, FileMode.Open, FileAccess.Read, sharing);
                         dependencyLocks.Add(stream);
                         if (ComputeSha256(target) != JsonSupport.ReadString(dependency, "Sha256"))
                             throw new IOException($"Bridge 或保留副本在清理中断后已变化，已保留当前状态并暂缓恢复；请检查备份：{backup}");
                     }
                 }
                 // Restore the old package before restoring its map references.
+                if (inspectOnly)
+                {
+                    foreach (var entry in plan) GuardedSaveReplacement.ValidateReplaceAccess(entry.Target);
+                    return true;
+                }
                 foreach (var entry in plan.OrderBy(entry => entry.Target.EndsWith("persist.map.json", StringComparison.OrdinalIgnoreCase) ? 1 : 0))
                 {
                     var replacement = new GuardedSaveReplacement(entry.Target, entry.Original, entry.FinalHash, entry.OriginalHash);
@@ -93,6 +101,7 @@ public sealed partial class ManagedBattleEncounterBridgeService
                 File.WriteAllText(Path.Combine(backup, "maintenance-recovered.json"), "{}", Utf8NoBom);
                 foreach (var replacement in replacements) replacement.Complete();
                 _maintenanceCheckedKey = null;
+                recovered = true;
             }
             finally
             {
@@ -102,5 +111,6 @@ public sealed partial class ManagedBattleEncounterBridgeService
                 foreach (var stream in dependencyLocks) stream.Dispose();
             }
         }
+        return recovered;
     }
 }

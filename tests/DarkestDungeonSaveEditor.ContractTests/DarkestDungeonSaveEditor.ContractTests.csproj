@@ -11,5 +11,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\DarkestDungeonSaveEditor.Core\DarkestDungeonSaveEditor.Core.csproj" />
+    <ProjectReference Include="..\..\src\DarkestDungeonSaveEditor.App\DarkestDungeonSaveEditor.App.csproj" />
   </ItemGroup>
 </Project>

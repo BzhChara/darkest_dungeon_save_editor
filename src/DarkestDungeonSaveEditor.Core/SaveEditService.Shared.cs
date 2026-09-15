@@ -26,6 +26,7 @@ public sealed partial class SaveEditService
         SaveProfile profile,
         ActiveContentSnapshot activeContent)
     {
+        ActiveContentResolver.ValidateSourceBindings(activeContent.Resolution, activeContent.Sources);
         if (!Path.GetFullPath(activeContent.Profile.ProfileDirectory)
                 .Equals(Path.GetFullPath(profile.ProfileDirectory), StringComparison.OrdinalIgnoreCase))
         {

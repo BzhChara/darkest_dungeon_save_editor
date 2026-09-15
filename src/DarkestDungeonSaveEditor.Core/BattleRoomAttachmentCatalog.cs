@@ -26,6 +26,7 @@ public sealed record BattleRoomAttachmentCatalogGuard(
     IReadOnlyList<BattleRoomAttachmentFileFingerprint> EffectiveFiles,
     string Fingerprint)
 {
+    public ActiveContentResolution? Resolution { get; init; }
     public string? RequestedDungeonId { get; init; }
 }
 
@@ -175,7 +176,7 @@ public static partial class BattleRoomAttachmentCatalog
             activeContent.SourceGameSha256,
             activeContent.Sources.ToArray(),
             fingerprints,
-            ComputeCatalogFingerprint(fingerprints)) { RequestedDungeonId = dungeonId };
+            ComputeCatalogFingerprint(fingerprints)) { RequestedDungeonId = dungeonId, Resolution = activeContent.Resolution };
 
         var parsed = effectiveFiles
             .SelectMany(file => ParseFile(file, activeContent.Sources, guard, issues))
@@ -250,6 +251,7 @@ public static partial class BattleRoomAttachmentCatalog
 
     public static void ValidateGuard(BattleRoomAttachmentCatalogGuard guard)
     {
+        ActiveContentResolver.ValidateSourceBindings(guard.Resolution, guard.ActiveSources);
         ArgumentNullException.ThrowIfNull(guard);
         if (!File.Exists(guard.GameSavePath) ||
             !ComputeSha256(guard.GameSavePath).Equals(

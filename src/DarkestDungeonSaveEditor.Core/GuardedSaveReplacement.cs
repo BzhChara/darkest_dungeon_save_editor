@@ -1,4 +1,7 @@
 using System.Security.Cryptography;
+using System.ComponentModel;
+using System.Runtime.InteropServices;
+using Microsoft.Win32.SafeHandles;
 
 namespace DarkestDungeonSaveEditor.Core;
 
@@ -51,6 +54,26 @@ internal sealed class GuardedSaveReplacement : IDisposable
     internal bool HasReplaced { get; private set; }
     internal Action<string>? BeforeRecoveryLock { get; set; }
     internal Action<string, string, string>? AtomicReplaceOverride { get; set; }
+
+    // Open existing file metadata with DELETE access, without changing any bytes.
+    // A successful hash read alone does not establish that an external reader permits replacement.
+    internal static void ValidateReplaceAccess(string path)
+    {
+        const uint deleteAccess = 0x00010000;
+        const uint openExisting = 3;
+        using var handle = CreateFileW(Path.GetFullPath(path), deleteAccess,
+            FileShare.ReadWrite | FileShare.Delete, IntPtr.Zero, openExisting, 0, IntPtr.Zero);
+        if (handle.IsInvalid)
+        {
+            var error = new Win32Exception(Marshal.GetLastWin32Error());
+            throw new IOException($"文件暂时不允许替换：{path}；{error.Message}", error);
+        }
+    }
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true, ExactSpelling = true)]
+    private static extern SafeFileHandle CreateFileW(string fileName, uint desiredAccess,
+        FileShare shareMode, IntPtr securityAttributes, uint creationDisposition,
+        uint flagsAndAttributes, IntPtr templateFile);
 
     internal void Replace()
     {

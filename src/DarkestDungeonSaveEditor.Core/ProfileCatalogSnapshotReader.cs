@@ -78,8 +78,15 @@ public sealed class ProfileCatalogSnapshotReader
             // Reuse two private scratch slots, not a new archive for every movement/save event.
             var nextSlot = 1 - _slot;
             var workspace = Path.Combine(_workspace, nextSlot.ToString());
-            var gamePath = await DecodeCopyAsync(workspace, "persist.game.json", before, cancellationToken)
-                .ConfigureAwait(false);
+            // Non-game refreshes can rotate the data slot while retaining the previous
+            // decoded game file. Never delete that published cache for a speculative decode.
+            var gameWorkspace = Path.GetFullPath(Path.Combine(workspace, "decoded", "persist.game.json"))
+                .Equals(Path.GetFullPath(_content.DecodedGamePath), StringComparison.OrdinalIgnoreCase)
+                ? Path.Combine(_workspace, _slot.ToString()) : workspace;
+            var gamePath = string.Equals(before["persist.game.json"], _content.SourceGameSha256,
+                StringComparison.OrdinalIgnoreCase)
+                ? _content.DecodedGamePath
+                : await DecodeCopyAsync(gameWorkspace, "persist.game.json", before, cancellationToken).ConfigureAwait(false);
             var key = ProfileContentConfiguration.GetKey(JsonSupport.ReadObject(gamePath));
             var profile = RaidSaveLocation.FromGame(_profile.ProfileDirectory, JsonSupport.ReadObject(gamePath)).Bind(_profile);
             var routedHashes = CaptureHashes(profile);
@@ -99,7 +106,11 @@ public sealed class ProfileCatalogSnapshotReader
             var contentFingerprint = ProfileCatalogContentFingerprint.Capture(content.Sources, cancellationToken);
             var contentChanged = _lastSnapshot is null || key != _configurationKey || contentFingerprint != _contentFingerprint;
             if (!contentChanged && _lastSnapshot is not null && HashesEqual(before, _lastSnapshot.FileHashes))
+            {
+                if (!HashesEqual(before, CaptureHashes(profile)))
+                    throw new IOException("游戏仍在保存，等待完整存档后自动重试。");
                 return _lastSnapshot with { ReadAtUtc = DateTime.UtcNow };
+            }
             var scene = QuantityItemSaveScene.Read(content).Context;
             if (scene == QuantityItemSaveContext.Raid)
             {
@@ -140,6 +151,7 @@ public sealed class ProfileCatalogSnapshotReader
             }
             if (contentChanged && contentFingerprint != ProfileCatalogContentFingerprint.Capture(content.Sources, cancellationToken))
                 throw new IOException("资源文件仍在更新，等待完整内容后自动重试。");
+            ActiveContentResolver.ValidateSourceBindings(content.Resolution, content.Sources, cancellationToken);
             cache[scene] = quantities;
             _quantityCache = cache;
             _content = content;

@@ -47,7 +47,25 @@ public sealed record ActiveContentSnapshot(
     string WorkspaceDirectory,
     string DecodedGamePath,
     int AppliedModCount,
-    string SourceGameSha256);
+    string SourceGameSha256)
+{
+    private readonly IReadOnlyList<ActiveContentSource> _sources = Sources;
+    public IReadOnlyList<ActiveContentSource> Sources
+    {
+        get => _sources;
+        // An explicit replacement is a hypothetical catalog (e.g. Bridge staging),
+        // not the source mapping returned by the resolver.
+        init { _sources = value; Resolution = null; }
+    }
+    public ActiveContentResolution? Resolution { get; init; }
+}
+
+// Keep the actual search roots and configuration, independent of rotating decoded scratch files.
+public sealed record ActiveContentResolution(
+    string GameDirectory,
+    string? WorkshopDirectory,
+    string? AdditionalLocalModDirectory,
+    string ConfigurationJson);
 
 public sealed record HeroGenerationDefinition(
     bool? IsEnabled,
@@ -462,7 +480,10 @@ public sealed record PreparedStagecoachContentGuard(
     string GameMode,
     IReadOnlyList<ActiveContentSource> Sources,
     string HeroCatalogSha256,
-    IReadOnlyList<PreparedContentFileFingerprint> ManifestFingerprints);
+    IReadOnlyList<PreparedContentFileFingerprint> ManifestFingerprints)
+{
+    public ActiveContentResolution? Resolution { get; init; }
+}
 
 public sealed record PreparedTrinketEdit(
     string SessionId,
@@ -505,6 +526,7 @@ public sealed record PreparedQuantityItemContentGuard(
     string ItemSourceSha256,
     IReadOnlyList<PreparedContentFileFingerprint> ManifestFingerprints)
 {
+    public ActiveContentResolution? Resolution { get; init; }
     public QuantityItemSaveContext SaveContext { get; init; } = QuantityItemSaveContext.Town;
     public int? RaidInventoryCapacity { get; init; }
     public string RaidStorageSourcePath { get; init; } = string.Empty;
@@ -520,7 +542,10 @@ public sealed record PreparedTrinketContentGuard(
     string StorageSourceSha256,
     string TrinketSourcePath,
     string TrinketSourceSha256,
-    IReadOnlyList<PreparedContentFileFingerprint> ManifestFingerprints);
+    IReadOnlyList<PreparedContentFileFingerprint> ManifestFingerprints)
+{
+    public ActiveContentResolution? Resolution { get; init; }
+}
 
 public sealed record PreparedContentFileFingerprint(
     string Path,

@@ -27,6 +27,17 @@ internal static partial class ContractSuite
         var unchanged = await reader.ReadAsync();
         Assert(ReferenceEquals(first.Content, unchanged.Content) && ReferenceEquals(first.QuantityItems, unchanged.QuantityItems),
             "A catch-up poll with unchanged hashes must reuse the complete snapshot and definitions.");
+        var scratch = Path.GetDirectoryName(first.Content.WorkspaceDirectory)!;
+        var scratchFiles = Directory.EnumerateFiles(scratch, "*", SearchOption.AllDirectories)
+            .ToDictionary(path => path, File.GetLastWriteTimeUtc);
+        for (var poll = 0; poll < 3; poll++)
+        {
+            var quiet = await reader.ReadAsync(refreshContent: true);
+            Assert(ReferenceEquals(first.Content, quiet.Content) && ReferenceEquals(first.QuantityItems, quiet.QuantityItems) &&
+                scratchFiles.Count == Directory.EnumerateFiles(scratch, "*", SearchOption.AllDirectories).Count() &&
+                scratchFiles.All(file => File.GetLastWriteTimeUtc(file.Key) == file.Value),
+                "Idle resource polling must not decode or rewrite scratch copies of unchanged saves.");
+        }
         var hotUpdatePath = WriteMultiMash(fixture.GameRoot, "dungeons/cove/maintenance_hot_update.1.mash.darkest",
             "hall: .chance 1 .types hot_updated_monster\n");
         var hotUpdated = await reader.ReadAsync(refreshContent: true);
@@ -79,6 +90,20 @@ internal static partial class ContractSuite
         Assert(newGold.CurrentAmount == 5432 && newGold.LocalizedName == gold.LocalizedName &&
             newGold.SourceLabel == gold.SourceLabel,
             "Quantity refresh must adopt live amounts without changing bilingual names or provenance.");
+        var validGame = File.ReadAllBytes(gamePath);
+        var cachedGame = quantities.Content.DecodedGamePath;
+        var cachedBytes = File.ReadAllBytes(cachedGame);
+        File.WriteAllText(gamePath, "{partial-game");
+        var cachedPartialRejected = false;
+        try { await reader.ReadAsync(refreshContent: true); }
+        catch (Exception error) when (error is not OperationCanceledException) { cachedPartialRejected = true; }
+        Assert(cachedPartialRejected && File.Exists(cachedGame) && cachedBytes.SequenceEqual(File.ReadAllBytes(cachedGame)),
+            "Game -> quantity -> partial game must never delete the still-published decoded game cache.");
+        File.WriteAllBytes(gamePath, validGame);
+        var restoredGame = await reader.ReadAsync(refreshContent: true);
+        Assert(restoredGame.Content.SourceGameSha256 == quantities.Content.SourceGameSha256 &&
+            restoredGame.QuantityItems.Items.Single(item => item.DisplayId == "gold").CurrentAmount == 5432,
+            "Restoring the prior game bytes after a failed speculative decode must recover without reloading the profile.");
         var orphan = initial.Items.Single(item => item.DisplayId == "orphan_mod_essence");
         estate = QuantityItemSaveEditor.SetAmount(estate, orphan, 1).UpdatedRoot;
         File.WriteAllText(profile.EstateSavePath, estate.ToJsonString());
