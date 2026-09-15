@@ -2,6 +2,9 @@
 
 此目录集中保存带有时间和任务范围的修复记录、审查报告、实验过程与结果。后续同类记录继续放在这里；当前有效规则与设计说明保留在上一级 `docs/`。
 
+- [历史修改第二十八轮审核：非人物文本的物品引用，2026-09-15](nonactor-item-reference-audit-2026-09-15.md)
+- [非人物文本的物品引用修复：2026-09-15](nonactor-item-reference-fixes-2026-09-15.md)
+
 - [历史修改第二十七轮审核：人物初始 HP 条件，2026-09-15](initial-hp-condition-audit-2026-09-15.md)
 - [新人物初始 HP 条件修复：2026-09-15](initial-hp-condition-fixes-2026-09-15.md)
 - [历史修改第二十六轮审核：升级要求覆盖与费用引用，2026-09-15](upgrade-requirement-consumer-audit-2026-09-15.md)

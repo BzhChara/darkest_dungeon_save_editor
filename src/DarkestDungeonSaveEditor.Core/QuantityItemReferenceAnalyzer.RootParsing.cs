@@ -62,7 +62,8 @@ internal static partial class QuantityItemReferenceAnalyzer
         {
             if (IsReachableInContext(defaultReachability, saveContext))
             {
-                ParseDarkestRoot(file, index, activeEvidence, rootLootEvidence);
+                ParseDarkestRoot(file, index, knownLootTables, rootLootEvidence,
+                    incompleteEvidence, uncertainLootEvidence, issues);
             }
 
             return true;
@@ -88,11 +89,24 @@ internal static partial class QuantityItemReferenceAnalyzer
     private static void ParseDarkestRoot(
         ScannedContentFile file,
         QuantityItemIndex index,
-        Dictionary<string, List<string>> activeEvidence,
-        Dictionary<string, List<string>> rootLootEvidence)
+        IEnumerable<string> knownLootTables,
+        Dictionary<string, List<string>> rootLootEvidence,
+        Dictionary<string, List<string>> incompleteEvidence,
+        Dictionary<string, List<string>> uncertainLootEvidence,
+        List<string> issues)
     {
         var hero = file.MountedPath.StartsWith("heroes/", StringComparison.OrdinalIgnoreCase);
         var monster = file.MountedPath.StartsWith("monsters/", StringComparison.OrdinalIgnoreCase);
+        var unverified = false;
+        var message = $"文本结构尚未确认物品消费规则：{file.File.RelativePath}";
+        void UncertainItems(IEnumerable<string> keys)
+        {
+            foreach (var key in keys)
+            {
+                AddEvidence(incompleteEvidence, key, message);
+                unverified = true;
+            }
+        }
         foreach (var (kind, body) in NativeDarkestReader.ReadRecordsFromText(file.Text))
         {
             if (hero || monster)
@@ -105,16 +119,23 @@ internal static partial class QuantityItemReferenceAnalyzer
                     AddEvidence(rootLootEvidence, actorCode, file.File.RelativePath);
                 continue;
             }
+            // Other text consumers have not been proven. Field names alone
+            // cannot establish item use, including through a valid Loot table.
             if (kind is "loot" or "extra_battle_loot" or "extra_curio_loot" &&
-                NativeDarkestReader.ReadString(body, ".code") is { Length: > 0 } code)
-                AddEvidence(rootLootEvidence, code, file.File.RelativePath);
+                NativeDarkestReader.ReadString(body, ".code") is { Length: > 0 } code &&
+                knownLootTables.Contains(code, StringComparer.Ordinal))
+            {
+                AddEvidence(uncertainLootEvidence, code, message);
+                unverified = true;
+            }
             if (NativeDarkestReader.ReadString(body, ".type") is { } type &&
                 NativeDarkestReader.ReadString(body, ".id") is { } id)
-                MarkResolved(index.Resolve(type, id), activeEvidence, file.File.RelativePath);
+                UncertainItems(index.Resolve(type, id));
             foreach (var field in new[] { ".use_item_id", ".item_id" })
                 if (NativeDarkestReader.ReadString(body, field) is { Length: > 0 } itemId)
-                    MarkResolved(index.ResolveIdentity(itemId), activeEvidence, file.File.RelativePath);
+                    UncertainItems(index.ResolveIdentity(itemId));
         }
+        if (unverified) issues.Add($"Quantity-item references remain unverified in a text structure: {file.File.RelativePath}");
     }
 
     private static void ParseCsvRoot(

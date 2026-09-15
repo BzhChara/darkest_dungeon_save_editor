@@ -25,6 +25,7 @@ internal static partial class ContractSuite
 
     private static async Task RunTextResourceQueryContractsAsync(string runRoot, DsonSaveCodec codec)
     {
+        await RunNonActorReferenceContractsAsync(runRoot, codec);
         await VerifyHeroProgressionResourcesAsync(runRoot, codec);
         VerifyActorReferenceQueryBoundaries(runRoot);
         VerifyItemReferenceContexts(runRoot);
