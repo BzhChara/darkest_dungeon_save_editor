@@ -1263,15 +1263,6 @@ internal static partial class ContractSuite
                 .Single(column => column.Attribute("Header")?.Value == "限制 / 不可用原因")
                 .Attribute("MinWidth")?.Value == "190" &&
             !initialQuirkDialogXaml.ToString().Contains("职业禁用项", StringComparison.Ordinal) &&
-            !initialQuirkDialogCode.Contains("selectedIds.Append(row.Id)", StringComparison.Ordinal) &&
-            initialQuirkDialogCode.Contains("IncompatibleQuirkIds.Contains", StringComparison.Ordinal) &&
-            initialQuirkDialogCode.Contains(
-                "CombineReasons(row.ContextReason, incompatibilityReason)",
-                StringComparison.Ordinal) &&
-            initialQuirkDialogCode.Contains("row.SetAvailability(true, row.ContextReason);", StringComparison.Ordinal) &&
-            initialQuirkDialogCode.Contains(
-                "BaseUnavailableReason = CompactRowReason(baseUnavailableReason)",
-                StringComparison.Ordinal) &&
             initialQuirkDialogCode.Contains(
                 "CompactRowReason(definition.WriteStatusReason)",
                 StringComparison.Ordinal) &&
@@ -1285,13 +1276,10 @@ internal static partial class ContractSuite
                 initialQuirkDialogCode.Contains("FormatMaxHpModifier", StringComparison.Ordinal) &&
                 initialQuirkDialogCode.Contains("火光 ≤", StringComparison.Ordinal) &&
                 initialQuirkDialogCode.Contains("_resolveLevel", StringComparison.Ordinal) &&
-                initialQuirkDialogCode.Contains(
-                    "row.SetAvailability(row.IsSelected, row.BaseUnavailableReason)",
-                    StringComparison.Ordinal) &&
                 initialQuirkDialogCode.Contains("if (requestedValue)", StringComparison.Ordinal) &&
                 !initialQuirkDialogCode.Contains("row.IsSelected = !requestedValue", StringComparison.Ordinal) &&
                 mainWindowCode.Contains("GetSelectedHeroLevel(),", StringComparison.Ordinal),
-            "The initial quirk dialog must fully show fixed/special kind text, distinguish absent from unverified HP modifiers, keep context-limit explanations visible, keep quota feedback in the summary/click validation, and reserve row-level dynamic reasons for actual incompatibilities.");
+            "The initial quirk dialog must fully show fixed/special kind text, distinguish absent from unverified HP modifiers, keep context-limit explanations visible, and preserve level-aware selection/removal. Combination availability is exercised by QuirkSelectionInteractionContractTests.");
         var initialQuirkGrid = initialQuirkDialogXaml
             .Descendants(presentationNamespace + "DataGrid")
             .Single(grid => grid.Attribute(xamlName)?.Value == "QuirkGrid");
