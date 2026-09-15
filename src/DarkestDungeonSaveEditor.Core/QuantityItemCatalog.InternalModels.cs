@@ -25,6 +25,8 @@ public static partial class QuantityItemCatalog
             : string.Empty;
         public string CatalogKey =>
             QuantityItemDefinition.CreateCatalogKey(StorageKind, PersistedType, PersistedId);
+        public string DefinitionKey =>
+            QuantityItemDefinition.CreateCatalogKey(StorageKind, InventoryType, ItemId);
     }
 
     private sealed record SavedQuantityEntry(

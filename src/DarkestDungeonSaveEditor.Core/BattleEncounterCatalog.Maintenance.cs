@@ -21,7 +21,7 @@ public static partial class BattleEncounterCatalog
                 .Concat(new[] { "modfiles.txt", "project.xml", ManagedBattleEncounterBridgeService.ManifestFileName }
                     .Select(name => Path.Combine(source.Directory, name)).Where(File.Exists));
             foreach (var path in paths.Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.OrdinalIgnoreCase))
-                parts.Add($"{Path.GetFullPath(path)}|{ComputeSha256(path)}");
+                parts.Add($"{Path.GetFullPath(path)}|{(File.Exists(path) ? ComputeSha256(path) : "missing")}");
         }
         parts.AddRange(issues.Order(StringComparer.Ordinal)); // Missing listed files are observable changes.
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(string.Join('\n', parts))));
@@ -42,10 +42,9 @@ public static partial class BattleEncounterCatalog
     {
         var issues = new List<string>();
         var files = ResolveEffectiveMashFiles(content.Sources, dungeonId, difficulty, issues);
+        var fingerprints = files.Select(file => CaptureMashFingerprint(file, issues)).ToArray();
         if (issues.Count > 0)
             throw new InvalidOperationException($"战斗自动清理暂缓，无法确认 {dungeonId}/{difficulty}/{mashType} 的文件顺序：{issues[0]}");
-        var fingerprints = files.Select(file => new BattleEncounterFileFingerprint(file.Source.Id,
-            Path.GetFullPath(file.Path), file.RelativePath, ComputeSha256(file.Path))).ToArray();
         var guard = new BattleEncounterTableGuard(dungeonId, difficulty,
             Path.Combine(content.Profile.ProfileDirectory, "persist.game.json"), content.SourceGameSha256,
             content.Sources, fingerprints, ComputeTableFingerprint(fingerprints)) { Resolution = content.Resolution };

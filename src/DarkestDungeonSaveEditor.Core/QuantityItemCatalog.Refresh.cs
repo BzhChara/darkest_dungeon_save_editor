@@ -39,15 +39,17 @@ public static partial class QuantityItemCatalog
             residue.Add(new QuantityItemDefinition(entry.PersistedType,
                 entry.StorageKind == QuantityItemStorageKind.Wallet ? string.Empty : entry.PersistedId,
                 entry.StorageKind, null, null, SumAmounts(matches.Select(item => item.Amount), key),
-                "save", string.Empty, false, [])
+                "save", string.Empty, cached.DefinitionReadFailures.Count > 0, [])
             {
                 SourceLabel = cached.SaveContext == QuantityItemSaveContext.Raid
                     ? "仅当前副本（活动内容未找到定义）" : "仅存档（当前内容未找到定义）",
                 IsPresentInSave = true,
                 SavedEntryCount = matches.Length,
                 ReferenceStatus = QuantityItemReferenceStatus.SaveOnly,
-                ReferenceEvidence = [cached.SaveContext == QuantityItemSaveContext.Raid
-                    ? "当前副本背包包含该条目" : "当前存档包含该条目"]
+                ReferenceEvidence = cached.DefinitionReadFailures.Count > 0
+                    ? ["活动物品定义读取不完整，无法确认该条目仅存在于存档，暂不可修改"]
+                    : [cached.SaveContext == QuantityItemSaveContext.Raid
+                        ? "当前副本背包包含该条目" : "当前存档包含该条目"]
             });
         }
         // Only previously unseen save-only IDs need a name lookup. Never reclassify cached definitions.

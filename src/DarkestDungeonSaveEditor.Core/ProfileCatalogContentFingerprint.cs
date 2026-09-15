@@ -41,6 +41,11 @@ public static class ProfileCatalogContentFingerprint
             foreach (var path in paths.Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.Ordinal))
             {
                 cancellationToken.ThrowIfCancellationRequested();
+                if (!File.Exists(path))
+                {
+                    Add($"{Path.GetFullPath(path)}|missing");
+                    continue;
+                }
                 using var stream = File.OpenRead(path);
                 Add($"{Path.GetFullPath(path)}|{Convert.ToHexString(SHA256.HashData(stream))}");
             }

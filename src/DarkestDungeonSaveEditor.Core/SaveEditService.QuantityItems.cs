@@ -26,7 +26,7 @@ public sealed partial class SaveEditService
         if (item.HasProviderConflict)
         {
             throw new InvalidOperationException(
-                $"Quantity item '{item.DisplayId}' has unresolved definitions at the same priority and is read-only.");
+                $"Quantity item '{item.DisplayId}' has unresolved definitions and is read-only; review the catalog diagnostics.");
         }
 
         _codec.ValidateAvailability();
@@ -51,7 +51,8 @@ public sealed partial class SaveEditService
         }
         ValidateQuantityItemSaveContext(profile, saveContext);
         var manifestFingerprints = CaptureManifestFingerprints(activeContent.Sources);
-        var currentDefinitions = QuantityItemCatalog.LoadDefinitions(activeContent, saveContext);
+        var readFailures = new List<string>();
+        var currentDefinitions = QuantityItemCatalog.LoadDefinitions(activeContent, saveContext, readFailures: readFailures);
         ValidateManifestFingerprints(
             manifestFingerprints,
             "after the quantity-item catalog was loaded; reload the content catalog");
@@ -59,6 +60,7 @@ public sealed partial class SaveEditService
             definition.CatalogKey.Equals(item.CatalogKey, StringComparison.Ordinal));
         if (item.IsSaveOnly)
         {
+            RequireCompleteSaveOnlyDefinitions(readFailures);
             if (currentItem is not null)
             {
                 throw new InvalidOperationException(
@@ -371,9 +373,10 @@ public sealed partial class SaveEditService
             string.Empty,
             0,
             prepared.ContentGuard.SourceGameSha256);
+        var readFailures = new List<string>();
         var currentDefinitions = QuantityItemCatalog.LoadDefinitions(
             currentSnapshot,
-            prepared.ContentGuard.SaveContext);
+            prepared.ContentGuard.SaveContext, readFailures: readFailures);
         if (prepared.ContentGuard.SaveContext == QuantityItemSaveContext.Raid)
         {
             var currentStorage = RaidInventoryStorageCatalog.Load(currentSnapshot).Storage;
@@ -395,6 +398,7 @@ public sealed partial class SaveEditService
             definition.CatalogKey.Equals(prepared.Item.CatalogKey, StringComparison.Ordinal));
         if (prepared.Item.IsSaveOnly)
         {
+            RequireCompleteSaveOnlyDefinitions(readFailures);
             if (currentItem is not null)
             {
                 throw new InvalidOperationException(
@@ -418,6 +422,13 @@ public sealed partial class SaveEditService
             throw new InvalidOperationException(
                 "The selected quantity-item definition changed after preview; prepare a new preview.");
         }
+    }
+
+    private static void RequireCompleteSaveOnlyDefinitions(IReadOnlyList<string> readFailures)
+    {
+        if (readFailures.Count > 0)
+            throw new InvalidOperationException(
+                "活动物品定义读取不完整，无法确认所选条目仅存在于存档；请检查目录诊断并重新加载。");
     }
 
     private static bool QuantityItemDefinitionMatches(

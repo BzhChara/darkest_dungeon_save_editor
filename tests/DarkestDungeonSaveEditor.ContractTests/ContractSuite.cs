@@ -40,6 +40,7 @@ internal static partial class ContractSuite
         var codec = fixture.Codec;
 
         RunInventoryCapacityContracts(runRoot);
+        await RunInventoryProviderContractsAsync(runRoot, codec);
         await RunCanonicalResourceContractsAsync(runRoot, codec);
         await RunResourceOverlaySlotContractsAsync(runRoot, codec);
         await RunTextResourceQueryContractsAsync(runRoot, codec);

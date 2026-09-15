@@ -127,7 +127,6 @@ public static partial class BattleEncounterCatalog
             snapshot.DungeonId,
             snapshot.Difficulty,
             issues);
-        var fileOrderIssue = issues.FirstOrDefault();
         var gameSavePath = Path.Combine(snapshot.ProfileDirectory, "persist.game.json");
         if (!File.Exists(gameSavePath))
         {
@@ -142,12 +141,9 @@ public static partial class BattleEncounterCatalog
         }
 
         var fingerprints = effectiveFiles
-            .Select(file => new BattleEncounterFileFingerprint(
-                file.Source.Id,
-                Path.GetFullPath(file.Path),
-                file.RelativePath,
-                ComputeSha256(file.Path)))
+            .Select(file => CaptureMashFingerprint(file, issues))
             .ToArray();
+        var fileOrderIssue = issues.FirstOrDefault();
         var guard = new BattleEncounterTableGuard(
             snapshot.DungeonId,
             snapshot.Difficulty,
@@ -332,11 +328,7 @@ public static partial class BattleEncounterCatalog
                 guard.DungeonId,
                 guard.Difficulty,
                 issues)
-            .Select(file => new BattleEncounterFileFingerprint(
-                file.Source.Id,
-                Path.GetFullPath(file.Path),
-                file.RelativePath,
-                ComputeSha256(file.Path)))
+            .Select(file => CaptureMashFingerprint(file, issues))
             .ToArray();
         if (issues.Count > 0 ||
             !currentFiles.SequenceEqual(guard.EffectiveFiles) ||
@@ -700,6 +692,17 @@ public static partial class BattleEncounterCatalog
             files.Select(file =>
                 $"{file.SourceId}\t{file.RelativePath}\t{file.Path}\t{file.Sha256}"));
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(canonical))).ToLowerInvariant();
+    }
+
+    private static BattleEncounterFileFingerprint CaptureMashFingerprint(EffectiveMashFile file, List<string> issues)
+    {
+        var hash = string.Empty;
+        try { hash = ComputeSha256(file.Path); }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            issues.Add($"Encounter mash could not be read: {file.Path} ({error.Message})");
+        }
+        return new(file.Source.Id, Path.GetFullPath(file.Path), file.RelativePath, hash);
     }
 
     private static string ComputeSha256(string path)

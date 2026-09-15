@@ -318,6 +318,7 @@ public sealed record QuantityItemDefinition(
         ? ItemId
         : string.Empty;
     public string CatalogKey => CreateCatalogKey(StorageKind, PersistedType, PersistedId);
+    internal string DefinitionKey => CreateCatalogKey(StorageKind, InventoryType, ItemId);
     public string SaveIdentityIssue => NativeInventoryIdentity.GetSaveIssue(PersistedType, PersistedId);
     // This is an editor key, not a game hash. Length-prefix the type so ':' in
     // an authored type or ID cannot make two different storage entries alias.
@@ -336,6 +337,7 @@ public sealed record QuantityItemCatalogResult(
     public QuantityItemSaveContext SaveContext { get; init; } = QuantityItemSaveContext.Town;
     public RaidInventoryStorageDefinition? RaidStorage { get; init; }
     public int RaidOccupiedSlots { get; init; }
+    public IReadOnlyList<string> DefinitionReadFailures { get; init; } = [];
 
     // Compatibility alias for callers compiled against the original town-only catalog.
     public string SourceEstateSha256 => SourceSaveSha256;

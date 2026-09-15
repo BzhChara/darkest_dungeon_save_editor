@@ -102,7 +102,8 @@ public static partial class QuantityItemCatalog
         ArgumentNullException.ThrowIfNull(activeContent);
         ArgumentNullException.ThrowIfNull(estateRoot);
         var issues = new List<string>();
-        var definitions = LoadDefinitions(activeContent, QuantityItemSaveContext.Town, issues);
+        var readFailures = new List<string>();
+        var definitions = LoadDefinitions(activeContent, QuantityItemSaveContext.Town, issues, readFailures);
         var savedEntries = ReadSavedEntries(estateRoot, issues);
         var savedEntryCounts = savedEntries
             .GroupBy(entry => entry.CatalogKey, StringComparer.Ordinal)
@@ -151,14 +152,16 @@ public static partial class QuantityItemCatalog
                 amounts[entry.CatalogKey],
                 "save",
                 string.Empty,
-                false,
+                readFailures.Count > 0,
                 [])
             {
                 SourceLabel = "仅存档（当前内容未找到定义）",
                 IsPresentInSave = true,
                 SavedEntryCount = savedEntryCounts[entry.CatalogKey],
                 ReferenceStatus = QuantityItemReferenceStatus.SaveOnly,
-                ReferenceEvidence = ["当前存档包含该条目"]
+                ReferenceEvidence = readFailures.Count > 0
+                    ? ["活动物品定义读取不完整，无法确认该条目仅存在于存档，暂不可修改"]
+                    : ["当前存档包含该条目"]
             });
         }
 
@@ -185,7 +188,8 @@ public static partial class QuantityItemCatalog
             issues.Distinct(StringComparer.OrdinalIgnoreCase).ToArray(),
             sourceEstateSha256)
         {
-            SaveContext = QuantityItemSaveContext.Town
+            SaveContext = QuantityItemSaveContext.Town,
+            DefinitionReadFailures = readFailures.ToArray()
         };
     }
 
@@ -203,7 +207,8 @@ public static partial class QuantityItemCatalog
             "party",
             "inventory",
             "items").Count;
-        var definitions = LoadDefinitions(activeContent, QuantityItemSaveContext.Raid, issues);
+        var readFailures = new List<string>();
+        var definitions = LoadDefinitions(activeContent, QuantityItemSaveContext.Raid, issues, readFailures);
         var savedEntries = ReadSavedRaidEntries(raidRoot, issues);
         var savedEntryCounts = savedEntries
             .GroupBy(entry => entry.CatalogKey, StringComparer.Ordinal)
@@ -248,14 +253,16 @@ public static partial class QuantityItemCatalog
                 amounts[entry.CatalogKey],
                 "save",
                 string.Empty,
-                false,
+                readFailures.Count > 0,
                 [])
             {
                 SourceLabel = "仅当前副本（活动内容未找到定义）",
                 IsPresentInSave = true,
                 SavedEntryCount = savedEntryCounts[entry.CatalogKey],
                 ReferenceStatus = QuantityItemReferenceStatus.SaveOnly,
-                ReferenceEvidence = ["当前副本背包包含该条目"]
+                ReferenceEvidence = readFailures.Count > 0
+                    ? ["活动物品定义读取不完整，无法确认该条目仅存在于副本存档，暂不可修改"]
+                    : ["当前副本背包包含该条目"]
             });
         }
 
@@ -285,7 +292,8 @@ public static partial class QuantityItemCatalog
         {
             SaveContext = QuantityItemSaveContext.Raid,
             RaidStorage = raidStorage.Storage,
-            RaidOccupiedSlots = occupiedSlots
+            RaidOccupiedSlots = occupiedSlots,
+            DefinitionReadFailures = readFailures.ToArray()
         };
     }
 

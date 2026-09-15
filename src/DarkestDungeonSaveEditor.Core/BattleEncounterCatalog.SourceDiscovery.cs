@@ -137,7 +137,6 @@ public static partial class BattleEncounterCatalog
                 if (!File.Exists(path))
                 {
                     issues.Add($"Encounter mash listed by Mod is missing: {path}");
-                    continue;
                 }
 
                 result.Add(path);
