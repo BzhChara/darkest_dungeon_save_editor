@@ -2,8 +2,6 @@ using System.Reflection;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
-using System.Windows.Markup;
-using System.Xml.Linq;
 using DarkestDungeonSaveEditor.App;
 
 internal static partial class ContractSuite
@@ -27,41 +25,12 @@ internal static partial class ContractSuite
             await f.Codec.EncodeAsync(input, output, null);
     }
 
-    private static Task RunProfileSyncInteractionContractsAsync(ContractFixture f)
-    {
-        var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var thread = new Thread(() =>
-        {
-            var dispatcher = Dispatcher.CurrentDispatcher;
-            SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext(dispatcher));
-            var frame = new DispatcherFrame();
-            dispatcher.BeginInvoke(new Action(async () =>
-            {
-                try { await VerifyProfileSyncInteractionAsync(f); completion.SetResult(); }
-                catch (Exception ex) { completion.SetException(ex); }
-                finally { frame.Continue = false; }
-            }));
-            Dispatcher.PushFrame(frame);
-        });
-        thread.SetApartmentState(ApartmentState.STA);
-        thread.IsBackground = true;
-        thread.Start();
-        return completion.Task;
-    }
+    private static Task RunProfileSyncInteractionContractsAsync(ContractFixture f) =>
+        RunWpfContractsAsync(() => VerifyProfileSyncInteractionAsync(f));
 
     // Exercise the shipped WPF handlers on a Dispatcher. No visible window or real profile is opened.
     private static async Task VerifyProfileSyncInteractionAsync(ContractFixture f)
     {
-        var app = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
-        var directory = new DirectoryInfo(Path.GetDirectoryName(typeof(MainWindow).Assembly.Location)!);
-        while (!File.Exists(Path.Combine(directory.FullName, "DarkestDungeonSaveEditor.sln"))) directory = directory.Parent!;
-        var theme = XDocument.Load(Path.Combine(directory.FullName, "src/DarkestDungeonSaveEditor.App/App.xaml")).Root!;
-        var resourceRoot = new XElement(theme.Name.Namespace + "ResourceDictionary",
-            theme.Attributes().Where(attribute => attribute.IsNamespaceDeclaration), theme.Element(theme.Name.Namespace + "Application.Resources")!.Elements());
-        app.Resources = (ResourceDictionary)XamlReader.Parse(resourceRoot.ToString(), new ParserContext
-        {
-            BaseUri = new Uri("pack://application:,,,/DarkestDungeonSaveEditor.App;component/")
-        });
         var window = new MainWindow();
         const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic;
         object? Get(string name) => typeof(MainWindow).GetField(name, flags)!.GetValue(window);
@@ -253,7 +222,6 @@ internal static partial class ContractSuite
             gate?.Release();
             Call("StopProfileSync");
             window.Close();
-            app.Shutdown();
         }
     }
 }

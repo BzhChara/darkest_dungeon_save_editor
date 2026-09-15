@@ -2,6 +2,10 @@
 
 此目录集中保存带有时间和任务范围的修复记录、审查报告、实验过程与结果。后续同类记录继续放在这里；当前有效规则与设计说明保留在上一级 `docs/`。
 
+- [怪癖组合选择修复，2026-09-15](quirk-selection-combination-fix-2026-09-15.md)
+
+- [历史修改第三十轮审核：怪癖组合选择与旧预检限制，2026-09-15](quirk-selection-combination-audit-2026-09-15.md)
+
 - [来源映射写入保护与空闲同步修复，2026-09-15](content-sync-source-bindings-fix-2026-09-15.md)
 
 - [历史修改第二十九轮审核：来源映射与写入校验，2026-09-15](source-binding-guard-audit-2026-09-15.md)

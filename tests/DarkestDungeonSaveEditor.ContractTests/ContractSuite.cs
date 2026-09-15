@@ -123,7 +123,11 @@ internal static partial class ContractSuite
         await RunSourceBindingBattleContractsAsync(Path.Combine(runRoot, "battle-bindings"), codec);
         await RunSourceBindingHeroContractsAsync(fixture);
         await RunProfileSyncContractsAsync(fixture);
-        await RunProfileSyncInteractionContractsAsync(fixture);
+        await RunWpfContractsAsync(async () =>
+        {
+            await VerifyQuirkSelectionInteractionAsync(repositoryRoot);
+            await VerifyProfileSyncInteractionAsync(fixture);
+        });
         RunContentDiscoveryContracts(activeContent, fixture);
         RunManifestDiscoveryContracts(activeContent, fixture);
         RunLocalizationPolicyContracts(activeContent, fixture);

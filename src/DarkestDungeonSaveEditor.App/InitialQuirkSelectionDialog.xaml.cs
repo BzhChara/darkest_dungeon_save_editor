@@ -56,11 +56,9 @@ public partial class InitialQuirkSelectionDialog : Window
             var source = sources.Length == 1
                 ? sources[0]
                 : $"多个定义：{string.Join(", ", sources)}";
-            var baseUnavailableReason = GetUnavailableReason(definition.Id);
             _rows.Add(new QuirkChoiceRow(
                 definition,
                 source,
-                baseUnavailableReason,
                 selectedIds.Contains(definition.Id)));
         }
 
@@ -87,7 +85,7 @@ public partial class InitialQuirkSelectionDialog : Window
 
     public IReadOnlyList<string> SelectedQuirkIds { get; private set; } = [];
 
-    private string GetUnavailableReason(string quirkId)
+    private string GetUnavailableReason(IReadOnlyCollection<string> quirkIds)
     {
         try
         {
@@ -95,7 +93,7 @@ public partial class InitialQuirkSelectionDialog : Window
                 _catalog,
                 _heroClass,
                 _resolveLevel,
-                [quirkId]);
+                quirkIds);
             return string.Empty;
         }
         catch (InvalidOperationException ex)
@@ -209,43 +207,18 @@ public partial class InitialQuirkSelectionDialog : Window
 
     private void RefreshAvailability()
     {
-        var selectedDefinitions = _rows
-            .Where(row => row.IsSelected)
-            .Select(row => row.Definition)
-            .ToArray();
+        var selectedIds = GetSelectedIds();
+        var selectionUnavailableReason = GetUnavailableReason(selectedIds);
         foreach (var row in _rows)
         {
-            if (!string.IsNullOrWhiteSpace(row.BaseUnavailableReason))
-            {
-                // A level change can make a previously valid flat-HP selection invalid.
-                // Keep an already selected row enabled so the user can remove it.
-                row.SetAvailability(row.IsSelected, row.BaseUnavailableReason);
-                continue;
-            }
-
-            if (row.IsSelected)
-            {
-                row.SetAvailability(true, row.ContextReason);
-                continue;
-            }
-
-            var incompatible = selectedDefinitions.FirstOrDefault(selected =>
-                selected.IncompatibleQuirkIds.Contains(row.Id, StringComparer.Ordinal) ||
-                row.Definition.IncompatibleQuirkIds.Contains(selected.Id, StringComparer.Ordinal));
-            if (incompatible is not null)
-            {
-                var incompatibilityReason =
-                    $"初始怪癖 '{incompatible.Id}' 与 '{row.Id}' 互斥，不能同时选择。";
-                row.SetAvailability(
-                    false,
-                    CombineReasons(row.ContextReason, incompatibilityReason));
-                continue;
-            }
-
-            // The counters above the grid already communicate the three independent quotas.
-            // Keep row-level dynamic reasons for actual quirk incompatibilities only;
-            // the active shared-rule limit is checked when the user clicks a row.
-            row.SetAvailability(true, row.ContextReason);
+            // HP modifiers can compensate each other; validate the proposed combination.
+            // Selected rows stay enabled so an invalid selection can always be removed.
+            var reason = row.IsSelected
+                ? selectionUnavailableReason
+                : GetUnavailableReason([.. selectedIds, row.Id]);
+            row.SetAvailability(
+                row.IsSelected || string.IsNullOrWhiteSpace(reason),
+                CompactRowReason(CombineReasons(row.ContextReason, reason)));
         }
 
         RefreshView();
@@ -311,19 +284,15 @@ public partial class InitialQuirkSelectionDialog : Window
         public QuirkChoiceRow(
             HeroInitialQuirkDefinition definition,
             string source,
-            string baseUnavailableReason,
             bool isSelected)
         {
             Definition = definition;
             Source = source;
-            BaseUnavailableReason = CompactRowReason(baseUnavailableReason);
             ContextReason = definition.WriteStatus == HeroInitialQuirkWriteStatus.RequiresSaveContext
                 ? CompactRowReason(definition.WriteStatusReason)
                 : string.Empty;
-            _unavailableReason = string.IsNullOrWhiteSpace(BaseUnavailableReason)
-                ? ContextReason
-                : BaseUnavailableReason;
-            _isSelectable = string.IsNullOrWhiteSpace(BaseUnavailableReason);
+            _unavailableReason = ContextReason;
+            _isSelectable = true;
             _isSelected = isSelected;
         }
 
@@ -363,7 +332,6 @@ public partial class InitialQuirkSelectionDialog : Window
                     ? "无"
                     : string.Join("；", Definition.MaxHpModifiers.Select(FormatMaxHpModifier));
         public string Source { get; }
-        public string BaseUnavailableReason { get; }
         public string ContextReason { get; }
 
         public bool IsSelected
