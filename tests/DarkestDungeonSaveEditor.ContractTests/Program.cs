@@ -1,11 +1,12 @@
 try
 {
-    if (args.Length is < 1 or > 2 || (args.Length == 2 && args[1] is not ("--maintenance" or "--manifests" or "--catalogs" or "--semantics" or "--capacities" or "--map-content" or "--raid-paths" or "--queries" or "--quirk-rules" or "--hero-selection" or "--overlay-slots" or "--canonical-resources" or "--encounter-queries" or "--case-identities" or "--inventory-persistence" or "--loot-references" or "--upgrade-references")))
+    if (args.Length is < 1 or > 2 || (args.Length == 2 && args[1] is not ("--maintenance" or "--manifests" or "--catalogs" or "--semantics" or "--capacities" or "--map-content" or "--raid-paths" or "--queries" or "--quirk-rules" or "--hero-selection" or "--overlay-slots" or "--canonical-resources" or "--encounter-queries" or "--case-identities" or "--inventory-persistence" or "--loot-references" or "--upgrade-references" or "--reference-consumers")))
     {
-        throw new InvalidOperationException("Usage: DarkestDungeonSaveEditor.ContractTests <repository-root> [--maintenance|--manifests|--catalogs|--semantics|--capacities|--map-content|--raid-paths|--queries|--quirk-rules|--hero-selection|--overlay-slots|--canonical-resources|--encounter-queries|--case-identities|--inventory-persistence|--loot-references|--upgrade-references]");
+        throw new InvalidOperationException("Usage: DarkestDungeonSaveEditor.ContractTests <repository-root> [--maintenance|--manifests|--catalogs|--semantics|--capacities|--map-content|--raid-paths|--queries|--quirk-rules|--hero-selection|--overlay-slots|--canonical-resources|--encounter-queries|--case-identities|--inventory-persistence|--loot-references|--upgrade-references|--reference-consumers]");
     }
 
-    if (args.Length == 2 && args[1] == "--upgrade-references") await ContractSuite.RunUpgradeReferencesOnlyAsync(Path.GetFullPath(args[0]));
+    if (args.Length == 2 && args[1] == "--reference-consumers") await ContractSuite.RunReferenceConsumersOnlyAsync(Path.GetFullPath(args[0]));
+    else if (args.Length == 2 && args[1] == "--upgrade-references") await ContractSuite.RunUpgradeReferencesOnlyAsync(Path.GetFullPath(args[0]));
     else if (args.Length == 2 && args[1] == "--loot-references") await ContractSuite.RunLootReferencesOnlyAsync(Path.GetFullPath(args[0]));
     else if (args.Length == 2 && args[1] == "--inventory-persistence") await ContractSuite.RunInventoryPersistenceOnlyAsync(Path.GetFullPath(args[0]));
     else if (args.Length == 2 && args[1] == "--case-identities") await ContractSuite.RunCaseIdentitiesOnlyAsync(Path.GetFullPath(args[0]));

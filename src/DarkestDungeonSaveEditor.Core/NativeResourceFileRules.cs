@@ -236,10 +236,23 @@ internal static partial class NativeResourceFileRules
     internal static bool IsEligibleReferenceFile(string path, IReadOnlyList<string> enabledDlcPrefixes, bool manifestDirectory = false)
     {
         var mounted = MountedPath(path, enabledDlcPrefixes, manifestDirectory);
-        if (mounted.StartsWith("loot/", DirectoryComparison(manifestDirectory)) || LootName().IsMatch(mounted))
+        // Identify a known family even when a manifest spells its directory
+        // incorrectly. Its actual query still applies the device's case rules;
+        // a rejected query must not fall through as an unverified text source.
+        if (mounted.StartsWith("loot/", StringComparison.OrdinalIgnoreCase) || LootName().IsMatch(mounted))
             return IsLootFile(mounted, [], manifestDirectory);
-        if (mounted.EndsWith("json", StringComparison.OrdinalIgnoreCase))
-            return ReferenceJsonKind(mounted, [], manifestDirectory) != NativeReferenceJsonKind.None;
-        return true;
+        if (mounted.StartsWith("curios/", StringComparison.OrdinalIgnoreCase))
+            return IsCurioTypeFile(mounted, [], manifestDirectory);
+        if (ReferenceJsonKind(mounted, [], manifestDirectory) != NativeReferenceJsonKind.None) return true;
+        return !mounted.EndsWith("json", StringComparison.OrdinalIgnoreCase) &&
+               !ReferenceJsonDirectories.Any(directory => mounted.StartsWith(directory, StringComparison.OrdinalIgnoreCase));
     }
+
+    // Item-reference consumers in these roots load JSON, not arbitrary
+    // .darkest files. Discovery and missing-file diagnostics share this gate.
+    private static readonly string[] ReferenceJsonDirectories =
+    [
+        "campaign/provision/", "campaign/town_events/", "campaign/estate/", "campaign/quest/",
+        "campaign/town/districts/", "campaign/town/buildings/", "upgrades/"
+    ];
 }
