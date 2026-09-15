@@ -47,7 +47,7 @@ public sealed partial class SaveEditService
             activeContent.GameMode,
             activeContent.Sources.ToArray(),
             expectedCatalogSha256,
-            manifestFingerprints);
+            manifestFingerprints) { Resolution = activeContent.Resolution };
 
         var townTargetPath = GetProfileSavePath(profile, "persist.town.json");
         var rosterTargetPath = GetProfileSavePath(profile, "persist.roster.json");
@@ -250,6 +250,7 @@ public sealed partial class SaveEditService
         SaveProfile profile,
         PreparedStagecoachContentGuard contentGuard)
     {
+        ActiveContentResolver.ValidateSourceBindings(contentGuard.Resolution, contentGuard.Sources);
         var gameSavePath = Path.Combine(profile.ProfileDirectory, "persist.game.json");
         if (!File.Exists(gameSavePath) ||
             !ComputeSha256(gameSavePath).Equals(

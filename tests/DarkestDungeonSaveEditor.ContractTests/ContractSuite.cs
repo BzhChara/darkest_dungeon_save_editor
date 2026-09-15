@@ -119,7 +119,11 @@ internal static partial class ContractSuite
             "A DLC feature source must preserve its game-root virtual path prefix.");
 
 
+        await RunSourceBindingInventoryContractsAsync(Path.Combine(runRoot, "source-bindings"), codec);
+        await RunSourceBindingBattleContractsAsync(Path.Combine(runRoot, "battle-bindings"), codec);
+        await RunSourceBindingHeroContractsAsync(fixture);
         await RunProfileSyncContractsAsync(fixture);
+        await RunProfileSyncInteractionContractsAsync(fixture);
         RunContentDiscoveryContracts(activeContent, fixture);
         RunManifestDiscoveryContracts(activeContent, fixture);
         RunLocalizationPolicyContracts(activeContent, fixture);

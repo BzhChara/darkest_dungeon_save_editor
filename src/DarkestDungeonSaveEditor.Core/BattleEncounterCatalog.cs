@@ -33,7 +33,10 @@ public sealed record BattleEncounterTableGuard(
     string GameSaveSha256,
     IReadOnlyList<ActiveContentSource> ActiveSources,
     IReadOnlyList<BattleEncounterFileFingerprint> EffectiveFiles,
-    string Fingerprint);
+    string Fingerprint)
+{
+    public ActiveContentResolution? Resolution { get; init; }
+}
 
 public sealed record BattleEncounterDefinition(
     int MashType,
@@ -152,7 +155,7 @@ public static partial class BattleEncounterCatalog
             activeContent.SourceGameSha256,
             activeContent.Sources.ToArray(),
             fingerprints,
-            ComputeTableFingerprint(fingerprints));
+            ComputeTableFingerprint(fingerprints)) { Resolution = activeContent.Resolution };
 
         var unparsedTypes = new HashSet<int>();
         var parsed = effectiveFiles
@@ -312,6 +315,7 @@ public static partial class BattleEncounterCatalog
 
     public static void ValidateGuard(BattleEncounterTableGuard guard)
     {
+        ActiveContentResolver.ValidateSourceBindings(guard.Resolution, guard.ActiveSources);
         ArgumentNullException.ThrowIfNull(guard);
         if (!File.Exists(guard.GameSavePath) ||
             !ComputeSha256(guard.GameSavePath).Equals(

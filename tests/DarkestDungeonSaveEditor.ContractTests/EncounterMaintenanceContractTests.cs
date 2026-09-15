@@ -175,7 +175,7 @@ internal static partial class ContractSuite
                 Assert((await history.ReadAsync(profile, snapshot, CancellationToken.None)).Count == 2,
                     "Persistent raid placements must remain owned after force-town.");
                 var deferred = await bridge.ReconcileAsync(townContent, game, mods);
-                Assert(deferred.Deferred && !deferred.Changed && deferred.ClearedBattles == 0 &&
+                Assert(deferred.Deferred && !deferred.RetryWhenGameExits && !deferred.Changed && deferred.ClearedBattles == 0 &&
                     ComputeSha256(mapPath) == beforeMap && bridgeBefore!.All(pair => ComputeSha256(pair.Key) == pair.Value) &&
                     (await history.ReadAsync(profile, snapshot, CancellationToken.None)).Count == 2,
                     "Town maintenance must preserve persistent raid ownership and defer Bridge compaction, including a reset raid_save pointer.");
@@ -269,9 +269,22 @@ internal static partial class ContractSuite
             {
                 running = true;
                 var deferred = await bridge.ReconcileAsync(content, game, mods);
-                Assert(deferred.Deferred && !deferred.Changed && ComputeSha256(mapPath) == beforeMap &&
+                Assert(deferred.Deferred && deferred.RetryWhenGameExits && !deferred.Changed && ComputeSha256(mapPath) == beforeMap &&
                     bridgeBefore!.All(pair => ComputeSha256(pair.Key) == pair.Value), "A running game must defer every save and package write.");
                 running = false;
+                var inspection = await bridge.ReconcileAsync(content, game, mods, inspectOnly: true);
+                Assert(inspection.RequiresWrite && !inspection.Changed && ComputeSha256(mapPath) == beforeMap &&
+                    bridgeBefore!.All(pair => ComputeSha256(pair.Key) == pair.Value),
+                    "Read-only maintenance inspection must detect pending work without changing the map or installed Bridge.");
+                using (var lockedMap = new FileStream(mapPath, FileMode.Open, FileAccess.Read, FileShare.Read))
+                {
+                    var replacementBlocked = false;
+                    try { await bridge.ReconcileAsync(content, game, mods, inspectOnly: true); }
+                    catch (IOException error) { replacementBlocked = error.Message.Contains("不允许替换", StringComparison.Ordinal); }
+                    Assert(replacementBlocked && ComputeSha256(mapPath) == beforeMap &&
+                        bridgeBefore!.All(pair => ComputeSha256(pair.Key) == pair.Value),
+                        "Maintenance inspection must detect a readable map's replacement lock without making any changes.");
+                }
             }
             if (scenario == "rollback")
             {

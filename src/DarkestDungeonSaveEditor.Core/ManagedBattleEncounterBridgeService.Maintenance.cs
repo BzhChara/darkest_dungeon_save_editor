@@ -8,7 +8,12 @@ public sealed record EditorBattleMaintenanceResult(bool Changed, bool Deferred, 
 {
     public static EditorBattleMaintenanceResult Unchanged { get; } = new(false, false, 0, 0, 0, null, []);
     public string? DeferredReason { get; init; }
-    public string Message => Deferred
+    public bool RetryWhenGameExits { get; init; }
+    public bool RequiresWrite { get; init; }
+    public bool RecoveryPerformed { get; init; }
+    public string Message => RecoveryPerformed && !Deferred && RemovedCombinations == 0 && ReindexedCombinations == 0 && ClearedBattles == 0
+        ? "已恢复中断的战斗维护，正在重新同步档案。"
+        : Deferred
         ? DeferredReason ?? "检测到编辑器战斗记录失效，已暂缓自动清理；退出游戏后将自动重试。"
         : $"战斗记录自动维护：删除失效 Bridge 组合 {RemovedCombinations} 条，更新编号 {ReindexedCombinations} 条，" +
           $"清空编辑器放置的战斗 {ClearedBattles} 场；备份={BackupDirectory}；原因={string.Join("；", Reasons)}";
@@ -23,15 +28,22 @@ public sealed partial class ManagedBattleEncounterBridgeService
     internal Action<string>? BeforeMaintenanceReplace { get; set; }
     internal Action<string>? AfterMaintenanceReplace { get; set; }
 
+    public bool CanRetryDeferredMaintenance => !_gameRunningProbe();
+
     /// <summary>Explicit offline maintenance. Catalog readers themselves remain read-only.</summary>
     public async Task<EditorBattleMaintenanceResult> ReconcileAsync(ActiveContentSnapshot content,
-        string gameDirectory, string? localModDirectory, CancellationToken cancellationToken = default)
+        string gameDirectory, string? localModDirectory, CancellationToken cancellationToken = default,
+        bool inspectOnly = false)
     {
         await _maintenanceGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            await RecoverInterruptedMaintenanceAsync(content.Profile, gameDirectory, localModDirectory, cancellationToken).ConfigureAwait(false);
-            return await ReconcileCoreAsync(content, gameDirectory, localModDirectory, cancellationToken).ConfigureAwait(false);
+            ActiveContentResolver.ValidateSourceBindings(content.Resolution, content.Sources, cancellationToken);
+            var recovery = await RecoverInterruptedMaintenanceAsync(content.Profile, gameDirectory,
+                localModDirectory, cancellationToken, inspectOnly).ConfigureAwait(false);
+            if (inspectOnly && recovery) return EditorBattleMaintenanceResult.Unchanged with { RequiresWrite = true };
+            var result = await ReconcileCoreAsync(content, gameDirectory, localModDirectory, cancellationToken, inspectOnly).ConfigureAwait(false);
+            return recovery ? result with { Changed = true, RecoveryPerformed = true } : result;
         }
         finally
         {
@@ -50,7 +62,7 @@ public sealed partial class ManagedBattleEncounterBridgeService
     }
 
     private async Task<EditorBattleMaintenanceResult> ReconcileCoreAsync(ActiveContentSnapshot content,
-        string gameDirectory, string? localModDirectory, CancellationToken token)
+        string gameDirectory, string? localModDirectory, CancellationToken token, bool inspectOnly)
     {
         var profile = content.Profile;
         var unresolved = content.Issues.FirstOrDefault(issue =>
@@ -310,7 +322,14 @@ public sealed partial class ManagedBattleEncounterBridgeService
                 stagedFiles.Remove(path);
             removed = reindexed = 0;
         }
-        if (_gameRunningProbe()) return new(false, true, removed, reindexed, 0, null, reasons);
+        if (_gameRunningProbe()) return new(false, true, removed, reindexed, 0, null, reasons) { RetryWhenGameExits = true };
+        if (inspectOnly)
+        {
+            foreach (var target in stagedFiles.Keys) GuardedSaveReplacement.ValidateReplaceAccess(target);
+            if (invalidated && snapshot is not null && placements.Count > 0)
+                GuardedSaveReplacement.ValidateReplaceAccess(snapshot.MapSavePath);
+            return new(false, false, removed, reindexed, 0, null, reasons) { RequiresWrite = true };
+        }
         token.ThrowIfCancellationRequested();
         Directory.CreateDirectory(Workspace());
         using var gameLock = new FileStream(Path.Combine(profile.ProfileDirectory, "persist.game.json"),
@@ -346,6 +365,7 @@ public sealed partial class ManagedBattleEncounterBridgeService
                 throw new IOException("存档或 Mod 文件在自动清理准备期间发生变化，等待稳定后重试。");
             token.ThrowIfCancellationRequested();
             EnsureGameIsNotRunning();
+            ActiveContentResolver.ValidateSourceBindings(content.Resolution, content.Sources, token);
             var readOnlyFiles = originalFiles.Where(pair => !stagedFiles.ContainsKey(pair.Key)).Concat(retainedGuards).ToArray();
             backup = CreateProfileBackup(profile, Path.GetFileName(Workspace()), content.SourceGameSha256);
             if (Directory.Exists(package)) CopyDirectory(package, Path.Combine(backup, "bridge-package"));
