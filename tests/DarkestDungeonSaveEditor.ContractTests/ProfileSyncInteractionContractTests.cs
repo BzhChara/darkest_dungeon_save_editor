@@ -216,6 +216,7 @@ internal static partial class ContractSuite
             gate.Release(); gate = null; await Settled();
             Assert(Flag("_syncReady") && !Flag("_syncApplying"), "Cancelled older generations must not lock a newly loaded profile.");
             Console.WriteLine("PASS: WPF partial-save recovery and cancellation discard old checks without leaving controls locked.");
+            await VerifyMissingResourceSyncAsync(f);
         }
         finally
         {

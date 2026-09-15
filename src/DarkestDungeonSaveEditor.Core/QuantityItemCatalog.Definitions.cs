@@ -11,7 +11,8 @@ public static partial class QuantityItemCatalog
     internal static IReadOnlyList<QuantityItemDefinition> LoadDefinitions(
         ActiveContentSnapshot activeContent,
         QuantityItemSaveContext saveContext = QuantityItemSaveContext.Town,
-        List<string>? issues = null)
+        List<string>? issues = null,
+        List<string>? readFailures = null)
     {
         issues ??= [];
         var candidates = new List<ContentFileCandidate>();
@@ -27,22 +28,24 @@ public static partial class QuantityItemCatalog
         var definitions = new Dictionary<string, List<QuantityItemDefinition>>(StringComparer.Ordinal);
         foreach (var file in ResolveSamePriorityFileConflicts(candidates))
         {
-            ScanFile(file, saveContext, definitions, issues, forceProviderConflict: true);
+            ScanFile(file, saveContext, definitions, issues, readFailures, forceProviderConflict: true);
         }
 
         foreach (var file in NativeContentFileResolver.Resolve(candidates, activeContent.Sources, "Inventory item definition", issues))
         {
-            ScanFile(file, saveContext, definitions, issues);
+            ScanFile(file, saveContext, definitions, issues, readFailures);
         }
 
         var collisionKeys = NativeResourceIdentity.FindCollisions(definitions.Values.SelectMany(group => group),
-            item => item.CatalogKey, item => (Loc2LocalizationReader.HashName(NativeJsonReader.CString(item.InventoryType)),
+            item => item.DefinitionKey, item => (Loc2LocalizationReader.HashName(NativeJsonReader.CString(item.InventoryType)),
                 Loc2LocalizationReader.HashName(NativeJsonReader.CString(item.ItemId))));
         if (collisionKeys.Count > 0) issues.Add("Inventory keys share native hashes and cannot be selected safely: " + string.Join(", ", collisionKeys));
         var merged = definitions.Values
             .Select(group => MergeDefinitions(group, issues))
-            .Select(definition => collisionKeys.Contains(definition.CatalogKey)
+            .Select(definition => collisionKeys.Contains(definition.DefinitionKey)
                 ? definition with { HasProviderConflict = true, Source = "unresolved" } : definition)
+            .GroupBy(definition => definition.CatalogKey, StringComparer.Ordinal)
+            .Select(AggregateWalletDefinitions)
             .OrderBy(definition => definition.DisplayId, StringComparer.OrdinalIgnoreCase)
             .ToArray();
         foreach (var definition in merged.Where(item => item.SaveIdentityIssue.Length > 0))
@@ -55,6 +58,7 @@ public static partial class QuantityItemCatalog
         QuantityItemSaveContext saveContext,
         Dictionary<string, List<QuantityItemDefinition>> definitions,
         List<string> issues,
+        List<string>? readFailures,
         bool forceProviderConflict = false)
     {
         try
@@ -72,13 +76,13 @@ public static partial class QuantityItemCatalog
                     file.Source.Id,
                     Path.GetFullPath(file.Path),
                     forceProviderConflict,
-                    providerSources.TryGetValue(parsed.CatalogKey, out var sources)
+                    providerSources.TryGetValue(parsed.DefinitionKey, out var sources)
                         ? sources
                         : [file.Source.Id]);
-                if (!definitions.TryGetValue(definition.CatalogKey, out var group))
+                if (!definitions.TryGetValue(definition.DefinitionKey, out var group))
                 {
                     group = [];
-                    definitions[definition.CatalogKey] = group;
+                    definitions[definition.DefinitionKey] = group;
                 }
 
                 group.Add(definition);
@@ -86,7 +90,9 @@ public static partial class QuantityItemCatalog
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or DecoderFallbackException)
         {
-            issues.Add($"Failed to read inventory item file '{file.Path}': {ex.Message}");
+            var reason = $"Failed to read inventory item file '{file.Path}': {ex.Message}";
+            issues.Add(reason);
+            readFailures?.Add(reason);
         }
     }
 
@@ -173,10 +179,10 @@ public static partial class QuantityItemCatalog
             {
                 foreach (var definition in ReadDefinitions(provider.Path, saveContext))
                 {
-                    if (!result.TryGetValue(definition.CatalogKey, out var sources))
+                    if (!result.TryGetValue(definition.DefinitionKey, out var sources))
                     {
                         sources = [];
-                        result[definition.CatalogKey] = sources;
+                        result[definition.DefinitionKey] = sources;
                     }
 
                     if (!sources.Contains(provider.SourceId, StringComparer.OrdinalIgnoreCase))
@@ -266,14 +272,28 @@ public static partial class QuantityItemCatalog
         // GetItemInfo stops at the first matching type and ID hash (0x1404F1590).
         // Mod priority replaces paths, not every same-ID declaration globally.
         var winner = candidates[0];
-        var conflict = candidates.Any(candidate => candidate.HasProviderConflict ||
-            candidate.InventoryType != winner.InventoryType || candidate.ItemId != winner.ItemId);
+        var conflict = candidates.Any(candidate => candidate.HasProviderConflict);
         if (conflict)
             issues.Add($"Quantity item '{winner.DisplayId}' has an unverified file provider priority.");
         return winner with
         {
             HasProviderConflict = conflict,
             AllSources = candidates.SelectMany(candidate => candidate.AllSources)
+                .Distinct(StringComparer.OrdinalIgnoreCase).ToArray()
+        };
+    }
+
+    private static QuantityItemDefinition AggregateWalletDefinitions(
+        IGrouping<string, QuantityItemDefinition> definitions)
+    {
+        // Distinct native definitions may map to one wallet type. Select each
+        // (type, id) first, then aggregate provenance and genuine uncertainty;
+        // an authored gold/shard ID is not part of the saved wallet identity.
+        var winner = definitions.First();
+        return winner with
+        {
+            HasProviderConflict = definitions.Any(definition => definition.HasProviderConflict),
+            AllSources = definitions.SelectMany(definition => definition.AllSources)
                 .Distinct(StringComparer.OrdinalIgnoreCase).ToArray()
         };
     }

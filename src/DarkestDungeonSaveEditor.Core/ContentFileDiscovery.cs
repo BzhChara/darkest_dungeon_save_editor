@@ -55,8 +55,8 @@ internal static class ContentFileDiscovery
                 if (!File.Exists(path))
                 {
                     issues.Add($"{label} file listed by Mod is missing: {path}");
-                    continue;
                 }
+                // A missing winning provider must not expose an overridden file.
                 result.Add(path);
             }
         }

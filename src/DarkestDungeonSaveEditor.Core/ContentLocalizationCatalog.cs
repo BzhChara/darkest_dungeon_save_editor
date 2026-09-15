@@ -345,7 +345,6 @@ internal sealed class ContentLocalizationCatalog
             if (!File.Exists(path))
             {
                 issues.Add($"Localization file listed by Mod is missing: {path}");
-                continue;
             }
 
             result.Add(path);

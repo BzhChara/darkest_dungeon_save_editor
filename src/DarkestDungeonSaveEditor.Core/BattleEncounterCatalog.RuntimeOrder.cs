@@ -41,8 +41,16 @@ public static partial class BattleEncounterCatalog
             .ToArray();
     }
 
-    private static bool HasIndexedTableDeclarations(string path) =>
-        NativeDarkestReader.ReadRecords(path).Any(record => record.Kind is "hall" or "room" or "boss");
+    private static bool HasIndexedTableDeclarations(string path)
+    {
+        try { return NativeDarkestReader.ReadRecords(path).Any(record => record.Kind is "hall" or "room" or "boss"); }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            // An unreadable candidate may contain indexed rows. Keep its slot;
+            // only the final effective provider should produce a read failure.
+            return true;
+        }
+    }
 
     private static bool HasProvenFileOrder(
         IReadOnlyList<BattleEncounterDefinition> rows,

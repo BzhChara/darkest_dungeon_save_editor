@@ -74,7 +74,23 @@ public partial class BattleMapView : UserControl
             }
             var attachments = _roomAttachmentCatalog;
             if (contentChanged || attachments is null || attachments.Guard.RequestedDungeonId != snapshot.DungeonId)
-                attachments = await Task.Run(() => BattleRoomAttachmentCatalog.Load(content, snapshot.DungeonId), cancellationToken);
+            {
+                try
+                {
+                    attachments = await Task.Run(() => BattleRoomAttachmentCatalog.Load(content, snapshot.DungeonId), cancellationToken);
+                }
+                catch (OperationCanceledException) { throw; }
+                catch (Exception error)
+                {
+                    // Match initial loading: an unavailable prop catalog must
+                    // not keep every other page in the shared sync retry loop.
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (generation != _profileGeneration) return;
+                    attachments = null;
+                    CrashDiagnostics.RecordException("BattleMap: room attachment catalog", error,
+                        $"档案={content.Profile.ProfileId}；地区={snapshot.DungeonId}；难度={snapshot.Difficulty}");
+                }
+            }
             cancellationToken.ThrowIfCancellationRequested();
             if (generation != _profileGeneration) return;
 
@@ -90,12 +106,16 @@ public partial class BattleMapView : UserControl
                 Encounters = encounters.Encounters.Select(Rebind).ToArray(),
                 BridgeEncounters = encounters.BridgeEncounters.Select(Rebind).ToArray()
             };
-            var guard = attachments.Guard with { GameSaveSha256 = content.SourceGameSha256 };
-            _roomAttachmentCatalog = attachments with
+            _roomAttachmentCatalog = null;
+            if (attachments is not null)
             {
-                Guard = guard,
-                Definitions = attachments.Definitions.Select(item => item with { CatalogGuard = guard }).ToArray()
-            };
+                var guard = attachments.Guard with { GameSaveSha256 = content.SourceGameSha256 };
+                _roomAttachmentCatalog = attachments with
+                {
+                    Guard = guard,
+                    Definitions = attachments.Definitions.Select(item => item with { CatalogGuard = guard }).ToArray()
+                };
+            }
             _activeContentSnapshot = content;
             if (!ReferenceEquals(snapshot, _currentSnapshot))
                 RenderSnapshot(snapshot, fitToView: _currentSnapshot is null || _fitToView);

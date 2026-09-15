@@ -209,7 +209,8 @@ internal static partial class QuantityItemReferenceAnalyzer
             ModManifestFile.Require(manifestPath);
             paths = ModManifestFile.ReadEntries(manifestPath, "json", ".darkest", "csv")
                 .Select(entry => Path.GetFullPath(Path.Combine(source.Directory, entry.RelativePath)))
-                .Where(path => IsInsideSource(source.Directory, path) && File.Exists(path))
+                // Missing manifest requests still replace lower provider slots.
+                .Where(path => IsInsideSource(source.Directory, path))
                 .ToArray();
         }
 

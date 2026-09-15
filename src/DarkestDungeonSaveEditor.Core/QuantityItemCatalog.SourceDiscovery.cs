@@ -56,9 +56,9 @@ public static partial class QuantityItemCatalog
             if (!File.Exists(path))
             {
                 issues.Add($"Inventory item file listed by Mod is missing: {path}");
-                continue;
             }
 
+            // Manifest entries participate in the overlay even if their bytes are missing.
             result.Add(path);
         }
 

@@ -270,7 +270,7 @@ public static partial class BattleRoomAttachmentCatalog
                 file.Source.Id,
                 Path.GetFullPath(file.Path),
                 file.RelativePath,
-                ComputeSha256(file.Path)))
+                ComputeGuardSha256(file.Path)))
             .OrderBy(file => file.RelativePath, StringComparer.OrdinalIgnoreCase)
             .ThenBy(file => file.SourceId, StringComparer.OrdinalIgnoreCase)
             .ThenBy(file => file.Path, StringComparer.OrdinalIgnoreCase)
@@ -282,6 +282,16 @@ public static partial class BattleRoomAttachmentCatalog
         {
             throw new InvalidOperationException(
                 "有效地图内容定义在选择后已经变化，请重新加载内容目录。");
+        }
+    }
+
+    private static string ComputeGuardSha256(string path)
+    {
+        try { return ComputeSha256(path); }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            throw new InvalidOperationException(
+                $"有效地图内容定义在选择后已经变化或无法读取，请重新加载内容目录：{path}", error);
         }
     }
 
@@ -509,9 +519,7 @@ public static partial class BattleRoomAttachmentCatalog
                 if (!File.Exists(path))
                 {
                     issues.Add($"Room prop file listed by Mod is missing: {path}");
-                    // Do not expose lower bytes when a winning pool cannot be opened.
-                    // A shadowed missing provider may still resolve to readable bytes.
-                    if (extension != ".props.darkest") continue;
+                    // Keep every eligible manifest request through consumer resolution.
                 }
 
                 result.Add(path);

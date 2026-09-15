@@ -280,9 +280,9 @@ public static class TrinketCatalog
             if (!File.Exists(path))
             {
                 issues.Add($"Trinket file listed by Mod is missing: {path}");
-                continue;
             }
 
+            // Resolve the winning manifest entry before attempting to read its bytes.
             result.Add(path);
         }
 

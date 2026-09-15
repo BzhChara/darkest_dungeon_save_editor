@@ -135,9 +135,7 @@ public static partial class HeroClassCatalog
             if (!File.Exists(path))
             {
                 issues.Add($"Hero catalog file listed by Mod is missing: {path}");
-                // Keep a missing shared-rule provider in its native slot. Dropping it
-                // would expose an overridden file and invent a known quirk limit.
-                if (target != sharedRuleFiles) continue;
+                // All consumer queries keep manifest slots until provider resolution.
             }
 
             target.Add(path);

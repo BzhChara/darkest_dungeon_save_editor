@@ -99,8 +99,20 @@ internal static partial class ContractSuite
                 ? "props/addon/trap_definitionsXjson\n"
                 : "props/trap_definitionsXjson\nprops/notes.json\nprops/addon/notes.json\n");
             var missingContent = template with { Sources = [new("local:map-missing", "Missing", "local", missingRoot, 0)] };
-            Assert(BattleRoomAttachmentCatalog.Load(missingContent).Issues.Any(i => i.Contains("Room prop file listed by Mod is missing")) == eligible,
-                "Only missing native-consumed prop paths should produce missing-resource diagnostics.");
+            if (eligible)
+            {
+                var rejected = false;
+                try { BattleRoomAttachmentCatalog.Load(missingContent); }
+                catch (InvalidDataException error) when (error.InnerException is IOException &&
+                    error.Message.Contains(Path.Combine(missingRoot, "props", "addon", "trap_definitionsXjson"), StringComparison.Ordinal))
+                { rejected = true; }
+                Assert(rejected, "A missing consumed prop must remain an unavailable input, rather than a warning-only empty library.");
+            }
+            else
+            {
+                Assert(!BattleRoomAttachmentCatalog.Load(missingContent).Issues.Any(i => i.Contains("Room prop file listed by Mod is missing")),
+                    "Missing unconsumed prop paths must not report missing-resource diagnostics or block the catalog.");
+            }
         }
         Console.WriteLine("PASS: first map JSON members, inheritance/difficulty validation, six-source filename stages and stale-choice guards.");
     }
