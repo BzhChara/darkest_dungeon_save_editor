@@ -23,7 +23,7 @@ internal static partial class QuantityItemReferenceAnalyzer
         void Currencies(JsonElement node)
         {
             foreach (var cost in List(node, "currency_cost"))
-                MarkResolved(index.ResolveIdentityHash(String(cost, "type")), evidence, path);
+                MarkResolved(index.ResolveCurrencyHash(String(cost, "type")), evidence, path);
         }
         // Serialized inventory entries are numeric slots, not arbitrary child objects.
         // Use lookup for each distinct slot so a repeated JSON member is first-match.
@@ -108,7 +108,7 @@ internal static partial class QuantityItemReferenceAnalyzer
                         var type = Loc2LocalizationReader.HashName(NativeJsonReader.ReadBoundedString(data, "type", 63));
                         if (type == Loc2LocalizationReader.HashName("bonus_currency") ||
                             type == Loc2LocalizationReader.HashName("event_cost"))
-                            MarkResolved(index.ResolveIdentityHash(String(data, "string_data")), evidence, path);
+                            MarkResolved(index.ResolveCurrencyHash(String(data, "string_data")), evidence, path);
                     }
                 }
                 return complete;
@@ -123,7 +123,7 @@ internal static partial class QuantityItemReferenceAnalyzer
             case NativeReferenceJsonKind.Estate:
                 if (town)
                     foreach (var currency in List(root, "currencies"))
-                        MarkResolved(index.ResolveIdentityHash(String(currency, "id")), evidence, path);
+                        MarkResolved(index.ResolveCurrencyHash(String(currency, "id")), evidence, path);
                 break;
 
             case NativeReferenceJsonKind.PlotQuests:
@@ -147,7 +147,7 @@ internal static partial class QuantityItemReferenceAnalyzer
                     foreach (var difficulty in List(rewards, "item_table"))
                         foreach (var length in Array(difficulty)) Items(Array(length));
                     foreach (var heirloom in List(rewards, "heirloom_amount_table"))
-                        MarkResolved(index.ResolveIdentityHash(String(heirloom, "type")), evidence, path);
+                        MarkResolved(index.ResolveCurrencyHash(String(heirloom, "type")), evidence, path);
                 }
                 break;
 

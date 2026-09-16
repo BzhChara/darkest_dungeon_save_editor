@@ -103,7 +103,8 @@ public static partial class QuantityItemCatalog
         ArgumentNullException.ThrowIfNull(estateRoot);
         var issues = new List<string>();
         var readFailures = new List<string>();
-        var definitions = LoadDefinitions(activeContent, QuantityItemSaveContext.Town, issues, readFailures);
+        var referenceDefinitions = new List<QuantityItemDefinition>();
+        var definitions = LoadDefinitions(activeContent, QuantityItemSaveContext.Town, issues, readFailures, referenceDefinitions);
         var savedEntries = ReadSavedEntries(estateRoot, issues);
         var savedEntryCounts = savedEntries
             .GroupBy(entry => entry.CatalogKey, StringComparer.Ordinal)
@@ -120,7 +121,7 @@ public static partial class QuantityItemCatalog
 
         var referenceAnalysis = QuantityItemReferenceAnalyzer.Analyze(
             activeContent,
-            definitions,
+            referenceDefinitions,
             QuantityItemSaveContext.Town,
             issues);
         var merged = new List<QuantityItemDefinition>(definitions.Count + savedEntries.Count);

@@ -92,9 +92,10 @@ internal static partial class QuantityItemReferenceAnalyzer
             source => source.Id,
             StringComparer.OrdinalIgnoreCase);
         var result = new Dictionary<string, QuantityItemReferenceAnalysis>(StringComparer.Ordinal);
-        foreach (var definition in definitions)
+        foreach (var group in definitions.GroupBy(definition => definition.CatalogKey, StringComparer.Ordinal))
         {
-            var hasOfficialOrigin = definition.AllSources.Any(sourceId =>
+            var definition = group.First();
+            var hasOfficialOrigin = group.SelectMany(item => item.AllSources).Any(sourceId =>
                 sourcesById.TryGetValue(sourceId, out var source) &&
                 source.Kind is not ("workshop" or "local"));
             if (hasOfficialOrigin)

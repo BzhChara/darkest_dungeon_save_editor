@@ -62,7 +62,7 @@ internal static partial class QuantityItemReferenceAnalyzer
                 var evidence = identitiesComplete ? activeEvidence : incompleteEvidence;
                 foreach (var requirement in requirements)
                     foreach (var cost in NativeJsonReader.Array(requirement, "currency_cost"))
-                        MarkResolved(index.ResolveIdentityHash(NativeJsonReader.ReadCString(cost, "type")), evidence, tree.Path);
+                        MarkResolved(index.ResolveCurrencyHash(NativeJsonReader.ReadCString(cost, "type")), evidence, tree.Path);
             }
             catch (Exception error) when (error is InvalidDataException or InvalidOperationException)
             {

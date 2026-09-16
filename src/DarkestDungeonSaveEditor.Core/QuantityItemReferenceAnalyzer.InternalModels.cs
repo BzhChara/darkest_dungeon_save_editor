@@ -63,7 +63,8 @@ internal static partial class QuantityItemReferenceAnalyzer
             }
 
             return _definitions
-                .Where(definition => Matches(definition, type, id))
+                .Where(definition => definition.InventoryType.Equals(type, StringComparison.Ordinal) &&
+                    definition.ItemId.Equals(id, StringComparison.Ordinal))
                 .Select(definition => definition.CatalogKey)
                 .Distinct(StringComparer.Ordinal)
                 .ToArray();
@@ -84,38 +85,16 @@ internal static partial class QuantityItemReferenceAnalyzer
                 .ToArray();
         }
 
-        public IEnumerable<string> ResolveIdentityHash(string identity)
+        public IEnumerable<string> ResolveCurrencyHash(string identity)
         {
             if (identity.Length == 0) return [];
             var hash = Loc2LocalizationReader.HashName(identity);
-            return _definitions.Where(definition => Loc2LocalizationReader.HashName(definition.DisplayId) == hash)
+            // Currency consumers name the wallet type, not an inventory
+            // variant's display ID. Estate currencies retain their item ID.
+            return _definitions.Where(definition => Loc2LocalizationReader.HashName(
+                    definition.StorageKind == QuantityItemStorageKind.Wallet
+                        ? definition.PersistedType : definition.ItemId) == hash)
                 .Select(definition => definition.CatalogKey).Distinct(StringComparer.Ordinal).ToArray();
-        }
-
-        private static bool Matches(QuantityItemDefinition definition, string type, string id)
-        {
-            if (definition.StorageKind == QuantityItemStorageKind.RaidInventory)
-            {
-                return definition.InventoryType.Equals(type, StringComparison.Ordinal) &&
-                       definition.ItemId.Equals(id, StringComparison.Ordinal);
-            }
-
-            if (definition.StorageKind == QuantityItemStorageKind.EstateItems)
-            {
-                return definition.InventoryType.Equals(type, StringComparison.Ordinal) &&
-                       definition.ItemId.Equals(id, StringComparison.Ordinal);
-            }
-
-            if (definition.InventoryType.Equals("heirloom", StringComparison.Ordinal))
-            {
-                return type.Equals("heirloom", StringComparison.Ordinal)
-                    ? definition.ItemId.Equals(id, StringComparison.Ordinal)
-                    : string.IsNullOrWhiteSpace(id) &&
-                      definition.PersistedType.Equals(type, StringComparison.Ordinal);
-            }
-
-            return definition.InventoryType.Equals(type, StringComparison.Ordinal) &&
-                   string.IsNullOrWhiteSpace(id);
         }
     }
 
