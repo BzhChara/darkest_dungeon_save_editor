@@ -17,6 +17,15 @@ public static partial class HeroClassCatalog
         "attack_rating", "crit_chance", "max_hp", "riposte_on_hit_chance", "riposte_on_miss_chance"
     }.Select(Loc2LocalizationReader.HashName).ToHashSet();
     private static readonly uint MaxHpStatHash = Loc2LocalizationReader.HashName("max_hp");
+    private static readonly IReadOnlyDictionary<uint, string> HpBuffStatTypes = new[]
+        { "combat_stat_add", "combat_stat_multiply" }.ToDictionary(Loc2LocalizationReader.HashName);
+    private static readonly IReadOnlyDictionary<uint, string> HpBuffRuleTypes = new[]
+        { "always", "no_trinkets", "afflicted", "in_mode", "lightabove" }.ToDictionary(Loc2LocalizationReader.HashName);
+
+    // Resolve after the native 63-byte/C-string read. Downstream HP conditions
+    // consume canonical names; unknown enum hashes retain the existing guards.
+    private static string ResolveBuffEnum(string value, IReadOnlyDictionary<uint, string> names) =>
+        names.TryGetValue(Loc2LocalizationReader.HashName(value), out var name) ? name : value;
 
     private static HeroInitialQuirkDefinition BuildInitialQuirk(
         QuirkDefinition quirk,
@@ -356,10 +365,10 @@ public static partial class HeroClassCatalog
 
             yield return new BuffDefinition(
                 id,
-                ReadNativeBuffString(item, "stat_type", ref invalidString),
+                ResolveBuffEnum(ReadNativeBuffString(item, "stat_type", ref invalidString), HpBuffStatTypes),
                 ReadNativeBuffString(item, "stat_sub_type", ref invalidString),
                 ReadJsonFloat(item, "amount"),
-                ReadNativeBuffString(item, "rule_type", ref invalidString),
+                ResolveBuffEnum(ReadNativeBuffString(item, "rule_type", ref invalidString), HpBuffRuleTypes),
                 ReadJsonBoolean(item, "is_false_rule"),
                 hasRuleData ? ReadJsonFloat(ruleData, "float") : null,
                 hasRuleData ? ReadNativeBuffString(ruleData, "string", ref invalidString) : string.Empty,

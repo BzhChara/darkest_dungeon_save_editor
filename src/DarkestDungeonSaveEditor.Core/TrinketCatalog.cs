@@ -23,7 +23,9 @@ public static class TrinketCatalog
         var issues = new List<string>();
         var definitions = new Dictionary<string, List<TrinketDefinition>>(StringComparer.Ordinal);
         var fileCandidates = new List<ContentFileCandidate>();
-        var heroIds = NativeContentFileResolver.DiscoverActorIds(activeContent.Sources, "heroes", issues);
+        var heroIds = NativeContentFileResolver.DiscoverActorIds(activeContent.Sources, "heroes", issues)
+            .Select(id => Loc2LocalizationReader.HashName(NativeJsonReader.CString(id))).ToHashSet();
+        var buffs = TrinketBuffDependencies.Load(activeContent, issues);
         var enabledDlcPrefixes = ContentFileOverlay.GetEnabledDlcPrefixes(activeContent.Sources);
         foreach (var source in activeContent.Sources.OrderBy(item => item.LoadOrder))
         {
@@ -42,7 +44,7 @@ public static class TrinketCatalog
 
         foreach (var file in NativeContentFileResolver.Resolve(fileCandidates, activeContent.Sources, "Trinket definition", issues))
         {
-            ScanFile(file, heroIds, definitions, issues);
+            ScanFile(file, heroIds, buffs, definitions, issues);
         }
 
         var localization = ContentLocalizationCatalog.Load(
@@ -79,7 +81,8 @@ public static class TrinketCatalog
 
     private static void ScanFile(
         EffectiveContentFile file,
-        IReadOnlySet<string> heroIds,
+        IReadOnlySet<uint> heroIds,
+        TrinketBuffDependencies buffs,
         Dictionary<string, List<TrinketDefinition>> definitions,
         List<string> issues)
     {
@@ -116,16 +119,31 @@ public static class TrinketCatalog
                     continue;
                 }
 
-                // Native loader 0x1404F39A0 checks every required class and
-                // skips this entry when any class is absent from the actor table.
+                // Native references use full C-string hashes, not literal names.
+                // Every required class must be present in the actor table.
                 if (NativeJsonReader.TryGetProperty(entry, "hero_class_requirements", out var requirements) &&
                     requirements.ValueKind == JsonValueKind.Array &&
                     requirements.EnumerateArray().Any(value => value.ValueKind != JsonValueKind.String ||
-                        !heroIds.Contains(value.GetString()!)))
+                        !heroIds.Contains(Loc2LocalizationReader.HashName(NativeJsonReader.CString(value.GetString()!)))))
                 {
                     issues.Add($"Trinket '{id}' requires an unloaded hero class and was ignored: {path}");
                     continue;
                 }
+
+                // The native loader discards entries with missing ordinary Buffs
+                // before first-ID selection. An unreadable dependency is unknown,
+                // so retain the candidate as read-only instead of choosing a later ID.
+                var buffStates = NativeJsonReader.Array(entry, "buffs")
+                    .Select(value => value.ValueKind == JsonValueKind.String ? buffs.Contains(value.GetString()!) : null)
+                    .ToArray();
+                if (buffStates.Contains(false))
+                {
+                    issues.Add($"Trinket '{id}' references a missing Buff and was ignored: {path}");
+                    continue;
+                }
+                var unresolvedBuffs = buffStates.Contains(null);
+                if (unresolvedBuffs)
+                    issues.Add($"Trinket '{id}' Buff dependencies could not be verified and are read-only: {path}");
 
                 var providerSources = providerSourcesById.TryGetValue(id, out var declaringSources)
                     ? declaringSources
@@ -145,11 +163,11 @@ public static class TrinketCatalog
                     ReadString(entry, "rarity"),
                     ReadInt(entry, "limit"),
                     ReadInt(entry, "price"),
-                    file.Source.Id,
+                    unresolvedBuffs ? "unresolved" : file.Source.Id,
                     Path.GetFullPath(path),
                     statefulFields.Length > 0,
                     statefulFields,
-                    false,
+                    unresolvedBuffs,
                     providerSources)
                 {
                     QuestUses = questUses,
