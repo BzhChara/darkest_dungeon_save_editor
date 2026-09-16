@@ -131,6 +131,18 @@ public static class ActiveContentResolver
         Path.GetFullPath(left.Directory).Equals(Path.GetFullPath(right.Directory), StringComparison.OrdinalIgnoreCase) &&
         left.VirtualPathPrefix.Equals(right.VirtualPathPrefix, StringComparison.OrdinalIgnoreCase);
 
+    internal static bool HasUnresolvedModSources(ActiveContentSnapshot content)
+    {
+        // Explicit/hypothetical source lists do not claim a saved Mod mapping.
+        // ResolveSources can omit an enabled Mod whose directory/title cannot
+        // be mapped; absence in that partial scan is not confirmed absence.
+        if (content.Resolution is not { } resolution) return false;
+        var configuration = JsonNode.Parse(resolution.ConfigurationJson)!.AsObject();
+        var issues = new List<string>();
+        var enabled = ReadAppliedEntries(configuration["applied_ugcs_1_0"] as JsonObject, issues);
+        return issues.Count > 0 || enabled.Count > content.Sources.Count(source => source.Kind is "local" or "workshop");
+    }
+
     private static (string GameMode, IReadOnlyList<ActiveContentSource> Sources,
         IReadOnlyList<string> Issues, int AppliedModCount) ResolveSources(JsonObject baseRoot,
         string gameDirectory, string? workshopDirectory, string? normalizedAdditionalLocalModDirectory,

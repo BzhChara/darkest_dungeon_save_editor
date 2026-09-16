@@ -321,7 +321,7 @@ public sealed partial class SaveEditService
             string.Empty,
             string.Empty,
             0,
-            prepared.ContentGuard.SourceGameSha256);
+            prepared.ContentGuard.SourceGameSha256) { Resolution = prepared.ContentGuard.Resolution };
         var currentCatalog = TrinketCatalog.Load(currentSnapshot);
         var currentStorage = currentCatalog.Storage;
         if (currentStorage is null ||

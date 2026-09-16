@@ -261,7 +261,8 @@ Real game loading after a deliberate raid edit remains a separate authorized smo
 
 - Do not reuse the quantity-item absent/unreferenced filter for trinkets. Native loot tables can request a rarity pool without naming individual trinket IDs; lack of an explicit ID reference is not proof that a trinket is unused. Manifest eligibility, a valid definition and active class requirements remain necessary. This is not a claim that every parsed trinket can naturally drop; see [duplicate-resource rules](resource-duplicate-semantics.md).
 - Parse ID, Chinese name, English name, rarity, definition limit, origin, current override provider, and stateful shape.
-- All `hero_class_requirements` must resolve to discovered active classes, as in the native trinket loader. Entries referencing absent classes do not enter the usable catalog.
+- All `hero_class_requirements` must resolve to discovered active class hashes, using complete C strings up to NUL. Reference aliases with the same native hash are valid; case/whitespace with different hashes remain distinct. The actual class and saved trinket IDs are unchanged.
+- Ordinary `buffs` references must exist in the effective Buff table, after manifest/query eligibility and file-provider resolution. A confirmed missing dependency removes that entry before first-ID selection, allowing a later valid definition to win. Incomplete Buff reads leave an unproven entry read-only in its original position instead of certifying a later duplicate. This checks presence, not natural-drop reachability or all stateful Buff lists. See [trinket dependencies and HP enum identities](resource-duplicate-semantics.md#30-trinket-dependencies-and-hp-buff-enum-identities-2026-09-17).
 - Resource JSON takes the first exact member within an object, including trinket root arrays, IDs, requirements and instance counters. Wrong-typed first values cannot fall through to later duplicates. This is independent of first-entry lookup for repeated trinket IDs. File discovery follows the native entries query rather than a literal suffix; see [catalog JSON and filename rules](resource-duplicate-semantics.md#16-trinket-and-map-json-members-catalog-file-queries-2026-09-10).
 - An ordinary trinket is added to the trinket inventory in `persist.estate.json`; it is not equipped onto a hero.
 - Inventory counts do not include copies equipped by heroes.
@@ -294,6 +295,10 @@ Zero, signed boundaries and ignored optional fields were additionally checked ag
 ### 5.4 Preview invalidation
 
 A trinket preview pins the profile hash, active providers, Manifest existence/hashes, the effective capacity file, the selected definition, and related semantic fingerprints. It is rejected if any relevant save, Mod/DLC state, order, Manifest, definition, capacity source, or effective result changes before commit.
+
+The existing preflight/commit catalog reload also re-evaluates ordinary Buff and class dependencies. Removing or restoring a dependency can invalidate the selection even without changing the trinket file or manifest. An invalidation detected after target replacement uses the existing transaction recovery. No dependency fingerprint is persisted in the save, and changes that leave the selected definition valid do not independently require migration.
+
+For a resolver-backed snapshot, enabled Mods omitted because their title/directory could not be mapped are an incomplete provider set, not proof that their Buffs do not exist. Dependency checks compare the saved configuration to mapped Mod sources; commit keeps that same resolution context when rebuilding its catalog. Explicit hypothetical source lists retain their existing separate meaning.
 
 ## 6. Heroes
 
@@ -475,6 +480,8 @@ The inverse-affliction rule was added on 2026-09-15 using the pinned game's stat
 ### 8.2 Implemented model and historical catalog result
 
 The application now retains every recognized `max_hp` Buff on a quirk, distinguishes `combat_stat_add` from `combat_stat_multiply`, preserves `rule_data.float`/`string`, and supports `always`, `no_trinkets`, `afflicted`, `in_mode`, and `lightabove` with `is_false_rule`. Effects active under the initial states in section 8.1 determine the stagecoach candidate's full-health `current_hp`, including inverse `afflicted`. Mode/light conditions require raid context and are evaluated only for reachable-state safety during generation. Unknown HP operations, conditions, or malformed condition data remain Unverified.
+
+Supported `stat_type` and `rule_type` names are resolved by native hashes after the bounded C-string read, then converted to canonical internal names before HP calculation and reachable-state enumeration. For example, `d:mbat_stat_multiply`/`b7ways` have the same hashes as `combat_stat_multiply`/`always`; base HP 20 with amount 0.5 produces HP 30. This does not lowercase or trim arbitrary enum names, expand the supported condition set, or bypass non-finite/non-positive HP checks.
 
 Since 2026-09-10, Buff amount and rule thresholds first adopt native single-precision values; stat/rule strings keep their native case, whitespace and bounded bytes. `in_mode` conditions compare native hashes, so case-distinct modes cannot falsely cancel HP changes. The existing formula and preview calculation order remain; candidate serialization rounds final HP to the DSON float value. DSON round-trip validation compares only the new candidate's HP by exact float bits to accommodate Java-version decimal differences; all other fields, existing heroes and plain-JSON saves retain strict equality. Final HP outside the finite float range is rejected before generation. See [the scalar, identity and reference rules](resource-duplicate-semantics.md#14-buff-scalarcondition-identities-and-resource-eligibility-2026-09-10). This does not change the save schema or claim full native HP arithmetic emulation.
 
