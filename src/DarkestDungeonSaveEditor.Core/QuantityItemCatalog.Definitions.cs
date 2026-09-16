@@ -12,7 +12,8 @@ public static partial class QuantityItemCatalog
         ActiveContentSnapshot activeContent,
         QuantityItemSaveContext saveContext = QuantityItemSaveContext.Town,
         List<string>? issues = null,
-        List<string>? readFailures = null)
+        List<string>? readFailures = null,
+        List<QuantityItemDefinition>? referenceDefinitions = null)
     {
         issues ??= [];
         var candidates = new List<ContentFileCandidate>();
@@ -40,10 +41,15 @@ public static partial class QuantityItemCatalog
             item => item.DefinitionKey, item => (Loc2LocalizationReader.HashName(NativeJsonReader.CString(item.InventoryType)),
                 Loc2LocalizationReader.HashName(NativeJsonReader.CString(item.ItemId))));
         if (collisionKeys.Count > 0) issues.Add("Inventory keys share native hashes and cannot be selected safely: " + string.Join(", ", collisionKeys));
-        var merged = definitions.Values
+        var selected = definitions.Values
             .Select(group => MergeDefinitions(group, issues))
             .Select(definition => collisionKeys.Contains(definition.DefinitionKey)
                 ? definition with { HasProviderConflict = true, Source = "unresolved" } : definition)
+            .ToArray();
+        // Typed item references need every first-match (type, id), including
+        // variants that share one town wallet. Keep them until after analysis.
+        referenceDefinitions?.AddRange(selected);
+        var merged = selected
             .GroupBy(definition => definition.CatalogKey, StringComparer.Ordinal)
             .Select(AggregateWalletDefinitions)
             .OrderBy(definition => definition.DisplayId, StringComparer.OrdinalIgnoreCase)

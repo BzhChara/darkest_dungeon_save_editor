@@ -41,6 +41,7 @@ internal static partial class ContractSuite
 
         RunInventoryCapacityContracts(runRoot);
         await RunInventoryProviderContractsAsync(runRoot, codec);
+        await RunQuantityReferenceIdentityContractsAsync(runRoot, codec);
         await RunCanonicalResourceContractsAsync(runRoot, codec);
         await RunResourceOverlaySlotContractsAsync(runRoot, codec);
         await RunTextResourceQueryContractsAsync(runRoot, codec);

@@ -7,6 +7,7 @@ internal static partial class ContractSuite
     {
         var fixture = BuildContractFixture(repositoryRoot);
         await RunNonActorReferenceContractsAsync(fixture.RunRoot, fixture.Codec);
+        await RunQuantityReferenceIdentityContractsAsync(fixture.RunRoot, fixture.Codec);
         Console.WriteLine($"Artifacts: {fixture.RunRoot}");
     }
 

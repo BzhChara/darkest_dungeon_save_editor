@@ -45,9 +45,7 @@ internal static partial class QuantityItemReferenceAnalyzer
                     enabledDlcPrefixes,
                     actorPaths,
                     saveContext,
-                    issues,
-                    ref scanComplete,
-                    ref upgradeFilesComplete);
+                    issues);
                 foreach (var path in EnumerateCandidateFiles(source, enabledDlcPrefixes, actorPaths))
                 {
                     candidates.Add(new ContentFileCandidate(source, path));
@@ -149,9 +147,7 @@ internal static partial class QuantityItemReferenceAnalyzer
         IReadOnlyList<string> enabledDlcPrefixes,
         IReadOnlySet<string> actorPaths,
         QuantityItemSaveContext saveContext,
-        List<string> issues,
-        ref bool scanComplete,
-        ref bool upgradeFilesComplete)
+        List<string> issues)
     {
         var manifestPath = Path.Combine(source.Directory, "modfiles.txt");
         if (source.Kind is not ("workshop" or "local"))
@@ -185,9 +181,9 @@ internal static partial class QuantityItemReferenceAnalyzer
                 continue;
             }
 
-            scanComplete = false;
-            if (NativeResourceFileRules.ReferenceJsonKind(normalized, enabledDlcPrefixes, true) == NativeReferenceJsonKind.Upgrades)
-                upgradeFilesComplete = false;
+            // This installation diagnostic precedes provider resolution. A
+            // missing file may be fully replaced by a readable higher Mod;
+            // only effective-file read failures make the analysis incomplete.
             issues.Add($"Quantity-item reference file listed by active Mod is missing: {path}");
         }
     }

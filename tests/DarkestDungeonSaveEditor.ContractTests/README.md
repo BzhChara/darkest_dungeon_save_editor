@@ -57,6 +57,7 @@ The suite is split by responsibility:
 - `EncounterDirectoryCaseContractTests.cs`: physical directory aliases versus raw-case manifest directory trees, custom table IDs, exact filename queries, all three indexes, global/direct/append/maintenance consistency, fingerprints and stale selections;
 - `ReferenceContextContractTests.cs`: Curio subdirectory context, actor record/field eligibility, normal companion/monster loot, mounted DLC paths, missing/unreadable references and unchanged-manifest content refresh;
 - `NonActorReferenceContractTests.cs`: known JSON/Curio query gates for non-actor text and missing-file diagnostics; six source types, nested/case variants, native actor controls, per-item uncertainty through Loot, independent confirmed roots, refresh and 12 quantity DSON roundtrips;
+- `QuantityReferenceProviderContractTests.cs`, `QuantityReferenceIdentityContractTests.cs`: 60 local/Workshop provider scenarios and 76 wallet-identity scenarios; masked versus effective missing files, additive district inputs, context isolation and byte restoration; raw item references versus persisted currencies, wallet variants, first-match definitions, official provenance, saved-amount refresh and four isolated service/DSON commits (`--reference-consumers`, also in the full suite);
 - `MapPropJsonContractTests.cs`: first nested JSON members, inherited defaults, difficulty fields, root/nested query stages, missing-path diagnostics and stale-choice guards across six source types;
 - `HeroCandidateContractTests.cs`: candidate serialization, progression, full skill unlocks, and initial quirks;
 - `HeroInitialHpConditionContractTests.cs`: initial HP from known unafflicted/unequipped state across six source kinds, inverse and raid-context conditions, mixed/repeated Buff references, unknown/non-positive HP guards and ordinary/shard DSON persistence (`--semantics` and the full suite);
@@ -77,6 +78,8 @@ Close Darkest Dungeon before the suite: save transaction contracts exercise the 
 ## 资源文件查询验证
 
 非人物引用专项：`dotnet run --project tests/DarkestDungeonSaveEditor.ContractTests -c Release -- . --reference-consumers`。覆盖 228 个内容样例、876 次小镇／副本目录检查及 12 次 DSON 保存回读；`--queries` 和完整套件也包含这一组。样例只写隔离资源与存档，验证无关文本及缺失清单项不会误确认引用或污染其他物品，同时保留未验证来源的不确定性和合法伴生掉落。
+
+该专项还执行物品引用提供者与钱包身份的 136 个新增场景，包含 4 次隔离存档实际提交及 DSON 回读；完整套件也执行这些新增测试。`--queries` 保持原有非人物引用测试范围。逐项结果保存在本次测试工件目录的 `results.json` 中；这些是编辑器契约测试，不代表新增了游戏实机实验。
 
 大小写专项：`dotnet run --project tests/DarkestDungeonSaveEditor.ContractTests -c Release -- . --case-identities`。同时运行既有容量矩阵。完整套件还运行 `CanonicalResourceContractTests` 中原生 `arena` 精确排除、`ARENA` 物理别名及 Mod 清单对照；此部分也可用 `--canonical-resources` 单独执行。专项不能替代整套测试。
 
