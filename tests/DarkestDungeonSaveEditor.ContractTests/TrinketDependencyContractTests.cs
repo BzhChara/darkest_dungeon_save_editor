@@ -7,6 +7,7 @@ internal static partial class ContractSuite
         var fixture = BuildContractFixture(repositoryRoot);
         await RunTrinketDependencyContractsAsync(fixture.RunRoot, fixture.Codec);
         await RunBuffEnumContractsAsync(fixture.RunRoot, fixture.Codec);
+        await RunHeroReferenceDependencyContractsAsync(fixture.RunRoot, fixture.Codec);
         Console.WriteLine($"Artifacts: {fixture.RunRoot}");
     }
 
@@ -85,8 +86,11 @@ internal static partial class ContractSuite
             Console.WriteLine($"PASS: {kind} trinket Buff/hero dependencies, {count} selection cases, DSON counters, preview/commit/recovery guards.");
         }
         foreach (var kind in new[] { "local", "workshop" })
+        {
             VerifyTrinketBuffProviders(Path.Combine(runRoot, "trinket-buff-providers", kind), kind);
-        await VerifyUnmappedTrinketBuffSourcesAsync(Path.Combine(runRoot, "unmapped-trinket-buffs"), codec);
+            VerifyTrinketHeroProviders(Path.Combine(runRoot, "trinket-hero-providers", kind), kind);
+        }
+        await VerifyUnmappedTrinketSourcesAsync(Path.Combine(runRoot, "unmapped-trinket-dependencies"), codec);
     }
 
     private static async Task VerifyTrinketDependencyChangesAsync(InventoryProviderFixture f, string resources)
@@ -163,14 +167,15 @@ internal static partial class ContractSuite
         Console.WriteLine($"PASS: {kind} Buff overlay, missing winner, unknown reads, manifest admission and first JSON members.");
     }
 
-    private static async Task VerifyUnmappedTrinketBuffSourcesAsync(string runRoot, DsonSaveCodec codec)
+    private static async Task VerifyUnmappedTrinketSourcesAsync(string runRoot, DsonSaveCodec codec)
     {
+        foreach (var field in new[] { "buffs", "hero_class_requirements" })
         foreach (var scenario in new[] { "unmapped-title", "ambiguous-title", "missing-workshop", "resolved" })
         {
-            var root = Path.Combine(runRoot, scenario);
+            var root = Path.Combine(runRoot, field, scenario);
             var game = Path.Combine(root, "game");
             WriteMultiMash(game, "inventory/a.inventory.system_configs.darkest", "inventory_system_config: .type trinket_storage .max_slots 100\n");
-            WriteDependencyEntries(game, DependencyFirstPath, DependencyTrinket(2, "buffs", "Az"));
+            WriteDependencyEntries(game, DependencyFirstPath, DependencyTrinket(2, field, "Az"));
             WriteDependencyEntries(game, DependencyLastPath, DependencyTrinket(7, "buffs"));
             if (scenario is "ambiguous-title" or "resolved")
                 foreach (var folder in scenario == "ambiguous-title" ? new[] { "a", "b" } : new[] { "a" })
@@ -178,6 +183,7 @@ internal static partial class ContractSuite
                     var mod = Path.Combine(game, "mods", folder);
                     WriteMultiMash(mod, "project.xml", "<project><Title>Buff Provider</Title></project>");
                     WriteMultiMash(mod, DependencyBuffPath, DependencyBuffJson);
+                    WriteMultiMash(mod, "heroes/Az/Az.info.darkest", "armour: .name test .hp 20\n");
                     WriteFixtureManifest(mod);
                 }
             var f = await BuildInventoryProviderProfileAsync(root, [new("base", "Base", "base", game, 0)], false, codec);
@@ -195,7 +201,7 @@ internal static partial class ContractSuite
             var item = catalog.Trinkets.Single();
             var resolved = scenario == "resolved";
             Assert(content.AppliedModCount == 1 && item.QuestUses == 2 && item.HasProviderConflict != resolved,
-                $"{scenario}: omitted enabled providers must leave the earlier Buff-dependent entry unresolved.");
+                $"{field}/{scenario}: omitted enabled providers must leave the earlier dependent entry unresolved.");
             if (resolved)
             {
                 await f.Service.CommitAsync(await f.Service.PrepareTrinketEditAsync(content.Profile, item, 1, catalog.Storage, content));
@@ -214,5 +220,26 @@ internal static partial class ContractSuite
             Assert(ComputeSha256(content.Profile.EstateSavePath) == before, "Incomplete-source preflight and commit rejection must not modify the estate.");
         }
         Console.WriteLine("PASS: actual source resolution, unmapped/ambiguous local Mods, absent Workshop provider, preflight/commit context and resolved control.");
+    }
+
+    private static void VerifyTrinketHeroProviders(string root, string kind)
+    {
+        var mod = Path.Combine(root, "mod");
+        WriteDependencyEntries(mod, DependencyFirstPath, DependencyTrinket(2, "hero_class_requirements", "BE"));
+        WriteDependencyEntries(mod, DependencyLastPath, DependencyTrinket(7, "buffs"));
+        WriteFixtureManifest(mod);
+        var content = QueryContent(root, [new(kind, kind, kind, mod, 1000)]);
+        Assert(TrinketCatalog.Load(content).Trinkets.Single() is { QuestUses: 7, HasProviderConflict: false },
+            "Complete actor discovery can prove a required class absent and skip that entry.");
+        var incomplete = content with { Sources = content.Sources.Append(new ActiveContentSource(
+            "mode:missing", "Missing", "mode", Path.Combine(root, "unavailable"), 50)).ToArray() };
+        Assert(TrinketCatalog.Load(incomplete).Trinkets.Single() is { QuestUses: 2, HasProviderConflict: true },
+            "An unavailable discovery source leaves an absent required class unknown, preserving the first trinket.");
+        // Native actor registration depends on discovery, not successfully parsing
+        // a canonical generation template. Even a listed missing info registers Az.
+        File.AppendAllText(Path.Combine(mod, "modfiles.txt"), "heroes/Az/Az.info.darkest\n");
+        Assert(TrinketCatalog.Load(incomplete).Trinkets.Single() is { QuestUses: 2, HasProviderConflict: false },
+            "A proven registered hero remains present despite missing info or other unresolved discovery sources.");
+        Console.WriteLine($"PASS: {kind} trinket hero dependency completeness and actor-registration controls.");
     }
 }

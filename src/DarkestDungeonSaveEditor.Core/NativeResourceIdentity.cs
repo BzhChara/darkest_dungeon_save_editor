@@ -2,6 +2,10 @@ namespace DarkestDungeonSaveEditor.Core;
 
 internal static class NativeResourceIdentity
 {
+    // JSON Buff/quirk identities and references stop at the first NUL, then
+    // hash the full UTF-8 string (independent of their display buffer sizes).
+    public static uint HashCString(string id) => Loc2LocalizationReader.HashName(NativeJsonReader.CString(id));
+
     // Reuse the game's UTF-8 polynomial hash. Different strings can address
     // the same native definition, so a string-only editor row is not safe.
     public static IReadOnlySet<string> FindCollisions<T, TKey>(IEnumerable<T> values,

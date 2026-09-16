@@ -42,6 +42,7 @@ internal static partial class ContractSuite
         RunInventoryCapacityContracts(runRoot);
         await RunTrinketDependencyContractsAsync(runRoot, codec);
         await RunBuffEnumContractsAsync(runRoot, codec);
+        await RunHeroReferenceDependencyContractsAsync(runRoot, codec);
         await RunInventoryProviderContractsAsync(runRoot, codec);
         await RunQuantityReferenceIdentityContractsAsync(runRoot, codec);
         await RunCanonicalResourceContractsAsync(runRoot, codec);
@@ -162,6 +163,13 @@ internal static partial class ContractSuite
             activeWorkshopInventoryRoot);
         await VerifyTrinketJsonMembersAsync(activeContent, runRoot, codec);
         await RunInventoryPersistenceContractsAsync(runRoot, codec);
+        Assert(HeroClassCatalog.Load(activeContent).InitialQuirks.Single(q => q.Id == "tough").WriteStatus == HeroInitialQuirkWriteStatus.Unverified,
+            "An enabled missing Workshop source keeps otherwise known hero Buff attributes unverified.");
+        // The missing-provider discovery assertions above remain intact. Hero
+        // HP/generation/save contracts below need a complete, resolver-backed set.
+        WriteMultiMash(workshopRoot, "333/modfiles.txt", string.Empty);
+        activeContent = await ActiveContentResolver.ResolveAsync(profile, gameRoot, workshopRoot,
+            additionalLocalModDirectory, codec, locations.WorkspaceDirectory);
         await RunHeroContractsAsync(
             activeContent,
             trinketState.ActiveCatalog,

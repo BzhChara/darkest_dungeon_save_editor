@@ -75,8 +75,8 @@ public static partial class StagecoachHeroCandidateFactory
             {
                 var left = selected[leftIndex];
                 var right = selected[rightIndex];
-                if (left.IncompatibleQuirkIds.Contains(right.Id, StringComparer.Ordinal) ||
-                    right.IncompatibleQuirkIds.Contains(left.Id, StringComparer.Ordinal))
+                if (left.IncompatibleQuirkIds.Any(id => NativeResourceIdentity.HashCString(id) == NativeResourceIdentity.HashCString(right.Id)) ||
+                    right.IncompatibleQuirkIds.Any(id => NativeResourceIdentity.HashCString(id) == NativeResourceIdentity.HashCString(left.Id)))
                 {
                     throw new InvalidOperationException(
                         $"初始怪癖 '{left.Id}' 与 '{right.Id}' 互斥，不能同时选择。");

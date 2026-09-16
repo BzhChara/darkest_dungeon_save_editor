@@ -23,8 +23,7 @@ public static class TrinketCatalog
         var issues = new List<string>();
         var definitions = new Dictionary<string, List<TrinketDefinition>>(StringComparer.Ordinal);
         var fileCandidates = new List<ContentFileCandidate>();
-        var heroIds = NativeContentFileResolver.DiscoverActorIds(activeContent.Sources, "heroes", issues)
-            .Select(id => Loc2LocalizationReader.HashName(NativeJsonReader.CString(id))).ToHashSet();
+        var heroes = TrinketHeroDependencies.Load(activeContent, issues);
         var buffs = TrinketBuffDependencies.Load(activeContent, issues);
         var enabledDlcPrefixes = ContentFileOverlay.GetEnabledDlcPrefixes(activeContent.Sources);
         foreach (var source in activeContent.Sources.OrderBy(item => item.LoadOrder))
@@ -44,7 +43,7 @@ public static class TrinketCatalog
 
         foreach (var file in NativeContentFileResolver.Resolve(fileCandidates, activeContent.Sources, "Trinket definition", issues))
         {
-            ScanFile(file, heroIds, buffs, definitions, issues);
+            ScanFile(file, heroes, buffs, definitions, issues);
         }
 
         var localization = ContentLocalizationCatalog.Load(
@@ -81,7 +80,7 @@ public static class TrinketCatalog
 
     private static void ScanFile(
         EffectiveContentFile file,
-        IReadOnlySet<uint> heroIds,
+        TrinketHeroDependencies heroes,
         TrinketBuffDependencies buffs,
         Dictionary<string, List<TrinketDefinition>> definitions,
         List<string> issues)
@@ -121,10 +120,10 @@ public static class TrinketCatalog
 
                 // Native references use full C-string hashes, not literal names.
                 // Every required class must be present in the actor table.
-                if (NativeJsonReader.TryGetProperty(entry, "hero_class_requirements", out var requirements) &&
-                    requirements.ValueKind == JsonValueKind.Array &&
-                    requirements.EnumerateArray().Any(value => value.ValueKind != JsonValueKind.String ||
-                        !heroIds.Contains(Loc2LocalizationReader.HashName(NativeJsonReader.CString(value.GetString()!)))))
+                var heroStates = NativeJsonReader.Array(entry, "hero_class_requirements")
+                    .Select(value => value.ValueKind == JsonValueKind.String ? heroes.Contains(value.GetString()!) : false)
+                    .ToArray();
+                if (heroStates.Contains(false))
                 {
                     issues.Add($"Trinket '{id}' requires an unloaded hero class and was ignored: {path}");
                     continue;
@@ -144,6 +143,10 @@ public static class TrinketCatalog
                 var unresolvedBuffs = buffStates.Contains(null);
                 if (unresolvedBuffs)
                     issues.Add($"Trinket '{id}' Buff dependencies could not be verified and are read-only: {path}");
+                var unresolvedHeroes = heroStates.Contains(null);
+                if (unresolvedHeroes)
+                    issues.Add($"Trinket '{id}' hero dependencies could not be verified and are read-only: {path}");
+                var unresolvedDependencies = unresolvedBuffs || unresolvedHeroes;
 
                 var providerSources = providerSourcesById.TryGetValue(id, out var declaringSources)
                     ? declaringSources
@@ -163,11 +166,11 @@ public static class TrinketCatalog
                     ReadString(entry, "rarity"),
                     ReadInt(entry, "limit"),
                     ReadInt(entry, "price"),
-                    unresolvedBuffs ? "unresolved" : file.Source.Id,
+                    unresolvedDependencies ? "unresolved" : file.Source.Id,
                     Path.GetFullPath(path),
                     statefulFields.Length > 0,
                     statefulFields,
-                    unresolvedBuffs,
+                    unresolvedDependencies,
                     providerSources)
                 {
                     QuestUses = questUses,
