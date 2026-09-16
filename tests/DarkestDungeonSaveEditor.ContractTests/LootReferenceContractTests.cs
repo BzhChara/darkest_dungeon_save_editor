@@ -21,6 +21,7 @@ internal static partial class ContractSuite
 
     private static async Task RunLootReferenceContractsAsync(string runRoot, DsonSaveCodec codec)
     {
+        await RunLootItemIdentityContractsAsync(runRoot, codec);
         var cases = new List<LootReferenceCase>();
         foreach (var (name, chance, active) in new[] {
             ("zero", "0", false), ("negative", "-1", false), ("negative-overflow", "-1e50", false), ("underflow", "1e-50", false),

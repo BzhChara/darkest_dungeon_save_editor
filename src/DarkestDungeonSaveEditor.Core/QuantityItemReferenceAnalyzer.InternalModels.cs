@@ -35,16 +35,25 @@ internal static partial class QuantityItemReferenceAnalyzer
         public HashSet<string> ItemKeys { get; } = new(StringComparer.Ordinal);
         public HashSet<LootCode> NestedTables { get; } = [];
         public HashSet<string> UncertainItemKeys { get; } = new(StringComparer.Ordinal);
+        public HashSet<string> ConflictedItemKeys { get; } = new(StringComparer.Ordinal);
         public HashSet<LootCode> UncertainNestedTables { get; } = [];
     }
 
     private sealed class QuantityItemIndex
     {
         private readonly IReadOnlyList<QuantityItemDefinition> _definitions;
+        private readonly Dictionary<(uint Type, uint Id), QuantityItemDefinition[]> _lootDefinitions;
 
         public QuantityItemIndex(IReadOnlyList<QuantityItemDefinition> definitions)
         {
             _definitions = definitions;
+            // Definition hashes use their complete C strings. Only the Loot
+            // consumer's reference buffers truncate to 63 bytes; other typed
+            // consumers and the persisted identities keep their own rules.
+            _lootDefinitions = definitions.GroupBy(definition => (
+                    Loc2LocalizationReader.HashName(NativeJsonReader.CString(definition.InventoryType)),
+                    Loc2LocalizationReader.HashName(NativeJsonReader.CString(definition.ItemId))))
+                .ToDictionary(group => group.Key, group => group.ToArray());
             Identities = definitions
                 .Select(definition => definition.DisplayId)
                 .Where(identity => !string.IsNullOrWhiteSpace(identity))
@@ -54,6 +63,9 @@ internal static partial class QuantityItemReferenceAnalyzer
         }
 
         public IReadOnlyList<ItemIdentity> Identities { get; }
+
+        public IReadOnlyList<QuantityItemDefinition> ResolveLootItemHashes(uint type, uint id) =>
+            _lootDefinitions.TryGetValue((type, id), out var matches) ? matches : [];
 
         public IEnumerable<string> Resolve(string type, string id)
         {
