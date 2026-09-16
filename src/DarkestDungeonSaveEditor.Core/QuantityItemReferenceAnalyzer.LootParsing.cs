@@ -6,6 +6,9 @@ namespace DarkestDungeonSaveEditor.Core;
 
 internal static partial class QuantityItemReferenceAnalyzer
 {
+    private static readonly uint LootItemEntryHash = Loc2LocalizationReader.HashName("item");
+    private static readonly uint LootTableEntryHash = Loc2LocalizationReader.HashName("table");
+
     private static bool ParseLootFile(
         ScannedContentFile file,
         QuantityItemIndex index,
@@ -68,23 +71,28 @@ internal static partial class QuantityItemReferenceAnalyzer
 
                     var usable = ReadLootWeight(entry);
                     if (usable == false) continue;
-                    var entryType = ReadString(entry, "type");
+                    var entryType = ReadLootCode(ReadString(entry, "type")).Hash;
                     if (!TryGetProperty(entry, "data", out var data) ||
                         data.ValueKind != JsonValueKind.Object)
                     {
                         continue;
                     }
 
-                    if (entryType.Equals("item", StringComparison.Ordinal))
+                    if (entryType == LootItemEntryHash)
                     {
-                        var itemType = ReadString(data, "type");
-                        var itemId = ReadString(data, "id");
-                        foreach (var key in index.Resolve(itemType, itemId))
+                        // ItemEntry::LoadFromJsonValue calls Item's JSON reader:
+                        // copy each identity to a 64-byte C buffer, then hash
+                        // those bytes. Keep the selected definition unchanged.
+                        var itemType = ReadLootCode(ReadString(data, "type"), 63).Hash;
+                        var itemId = ReadLootCode(ReadString(data, "id"), 63).Hash;
+                        foreach (var definition in index.ResolveLootItemHashes(itemType, itemId))
                         {
-                            (usable == true ? table.ItemKeys : table.UncertainItemKeys).Add(key);
+                            if (definition.HasProviderConflict) table.ConflictedItemKeys.Add(definition.CatalogKey);
+                            if (usable != true) table.UncertainItemKeys.Add(definition.CatalogKey);
+                            else if (!definition.HasProviderConflict) table.ItemKeys.Add(definition.CatalogKey);
                         }
                     }
-                    else if (entryType.Equals("table", StringComparison.Ordinal))
+                    else if (entryType == LootTableEntryHash)
                     {
                         var nested = ReadString(data, "table");
                         if (!string.IsNullOrWhiteSpace(nested))

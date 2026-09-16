@@ -84,6 +84,7 @@ internal static partial class QuantityItemReferenceAnalyzer
                 var evidence = state.Uncertain ? incompleteEvidence : activeEvidence;
                 foreach (var item in variant.ItemKeys) AddEvidence(evidence, item, chain);
                 foreach (var item in variant.UncertainItemKeys) AddEvidence(incompleteEvidence, item, uncertainChain);
+                foreach (var item in variant.ConflictedItemKeys) AddEvidence(incompleteEvidence, item, chain + "（物品定义冲突，无法确认）");
                 foreach (var context in selected)
                 {
                     foreach (var nested in variant.NestedTables)

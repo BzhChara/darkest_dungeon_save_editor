@@ -50,6 +50,7 @@ The suite is split by responsibility:
 - `JsonMemberContractTests.cs`: first exact resource JSON members (including wrong types), repeated Buff occurrences through HP validation and DSON persistence, and raw town-event recruit payload/class binding;
 - `JsonReferenceConsumerContractTests.cs`: native JSON filename/structure filtering, town/raid roots, irrelevant notes, duplicate fields, uncertain loaded structures, refresh of nonliteral suffixes, and real actor-to-nested-loot references;
 - `LootReferenceContractTests.cs`: first-member float32 weights, ordered conditional loot variants, compatible nested/cyclic paths, native table hashes/buffers, a concrete-context selection oracle, Mod overlays, refresh, saved hidden items and manual DSON previews (`--loot-references`);
+- `LootItemIdentityContractTests.cs`: C-string category hashes, 63-byte UTF-8 item references (including split characters), aliases, first JSON members, conflict refusal, unchanged-manifest refresh and actual DSON commits preserving the selected definition ID (included in `--loot-references` and the full suite);
 - `CatalogFileQueryContractTests.cs`: native trinket/Buff/quirk/camping filename queries across six source types, exact-dot/root exclusions, manifests, same-path priority, missing files, content refresh and generated HP DSON;
 - `TextResourceQueryContractTests.cs`: native inventory/capacity/Effect/Curio filename queries across six source types, mounted-root reference exclusions, actor-documentation rejection with canonical actor controls, manifests, overlays, missing diagnostics, same-size content refresh, curio preflight and capacity-limited DSON;
 - `EncounterCollectionQueryContractTests.cs`: six-source independent Standard/Conditional/Additional queries, keyword decoys and wildcard suffixes, overlapping query identities, repeated local/Workshop Bridge sources, full source identity guards, omitted/bare/whitespace/quoted-empty slots, and 12 DSON create/replace/delete/maintenance scenarios. Run these plus existing filename/empty-slot regressions with `--encounter-queries`;
@@ -108,3 +109,5 @@ Close Darkest Dungeon before the suite: save transaction contracts exercise the 
 `dotnet run --project tests/DarkestDungeonSaveEditor.ContractTests -c Release -- . --loot-references`
 
 本地、工坊和 DLC 前缀 Mod 各运行 58 个权重／同名表／条件与子表对照；另以 32 个随机种子固定的掉落图分别枚举 216 个具体条件，独立对照范围算法。每条表使用独立物品 ID，避免不同错误路径被同一个物品结果掩盖。还验证同路径覆盖、不同路径先匹配、未列清单文件、清单不变时的内容刷新、已有隐藏物品可见，以及 3 次保留 ID 和堆叠的真实 DSON 写入预览。只使用隔离资源和存档；完整套件也包含这些测试。
+
+另包含三类来源各 26 个掉落身份样本：类别／物品类型／ID 的 NUL、哈希别名、63 字节与 UTF-8 边界、重复字段、空 ID、零权重和不确定权重。验证同哈希的多个定义继续只读，权重与定义不确定原因分别正确记录，重复同 ID 保持首定义数值，内容字节改变但清单／长度／时间戳不变时仍更新引用。三个真实 DSON 提交确认写入定义 ID 而非引用别名；每个样本还验证堆叠、输入不变、数量刷新和小镇／副本边界。
