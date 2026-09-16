@@ -38,11 +38,13 @@ public static partial class HeroClassCatalog
         Func<T, string> getId,
         Func<IReadOnlyList<T>, T> select,
         string contentLabel,
-        List<string> issues)
+        List<string> issues,
+        Func<string, uint>? hashIdentity = null)
     {
         // Files have already been overlaid in native enumeration order. Do not
         // choose a source again here: each resource has its own duplicate rule.
-        var collisions = NativeResourceIdentity.FindCollisions(candidates.Values.SelectMany(group => group).Select(getId));
+        var collisions = NativeResourceIdentity.FindCollisions(candidates.Values.SelectMany(group => group),
+            getId, value => (hashIdentity ?? Loc2LocalizationReader.HashName)(getId(value)));
         var result = new Dictionary<string, T>(StringComparer.Ordinal);
         foreach (var pair in candidates)
         {

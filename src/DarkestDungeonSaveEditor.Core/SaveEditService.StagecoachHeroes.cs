@@ -272,7 +272,7 @@ public sealed partial class SaveEditService
             string.Empty,
             string.Empty,
             0,
-            contentGuard.SourceGameSha256);
+            contentGuard.SourceGameSha256) { Resolution = contentGuard.Resolution };
         var currentCatalog = HeroClassCatalog.Load(currentSnapshot);
         ValidateManifestFingerprints(
             contentGuard.ManifestFingerprints,

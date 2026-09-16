@@ -51,6 +51,15 @@ internal static partial class ContractSuite
         var profile = new SaveProfile("quirk_ui", f.ProfileRoot, f.EstatePath, "contract-user", DateTime.UtcNow);
         var content = await ActiveContentResolver.ResolveAsync(profile, f.GameRoot, f.WorkshopRoot,
             f.AdditionalLocalModDirectory, f.Codec, root);
+        var incomplete = HeroClassCatalog.Load(content);
+        Assert(incomplete.InitialQuirks.Single(q => q.Id == "ui_flat_gain").WriteStatus == HeroInitialQuirkWriteStatus.Unverified,
+            "The general fixture's enabled but missing Workshop 333 must not certify Buff attributes.");
+        // This UI test needs known Buff values. Resolve the deliberately absent
+        // source with a real empty manifest before testing HP compensation.
+        WriteMultiMash(f.WorkshopRoot, "333/modfiles.txt", string.Empty);
+        content = await ActiveContentResolver.ResolveAsync(profile, f.GameRoot, f.WorkshopRoot,
+            f.AdditionalLocalModDirectory, f.Codec, root);
+        Console.WriteLine("PASS: unknown enabled provider blocks HP attributes; resolving its empty manifest restores the WPF selection fixture.");
         var catalog = HeroClassCatalog.Load(content);
         var hero = catalog.HeroClasses.Single(h => h.Id == "local_hero");
         Assert(hero.LevelProfiles.Single(p => p.ResolveLevel == 0).ArmourHp == 20, "UI fixture must have base HP 20.");

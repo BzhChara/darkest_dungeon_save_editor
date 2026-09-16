@@ -29,20 +29,20 @@ public static partial class HeroClassCatalog
 
     private static HeroInitialQuirkDefinition BuildInitialQuirk(
         QuirkDefinition quirk,
-        IReadOnlyDictionary<string, QuirkDefinition> effectiveQuirks,
-        IReadOnlyDictionary<string, BuffDefinition> effectiveBuffs,
-        IReadOnlyDictionary<string, List<BuffDefinition>> buffCandidates)
+        IReadOnlyDictionary<uint, QuirkDefinition> effectiveQuirks,
+        IReadOnlyDictionary<uint, BuffDefinition> effectiveBuffs,
+        IReadOnlySet<uint> knownBuffHashes)
     {
         var contextReasons = new List<string>();
         var unverifiedReasons = new List<string>();
         var definitionLimits = new List<int>();
-        if (!effectiveQuirks.ContainsKey(quirk.Id))
+        if (!effectiveQuirks.ContainsKey(NativeResourceIdentity.HashCString(quirk.Id)))
             unverifiedReasons.Add("怪癖 ID 或定义未能唯一解析，不能确定游戏实际采用的属性");
         var visitedEvolutionIds = new HashSet<string>(StringComparer.Ordinal) { quirk.Id };
         var evolutionStep = quirk;
         while (evolutionStep.Evolution?.TargetQuirkId is { } targetId)
         {
-            if (!effectiveQuirks.TryGetValue(targetId, out var target))
+            if (!effectiveQuirks.TryGetValue(NativeResourceIdentity.HashCString(targetId), out var target))
             {
                 unverifiedReasons.Add($"进化目标 '{targetId}' 缺失或定义未能唯一解析（来自 '{evolutionStep.Id}'）");
                 break;
@@ -53,7 +53,7 @@ public static partial class HeroClassCatalog
                 break;
             }
             // Some authored evolutions cycle; an existing, valid cycle is not a missing target.
-            if (!visitedEvolutionIds.Add(targetId))
+            if (!visitedEvolutionIds.Add(target.Id))
                 break;
             evolutionStep = target;
         }
@@ -74,11 +74,12 @@ public static partial class HeroClassCatalog
         var referencedBuffs = new List<BuffDefinition>();
         foreach (var buffId in quirk.BuffIds)
         {
-            if (!effectiveBuffs.TryGetValue(buffId, out var buff))
+            var buffHash = NativeResourceIdentity.HashCString(buffId);
+            if (!effectiveBuffs.TryGetValue(buffHash, out var buff))
             {
-                if (!buffCandidates.TryGetValue(buffId, out var unresolved) || unresolved.Count == 0)
+                if (!knownBuffHashes.Contains(buffHash))
                 {
-                    unverifiedReasons.Add($"Buff '{buffId}' 缺失，无法排除 max_hp 修正");
+                    unverifiedReasons.Add($"Buff '{buffId}' 缺失或来源未能读取，无法排除 max_hp 修正");
                 }
                 else
                 {
@@ -152,7 +153,9 @@ public static partial class HeroClassCatalog
                     durationMin,
                     durationMax,
                     parsedEvolution.TownProgressionDurationChange,
-                    parsedEvolution.TargetQuirkId,
+                    parsedEvolution.TargetQuirkId is { } targetId &&
+                        effectiveQuirks.TryGetValue(NativeResourceIdentity.HashCString(targetId), out var target)
+                            ? target.Id : parsedEvolution.TargetQuirkId,
                     parsedEvolution.CausesDeath,
                     parsedEvolution.TownAttemptUseItemDurationThreshold);
             }

@@ -57,7 +57,9 @@ public static partial class HeroClassCatalog
             item.Files.QuirkFiles.Select(path => new ContentFileCandidate(item.Source, path))).ToArray(),
             activeContent.Sources, "Quirk definition", issues);
         var eventFiles = ResolveFiles(sourceFiles, files => files.TownEventFiles, "Town event definition", issues);
-        var buffFiles = ResolveFiles(sourceFiles, files => files.BuffFiles, "Buff definition", issues);
+        var buffResolutionIssues = new List<string>();
+        var buffFiles = ResolveFiles(sourceFiles, files => files.BuffFiles, "Buff definition", buffResolutionIssues);
+        issues.AddRange(buffResolutionIssues);
         var campingFiles = ResolveFiles(sourceFiles, files => files.CampingSkillFiles, "Camping skill definition", issues);
         var nameFiles = ResolveFiles(sourceFiles, files => files.NameFiles, "Hero name definition", issues);
         var upgradeFiles = ResolveFiles(sourceFiles, files => files.HeroUpgradeFiles, "Hero upgrade definition", issues);
@@ -144,19 +146,31 @@ public static partial class HeroClassCatalog
             }
         }
 
+        var verifiedBuffIds = new HashSet<string>(StringComparer.Ordinal);
         foreach (var file in buffFiles)
         {
             try
             {
-                foreach (var buff in ReadBuffDefinitions(file.Path, file.Source.Id))
+                foreach (var buff in ReadBuffDefinitions(file.Path, file.Source.Id).ToArray())
                 {
                     AddCandidate(buffCandidates, buff.Id, buff);
+                    verifiedBuffIds.Add(buff.Id);
                 }
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
             {
+                // An unreadable slot may redefine any earlier ID. Later whole
+                // definitions can establish their values again in native order.
+                verifiedBuffIds.Clear();
                 issues.Add($"Failed to read buff definitions '{file.Path}': {ex.Message}");
             }
+        }
+        if (buffResolutionIssues.Count > 0 || ActiveContentResolver.HasUnresolvedModSources(activeContent) ||
+            activeContent.Sources.Any(source => !Directory.Exists(source.Directory)))
+        {
+            // Unknown providers have no provable slot relative to the files above.
+            verifiedBuffIds.Clear();
+            issues.Add("Hero Buff provider discovery is incomplete; referenced attributes could not be verified.");
         }
 
         foreach (var file in campingFiles)
@@ -240,7 +254,8 @@ public static partial class HeroClassCatalog
             issues);
         // Native quirk lookup (0x1404ABD00) walks the entire loaded vector and
         // returns the last matching ID. Different filenames do not imply ambiguity.
-        var quirkHashCollisions = NativeResourceIdentity.FindCollisions(quirkCandidates.Values.SelectMany(group => group).Select(quirk => quirk.Id));
+        var quirkHashCollisions = NativeResourceIdentity.FindCollisions(quirkCandidates.Values.SelectMany(group => group),
+            quirk => quirk.Id, quirk => NativeResourceIdentity.HashCString(quirk.Id));
         if (quirkHashCollisions.Count > 0) issues.Add("Quirk IDs share native hashes and remain unresolved: " + string.Join(", ", quirkHashCollisions));
         var effectiveQuirks = quirkCandidates.Where(pair => !pair.Value.Any(quirk => quirkHashCollisions.Contains(quirk.Id)) && pair.Value.Select(value => value.Id)
                 .Distinct(StringComparer.Ordinal).Count() == 1).ToDictionary(pair => pair.Key,
@@ -250,7 +265,12 @@ public static partial class HeroClassCatalog
             definition => definition.Id,
             definitions => definitions[^1],
             "Buff",
-            issues);
+            issues,
+            NativeResourceIdentity.HashCString);
+        var quirksByHash = effectiveQuirks.Values.ToDictionary(quirk => NativeResourceIdentity.HashCString(quirk.Id));
+        var buffsByHash = effectiveBuffs.Values.Where(buff => verifiedBuffIds.Contains(buff.Id))
+            .ToDictionary(buff => NativeResourceIdentity.HashCString(buff.Id));
+        var knownBuffHashes = buffCandidates.Keys.Select(NativeResourceIdentity.HashCString).ToHashSet();
         var effectiveUpgrades = ResolveHeroUpgradeTrees(upgradeFiles, issues);
         var resolveLevelThresholds = ReadEffectiveResolveLevelThresholds(rosterVariableFiles, enabledDlcPrefixes, issues);
         var effectiveEvents = ResolveOrderedDefinitions(
@@ -315,7 +335,7 @@ public static partial class HeroClassCatalog
                         ? providerSources
                         : quirk.AllSources
                 };
-                return BuildInitialQuirk(mergedQuirk, effectiveQuirks, effectiveBuffs, buffCandidates) with
+                return BuildInitialQuirk(mergedQuirk, quirksByHash, buffsByHash, knownBuffHashes) with
                 {
                     LocalizedName = localization.GetQuirkName(mergedQuirk.Id),
                     SourceLabel = ContentSourceLabelFormatter.Format(
