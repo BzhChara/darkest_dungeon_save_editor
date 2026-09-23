@@ -396,6 +396,10 @@ public static partial class HeroClassCatalog
         string SourcePath,
         string UnsupportedReason);
 
+    private sealed record HeroUpgradeTreeResolution(
+        IReadOnlyDictionary<string, HeroUpgradeTreeCandidate> Candidates,
+        OrderedDefinitionReadState Reads);
+
     private sealed record HeroProgressionBuildResult(
         IReadOnlyList<HeroLevelProfile> LevelProfiles,
         string UnsupportedReason);

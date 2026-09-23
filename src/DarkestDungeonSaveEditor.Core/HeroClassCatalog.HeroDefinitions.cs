@@ -15,7 +15,7 @@ public static partial class HeroClassCatalog
         IReadOnlyDictionary<string, EffectQuirkAssignment> effectiveEffects,
         IReadOnlyDictionary<string, QuirkDefinition> effectiveQuirks,
         IReadOnlyDictionary<string, CampingSkillBuilder> campingSkills,
-        IReadOnlyDictionary<string, HeroUpgradeTreeCandidate> effectiveUpgrades,
+        HeroUpgradeTreeResolution effectiveUpgrades,
         IReadOnlyList<int> resolveLevelThresholds,
         List<string> issues)
     {

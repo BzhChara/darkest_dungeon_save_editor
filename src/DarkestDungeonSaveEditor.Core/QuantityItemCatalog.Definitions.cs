@@ -32,9 +32,14 @@ public static partial class QuantityItemCatalog
             ScanFile(file, saveContext, definitions, issues, readFailures, forceProviderConflict: true);
         }
 
-        foreach (var file in NativeContentFileResolver.Resolve(candidates, activeContent.Sources, "Inventory item definition", issues))
+        var resolutionIssues = new List<string>();
+        var files = NativeContentFileResolver.Resolve(candidates, activeContent.Sources, "Inventory item definition", resolutionIssues);
+        issues.AddRange(resolutionIssues);
+        readFailures?.AddRange(resolutionIssues);
+        var reads = new OrderedDefinitionReadState(firstMatch: true, orderKnown: resolutionIssues.Count == 0);
+        foreach (var file in files)
         {
-            ScanFile(file, saveContext, definitions, issues, readFailures);
+            ScanFile(file, saveContext, definitions, issues, readFailures, reads: reads);
         }
 
         var collisionKeys = NativeResourceIdentity.FindCollisions(definitions.Values.SelectMany(group => group),
@@ -43,7 +48,7 @@ public static partial class QuantityItemCatalog
         if (collisionKeys.Count > 0) issues.Add("Inventory keys share native hashes and cannot be selected safely: " + string.Join(", ", collisionKeys));
         var selected = definitions.Values
             .Select(group => MergeDefinitions(group, issues))
-            .Select(definition => collisionKeys.Contains(definition.DefinitionKey)
+            .Select(definition => collisionKeys.Contains(definition.DefinitionKey) || !reads.IsVerified(definition.DefinitionKey)
                 ? definition with { HasProviderConflict = true, Source = "unresolved" } : definition)
             .ToArray();
         // Typed item references need every first-match (type, id), including
@@ -65,12 +70,13 @@ public static partial class QuantityItemCatalog
         Dictionary<string, List<QuantityItemDefinition>> definitions,
         List<string> issues,
         List<string>? readFailures,
-        bool forceProviderConflict = false)
+        bool forceProviderConflict = false,
+        OrderedDefinitionReadState? reads = null)
     {
         try
         {
             var providerSources = ReadProviderSourcesByKey(file, saveContext);
-            foreach (var parsed in ReadDefinitions(file.Path, saveContext))
+            foreach (var parsed in ReadDefinitions(file.Path, saveContext).ToArray())
             {
                 var definition = new QuantityItemDefinition(
                     parsed.InventoryType,
@@ -92,10 +98,12 @@ public static partial class QuantityItemCatalog
                 }
 
                 group.Add(definition);
+                reads?.RecordDefinition(definition.DefinitionKey);
             }
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or DecoderFallbackException)
         {
+            reads?.RecordFailure();
             var reason = $"Failed to read inventory item file '{file.Path}': {ex.Message}";
             issues.Add(reason);
             readFailures?.Add(reason);

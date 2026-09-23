@@ -53,16 +53,20 @@ public static partial class HeroClassCatalog
                 if (actorFiles.TryGetValue($"heroes/{id}/{id}{suffix}", out var file)) heroOverrideFiles.Add(file);
         }
         var effectFiles = ResolveFiles(sourceFiles, files => files.EffectFiles, "Effect definition", issues, effects: true);
+        var quirkResolutionIssues = new List<string>();
         var quirkFiles = NativeContentFileResolver.Resolve(sourceFiles.SelectMany(item =>
             item.Files.QuirkFiles.Select(path => new ContentFileCandidate(item.Source, path))).ToArray(),
-            activeContent.Sources, "Quirk definition", issues);
+            activeContent.Sources, "Quirk definition", quirkResolutionIssues);
+        issues.AddRange(quirkResolutionIssues);
         var eventFiles = ResolveFiles(sourceFiles, files => files.TownEventFiles, "Town event definition", issues);
         var buffResolutionIssues = new List<string>();
         var buffFiles = ResolveFiles(sourceFiles, files => files.BuffFiles, "Buff definition", buffResolutionIssues);
         issues.AddRange(buffResolutionIssues);
         var campingFiles = ResolveFiles(sourceFiles, files => files.CampingSkillFiles, "Camping skill definition", issues);
         var nameFiles = ResolveFiles(sourceFiles, files => files.NameFiles, "Hero name definition", issues);
-        var upgradeFiles = ResolveFiles(sourceFiles, files => files.HeroUpgradeFiles, "Hero upgrade definition", issues);
+        var upgradeResolutionIssues = new List<string>();
+        var upgradeFiles = ResolveFiles(sourceFiles, files => files.HeroUpgradeFiles, "Hero upgrade definition", upgradeResolutionIssues);
+        issues.AddRange(upgradeResolutionIssues);
         var rosterVariableFiles = ResolveFiles(sourceFiles, files => files.RosterVariableFiles, "Roster variables", issues,
             openPath: "campaign/roster/roster.variables.json");
         var sharedRuleFiles = ResolveFiles(sourceFiles, files => files.SharedRuleFiles, "Shared rules", issues);
@@ -119,6 +123,7 @@ public static partial class HeroClassCatalog
             }
         }
 
+        var quirkReads = new OrderedDefinitionReadState(firstMatch: false, orderKnown: quirkResolutionIssues.Count == 0);
         foreach (var file in quirkFiles)
         {
             try
@@ -127,7 +132,7 @@ public static partial class HeroClassCatalog
                 foreach (var quirk in ReadQuirkDefinitions(
                              file.Path,
                              file.Source.Id,
-                             [file.Source.Id]))
+                             [file.Source.Id]).ToArray())
                 {
                     var providerSources = providerSourcesById.TryGetValue(
                         quirk.Id,
@@ -138,10 +143,12 @@ public static partial class HeroClassCatalog
                         quirkCandidates,
                         quirk.Id,
                         quirk with { AllSources = providerSources });
+                    quirkReads.RecordDefinition(quirk.Id);
                 }
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
             {
+                quirkReads.RecordFailure();
                 issues.Add($"Failed to read quirk definitions '{file.Path}': {ex.Message}");
             }
         }
@@ -267,11 +274,13 @@ public static partial class HeroClassCatalog
             "Buff",
             issues,
             NativeResourceIdentity.HashCString);
-        var quirksByHash = effectiveQuirks.Values.ToDictionary(quirk => NativeResourceIdentity.HashCString(quirk.Id));
+        var verifiedQuirks = effectiveQuirks.Where(pair => quirkReads.IsVerified(pair.Key))
+            .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
+        var quirksByHash = verifiedQuirks.Values.ToDictionary(quirk => NativeResourceIdentity.HashCString(quirk.Id));
         var buffsByHash = effectiveBuffs.Values.Where(buff => verifiedBuffIds.Contains(buff.Id))
             .ToDictionary(buff => NativeResourceIdentity.HashCString(buff.Id));
         var knownBuffHashes = buffCandidates.Keys.Select(NativeResourceIdentity.HashCString).ToHashSet();
-        var effectiveUpgrades = ResolveHeroUpgradeTrees(upgradeFiles, issues);
+        var effectiveUpgrades = ResolveHeroUpgradeTrees(upgradeFiles, issues, upgradeResolutionIssues.Count == 0);
         var resolveLevelThresholds = ReadEffectiveResolveLevelThresholds(rosterVariableFiles, enabledDlcPrefixes, issues);
         var effectiveEvents = ResolveOrderedDefinitions(
             eventCandidates,
@@ -301,7 +310,7 @@ public static partial class HeroClassCatalog
                     : [],
                 eventsByClass,
                 effectiveEffects,
-                effectiveQuirks,
+                verifiedQuirks,
                 campingSkills,
                 effectiveUpgrades,
                 resolveLevelThresholds,

@@ -8,11 +8,13 @@ namespace DarkestDungeonSaveEditor.Core;
 
 public static partial class HeroClassCatalog
 {
-    private static IReadOnlyDictionary<string, HeroUpgradeTreeCandidate> ResolveHeroUpgradeTrees(
+    private static HeroUpgradeTreeResolution ResolveHeroUpgradeTrees(
         IReadOnlyList<EffectiveContentFile> files,
-        List<string> issues)
+        List<string> issues,
+        bool orderKnown)
     {
         var result = new Dictionary<string, HeroUpgradeTreeCandidate>(StringComparer.Ordinal);
+        var reads = new OrderedDefinitionReadState(firstMatch: false, orderKnown);
         // IO_FindFiles supplies effective files in native order. Upgrade lookups
         // (0x1406741C0 / 0x1404703D0, build 27890) retain the last matching tree,
         // including duplicates within one file; filenames do not identify heroes.
@@ -60,10 +62,12 @@ public static partial class HeroClassCatalog
                     }
                     result[id] = new HeroUpgradeTreeCandidate(
                         id, requirements, file.Source.Id, Path.GetFullPath(file.Path), reason);
+                    reads.RecordDefinition(id);
                 }
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or InvalidDataException)
             {
+                reads.RecordFailure();
                 issues.Add($"Failed to read hero upgrade definition '{file.Path}': {ex.Message}");
             }
         }
@@ -73,17 +77,31 @@ public static partial class HeroClassCatalog
         {
             result[id] = result[id] with { UnsupportedReason = "升级树 ID 与其他 ID 的游戏哈希冲突" };
         }
-        return result;
+        return new HeroUpgradeTreeResolution(result, reads);
     }
 
     private static HeroUpgradeDefinition BindHeroUpgradeTrees(
         HeroCandidate hero,
-        IReadOnlyDictionary<string, HeroUpgradeTreeCandidate> candidates,
+        HeroUpgradeTreeResolution resolution,
         List<string> issues)
     {
+        var candidates = resolution.Candidates;
         var trees = new List<HeroUpgradeTreeDefinition>();
         void AddTree(string id, HeroUpgradeTreeKind kind)
         {
+            if (!resolution.Reads.IsVerified(id) && !resolution.Reads.CanProveAbsence)
+            {
+                // Unknown is not a tree-less skill/equipment default. Even an
+                // ID absent from the readable subset may occur in a failed slot.
+                trees.Add(new HeroUpgradeTreeDefinition(id, kind, [])
+                {
+                    Source = "unresolved",
+                    SourcePath = candidates.GetValueOrDefault(id)?.SourcePath ?? string.Empty,
+                    UnsupportedReason = "升级树文件读取不完整，无法确认当前升级条件"
+                });
+                issues.Add($"Hero upgrade tree '{id}' is unavailable because its effective definition could not be verified.");
+                return;
+            }
             if (!candidates.TryGetValue(id, out var candidate))
             {
                 // A computed target can alias an authored ID even when the
