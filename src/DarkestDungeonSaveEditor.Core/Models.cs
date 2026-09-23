@@ -157,6 +157,7 @@ public sealed record HeroClassDefinition(
     public BilingualContentName LocalizedName { get; init; } = BilingualContentName.Empty;
     public string SourceLabel { get; init; } = string.Empty;
     public IReadOnlyList<HeroGenerationAvailability> GenerationAvailability { get; init; } = [];
+    public bool CampingSkillsComplete { get; init; } = true;
     public IReadOnlyDictionary<string, IReadOnlyList<int>> CombatSkillLevels { get; init; } =
         new Dictionary<string, IReadOnlyList<int>>(StringComparer.Ordinal);
     internal HeroEquipmentDefinition? Equipment { get; init; }

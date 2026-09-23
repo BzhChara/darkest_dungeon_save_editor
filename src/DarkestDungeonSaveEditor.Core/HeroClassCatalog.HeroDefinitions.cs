@@ -15,6 +15,7 @@ public static partial class HeroClassCatalog
         IReadOnlyDictionary<string, EffectQuirkAssignment> effectiveEffects,
         IReadOnlyDictionary<string, QuirkDefinition> effectiveQuirks,
         IReadOnlyDictionary<string, CampingSkillBuilder> campingSkills,
+        bool campingSkillsComplete,
         HeroUpgradeTreeResolution effectiveUpgrades,
         IReadOnlyList<int> resolveLevelThresholds,
         List<string> issues)
@@ -60,7 +61,10 @@ public static partial class HeroClassCatalog
                 recruitEvents,
                 [],
                 true,
-                sources);
+                sources)
+            {
+                CampingSkillsComplete = campingSkillsComplete
+            };
         }
 
         var selected = ApplyHeroOverrides(ordered[0], overrideFiles);
@@ -124,6 +128,7 @@ public static partial class HeroClassCatalog
             false,
             sources)
         {
+            CampingSkillsComplete = campingSkillsComplete,
             Equipment = CreateEquipmentDefinition(selected),
             CombatSkillLevels = selected.CombatSkillLevels.ToDictionary(
                 pair => pair.Key,

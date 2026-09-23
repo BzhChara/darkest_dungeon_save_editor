@@ -10,6 +10,12 @@ public static partial class StagecoachHeroCandidateFactory
         int resolveLevel,
         List<string>? warnings = null)
     {
+        // Generation unlocks all applicable camping skills, even when none
+        // are equipped. A readable subset cannot prove that complete plan.
+        if (!heroClass.CampingSkillsComplete)
+            throw new InvalidOperationException(
+                $"职业 '{heroClass.Id}' 的露营技能定义读取不完整，无法确认初始技能与完整解锁计划。");
+
         var unsupportedTree = heroClass.UpgradeTrees.FirstOrDefault(tree =>
             !string.IsNullOrWhiteSpace(tree.UnsupportedReason));
         if (unsupportedTree is not null)

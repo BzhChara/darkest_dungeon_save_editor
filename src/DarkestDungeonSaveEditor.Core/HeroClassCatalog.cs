@@ -52,17 +52,23 @@ public static partial class HeroClassCatalog
             foreach (var suffix in new[] { HeroArtSuffix, HeroOverrideSuffix })
                 if (actorFiles.TryGetValue($"heroes/{id}/{id}{suffix}", out var file)) heroOverrideFiles.Add(file);
         }
-        var effectFiles = ResolveFiles(sourceFiles, files => files.EffectFiles, "Effect definition", issues, effects: true);
+        var effectResolutionIssues = new List<string>();
+        var effectFiles = ResolveFiles(sourceFiles, files => files.EffectFiles, "Effect definition", effectResolutionIssues, effects: true);
+        issues.AddRange(effectResolutionIssues);
         var quirkResolutionIssues = new List<string>();
         var quirkFiles = NativeContentFileResolver.Resolve(sourceFiles.SelectMany(item =>
             item.Files.QuirkFiles.Select(path => new ContentFileCandidate(item.Source, path))).ToArray(),
             activeContent.Sources, "Quirk definition", quirkResolutionIssues);
         issues.AddRange(quirkResolutionIssues);
-        var eventFiles = ResolveFiles(sourceFiles, files => files.TownEventFiles, "Town event definition", issues);
+        var eventResolutionIssues = new List<string>();
+        var eventFiles = ResolveFiles(sourceFiles, files => files.TownEventFiles, "Town event definition", eventResolutionIssues);
+        issues.AddRange(eventResolutionIssues);
         var buffResolutionIssues = new List<string>();
         var buffFiles = ResolveFiles(sourceFiles, files => files.BuffFiles, "Buff definition", buffResolutionIssues);
         issues.AddRange(buffResolutionIssues);
-        var campingFiles = ResolveFiles(sourceFiles, files => files.CampingSkillFiles, "Camping skill definition", issues);
+        var campingResolutionIssues = new List<string>();
+        var campingFiles = ResolveFiles(sourceFiles, files => files.CampingSkillFiles, "Camping skill definition", campingResolutionIssues);
+        issues.AddRange(campingResolutionIssues);
         var nameFiles = ResolveFiles(sourceFiles, files => files.NameFiles, "Hero name definition", issues);
         var upgradeResolutionIssues = new List<string>();
         var upgradeFiles = ResolveFiles(sourceFiles, files => files.HeroUpgradeFiles, "Hero upgrade definition", upgradeResolutionIssues);
@@ -108,17 +114,22 @@ public static partial class HeroClassCatalog
                 string.Join(" | ", pair.Value.Select(file => file.Path)));
         }
 
+        var effectReads = new OrderedDefinitionReadState(firstMatch: false, orderKnown: effectResolutionIssues.Count == 0);
         foreach (var file in effectFiles)
         {
             try
             {
-                foreach (var effect in ReadEffectAssignments(file.Path, file.Source.Id))
+                foreach (var effect in ReadEffectAssignments(file.Path, file.Source.Id).ToArray())
                 {
                     AddCandidate(effectCandidates, effect.Name, effect);
+                    // Omission preserves the old field, so only an explicit
+                    // disease assignment (including "") can recover certainty.
+                    if (effect.QuirkId is not null) effectReads.RecordDefinition(effect.Name);
                 }
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
+                effectReads.RecordFailure();
                 issues.Add($"Failed to read effect definitions '{file.Path}': {ex.Message}");
             }
         }
@@ -180,11 +191,12 @@ public static partial class HeroClassCatalog
             issues.Add("Hero Buff provider discovery is incomplete; referenced attributes could not be verified.");
         }
 
+        var campingReads = new OrderedDefinitionReadState(firstMatch: true, orderKnown: campingResolutionIssues.Count == 0);
         foreach (var file in campingFiles)
         {
             try
             {
-                foreach (var skill in ReadCampingSkills(file.Path))
+                foreach (var skill in ReadCampingSkills(file.Path).ToArray())
                 {
                     if (!campingSkills.TryGetValue(skill.Id, out var builder))
                     {
@@ -193,10 +205,12 @@ public static partial class HeroClassCatalog
                     }
 
                     builder.Add(skill);
+                    campingReads.RecordDefinition(skill.Id);
                 }
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
             {
+                campingReads.RecordFailure();
                 issues.Add($"Failed to read camping skill definitions '{file.Path}': {ex.Message}");
             }
         }
@@ -224,17 +238,21 @@ public static partial class HeroClassCatalog
             }
         }
 
+        var eventReads = new OrderedDefinitionReadState(firstMatch: true, orderKnown: eventResolutionIssues.Count == 0);
         foreach (var file in eventFiles)
         {
             try
             {
-                foreach (var eventGroup in ReadRecruitEvents(file.Path, file.Source.Id))
+                foreach (var eventGroup in ReadRecruitEvents(file.Path, file.Source.Id).ToArray())
                 {
                     AddCandidate(eventCandidates, eventGroup.EventId, eventGroup);
+                    // An empty first result still owns the event ID.
+                    eventReads.RecordDefinition(eventGroup.EventId);
                 }
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or EncoderFallbackException or DecoderFallbackException)
             {
+                eventReads.RecordFailure();
                 issues.Add($"Failed to read town event definitions '{file.Path}': {ex.Message}");
             }
         }
@@ -258,7 +276,8 @@ public static partial class HeroClassCatalog
             definition => definition.Name,
             definitions => definitions.LastOrDefault(definition => definition.QuirkId is not null) ?? definitions[^1],
             "Effect",
-            issues);
+            issues).Where(pair => effectReads.IsVerified(pair.Key))
+            .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
         // Native quirk lookup (0x1404ABD00) walks the entire loaded vector and
         // returns the last matching ID. Different filenames do not imply ambiguity.
         var quirkHashCollisions = NativeResourceIdentity.FindCollisions(quirkCandidates.Values.SelectMany(group => group),
@@ -289,6 +308,7 @@ public static partial class HeroClassCatalog
             "Town event",
             issues);
         var recruitEvents = effectiveEvents.Values
+            .Where(group => eventReads.IsVerified(group.EventId))
             .SelectMany(group => group.Recruits)
             .OrderBy(item => item.HeroClass, StringComparer.OrdinalIgnoreCase)
             .ThenBy(item => item.Id, StringComparer.OrdinalIgnoreCase)
@@ -299,6 +319,8 @@ public static partial class HeroClassCatalog
                 group => group.Key,
                 group => (IReadOnlyList<HeroRecruitEventDefinition>)group.ToArray());
 
+        var verifiedCampingSkills = campingSkills.Where(pair => campingReads.IsVerified(pair.Key))
+            .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
         var heroHashCollisions = NativeResourceIdentity.FindCollisions(heroIds);
         if (heroHashCollisions.Count > 0) issues.Add("Hero IDs share native hashes and remain unresolved: " + string.Join(", ", heroHashCollisions));
         var heroClasses = candidates
@@ -311,7 +333,8 @@ public static partial class HeroClassCatalog
                 eventsByClass,
                 effectiveEffects,
                 verifiedQuirks,
-                campingSkills,
+                verifiedCampingSkills,
+                campingReads.CanProveAbsence,
                 effectiveUpgrades,
                 resolveLevelThresholds,
                 issues))
