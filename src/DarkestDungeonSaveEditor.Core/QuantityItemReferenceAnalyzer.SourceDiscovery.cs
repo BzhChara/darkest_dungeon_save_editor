@@ -89,6 +89,13 @@ internal static partial class QuantityItemReferenceAnalyzer
                      _ => NativeContentFileResolver.Resolve(group.ToArray(), activeContent.Sources, "Quantity-item reference", issues)
                  })))
         {
+            var scanned = new ScannedContentFile(
+                file,
+                NativeResourceFileRules.MountedPath(file.RelativePath, enabledDlcPrefixes),
+                string.Empty,
+                NativeResourceFileRules.IsLootFile(file.RelativePath, enabledDlcPrefixes),
+                NativeResourceFileRules.ReferenceJsonKind(file.RelativePath, enabledDlcPrefixes),
+                NativeResourceFileRules.IsCurioTypeFile(file.RelativePath, enabledDlcPrefixes));
             try
             {
                 if (DsonSaveCodec.IsDson(file.Path))
@@ -96,15 +103,12 @@ internal static partial class QuantityItemReferenceAnalyzer
                     continue;
                 }
 
-                result.Add(new ScannedContentFile(
-                    file,
-                    NativeResourceFileRules.MountedPath(file.RelativePath, enabledDlcPrefixes),
-                    NativeResourceFileRules.IsCurioTypeFile(file.RelativePath, enabledDlcPrefixes)
+                result.Add(scanned with
+                {
+                    Text = scanned.IsCurioTypeFile
                         ? new UTF8Encoding(false, true).GetString(File.ReadAllBytes(file.Path))
-                        : File.ReadAllText(file.Path, Encoding.UTF8),
-                    NativeResourceFileRules.IsLootFile(file.RelativePath, enabledDlcPrefixes),
-                    NativeResourceFileRules.ReferenceJsonKind(file.RelativePath, enabledDlcPrefixes),
-                    NativeResourceFileRules.IsCurioTypeFile(file.RelativePath, enabledDlcPrefixes)));
+                        : File.ReadAllText(file.Path, Encoding.UTF8)
+                });
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or DecoderFallbackException)
             {
@@ -115,6 +119,10 @@ internal static partial class QuantityItemReferenceAnalyzer
                     if (NativeResourceFileRules.ReferenceJsonKind(file.RelativePath, enabledDlcPrefixes) == NativeReferenceJsonKind.Upgrades)
                         upgradeFilesComplete = false;
                     issues.Add($"Failed to read quantity-item reference file '{file.Path}': {ex.Message}");
+                    // Retain unknown slots for first-result consumers. A later
+                    // duplicate cannot become authoritative merely because this file failed.
+                    if (scanned.IsLootFile || scanned.JsonKind == NativeReferenceJsonKind.TownEvents)
+                        result.Add(scanned with { ReadFailed = true });
                 }
             }
         }

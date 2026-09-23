@@ -50,6 +50,7 @@ internal static partial class QuantityItemReferenceAnalyzer
         var upgradeFilesComplete = true;
         var files = LoadEffectiveFiles(activeContent, saveContext, issues, ref scanComplete, ref upgradeFilesComplete);
         var eventIds = new Dictionary<uint, string>();
+        var eventReads = new OrderedDefinitionReadState(firstMatch: true);
         var dlcPrefixes = ContentFileOverlay.GetEnabledDlcPrefixes(activeContent.Sources);
 
         foreach (var definition in definitions.Where(definition => definition.EstateCanBeProvision == true))
@@ -62,9 +63,12 @@ internal static partial class QuantityItemReferenceAnalyzer
                     : "物品定义明确允许从庄园配给进副本");
         }
 
+        var lootFilesComplete = true;
         foreach (var file in files.Where(file => file.IsLootFile))
         {
-            scanComplete &= ParseLootFile(file, index, lootTables, incompleteEvidence, issues);
+            var parsed = !file.ReadFailed && ParseLootFile(file, index, lootTables, incompleteEvidence, issues, lootFilesComplete);
+            scanComplete &= parsed;
+            lootFilesComplete &= parsed;
         }
 
         if (saveContext == QuantityItemSaveContext.Town)
@@ -72,7 +76,8 @@ internal static partial class QuantityItemReferenceAnalyzer
 
         foreach (var file in files.Where(file => !file.IsLootFile && file.JsonKind != NativeReferenceJsonKind.Upgrades))
         {
-            scanComplete &= ParseRootFile(
+            var isEvent = NativeResourceFileRules.IsTownEventFile(file.File.RelativePath, dlcPrefixes);
+            var parsed = !file.ReadFailed && ParseRootFile(
                 file,
                 index,
                 lootTables.Codes,
@@ -82,8 +87,10 @@ internal static partial class QuantityItemReferenceAnalyzer
                 incompleteEvidence,
                 uncertainLootEvidence,
                 issues,
-                NativeResourceFileRules.IsTownEventFile(file.File.RelativePath, dlcPrefixes)
-                    ? eventIds : null);
+                isEvent ? eventIds : null,
+                isEvent ? eventReads : null);
+            scanComplete &= parsed;
+            if (isEvent && !parsed) eventReads.RecordFailure();
         }
 
         TraverseLootRoots(lootTables, rootLootEvidence, uncertainLootEvidence, activeEvidence, incompleteEvidence);

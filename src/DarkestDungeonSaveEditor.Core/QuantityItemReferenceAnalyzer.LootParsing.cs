@@ -14,7 +14,8 @@ internal static partial class QuantityItemReferenceAnalyzer
         QuantityItemIndex index,
         LootTableLibrary lootTables,
         Dictionary<string, List<string>> incompleteEvidence,
-        List<string> issues)
+        List<string> issues,
+        bool selectionVerified)
     {
         if (!TryParseJson(file.Text, out var document) || document is null)
         {
@@ -52,7 +53,7 @@ internal static partial class QuantityItemReferenceAnalyzer
                 lootTables.Codes.Add(code.Name);
                 if (!lootTables.Tables.TryGetValue(code.Hash, out var variants))
                     lootTables.Tables[code.Hash] = variants = [];
-                var table = new LootTableVariant(ReadLootContext(tableNode), file.File.RelativePath);
+                var table = new LootTableVariant(ReadLootContext(tableNode), file.File.RelativePath, selectionVerified);
                 // Even an empty/zero-weight first variant can shadow later ones.
                 variants.Add(table);
 

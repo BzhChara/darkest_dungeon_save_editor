@@ -8,7 +8,8 @@ internal static partial class QuantityItemReferenceAnalyzer
     private static bool VisitReferenceJson(JsonElement root, ScannedContentFile file, QuantityItemIndex index,
         IEnumerable<string> knownLootTables, QuantityItemSaveContext context,
         Dictionary<string, List<string>> evidence, Dictionary<string, List<string>> incompleteEvidence,
-        Dictionary<string, List<string>> uncertainLootEvidence, Dictionary<uint, string>? eventIds, List<string> issues)
+        Dictionary<string, List<string>> uncertainLootEvidence, Dictionary<uint, string>? eventIds,
+        OrderedDefinitionReadState? eventReads, List<string> issues)
     {
         var path = file.File.RelativePath;
         var town = context == QuantityItemSaveContext.Town;
@@ -82,9 +83,18 @@ internal static partial class QuantityItemReferenceAnalyzer
             case NativeReferenceJsonKind.TownEvents:
                 if (!town) return true;
                 var complete = true;
-                foreach (var eventNode in List(root, "events"))
+                // Decode the whole file before publishing first-result identities
+                // or evidence, so a later string decode failure cannot leave a partial winner.
+                var events = List(root, "events").Select(node => (
+                    Id: String(node, "id"),
+                    ItemKeys: List(node, "data").Where(data =>
+                    {
+                        var type = Loc2LocalizationReader.HashName(NativeJsonReader.ReadBoundedString(data, "type", 63));
+                        return type == Loc2LocalizationReader.HashName("bonus_currency") || type == Loc2LocalizationReader.HashName("event_cost");
+                    }).SelectMany(data => index.ResolveCurrencyHash(String(data, "string_data"))).ToArray())).ToArray();
+                foreach (var entry in events)
                 {
-                    var id = String(eventNode, "id");
+                    var id = entry.Id;
                     if (id.Length == 0)
                     {
                         complete = false;
@@ -103,13 +113,10 @@ internal static partial class QuantityItemReferenceAnalyzer
                     }
                     // Only the first event result's data is executed. The native
                     // event parser has no generic cost/loot/item/notes object walker.
-                    foreach (var data in List(eventNode, "data"))
-                    {
-                        var type = Loc2LocalizationReader.HashName(NativeJsonReader.ReadBoundedString(data, "type", 63));
-                        if (type == Loc2LocalizationReader.HashName("bonus_currency") ||
-                            type == Loc2LocalizationReader.HashName("event_cost"))
-                            MarkResolved(index.ResolveCurrencyHash(String(data, "string_data")), evidence, path);
-                    }
+                    eventReads?.RecordDefinition(id);
+                    var verified = eventReads is null || eventReads.IsVerified(id);
+                    MarkResolved(entry.ItemKeys, verified ? evidence : incompleteEvidence,
+                        verified ? path : $"事件首条结果无法确认：{path}");
                 }
                 return complete;
 

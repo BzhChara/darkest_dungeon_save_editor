@@ -80,15 +80,17 @@ internal static partial class QuantityItemReferenceAnalyzer
                 var selected = remaining.Select(context => context.Intersect(variant.Context)).Where(context => !context.IsEmpty).ToArray();
                 if (selected.Length == 0) continue;
                 var chain = $"{state.Evidence} → 掉落表 {state.Code.Name}（{variant.Source}）";
+                if (!variant.SelectionVerified) chain += "（前序掉落定义读取不完整，无法确认此表被选中）";
                 var uncertainChain = chain + "（掉落权重无法确认）";
-                var evidence = state.Uncertain ? incompleteEvidence : activeEvidence;
+                var uncertain = state.Uncertain || !variant.SelectionVerified;
+                var evidence = uncertain ? incompleteEvidence : activeEvidence;
                 foreach (var item in variant.ItemKeys) AddEvidence(evidence, item, chain);
                 foreach (var item in variant.UncertainItemKeys) AddEvidence(incompleteEvidence, item, uncertainChain);
                 foreach (var item in variant.ConflictedItemKeys) AddEvidence(incompleteEvidence, item, chain + "（物品定义冲突，无法确认）");
                 foreach (var context in selected)
                 {
                     foreach (var nested in variant.NestedTables)
-                        queue.Enqueue((nested, context, state.Uncertain, chain));
+                        queue.Enqueue((nested, context, uncertain, chain));
                     foreach (var nested in variant.UncertainNestedTables)
                         queue.Enqueue((nested, context, true, uncertainChain));
                 }
