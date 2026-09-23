@@ -41,9 +41,13 @@ public static class TrinketCatalog
             }
         }
 
-        foreach (var file in NativeContentFileResolver.Resolve(fileCandidates, activeContent.Sources, "Trinket definition", issues))
+        var resolutionIssues = new List<string>();
+        var files = NativeContentFileResolver.Resolve(fileCandidates, activeContent.Sources, "Trinket definition", resolutionIssues);
+        issues.AddRange(resolutionIssues);
+        var reads = new OrderedDefinitionReadState(firstMatch: true, orderKnown: resolutionIssues.Count == 0);
+        foreach (var file in files)
         {
-            ScanFile(file, heroes, buffs, definitions, issues);
+            ScanFile(file, heroes, buffs, definitions, issues, reads);
         }
 
         var localization = ContentLocalizationCatalog.Load(
@@ -56,7 +60,7 @@ public static class TrinketCatalog
         if (collisionIds.Count > 0) issues.Add("Trinket IDs share native hashes and cannot be selected safely: " + string.Join(", ", collisionIds));
         var merged = definitions.Values
             .Select(MergeDefinitions)
-            .Select(definition => collisionIds.Contains(definition.Id)
+            .Select(definition => collisionIds.Contains(definition.Id) || !reads.IsVerified(definition.Id)
                 ? definition with { HasProviderConflict = true, Source = "unresolved" } : definition)
             .Select(definition => definition with
             {
@@ -83,7 +87,8 @@ public static class TrinketCatalog
         TrinketHeroDependencies heroes,
         TrinketBuffDependencies buffs,
         Dictionary<string, List<TrinketDefinition>> definitions,
-        List<string> issues)
+        List<string> issues,
+        OrderedDefinitionReadState reads)
     {
         var path = file.Path;
         try
@@ -99,10 +104,12 @@ public static class TrinketCatalog
             if (!NativeJsonReader.TryGetProperty(document.RootElement, "entries", out var entries) ||
                 entries.ValueKind != JsonValueKind.Array)
             {
+                reads.RecordFailure();
                 issues.Add($"Trinket file has no entries array: {path}");
                 return;
             }
 
+            var parsed = new List<TrinketDefinition>();
             foreach (var entry in entries.EnumerateArray())
             {
                 if (entry.ValueKind != JsonValueKind.Object ||
@@ -177,17 +184,23 @@ public static class TrinketCatalog
                     TriggerLimit = triggerLimit
                 };
 
-                if (!definitions.TryGetValue(id, out var candidates))
+                parsed.Add(definition);
+            }
+            foreach (var definition in parsed)
+            {
+                if (!definitions.TryGetValue(definition.Id, out var candidates))
                 {
                     candidates = [];
-                    definitions[id] = candidates;
+                    definitions[definition.Id] = candidates;
                 }
 
                 candidates.Add(definition);
+                reads.RecordDefinition(definition.Id);
             }
         }
         catch (Exception ex)
         {
+            reads.RecordFailure();
             issues.Add($"Failed to read trinket file '{path}': {ex.Message}");
         }
     }
