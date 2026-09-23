@@ -9,6 +9,7 @@ internal static partial class ContractSuite
         await RunBuffEnumContractsAsync(fixture.RunRoot, fixture.Codec);
         await RunHeroReferenceDependencyContractsAsync(fixture.RunRoot, fixture.Codec);
         await RunDefinitionReadCompletenessContractsAsync(fixture.RunRoot, fixture.Codec);
+        await RunHeroSupportingReadContractsAsync(fixture.RunRoot, fixture.Codec);
         Console.WriteLine($"Artifacts: {fixture.RunRoot}");
     }
 
