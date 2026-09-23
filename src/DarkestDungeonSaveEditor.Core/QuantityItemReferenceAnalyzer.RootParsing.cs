@@ -16,7 +16,8 @@ internal static partial class QuantityItemReferenceAnalyzer
         Dictionary<string, List<string>> incompleteEvidence,
         Dictionary<string, List<string>> uncertainLootEvidence,
         List<string> issues,
-        Dictionary<uint, string>? eventIds = null)
+        Dictionary<uint, string>? eventIds = null,
+        OrderedDefinitionReadState? eventReads = null)
     {
         var defaultReachability = GetDefaultReachability(file.MountedPath);
         var extension = Path.GetExtension(file.File.Path);
@@ -29,7 +30,7 @@ internal static partial class QuantityItemReferenceAnalyzer
                     try
                     {
                         return VisitReferenceJson(document.RootElement, file, index, knownLootTables, saveContext,
-                            activeEvidence, incompleteEvidence, uncertainLootEvidence, eventIds, issues);
+                            activeEvidence, incompleteEvidence, uncertainLootEvidence, eventIds, eventReads, issues);
                     }
                     catch (Exception error) when (error is DecoderFallbackException or EncoderFallbackException)
                     {

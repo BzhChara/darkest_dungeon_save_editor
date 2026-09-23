@@ -12,7 +12,10 @@ internal static partial class QuantityItemReferenceAnalyzer
         string Text,
         bool IsLootFile,
         NativeReferenceJsonKind JsonKind,
-        bool IsCurioTypeFile);
+        bool IsCurioTypeFile)
+    {
+        public bool ReadFailed { get; init; }
+    }
 
     private enum ReferenceReachability
     {
@@ -28,10 +31,11 @@ internal static partial class QuantityItemReferenceAnalyzer
 
     private readonly record struct LootCode(uint Hash, string Name);
 
-    private sealed class LootTableVariant(LootContext context, string source)
+    private sealed class LootTableVariant(LootContext context, string source, bool selectionVerified)
     {
         public LootContext Context { get; } = context;
         public string Source { get; } = source;
+        public bool SelectionVerified { get; } = selectionVerified;
         public HashSet<string> ItemKeys { get; } = new(StringComparer.Ordinal);
         public HashSet<LootCode> NestedTables { get; } = [];
         public HashSet<string> UncertainItemKeys { get; } = new(StringComparer.Ordinal);
