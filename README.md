@@ -6,11 +6,11 @@ Confirmed content overlays, hero and quirk rules, trinkets, HP calculations, sav
 
 Current rules and design documents under `docs/` are versioned project documentation. Review reports, experiment records, and historical fix notes under `docs/change-history/` are local-only material: Git ignores that entire directory, and a new clone does not include it. Historical record names in the rule documents are provenance references, not links to files shipped with the project.
 
-Current source builds support English and Simplified Chinese. Use the compact **Language** button beside **Support** to choose **Follow system**, **Simplified Chinese**, or **English**, then restart the editor. Game and Mod names remain searchable in both languages. See [UI localization](docs/ui-localization.md) for fallback rules, preferences, and translation maintenance.
+The editor supports English and Simplified Chinese. Use the compact **Language** button beside **Support** to choose **Follow system**, **Simplified Chinese**, or **English**, then restart the editor. Game and Mod names remain searchable in both languages. See [UI localization](docs/ui-localization.md) for fallback rules, preferences, and translation maintenance.
 
 ## Download and run
 
-The first public prerelease is [v0.1.0-beta.1](https://github.com/BzhChara/darkest_dungeon_save_editor/releases/tag/v0.1.0-beta.1). Download the **Windows x64 ZIP** from its assets, extract all files, and run `DarkestDungeonSaveEditor.App.exe`. The .NET 8 runtime is included; **Java 8 or newer must be installed separately and available on `PATH`**. That release has a Simplified Chinese UI; bilingual UI support is available in current source builds and is not retroactively included in that ZIP.
+The current prerelease is [v0.1.0-beta.2](https://github.com/BzhChara/darkest_dungeon_save_editor/releases/tag/v0.1.0-beta.2), with English and Simplified Chinese UI support and refined battle-menu icons. Download the **Windows x64 ZIP** from its assets, extract all files, and run `DarkestDungeonSaveEditor.App.exe`. Keep the included `zh-CN` resource directory. The .NET 8 runtime is included; **Java 8 or newer must be installed separately and available on `PATH`**.
 
 See [Installation and first use](docs/release-installation.md) for requirements, checksum verification, backups and updates. This is a prerelease: keep a separate save backup and check the selected profile before editing. The **Source code** archives on GitHub require building the project.
 

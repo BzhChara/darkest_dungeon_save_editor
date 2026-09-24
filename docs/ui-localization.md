@@ -1,6 +1,6 @@
 # UI localization
 
-Current source builds include English and Simplified Chinese in the same application. The compact **Language** button beside **Support** opens a menu with **Follow system**, **Simplified Chinese**, and **English**. A check marks the saved preference. A change takes effect on the next startup; the reminder appears inside the menu. Selecting a language does not interrupt loading, synchronization, previews, or writes.
+Starting with `v0.1.0-beta.2`, releases include English and Simplified Chinese in the same application. The compact **Language** button beside **Support** opens a menu with **Follow system**, **Simplified Chinese**, and **English**. A check marks the saved preference. A change takes effect on the next startup; the reminder appears inside the menu. Selecting a language does not interrupt loading, synchronization, previews, or writes.
 
 With **Follow system**, a Chinese Windows UI language selects Simplified Chinese; other system languages select English. An explicit choice takes precedence. The preference is stored separately from saves in `%LOCALAPPDATA%/DarkestDungeonSaveEditor/language.json`. Missing settings use the system language. Unreadable, malformed, or unsupported settings fall back for that session and produce a diagnostic without overwriting the file. Failed preference writes retain the previous selection.
 
@@ -33,4 +33,4 @@ dotnet run --project tests/DarkestDungeonSaveEditor.ContractTests -c Release -- 
 
 These checks verify compiled resources in both cultures, matching keys/placeholders, fallback, background task culture, unchanged numeric culture, atomic settings, diagnostic grouping/severity, actual WPF text, and next-start preference behavior. They render normal/minimum-size windows into the reported ignored workspace for visual inspection. Existing save, synchronization, and guarded-write contracts remain applicable; legacy message assertions use an explicit Chinese culture.
 
-The published `v0.1.0-beta.1` package predates this feature. It remains unchanged; a future release must include the bilingual build and its satellite resources.
+The published `v0.1.0-beta.1` package predates this feature. Use `v0.1.0-beta.2` or newer for bilingual UI support. Every bilingual release must include the `zh-CN` satellite resources; the packaging script checks for them before creating the archive.
