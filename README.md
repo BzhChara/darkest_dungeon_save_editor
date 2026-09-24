@@ -8,6 +8,12 @@ Current rules and design documents under `docs/` are versioned project documenta
 
 UI action names below are English descriptions of localized controls. The application still reads both English and Simplified Chinese game names; translating the documentation does not change the application's language.
 
+## Download and run
+
+The first public prerelease is [v0.1.0-beta.1](https://github.com/BzhChara/darkest_dungeon_save_editor/releases/tag/v0.1.0-beta.1). Download the **Windows x64 ZIP** from its assets, extract all files, and run `DarkestDungeonSaveEditor.App.exe`. The .NET 8 runtime is included; **Java 8 or newer must be installed separately and available on `PATH`**. The application UI is currently localized in Simplified Chinese.
+
+See [Installation and first use](docs/release-installation.md) for requirements, checksum verification, backups and updates. This is a prerelease: keep a separate save backup and check the selected profile before editing. The **Source code** archives on GitHub require building the project.
+
 ## License
 
 Copyright (C) 2026 BzhChara and contributors.
@@ -84,6 +90,18 @@ Run the UI:
 ```powershell
 dotnet run --project .\src\DarkestDungeonSaveEditor.App\DarkestDungeonSaveEditor.App.csproj
 ```
+
+## Build a release package
+
+On Windows with PowerShell 7.1 or newer and a .NET SDK that supports targeting .NET 8, run:
+
+```powershell
+.\tools\Publish-Release.ps1
+```
+
+The script reads the shared version from `Directory.Build.props`, publishes a self-contained `win-x64` folder, includes installation instructions and licenses, and creates a ZIP plus `SHA256SUMS.txt` under a new directory in `artifacts/releases`. It does not create Git tags or publish to GitHub. Java remains an external requirement. Publishing may download the matching .NET runtime packs during restore.
+
+Before publishing a release, commit the intended source, run the contract suite, and build the package from that clean commit. Verify startup and codec operation from an extracted copy. Tag that same commit, then attach the ZIP and checksum file to a GitHub Release using the matching notes under `docs/releases/`. A prerelease version must be marked **Pre-release** on GitHub.
 
 ## Write and recovery boundaries
 
