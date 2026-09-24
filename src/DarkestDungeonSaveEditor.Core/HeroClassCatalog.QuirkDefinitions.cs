@@ -37,19 +37,19 @@ public static partial class HeroClassCatalog
         var unverifiedReasons = new List<string>();
         var definitionLimits = new List<int>();
         if (!effectiveQuirks.ContainsKey(NativeResourceIdentity.HashCString(quirk.Id)))
-            unverifiedReasons.Add("怪癖 ID 或定义未能唯一解析，不能确定游戏实际采用的属性");
+            unverifiedReasons.Add(EditorText.Get("HeroClassCatalog_QuirkDefinitions_001"));
         var visitedEvolutionIds = new HashSet<string>(StringComparer.Ordinal) { quirk.Id };
         var evolutionStep = quirk;
         while (evolutionStep.Evolution?.TargetQuirkId is { } targetId)
         {
             if (!effectiveQuirks.TryGetValue(NativeResourceIdentity.HashCString(targetId), out var target))
             {
-                unverifiedReasons.Add($"进化目标 '{targetId}' 缺失或定义未能唯一解析（来自 '{evolutionStep.Id}'）");
+                unverifiedReasons.Add(EditorText.Format("HeroClassCatalog_QuirkDefinitions_002", targetId, evolutionStep.Id));
                 break;
             }
             if (target.Evolution is { ValidationErrors.Count: > 0 })
             {
-                unverifiedReasons.Add($"进化链目标 '{targetId}' 的进化配置无效：{string.Join("；", target.Evolution.ValidationErrors)}");
+                unverifiedReasons.Add(EditorText.Format("HeroClassCatalog_QuirkDefinitions_003", targetId, string.Join("；", target.Evolution.ValidationErrors)));
                 break;
             }
             // Some authored evolutions cycle; an existing, valid cycle is not a missing target.
@@ -60,13 +60,13 @@ public static partial class HeroClassCatalog
 
         if (quirk.IsPositive is null)
         {
-            unverifiedReasons.Add("怪癖缺少明确的正负类型");
+            unverifiedReasons.Add(EditorText.Get("HeroClassCatalog_QuirkDefinitions_004"));
         }
 
         if (quirk.Tags.Contains("singleton"))
         {
             definitionLimits.Add(1);
-            contextReasons.Add("singleton 定义上限 1；预览统计 roster 与全部马车池，超限仅警告");
+            contextReasons.Add(EditorText.Get("InitialQuirkSelectionDialog_001"));
         }
 
         int? definitionLimit = definitionLimits.Count == 0 ? null : definitionLimits.Min();
@@ -79,13 +79,13 @@ public static partial class HeroClassCatalog
             {
                 if (!knownBuffHashes.Contains(buffHash))
                 {
-                    unverifiedReasons.Add($"Buff '{buffId}' 缺失或来源未能读取，无法排除 max_hp 修正");
+                    unverifiedReasons.Add(EditorText.Format("HeroClassCatalog_QuirkDefinitions_005", buffId));
                 }
                 else
                 {
                     // A colliding native key may resolve to a different Buff whose stat
                     // is HP, even when this string's own candidates are all non-HP.
-                    unverifiedReasons.Add($"Buff '{buffId}' 定义未解析，无法排除 max_hp 修正");
+                    unverifiedReasons.Add(EditorText.Format("HeroClassCatalog_QuirkDefinitions_006", buffId));
                 }
 
                 continue;
@@ -95,7 +95,7 @@ public static partial class HeroClassCatalog
                 (buff.StatType is "combat_stat_add" or "combat_stat_multiply" &&
                  !CombatStatHashes.Contains(Loc2LocalizationReader.HashName(buff.StatSubType))))
             {
-                unverifiedReasons.Add($"Buff '{buff.Id}' 的原生属性或条件字符串无法确认，不能可靠计算 max_hp");
+                unverifiedReasons.Add(EditorText.Format("HeroClassCatalog_QuirkDefinitions_007", buff.Id));
                 continue;
             }
             referencedBuffs.Add(buff);
@@ -126,7 +126,7 @@ public static partial class HeroClassCatalog
                 buff.IsFalseRule is null ||
                 !hasValidRuleData)
             {
-                unverifiedReasons.Add($"max_hp Buff '{buff.Id}' 使用了尚未验证的规则");
+                unverifiedReasons.Add(EditorText.Format("HeroClassCatalog_QuirkDefinitions_008", buff.Id));
             }
             else
             {
@@ -432,7 +432,7 @@ public static partial class HeroClassCatalog
             }
             else
             {
-                validationErrors.Add("进化字段 'evolution_class_id' 必须是字符串；空字符串表示无目标");
+                validationErrors.Add(EditorText.Get("HeroClassCatalog_QuirkDefinitions_009"));
             }
         }
 
@@ -445,7 +445,7 @@ public static partial class HeroClassCatalog
             }
             else
             {
-                validationErrors.Add("进化字段 'evolution_causes_death' 必须是布尔值");
+                validationErrors.Add(EditorText.Get("HeroClassCatalog_QuirkDefinitions_010"));
             }
         }
 
@@ -456,24 +456,24 @@ public static partial class HeroClassCatalog
 
         if (durationMin is < 0)
         {
-            validationErrors.Add("进化字段 'evolution_duration_min' 不能为负数");
+            validationErrors.Add(EditorText.Get("HeroClassCatalog_QuirkDefinitions_011"));
         }
         if (durationMax is < 0)
         {
-            validationErrors.Add("进化字段 'evolution_duration_max' 不能为负数");
+            validationErrors.Add(EditorText.Get("HeroClassCatalog_QuirkDefinitions_012"));
         }
         if (durationMin is { } minimum && durationMax is { } maximum && minimum > maximum)
         {
-            validationErrors.Add("进化持续值下限不能大于上限（evolution_duration_min / evolution_duration_max）");
+            validationErrors.Add(EditorText.Get("HeroClassCatalog_QuirkDefinitions_013"));
         }
         if (townAttemptUseItemDurationThreshold is < 0)
         {
-            validationErrors.Add("进化字段 'evolution_town_attempt_use_item_duration_threshold' 不能为负数");
+            validationErrors.Add(EditorText.Get("HeroClassCatalog_QuirkDefinitions_014"));
         }
         if (string.IsNullOrWhiteSpace(targetQuirkId) && !causesDeath)
         {
             validationErrors.Add(
-                "进化配置必须声明非空 evolution_class_id，或设置 evolution_causes_death=true");
+                EditorText.Get("HeroClassCatalog_QuirkDefinitions_015"));
         }
 
         return new ParsedQuirkEvolutionDefinition(
@@ -501,7 +501,7 @@ public static partial class HeroClassCatalog
             return value;
         }
 
-        validationErrors.Add($"进化字段 '{propertyName}' 必须是 32 位整数");
+        validationErrors.Add(EditorText.Format("HeroClassCatalog_QuirkDefinitions_016", propertyName));
         return null;
     }
 

@@ -26,14 +26,14 @@ public static partial class BattleEncounterCatalog
         foreach (var file in indexedFiles)
         {
             if (file.Providers.Select(ProviderPath).Distinct(StringComparer.Ordinal).Skip(1).Any())
-                issues.Add($"标准遭遇覆盖路径的大小写不一致，尚未验证原生匹配规则：{file.RelativePath}");
+                issues.Add(EditorText.Format("BattleEncounterCatalog_RuntimeOrder_001", file.RelativePath));
             if (MountPrefix(file.RelativePath) is not null &&
                 file.Providers.All(provider => sources[provider.SourceId].Kind is "local" or "workshop"))
-                issues.Add($"仅 Mod 提供的 DLC 子目录新增遭遇文件尚未验证原生发现规则：{file.RelativePath}");
+                issues.Add(EditorText.Format("BattleEncounterCatalog_RuntimeOrder_002", file.RelativePath));
         }
         if (indexedFiles.Select(file => MountPrefix(file.RelativePath)).Where(prefix => prefix is not null)
             .Distinct(StringComparer.OrdinalIgnoreCase).Skip(1).Any())
-            issues.Add($"同一地区/难度跨越多个 DLC 挂载目录，尚未验证这些挂载之间的顺序：{query.DungeonId}/{query.Difficulty}");
+            issues.Add(EditorText.Format("BattleEncounterCatalog_RuntimeOrder_003", query.DungeonId, query.Difficulty));
         // Each native region/difficulty/collection query starts with its own
         // result list. Global Bridge discovery must not merge different queries.
         return NativeContentFileResolver.Resolve(candidates, activeSources, "Encounter mash", issues)
@@ -65,7 +65,7 @@ public static partial class BattleEncounterCatalog
                 !prefixes.Any(prefix => row.SourceRelativePath.StartsWith(
                     $"{prefix}/dungeons/{row.OriginDungeonId}/", StringComparison.OrdinalIgnoreCase))))
         {
-            reason = "该类型由多个文件提供且跨越 DLC 或非标准挂载目录，尚未验证其运行时索引顺序";
+            reason = EditorText.Get("BattleEncounterCatalog_RuntimeOrder_004");
             return false;
         }
         return true;
@@ -85,7 +85,7 @@ public static partial class BattleEncounterCatalog
                 row.MonsterIds.Any(id => monsters.Sizes.TryGetValue(id, out var size) && size is null) ||
                 row.MonsterIds.Sum(id => monsters.Sizes.GetValueOrDefault(id) ?? 0) > 4)
             {
-                reason = $"遭遇组合的怪物体型无法确认或超过四格，不能证明该类型的运行时行数：{row.SourcePath}:{row.SourceLine}";
+                reason = EditorText.Format("BattleEncounterCatalog_RuntimeOrder_005", row.SourcePath, row.SourceLine);
                 return false;
             }
         }
@@ -105,7 +105,7 @@ public static partial class BattleEncounterCatalog
     {
         if (string.IsNullOrWhiteSpace(dungeonId) || difficulty < 0 || fileNumber < 0 ||
             dungeonId.Any(character => !char.IsAsciiLetterOrDigit(character) && character is not '_' and not '-'))
-            throw new InvalidOperationException("地区或难度不能用于生成专用遭遇文件。");
+            throw new InvalidOperationException(EditorText.Get("BattleEncounterCatalog_RuntimeOrder_006"));
         var discriminator = fileNumber == 0 ? string.Empty : "_" + fileNumber.ToString(System.Globalization.CultureInfo.InvariantCulture);
         return $"dungeons/{dungeonId}/ddse_managed{discriminator}.{dungeonId}.{difficulty.ToString(System.Globalization.CultureInfo.InvariantCulture)}.mash.darkest";
     }
@@ -128,23 +128,23 @@ public static partial class BattleEncounterCatalog
     {
         ValidateGuard(catalog.TableGuard);
         if (mashType is < 0 or > 2)
-            throw new InvalidOperationException("专用遭遇文件仅支持走廊、房间和首领战斗。");
+            throw new InvalidOperationException(EditorText.Get("BattleEncounterCatalog_RuntimeOrder_007"));
         // Also covers a type whose only authored rows could not be parsed.
         // An empty parsed list alone does not prove that native index 0 is free.
         var authoredRows = ParseGuardedFiles(catalog.TableGuard, BattleEncounterSourceKind.Standard, mashType);
         var monsters = ResolveAvailableMonsterDefinitions(catalog.TableGuard.ActiveSources, []);
         var rows = RuntimeRows(authoredRows, monsters);
         if (!HasProvenFileOrder(rows, out _) || !HasProvenRowCounts(rows, monsters, out _))
-            throw new InvalidOperationException("当前类型没有可证明的标准遭遇索引，不能更新 Bridge。");
+            throw new InvalidOperationException(EditorText.Get("BattleEncounterCatalog_RuntimeOrder_008"));
         var indexed = catalog.Encounters.Where(row => row.SourceKind == BattleEncounterSourceKind.Standard &&
             row.MashType == mashType && row.MashIndex is not null).OrderBy(row => row.MashIndex).ToArray();
         if (indexed.Length != rows.Length || !indexed.Select((row, index) =>
                 row.MashIndex == index && SameEncounterIdentity(row, rows[index])).All(matches => matches))
-            throw new InvalidOperationException("当前类型没有连续且可证明的标准遭遇索引，不能更新 Bridge。");
+            throw new InvalidOperationException(EditorText.Get("BattleEncounterCatalog_RuntimeOrder_009"));
 
         var relativePath = dedicatedRelativePath ?? DedicatedMashPath(catalog.DungeonId, catalog.Difficulty);
         if (!IsDedicatedMashPath(relativePath, catalog.DungeonId, catalog.Difficulty))
-            throw new InvalidDataException("专用 Bridge 路径与当前地区或难度不一致。");
+            throw new InvalidDataException(EditorText.Get("BattleEncounterCatalog_RuntimeOrder_010"));
         var expectedPath = managedPackageDirectory is null ? null :
             Path.GetFullPath(Path.Combine(managedPackageDirectory, relativePath));
         var aliases = ResolveEffectiveMashFiles(catalog.TableGuard.ActiveSources, catalog.DungeonId,
@@ -154,7 +154,7 @@ public static partial class BattleEncounterCatalog
         if (aliases.Any(file => expectedPath is null ||
                 !Path.GetFullPath(file.Path).Equals(expectedPath, StringComparison.OrdinalIgnoreCase) ||
                 file.ProviderPaths.Any(path => !Path.GetFullPath(path).Equals(expectedPath, StringComparison.OrdinalIgnoreCase))))
-            throw new InvalidOperationException("专用 Bridge 文件路径已被其他来源使用，不能覆盖或改变其加载位置。");
+            throw new InvalidOperationException(EditorText.Get("BattleEncounterCatalog_RuntimeOrder_011"));
 
         // An existing dedicated file must remain the tail for each type. New files
         // are unique root paths appended by the highest-priority managed mount;
@@ -164,7 +164,7 @@ public static partial class BattleEncounterCatalog
         if (firstDedicated >= 0 && authoredRows.Skip(firstDedicated).Any(row =>
                 !row.SourcePath.Equals(expectedPath, StringComparison.OrdinalIgnoreCase)))
         {
-            throw new InvalidOperationException("专用 Bridge 已不在当前类型的末尾，请恢复其最高优先级后重新加载。");
+            throw new InvalidOperationException(EditorText.Get("BattleEncounterCatalog_RuntimeOrder_012"));
         }
         return new BattleEncounterAppendTarget(relativePath, rows.Length);
     }
@@ -182,7 +182,7 @@ public static partial class BattleEncounterCatalog
                 !after.MonsterIds.SequenceEqual(row.MonsterIds, StringComparer.Ordinal) ||
                 !after.SourceRelativePath.Equals(row.SourceRelativePath, StringComparison.Ordinal) ||
                 after.SourceLine != row.SourceLine || after.SourceRecordIndex != row.SourceRecordIndex)
-                throw new InvalidOperationException("Bridge 会改变已有战斗的索引，本次不会写入。");
+                throw new InvalidOperationException(EditorText.Get("BattleEncounterCatalog_RuntimeOrder_013"));
         }
     }
 }

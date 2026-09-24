@@ -44,7 +44,7 @@ public static partial class BattleEncounterCatalog
         var files = ResolveEffectiveMashFiles(content.Sources, dungeonId, difficulty, issues);
         var fingerprints = files.Select(file => CaptureMashFingerprint(file, issues)).ToArray();
         if (issues.Count > 0)
-            throw new InvalidOperationException($"战斗自动清理暂缓，无法确认 {dungeonId}/{difficulty}/{mashType} 的文件顺序：{issues[0]}");
+            throw new InvalidOperationException(EditorText.Format("BattleEncounterCatalog_Maintenance_001", dungeonId, difficulty, mashType, issues[0]));
         var guard = new BattleEncounterTableGuard(dungeonId, difficulty,
             Path.Combine(content.Profile.ProfileDirectory, "persist.game.json"), content.SourceGameSha256,
             content.Sources, fingerprints, ComputeTableFingerprint(fingerprints)) { Resolution = content.Resolution };
@@ -53,7 +53,7 @@ public static partial class BattleEncounterCatalog
             .Where(row => row.SourceKind == BattleEncounterSourceKind.Standard && row.MashType == mashType).ToArray();
         if (authoredOnly)
         {
-            if (unparsed.Contains(mashType)) throw new InvalidDataException("专用遭遇文件含无法解析的行，暂缓自动清理。");
+            if (unparsed.Contains(mashType)) throw new InvalidDataException(EditorText.Get("BattleEncounterCatalog_Maintenance_002"));
             return rows;
         }
         var monsterIssues = new List<string>();
@@ -62,12 +62,12 @@ public static partial class BattleEncounterCatalog
         var runtimeRows = RuntimeRows(rows, monsters);
         if (unparsed.Contains(mashType) || !HasProvenFileOrder(runtimeRows, out _) ||
             !HasProvenRowCounts(runtimeRows, monsters, out _))
-            throw new InvalidOperationException($"战斗自动清理暂缓，{dungeonId}/{difficulty}/{mashType} 的运行时编号尚不能确认。");
+            throw new InvalidOperationException(EditorText.Format("BattleEncounterCatalog_Maintenance_003", dungeonId, difficulty, mashType));
         return runtimeRows.Select((row, index) => row with
         {
             MashIndex = index,
             CanPlaceDirectly = row.MonsterIds.Count > 0 && row.MonsterIds.All(monsters.Ids.Contains),
-            UnavailableReason = row.MonsterIds.Count == 0 ? "空遭遇占用运行时编号，但不能放置" : row.UnavailableReason
+            UnavailableReason = row.MonsterIds.Count == 0 ? EditorText.Get("BattleEncounterCatalog_Maintenance_004") : row.UnavailableReason
         }).ToArray();
     }
 
@@ -77,6 +77,6 @@ public static partial class BattleEncounterCatalog
         // are not evidence that every monster in that source was removed.
         var failure = issues.FirstOrDefault(issue => !issue.Contains(" is missing:", StringComparison.Ordinal));
         if (failure is not null)
-            throw new IOException($"战斗自动清理暂缓，内容扫描未完成：{failure}");
+            throw new IOException(EditorText.Format("BattleEncounterCatalog_Maintenance_005", failure));
     }
 }

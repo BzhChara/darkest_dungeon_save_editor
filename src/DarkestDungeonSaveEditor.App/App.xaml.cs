@@ -8,13 +8,23 @@ namespace DarkestDungeonSaveEditor.App;
 
 public partial class App : Application
 {
+    private readonly string? _languageLoadError;
+
+    public App()
+    {
+        var preference = EditorLanguageSettings.Load(EditorLanguageSettings.DefaultPath, out _languageLoadError);
+        EditorText.Initialize(preference, System.Globalization.CultureInfo.CurrentUICulture);
+    }
+
     protected override void OnStartup(StartupEventArgs e)
     {
         CrashDiagnostics.SetStage("Application: startup");
+        if (_languageLoadError is not null)
+            CrashDiagnostics.RecordStatus(EditorText.Format("Language_LoadFailed", _languageLoadError), DiagnosticLogLevel.Warning);
         try
         {
             CrashDiagnostics.RecordStatus(RuntimeLogIdentity.Describe(typeof(App).Assembly) +
-                $"；本次日志={CrashDiagnostics.LogFilePath}");
+                EditorText.Format("App_001", CrashDiagnostics.LogFilePath));
         }
         catch (Exception ex)
         {

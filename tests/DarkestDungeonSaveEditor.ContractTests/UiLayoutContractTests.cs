@@ -5,9 +5,9 @@ internal static partial class ContractSuite
     private static void RunUiLayoutContracts(string repositoryRoot)
     {
         var appDirectory = Path.Combine(repositoryRoot, "src", "DarkestDungeonSaveEditor.App");
-        var mainWindow = XDocument.Load(Path.Combine(appDirectory, "MainWindow.xaml"));
-        var quirkDialog = XDocument.Load(Path.Combine(appDirectory, "InitialQuirkSelectionDialog.xaml"));
-        var app = XDocument.Load(Path.Combine(appDirectory, "App.xaml"));
+        var mainWindow = LoadLocalizedContractXaml(Path.Combine(appDirectory, "MainWindow.xaml"));
+        var quirkDialog = LoadLocalizedContractXaml(Path.Combine(appDirectory, "InitialQuirkSelectionDialog.xaml"));
+        var app = LoadLocalizedContractXaml(Path.Combine(appDirectory, "App.xaml"));
         var interaction = File.ReadAllText(Path.Combine(appDirectory, "MainWindow.CatalogInteraction.cs"));
         var stateCode = File.ReadAllText(Path.Combine(appDirectory, "MainWindow.State.cs"));
         foreach (var section in new[] { "filteredTrinkets", "filteredHeroes" })
@@ -90,10 +90,10 @@ internal static partial class ContractSuite
             itemRowCode.Contains("StackSummary => Definition.StorageKind != QuantityItemStorageKind.RaidInventory", StringComparison.Ordinal) &&
             itemRowCode.Contains("Definition.BaseStackLimit is > 0", StringComparison.Ordinal) &&
             itemRowCode.Contains("Definition.BaseStackLimit.Value.ToString(CultureInfo.InvariantCulture)", StringComparison.Ordinal) &&
-            itemRowCode.Contains("? \"不适用\"", StringComparison.Ordinal) &&
-            itemRowCode.Contains(": \"未知\"", StringComparison.Ordinal) &&
+            itemRowCode.Contains("? EditorText.Get(\"MainWindow_RowModels_001\")", StringComparison.Ordinal) &&
+            itemRowCode.Contains(": EditorText.Get(\"BattleEncounterSelectionDialog_017\")", StringComparison.Ordinal) &&
             itemRowCode.Contains("ProvisionSummary => Definition.StorageKind != QuantityItemStorageKind.EstateItems", StringComparison.Ordinal) &&
-            new[] { "配给：可手动配给", "配给：不可手动配给", "配给：未声明" }
+            new[] { "MainWindow_RowModels_003", "MainWindow_RowModels_004", "MainWindow_RowModels_005" }
                 .All(value => itemRowCode.Contains(value, StringComparison.Ordinal)),
             "Item details must separate location/type/stack into wrapping fields, distinguish non-stackable town counts from unknown raid limits, and retain estate provisioning information.");
 

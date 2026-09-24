@@ -108,8 +108,8 @@ public static class RaidInventorySaveEditor
                 if (items.Count >= inventoryCapacity)
                 {
                     throw new InvalidOperationException(
-                        $"背包空位不足：{definition.DisplayId} 需要更多堆叠，但当前已占用 " +
-                        $"{items.Count}/{inventoryCapacity} 格。现有格子不会被覆盖。");
+                        EditorText.Format("RaidInventorySaveEditor_001", definition.DisplayId) +
+                        EditorText.Format("RaidInventorySaveEditor_002", items.Count, inventoryCapacity));
                 }
 
                 var slot = FindFirstFreeSlot(items, inventoryCapacity);

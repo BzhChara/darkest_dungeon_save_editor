@@ -67,12 +67,12 @@ internal static partial class QuantityItemReferenceAnalyzer
             var matched = false;
             foreach (var identity in index.Identities.Where(identity => tokens.Contains(identity.Identity)))
             {
-                MarkResolved(identity.CatalogKeys, incompleteEvidence, $"有效资源的此结构尚未确认物品消费规则：{path}");
+                MarkResolved(identity.CatalogKeys, incompleteEvidence, EditorText.Format("QuantityItemReferenceAnalyzer_JsonRoots_001", path));
                 matched = true;
             }
             foreach (var table in knownLootTables.Where(tokens.Contains))
             {
-                AddEvidence(uncertainLootEvidence, table, $"有效资源中尚未确认的掉落引用：{path}");
+                AddEvidence(uncertainLootEvidence, table, EditorText.Format("QuantityItemReferenceAnalyzer_JsonRoots_002", path));
                 matched = true;
             }
             if (matched) issues.Add($"Quantity-item references remain unverified in a consumed JSON structure: {path}");
@@ -116,7 +116,7 @@ internal static partial class QuantityItemReferenceAnalyzer
                     eventReads?.RecordDefinition(id);
                     var verified = eventReads is null || eventReads.IsVerified(id);
                     MarkResolved(entry.ItemKeys, verified ? evidence : incompleteEvidence,
-                        verified ? path : $"事件首条结果无法确认：{path}");
+                        verified ? path : EditorText.Format("QuantityItemReferenceAnalyzer_JsonRoots_003", path));
                 }
                 return complete;
 

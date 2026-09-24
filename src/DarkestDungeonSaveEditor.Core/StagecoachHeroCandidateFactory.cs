@@ -15,7 +15,7 @@ public static partial class StagecoachHeroCandidateFactory
         var levelZero = heroClass.LevelProfiles
             .SingleOrDefault(profile => profile.ResolveLevel == 0);
         var baseHp = levelZero?.ArmourHp ?? heroClass.BaseHp ??
-            throw new InvalidOperationException($"职业 '{heroClass.Id}' 没有可用于验证初始怪癖的 0 级生命模板。");
+            throw new InvalidOperationException(EditorText.Format("StagecoachHeroCandidateFactory_001", heroClass.Id));
         ValidateInitialQuirkSelection(catalog, heroClass, baseHp, selectedInitialQuirkIds);
     }
 
@@ -42,7 +42,7 @@ public static partial class StagecoachHeroCandidateFactory
         ArgumentNullException.ThrowIfNull(selectedInitialQuirkIds);
         if (heroClass.HasProviderConflict)
         {
-            throw new InvalidOperationException($"职业 '{heroClass.Id}' 有未解析的重复定义，不能选择初始怪癖。");
+            throw new InvalidOperationException(EditorText.Format("StagecoachHeroCandidateFactory_002", heroClass.Id));
         }
 
         var selectedQuirks = ResolveSelectedQuirks(
@@ -80,40 +80,40 @@ public static partial class StagecoachHeroCandidateFactory
         ArgumentNullException.ThrowIfNull(selectedInitialQuirkIds);
         if (heroClass.HasProviderConflict)
         {
-            throw new InvalidOperationException($"职业 '{heroClass.Id}' 有未解析的重复定义，不能生成候选。");
+            throw new InvalidOperationException(EditorText.Format("StagecoachHeroCandidateFactory_003", heroClass.Id));
         }
 
         var generation = heroClass.Generation ??
-            throw new InvalidOperationException($"职业 '{heroClass.Id}' 没有 generation 模板。");
+            throw new InvalidOperationException(EditorText.Format("StagecoachHeroCandidateFactory_004", heroClass.Id));
         var levelProfile = ResolveLevelProfile(catalog, heroClass, resolveLevel);
         var baseHp = levelProfile.ArmourHp;
         if (heroClass.ColourVariationCount <= 0)
         {
-            throw new InvalidOperationException($"职业 '{heroClass.Id}' 没有匹配游戏查询规则的活动皮肤目录，无法安全写入 colour_variation。");
+            throw new InvalidOperationException(EditorText.Format("StagecoachHeroCandidateFactory_005", heroClass.Id));
         }
 
         if (catalog.HeroNames.Count == 0)
         {
-            throw new InvalidOperationException("活动内容中没有可用的 hero_name_* 姓名。");
+            throw new InvalidOperationException(EditorText.Get("StagecoachHeroCandidateFactory_006"));
         }
 
         var classCampingCount = generation.ClassCampingSkills ?? 0;
         var sharedCampingCount = generation.SharedCampingSkills ?? 0;
         if (classCampingCount < 0 || sharedCampingCount < 0)
         {
-            throw new InvalidOperationException($"职业 '{heroClass.Id}' 的露营技能数量不能为负数。");
+            throw new InvalidOperationException(EditorText.Format("StagecoachHeroCandidateFactory_007", heroClass.Id));
         }
 
         var random = new Random(seed);
         var warnings = new List<string>();
         if (generation.IsEnabled == false)
         {
-            warnings.Add("该职业关闭了常规随机生成；这是用户显式选择的手动候选。");
+            warnings.Add(EditorText.Get("StagecoachHeroCandidateFactory_008"));
         }
 
         if (!string.IsNullOrWhiteSpace(generation.TownEventDependency))
         {
-            warnings.Add($"该职业声明城镇事件依赖：{generation.TownEventDependency}；手动候选不会触发该事件。");
+            warnings.Add(EditorText.Format("StagecoachHeroCandidateFactory_009", generation.TownEventDependency));
         }
 
         var combatSkills = SelectCombatSkills(heroClass, generation, random, warnings);
@@ -141,10 +141,10 @@ public static partial class StagecoachHeroCandidateFactory
         if (evolvingQuirkSummaries.Length > 0)
         {
             warnings.Add(
-                $"进化怪癖倒计时已按活动内容定义初始化：{string.Join("；", evolvingQuirkSummaries)}。");
+                EditorText.Format("StagecoachHeroCandidateFactory_010", string.Join("；", evolvingQuirkSummaries)));
         }
 
-        warnings.Add("buff_group_next_guid 使用已通过测试档实机载入验证的观测基线 2。");
+        warnings.Add(EditorText.Get("StagecoachHeroCandidateFactory_011"));
 
         var currentHp = GetValidatedInitialCurrentHp(heroClass.Id, baseHp, selectedQuirks);
 

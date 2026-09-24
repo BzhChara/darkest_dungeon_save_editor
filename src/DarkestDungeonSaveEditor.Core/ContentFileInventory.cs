@@ -66,12 +66,12 @@ public static partial class ContentFileInventory
         {
             if ((File.GetAttributes(root) & FileAttributes.ReparsePoint) != 0)
             {
-                return new ContentModFileInventory(sourceId, root, false, false, [], ["跳过来源目录重解析点，未读取其目标。"]);
+                return new ContentModFileInventory(sourceId, root, false, false, [], [EditorText.Get("ContentFileInventory_001")]);
             }
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            return new ContentModFileInventory(sourceId, root, false, false, [], [$"来源目录无法读取：{ex.Message}"]);
+            return new ContentModFileInventory(sourceId, root, false, false, [], [EditorText.Format("ContentFileInventory_002", ex.Message)]);
         }
 
         var pending = new Stack<string>();
@@ -84,7 +84,7 @@ public static partial class ContentFileInventory
                 if ((File.GetAttributes(directory) & FileAttributes.ReparsePoint) != 0)
                 {
                     treeComplete = false;
-                    issues.Add($"跳过扫描期间变化的重解析点：{Path.GetRelativePath(root, directory)}");
+                    issues.Add(EditorText.Format("ContentFileInventory_003", Path.GetRelativePath(root, directory)));
                     continue;
                 }
 
@@ -97,7 +97,7 @@ public static partial class ContentFileInventory
                         if ((attributes & FileAttributes.ReparsePoint) != 0)
                         {
                             treeComplete = false;
-                            issues.Add($"跳过重解析点：{Path.GetRelativePath(root, path)}");
+                            issues.Add(EditorText.Format("ContentFileInventory_004", Path.GetRelativePath(root, path)));
                             continue;
                         }
 
@@ -111,21 +111,21 @@ public static partial class ContentFileInventory
                             if (!actual.TryAdd(relative, new FileInfo(path).Length))
                             {
                                 treeComplete = false;
-                                issues.Add($"文件路径大小写冲突：{relative}");
+                                issues.Add(EditorText.Format("ContentFileInventory_005", relative));
                             }
                         }
                     }
                     catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
                     {
                         treeComplete = false;
-                        issues.Add($"文件信息无法读取：{Path.GetRelativePath(root, path)}（{ex.Message}）");
+                        issues.Add(EditorText.Format("ContentFileInventory_006", Path.GetRelativePath(root, path), ex.Message));
                     }
                 }
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
                 treeComplete = false;
-                issues.Add($"目录未完成扫描：{Path.GetRelativePath(root, directory)}（{ex.Message}）");
+                issues.Add(EditorText.Format("ContentFileInventory_007", Path.GetRelativePath(root, directory), ex.Message));
             }
         }
 
@@ -137,7 +137,7 @@ public static partial class ContentFileInventory
             if ((attributes & (FileAttributes.ReparsePoint | FileAttributes.Directory)) != 0)
             {
                 manifestReadable = false;
-                issues.Add("清单不是普通文件，未读取其目标。");
+                issues.Add(EditorText.Get("ContentFileInventory_008"));
             }
             else
             {
@@ -161,7 +161,7 @@ public static partial class ContentFileInventory
                         {
                             if (!long.TryParse(match.Groups["size"].Value, NumberStyles.None, CultureInfo.InvariantCulture, out var value))
                             {
-                                throw new InvalidDataException("文件长度无效");
+                                throw new InvalidDataException(EditorText.Get("ContentFileInventory_009"));
                             }
 
                             length = value;
@@ -170,30 +170,30 @@ public static partial class ContentFileInventory
                         relative = relative.Replace('\\', '/');
                         if (Path.IsPathRooted(relative) || relative.Contains(':'))
                         {
-                            throw new InvalidDataException("清单路径不是相对路径");
+                            throw new InvalidDataException(EditorText.Get("ContentFileInventory_010"));
                         }
 
                         if (relative.Split('/').Any(segment => segment.IndexOfAny(InvalidPathSegmentCharacters) >= 0))
                         {
-                            throw new InvalidDataException("清单路径包含非法文件名字符");
+                            throw new InvalidDataException(EditorText.Get("ContentFileInventory_011"));
                         }
 
                         var fullPath = Path.GetFullPath(Path.Combine(root, relative));
                         relative = Normalize(Path.GetRelativePath(root, fullPath));
                         if (relative is "." or ".." || relative.StartsWith("../", StringComparison.Ordinal))
                         {
-                            throw new InvalidDataException("清单路径越出 Mod 目录");
+                            throw new InvalidDataException(EditorText.Get("ContentFileInventory_012"));
                         }
 
                         if (!declared.TryAdd(relative, length))
                         {
-                            issues.Add($"清单重复路径（第 {lineNumber} 行）：{relative}");
+                            issues.Add(EditorText.Format("ContentFileInventory_013", lineNumber, relative));
                         }
                     }
                     catch (Exception ex) when (ex is ArgumentException or NotSupportedException or IOException or InvalidDataException or RegexMatchTimeoutException)
                     {
                         manifestReadable = false;
-                        issues.Add($"清单第 {lineNumber} 行未解析：{ex.Message}");
+                        issues.Add(EditorText.Format("ContentFileInventory_014", lineNumber, ex.Message));
                     }
                 }
             }
@@ -205,14 +205,14 @@ public static partial class ContentFileInventory
             if (!manifestReadable)
             {
                 hasManifest = true;
-                issues.Add("清单在扫描期间消失，请重新加载目录。");
+                issues.Add(EditorText.Get("ContentFileInventory_015"));
             }
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             hasManifest = true;
             manifestReadable = false;
-            issues.Add($"清单无法读取：{ex.Message}");
+            issues.Add(EditorText.Format("ContentFileInventory_016", ex.Message));
         }
 
         var files = new List<ContentInventoryFile>();

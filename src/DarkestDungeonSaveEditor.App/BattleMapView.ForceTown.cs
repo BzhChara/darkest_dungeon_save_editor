@@ -13,7 +13,7 @@ public partial class BattleMapView : UserControl
             _forceTownSaveService is null ||
             _isApplyingEdit)
         {
-            MapSelectionTextBlock.Text = "当前没有可用于强制返回城镇的完整副本快照。";
+            MapSelectionTextBlock.Text = EditorText.Get("BattleMapView_ForceTown_001");
             return;
         }
 
@@ -28,12 +28,12 @@ public partial class BattleMapView : UserControl
         var service = _forceTownSaveService;
         if (!ThemedDialog.Confirm(
                 owner,
-                $"程序将完整备份 {profile.ProfileId}，再把该档案的下次读档入口强制设置为城镇。" +
+                EditorText.Format("BattleMapView_ForceTown_002", profile.ProfileId) +
                 Environment.NewLine +
-                "这不是正常撤退结算：当前副本的未结算进度和战利品可能丢失，但人物、任务、周数和背包不会由编辑器额外改写。" +
+                EditorText.Get("BattleMapView_ForceTown_003") +
                 Environment.NewLine +
-                "写入后请正常启动游戏并载入这个档案，让游戏完成回城。",
-                "确认强制返回城镇"))
+                EditorText.Get("BattleMapView_ForceTown_004"),
+                EditorText.Get("BattleMapView_ForceTown_005")))
         {
             return;
         }
@@ -50,7 +50,7 @@ public partial class BattleMapView : UserControl
         StopProfileMonitoring();
         MapCanvas.IsHitTestVisible = false;
         ForceTownButton.IsEnabled = false;
-        MapSelectionTextBlock.Text = "正在验证并备份当前档案，然后写入回城状态……";
+        MapSelectionTextBlock.Text = EditorText.Get("BattleMapView_ForceTown_006");
 
         try
         {
@@ -60,7 +60,7 @@ public partial class BattleMapView : UserControl
                 !ReferenceEquals(snapshot, _currentSnapshot) ||
                 !ReferenceEquals(profile, _profile))
             {
-                throw new InvalidOperationException("地图已刷新；请在最新地图上重新执行强制返回城镇。");
+                throw new InvalidOperationException(EditorText.Get("BattleMapView_ForceTown_007"));
             }
 
             prepared = await service.PrepareAsync(profile, snapshot);
@@ -68,27 +68,27 @@ public partial class BattleMapView : UserControl
             backupDirectory = result.BackupDirectory;
             committed = true;
             SaveEditApplied?.Invoke(
-                $"强制回城状态已写入：档案={profile.ProfileId}；" +
-                $"目录={profile.ProfileDirectory}；操作编号={prepared.SessionId}；" +
-                $"原副本={prepared.Preview.PreviousRaidDungeon}；备份={result.BackupDirectory}");
+                EditorText.Format("BattleMapView_ForceTown_008", profile.ProfileId) +
+                EditorText.Format("BattleMapView_ForceTown_009", profile.ProfileDirectory, prepared.SessionId) +
+                EditorText.Format("BattleMapView_ForceTown_010", prepared.Preview.PreviousRaidDungeon, result.BackupDirectory));
             ShowUnavailableState(
-                $"已将 {profile.ProfileId} 的下次读档入口设置为城镇。现在请启动游戏并载入该档案。",
-                "回城状态已写入");
+                EditorText.Format("BattleMapView_ForceTown_011", profile.ProfileId),
+                EditorText.Get("BattleMapView_ForceTown_012"));
         }
         catch (Exception ex)
         {
             CrashDiagnostics.RecordException("Force town: " + (committed ? "post-commit UI" : "edit"), ex,
-                $"操作编号={prepared?.SessionId ?? "尚未完成准备"}；档案={profile.ProfileId}；" +
-                $"目录={profile.ProfileDirectory}；已写入={committed}；备份={backupDirectory ?? "见异常详情"}");
+                EditorText.Format("BattleMapView_ForceTown_013", prepared?.SessionId ?? EditorText.Get("BattleMapView_Commands_092"), profile.ProfileId) +
+                EditorText.Format("BattleMapView_ForceTown_014", profile.ProfileDirectory, committed, backupDirectory ?? EditorText.Get("BattleMapView_Commands_095")));
             MapSelectionTextBlock.Text = committed
-                ? "回城状态已写入，但界面未能切换；请重新加载内容目录。"
+                ? EditorText.Get("BattleMapView_ForceTown_015")
                 : ex is AggregateException
-                    ? "强制回城失败，恢复未能完整完成；请查看错误详情及备份。"
-                    : "强制回城失败，错误已记录；请查看详情确认存档状态。";
+                    ? EditorText.Get("BattleMapView_ForceTown_016")
+                    : EditorText.Get("BattleMapView_ForceTown_017");
             ThemedDialog.ShowMessage(
                 owner,
                 ex.Message,
-                committed ? "界面刷新失败" : "强制返回城镇失败",
+                committed ? EditorText.Get("BattleMapView_ForceTown_018") : EditorText.Get("BattleMapView_ForceTown_019"),
                 ThemedDialogKind.Error);
         }
         finally

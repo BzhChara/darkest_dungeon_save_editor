@@ -17,7 +17,7 @@ internal static partial class QuantityItemReferenceAnalyzer
         {
             if (ContainsQuotedToken(text, table))
             {
-                AddEvidence(rootLootEvidence, table, $"无法完整解析但包含掉落表引用：{relativePath}");
+                AddEvidence(rootLootEvidence, table, EditorText.Format("QuantityItemReferenceAnalyzer_Matching_001", relativePath));
                 matched = true;
             }
         }

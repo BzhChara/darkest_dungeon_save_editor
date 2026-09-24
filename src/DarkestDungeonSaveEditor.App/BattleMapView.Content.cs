@@ -9,7 +9,7 @@ public partial class BattleMapView : UserControl
     private MenuItem CreateRegionalContentItem(
         PrototypeMapCell target,
         string label,
-        string icon,
+        BattleMenuIcon icon,
         BattleRoomAttachmentKind kind)
     {
         var catalog = GetCurrentRoomAttachmentCatalog();
@@ -30,13 +30,13 @@ public partial class BattleMapView : UserControl
         if (catalog is null ||
             !TryGetWritableContext(target, out _, out _, out var snapshot, out _))
         {
-            MapSelectionTextBlock.Text = "当前地图或内容目录已经变化，请重新选择目标。";
+            MapSelectionTextBlock.Text = EditorText.Get("BattleMapView_Content_001");
             return;
         }
         var definition = catalog.SelectRegionalContent(kind, snapshot.DungeonId, Random.Shared.NextDouble());
         if (definition is null)
         {
-            MapSelectionTextBlock.Text = "当前区域没有可自动生成的对应资源。";
+            MapSelectionTextBlock.Text = EditorText.Get("BattleMapView_Content_002");
             return;
         }
         await PlaceContentAsync(target, definition);
@@ -45,7 +45,7 @@ public partial class BattleMapView : UserControl
     private MenuItem CreateContentPickerItem(
         PrototypeMapCell target,
         string label,
-        string icon,
+        BattleMenuIcon icon,
         IReadOnlyCollection<BattleRoomAttachmentDefinition> candidates)
     {
         if (candidates.Count == 0)
@@ -66,7 +66,7 @@ public partial class BattleMapView : UserControl
     {
         if (GetCurrentRoomAttachmentCatalog() is null || Window.GetWindow(this) is not { } dialogOwner)
         {
-            MapSelectionTextBlock.Text = "当前地图内容目录已经失效，请重新加载内容目录。";
+            MapSelectionTextBlock.Text = EditorText.Get("BattleMapView_Content_003");
             return;
         }
 
@@ -89,32 +89,32 @@ public partial class BattleMapView : UserControl
         CloseActiveContextMenu();
         if (GetCurrentRoomAttachmentCatalog() is null)
         {
-            MapSelectionTextBlock.Text = "当前地图内容目录已经失效，请重新加载内容目录。";
+            MapSelectionTextBlock.Text = EditorText.Get("BattleMapView_Content_003");
             return;
         }
         if (!TryGetWritableContext(target, out var owner, out var profile, out var snapshot, out var service))
         {
-            MapSelectionTextBlock.Text = "当前地图已刷新或正在处理其他操作，请重新选择目标。";
+            MapSelectionTextBlock.Text = EditorText.Get("BattleMapView_Content_004");
             return;
         }
         if (!definition.IsAvailableInDungeon(snapshot.DungeonId))
         {
-            MapSelectionTextBlock.Text = "当前副本区域已经变化，请重新选择目标。";
+            MapSelectionTextBlock.Text = EditorText.Get("BattleMapView_Content_005");
             return;
         }
 
         var kindLabel = definition.KindLabel;
-        var action = target.RawContent == 0 ? "新建" : $"替换“{target.ContentLabel ?? "当前内容"}”为";
+        var action = target.RawContent == 0 ? EditorText.Get("BattleMapView_Commands_002") : EditorText.Format("BattleMapView_Content_006", target.ContentLabel ?? EditorText.Get("BattleMapView_Commands_013"));
         var contentDescription = definition.IsRegionBound
             ? $"{kindLabel}（{FormatDungeon(definition.OriginDungeonId)}）"
-            : $"{kindLabel}：{definition.ChineseName} / {definition.EnglishName}";
+            : $"{kindLabel}: {EditorText.ContentName(definition.LocalizedName, definition.Id)} ({definition.Id})";
         if (!ThemedDialog.Confirm(owner,
-                $"将在 {target.DisplayName} {action}{contentDescription}" +
+                EditorText.Format("BattleMapView_Content_007", target.DisplayName, action, contentDescription) +
                 Environment.NewLine + $"ID：{definition.Id}" +
-                Environment.NewLine + $"来源：{definition.SourceLabel}" +
-                Environment.NewLine + "原有事件和残留资源将被替换，探索状态保持不变。" +
-                Environment.NewLine + "程序会先完整备份当前档案。",
-                $"确认写入{kindLabel}"))
+                Environment.NewLine + EditorText.Format("BattleMapView_Commands_049", definition.SourceLabel) +
+                Environment.NewLine + EditorText.Get("BattleMapView_Content_008") +
+                Environment.NewLine + EditorText.Get("BattleMapView_Commands_040"),
+                EditorText.Format("BattleMapView_Commands_020", kindLabel)))
         {
             return;
         }

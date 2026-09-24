@@ -10,9 +10,9 @@ namespace DarkestDungeonSaveEditor.App;
 
 public partial class InitialQuirkSelectionDialog : Window
 {
-    private const string DetailedSingletonReason =
-        "singleton 定义上限 1；预览统计 roster 与全部马车池，超限仅警告";
-    private const string CompactSingletonReason = "singleton 定义上限 1";
+    private static string DetailedSingletonReason =>
+        EditorText.Get("InitialQuirkSelectionDialog_001");
+    private static string CompactSingletonReason => EditorText.Get("InitialQuirkSelectionDialog_002");
     private readonly HeroClassCatalogResult _catalog;
     private readonly HeroClassDefinition _heroClass;
     private readonly int _resolveLevel;
@@ -34,6 +34,7 @@ public partial class InitialQuirkSelectionDialog : Window
         _resolveLevel = resolveLevel;
 
         InitializeComponent();
+        EditorNameColumns.Apply(QuirkGrid);
         var selectedIds = selectedQuirkIds.ToHashSet(StringComparer.Ordinal);
         foreach (var group in catalog.InitialQuirks
                      .GroupBy(quirk => quirk.Id, StringComparer.Ordinal)
@@ -55,7 +56,7 @@ public partial class InitialQuirkSelectionDialog : Window
                 .ToArray();
             var source = sources.Length == 1
                 ? sources[0]
-                : $"多个定义：{string.Join(", ", sources)}";
+                : EditorText.Format("InitialQuirkSelectionDialog_003", string.Join(", ", sources));
             _rows.Add(new QuirkChoiceRow(
                 definition,
                 source,
@@ -268,11 +269,11 @@ public partial class InitialQuirkSelectionDialog : Window
             row.IsSelected && !row.Definition.IsDisease && row.Definition.IsPositive == false);
         var diseaseCount = _rows.Count(row => row.IsSelected && row.Definition.IsDisease);
         var limits = _catalog.InitialQuirkLimits;
-        static string Limit(int? value) => value?.ToString(CultureInfo.InvariantCulture) ?? "未知";
+        static string Limit(int? value) => value?.ToString(CultureInfo.InvariantCulture) ?? EditorText.Get("BattleEncounterSelectionDialog_017");
         SelectionSummaryTextBlock.Text =
-            $"已选 +{positiveCount}/{Limit(limits.Positive)} " +
+            EditorText.Format("InitialQuirkSelectionDialog_004", positiveCount, Limit(limits.Positive)) +
             $"-{negativeCount}/{Limit(limits.Negative)} " +
-            $"疾病 {diseaseCount}/{Limit(limits.Diseases)}";
+            EditorText.Format("InitialQuirkSelectionDialog_005", diseaseCount, Limit(limits.Diseases));
     }
 
     private sealed class QuirkChoiceRow : INotifyPropertyChanged
@@ -304,32 +305,32 @@ public partial class InitialQuirkSelectionDialog : Window
         public string EnglishName => FormatLocalizedName(Definition.LocalizedName.English);
         public string Kind => Definition.Kind switch
         {
-            HeroInitialQuirkKind.Natural => "自然随机",
-            HeroInitialQuirkKind.Special => "固定/特殊",
-            HeroInitialQuirkKind.Disease => "疾病",
-            _ => "未知"
+            HeroInitialQuirkKind.Natural => EditorText.Get("InitialQuirkSelectionDialog_006"),
+            HeroInitialQuirkKind.Special => EditorText.Get("InitialQuirkSelectionDialog_007"),
+            HeroInitialQuirkKind.Disease => EditorText.Get("InitialQuirkSelectionDialog_008"),
+            _ => EditorText.Get("BattleEncounterSelectionDialog_017")
         };
         public string Polarity => Definition.IsDisease
-            ? "疾病"
+            ? EditorText.Get("InitialQuirkSelectionDialog_008")
             : Definition.IsPositive switch
             {
-                true => "正面",
-                false => "负面",
-                _ => "未知"
+                true => EditorText.Get("InitialQuirkSelectionDialog_009"),
+                false => EditorText.Get("InitialQuirkSelectionDialog_010"),
+                _ => EditorText.Get("BattleEncounterSelectionDialog_017")
             };
         public string WriteStatus => Definition.WriteStatus switch
         {
-            HeroInitialQuirkWriteStatus.Direct => "可直接写入",
-            HeroInitialQuirkWriteStatus.RequiresSaveContext => "需存档上下文",
-            HeroInitialQuirkWriteStatus.Unverified => "未验证",
-            HeroInitialQuirkWriteStatus.Unsupported => "暂不支持",
-            _ => "未知"
+            HeroInitialQuirkWriteStatus.Direct => EditorText.Get("InitialQuirkSelectionDialog_011"),
+            HeroInitialQuirkWriteStatus.RequiresSaveContext => EditorText.Get("InitialQuirkSelectionDialog_012"),
+            HeroInitialQuirkWriteStatus.Unverified => EditorText.Get("InitialQuirkSelectionDialog_013"),
+            HeroInitialQuirkWriteStatus.Unsupported => EditorText.Get("InitialQuirkSelectionDialog_014"),
+            _ => EditorText.Get("BattleEncounterSelectionDialog_017")
         };
         public string MaxHpSummary =>
             Definition.WriteStatusReason.Contains("max_hp", StringComparison.OrdinalIgnoreCase)
-                ? "待验证"
+                ? EditorText.Get("InitialQuirkSelectionDialog_015")
                 : Definition.MaxHpModifiers.Count == 0
-                    ? "无"
+                    ? EditorText.Get("InitialQuirkSelectionDialog_016")
                     : string.Join("；", Definition.MaxHpModifiers.Select(FormatMaxHpModifier));
         public string Source { get; }
         public string ContextReason { get; }
@@ -398,15 +399,15 @@ public partial class InitialQuirkSelectionDialog : Window
                 : modifier.Amount.ToString("+0.###;-0.###;0", CultureInfo.InvariantCulture);
             var condition = modifier.RuleType switch
             {
-                "always" => modifier.IsFalseRule ? "永不生效" : "常驻",
-                "no_trinkets" => modifier.IsFalseRule ? "有饰品时" : "无饰品时",
-                "afflicted" => modifier.IsFalseRule ? "未折磨时" : "折磨时",
+                "always" => modifier.IsFalseRule ? EditorText.Get("InitialQuirkSelectionDialog_017") : EditorText.Get("InitialQuirkSelectionDialog_018"),
+                "no_trinkets" => modifier.IsFalseRule ? EditorText.Get("InitialQuirkSelectionDialog_019") : EditorText.Get("InitialQuirkSelectionDialog_020"),
+                "afflicted" => modifier.IsFalseRule ? EditorText.Get("InitialQuirkSelectionDialog_021") : EditorText.Get("InitialQuirkSelectionDialog_022"),
                 "in_mode" => modifier.IsFalseRule
-                    ? $"非 {modifier.RuleString} 模式"
-                    : $"{modifier.RuleString} 模式",
+                    ? EditorText.Format("InitialQuirkSelectionDialog_023", modifier.RuleString)
+                    : EditorText.Format("InitialQuirkSelectionDialog_024", modifier.RuleString),
                 "lightabove" => modifier.IsFalseRule
-                    ? $"火光 ≤ {FormatRuleNumber(modifier.RuleFloat)}"
-                    : $"火光 > {FormatRuleNumber(modifier.RuleFloat)}",
+                    ? EditorText.Format("InitialQuirkSelectionDialog_025", FormatRuleNumber(modifier.RuleFloat))
+                    : EditorText.Format("InitialQuirkSelectionDialog_026", FormatRuleNumber(modifier.RuleFloat)),
                 _ => modifier.RuleType
             };
             return $"{amount} / {condition}";

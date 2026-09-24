@@ -44,9 +44,9 @@ public sealed class ModManifestPreparationService
             void Guard()
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                if (_gameRunning()) throw new InvalidOperationException("已启用的 Mod 缺少清单，请关闭游戏后重新载入存档，以完成清单生成。");
+                if (_gameRunning()) throw new InvalidOperationException(EditorText.Get("ModManifestPreparationService_001"));
                 if (ModManifestFiles.Hash(Path.Combine(content.Profile.ProfileDirectory, "persist.game.json")) != content.SourceGameSha256)
-                    throw new IOException("档案的 Mod 配置在清单准备期间发生变化，请重新载入存档。");
+                    throw new IOException(EditorText.Get("ModManifestPreparationService_002"));
             }
             Guard();
             var workspace = Path.Combine(_locations.WorkspaceDirectory, "mod_manifests", Guid.NewGuid().ToString("N"));
@@ -58,7 +58,7 @@ public sealed class ModManifestPreparationService
             {
                 Guard();
                 var source = missing[index];
-                progress?.Report($"正在生成 Mod 清单（{index + 1}/{missing.Length}）：{source.DisplayName}");
+                progress?.Report(EditorText.Format("ModManifestPreparationService_003", index + 1, missing.Length, source.DisplayName));
                 var before = ModManifestFiles.Snapshot(source.Directory, cancellationToken);
                 var evidence = Path.Combine(workspace, index.ToString());
                 Directory.CreateDirectory(evidence);
@@ -90,13 +90,13 @@ public sealed class ModManifestPreparationService
                     Guard();
                     ModManifestFiles.RequireSnapshot(item.Directory, item.Before, cancellationToken);
                     var destination = Path.Combine(item.Directory, "modfiles.txt");
-                    if (ModManifestFile.Exists(destination)) throw new IOException($"清单已由其他程序创建，请重新载入：{destination}");
+                    if (ModManifestFile.Exists(destination)) throw new IOException(EditorText.Format("ModManifestPreparationService_004", destination));
                     var temporary = Path.Combine(item.Directory, ".ddse-manifest-" + Guid.NewGuid().ToString("N") + ".tmp");
                     try
                     {
                         File.Copy(item.Output, temporary, overwrite: false);
                         if (ModManifestFiles.Hash(temporary) != item.Hash)
-                            throw new IOException("生成的清单在安装前被修改，停止写入。");
+                            throw new IOException(EditorText.Get("ModManifestPreparationService_005"));
                         using (var stream = new FileStream(temporary, FileMode.Open, FileAccess.Write, FileShare.None)) stream.Flush(true);
                         Guard();
                         File.Move(temporary, destination, overwrite: false);
@@ -109,11 +109,11 @@ public sealed class ModManifestPreparationService
                 foreach (var item in created)
                 {
                     if (ModManifestFiles.Hash(Path.Combine(item.Directory, "modfiles.txt")) != item.Hash)
-                        throw new IOException("新清单在写入后被其他程序修改。");
+                        throw new IOException(EditorText.Get("ModManifestPreparationService_006"));
                     ModManifestFiles.RequireSnapshot(item.Directory, item.Before, cancellationToken, ignoreManifest: true);
                 }
                 Receipt("complete");
-                progress?.Report($"已补齐 {created.Count} 个 Mod 的清单；生成记录：{receiptPath}");
+                progress?.Report(EditorText.Format("ModManifestPreparationService_007", created.Count, receiptPath));
                 return new(created.Count, receiptPath);
             }
             catch (Exception error)
@@ -122,7 +122,7 @@ public sealed class ModManifestPreparationService
                 try { Receipt("incomplete"); }
                 catch (IOException) { /* The preceding atomic receipt retains the planned paths and hashes. */ }
                 catch (UnauthorizedAccessException) { }
-                throw new IOException($"Mod 清单准备未完成，已新增 {created.Count} 份；详细记录：{receiptPath}。{error.Message}", error);
+                throw new IOException(EditorText.Format("ModManifestPreparationService_008", created.Count, receiptPath, error.Message), error);
             }
         }
         finally { Gate.Release(); }
@@ -148,7 +148,7 @@ internal static class ModManifestFiles
         while (current is not null)
         {
             if ((File.GetAttributes(current) & FileAttributes.ReparsePoint) != 0)
-                throw new IOException($"清单生成不支持链接或重解析点：{current}");
+                throw new IOException(EditorText.Format("ModManifestPreparationService_009", current));
             current = Path.GetDirectoryName(current);
         }
     }
@@ -163,7 +163,7 @@ internal static class ModManifestFiles
         {
             token.ThrowIfCancellationRequested();
             var attributes = File.GetAttributes(path);
-            if ((attributes & FileAttributes.ReparsePoint) != 0) throw new IOException($"Mod 包含链接或重解析点：{path}");
+            if ((attributes & FileAttributes.ReparsePoint) != 0) throw new IOException(EditorText.Format("ModManifestPreparationService_010", path));
             if ((attributes & FileAttributes.Directory) != 0) { directories.Push(path); continue; }
             var relative = Path.GetRelativePath(root, path).Replace('\\', '/');
             if (ignoreManifest && relative.Equals("modfiles.txt", StringComparison.OrdinalIgnoreCase)) continue;
@@ -177,7 +177,7 @@ internal static class ModManifestFiles
     {
         var after = Snapshot(root, token, ignoreManifest);
         if (before.Count != after.Count || before.Any(pair => after.GetValueOrDefault(pair.Key) != pair.Value))
-            throw new IOException($"Mod 文件在生成清单期间发生变化，请重新载入：{root}");
+            throw new IOException(EditorText.Format("ModManifestPreparationService_011", root));
     }
 
     internal static int Validate(byte[] bytes, IReadOnlyDictionary<string, ModManifestFileStamp> files)
@@ -186,14 +186,14 @@ internal static class ModManifestFiles
         foreach (var line in new UTF8Encoding(false, true).GetString(bytes).Split('\n', StringSplitOptions.RemoveEmptyEntries))
         {
             var row = line.TrimEnd('\r'); var separator = row.LastIndexOf(' ');
-            if (separator < 1 || !long.TryParse(row[(separator + 1)..], out var size)) throw new InvalidDataException("官方清单行格式无效。");
+            if (separator < 1 || !long.TryParse(row[(separator + 1)..], out var size)) throw new InvalidDataException(EditorText.Get("ModManifestPreparationService_012"));
             var relative = row[..separator];
             if (Path.IsPathRooted(relative) || relative.Contains('\\') || relative.Split('/').Any(part => part is ".." or "." or "") ||
                 relative.Equals("modfiles.txt", StringComparison.OrdinalIgnoreCase) || !seen.Add(relative) ||
                 !files.TryGetValue(relative, out var file) || file.Length != size)
-                throw new InvalidDataException($"官方清单路径或文件大小与原 Mod 不一致：{relative}");
+                throw new InvalidDataException(EditorText.Format("ModManifestPreparationService_013", relative));
         }
-        if (seen.Count == 0) throw new InvalidDataException("官方工具未生成有效文件记录，停止加载；不会改用无清单扫描。");
+        if (seen.Count == 0) throw new InvalidDataException(EditorText.Get("ModManifestPreparationService_014"));
         return seen.Count;
     }
 }

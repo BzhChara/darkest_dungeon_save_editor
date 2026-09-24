@@ -14,7 +14,7 @@ public static partial class StagecoachHeroCandidateFactory
         // are equipped. A readable subset cannot prove that complete plan.
         if (!heroClass.CampingSkillsComplete)
             throw new InvalidOperationException(
-                $"职业 '{heroClass.Id}' 的露营技能定义读取不完整，无法确认初始技能与完整解锁计划。");
+                EditorText.Format("StagecoachHeroCandidateFactory_Progression_001", heroClass.Id));
 
         var unsupportedTree = heroClass.UpgradeTrees.FirstOrDefault(tree =>
             !string.IsNullOrWhiteSpace(tree.UnsupportedReason));
@@ -22,7 +22,7 @@ public static partial class StagecoachHeroCandidateFactory
         {
             // An authored but unreadable winner is not a missing implicit tree.
             throw new InvalidOperationException(
-                $"职业 '{heroClass.Id}' 的升级树 '{unsupportedTree.Id}' 无法用于生成：" +
+                EditorText.Format("StagecoachHeroCandidateFactory_Progression_002", heroClass.Id, unsupportedTree.Id) +
                 $"{unsupportedTree.UnsupportedReason}（{unsupportedTree.SourcePath}）。");
         }
 
@@ -37,11 +37,11 @@ public static partial class StagecoachHeroCandidateFactory
             combatTargets.Values.Contains(target, StringComparer.Ordinal) ||
             campingTargets.Values.Contains(target, StringComparer.Ordinal));
         if (overlappingTarget is not null)
-            throw new InvalidOperationException($"职业 '{heroClass.Id}' 的装备与技能指向同一购买目标 '{overlappingTarget}'，无法安全生成。");
+            throw new InvalidOperationException(EditorText.Format("StagecoachHeroCandidateFactory_Progression_003", heroClass.Id, overlappingTarget));
         var targetCollisions = NativeResourceIdentity.FindCollisions(
             equipmentTargets.Values.Concat(combatTargets.Values).Concat(campingTargets.Values));
         if (targetCollisions.Count > 0)
-            throw new InvalidOperationException($"职业 '{heroClass.Id}' 的装备与技能购买编号冲突：{string.Join(", ", targetCollisions)}。");
+            throw new InvalidOperationException(EditorText.Format("StagecoachHeroCandidateFactory_Progression_004", heroClass.Id, string.Join(", ", targetCollisions)));
         // Selection rules control equipped skills, not the purchase-based level lookup.
         // Every tree-less skill uses the same bounded implicit progression policy.
         var combatPurchases = new List<HeroUpgradePurchase>();
@@ -56,7 +56,7 @@ public static partial class StagecoachHeroCandidateFactory
             .Where(tree => tree.Kind != HeroUpgradeTreeKind.CombatSkill).ToArray();
         if (applicableTrees.Any(tree => tree.Id != equipmentTargets[
                 tree.Kind == HeroUpgradeTreeKind.Weapon ? "weapon" : "armour"]))
-            throw new InvalidOperationException($"职业 '{heroClass.Id}' 的装备升级树与原生购买目标不一致，请刷新人物目录。");
+            throw new InvalidOperationException(EditorText.Format("StagecoachHeroCandidateFactory_Progression_005", heroClass.Id));
         var campingPurchases = BuildCampingUpgradePurchases(heroClass);
         var purchases = applicableTrees
             .SelectMany(tree => tree.Requirements
@@ -72,16 +72,16 @@ public static partial class StagecoachHeroCandidateFactory
                 string.IsNullOrWhiteSpace(purchase.RequirementCode)))
         {
             throw new InvalidOperationException(
-                $"职业 '{heroClass.Id}' 的活动 upgrade 模板包含空树 ID 或空 requirement code。");
+                EditorText.Format("StagecoachHeroCandidateFactory_Progression_006", heroClass.Id));
         }
         if (purchases.Any(purchase => !DsonSaveCodec.CanRoundTripPurchaseCode(purchase.RequirementCode)))
-            throw new InvalidOperationException($"职业 '{heroClass.Id}' 的购买码不能由 DSON 转换器无损保存，请检查升级树。");
+            throw new InvalidOperationException(EditorText.Format("StagecoachHeroCandidateFactory_Progression_007", heroClass.Id));
 
         var collisions = NativeResourceIdentity.FindCollisions(purchases.Select(purchase => purchase.TreeId));
         if (collisions.Count > 0)
         {
             throw new InvalidOperationException(
-                $"职业 '{heroClass.Id}' 的升级购买编号冲突：{string.Join(", ", collisions)}。");
+                EditorText.Format("StagecoachHeroCandidateFactory_Progression_008", heroClass.Id, string.Join(", ", collisions)));
         }
 
         var duplicate = purchases
@@ -90,7 +90,7 @@ public static partial class StagecoachHeroCandidateFactory
         if (duplicate is not null)
         {
             throw new InvalidOperationException(
-                $"职业 '{heroClass.Id}' 的活动 upgrade 模板产生了重复购买项：" +
+                EditorText.Format("StagecoachHeroCandidateFactory_Progression_009", heroClass.Id) +
                 $"{duplicate.First().TreeId}/{duplicate.First().RequirementCode}。");
         }
 
@@ -116,7 +116,7 @@ public static partial class StagecoachHeroCandidateFactory
         if (resolveLevel < 0 || resolveLevel > maximumLevel)
         {
             throw new InvalidOperationException(
-                $"人物等级必须在 0 到 {maximumLevel} 之间，当前为 {resolveLevel}。");
+                EditorText.Format("StagecoachHeroCandidateFactory_Progression_010", maximumLevel, resolveLevel));
         }
 
         var matches = heroClass.LevelProfiles
@@ -125,10 +125,10 @@ public static partial class StagecoachHeroCandidateFactory
         if (matches.Length != 1)
         {
             var reason = string.IsNullOrWhiteSpace(heroClass.ProgressionUnsupportedReason)
-                ? "等级模板缺失或重复"
+                ? EditorText.Get("StagecoachHeroCandidateFactory_Progression_011")
                 : heroClass.ProgressionUnsupportedReason;
             throw new InvalidOperationException(
-                $"职业 '{heroClass.Id}' 不能生成 {resolveLevel} 级人物：{reason}。");
+                EditorText.Format("StagecoachHeroCandidateFactory_Progression_012", heroClass.Id, resolveLevel, reason));
         }
 
         var profile = matches[0];
@@ -136,7 +136,7 @@ public static partial class StagecoachHeroCandidateFactory
             !double.IsFinite(profile.ArmourHp) || profile.ArmourHp <= 0)
         {
             throw new InvalidOperationException(
-                $"职业 '{heroClass.Id}' 的 {resolveLevel} 级模板包含无效 XP、装备 rank 或护甲 HP。");
+                EditorText.Format("StagecoachHeroCandidateFactory_Progression_013", heroClass.Id, resolveLevel));
         }
 
         return profile;
@@ -150,13 +150,13 @@ public static partial class StagecoachHeroCandidateFactory
     {
         if (heroClass.CombatSkillIds.Count == 0)
         {
-            throw new InvalidOperationException($"职业 '{heroClass.Id}' 没有 0 级战斗技能。");
+            throw new InvalidOperationException(EditorText.Format("StagecoachHeroCandidateFactory_Progression_014", heroClass.Id));
         }
 
         var available = heroClass.CombatSkillIds.ToHashSet(StringComparer.Ordinal);
         if (heroClass.GuaranteedCombatSkillIds.Any(skill => !available.Contains(skill)))
         {
-            throw new InvalidOperationException($"职业 '{heroClass.Id}' 的 generation_guaranteed 技能不在 0 级技能表中。");
+            throw new InvalidOperationException(EditorText.Format("StagecoachHeroCandidateFactory_Progression_015", heroClass.Id));
         }
 
         if (heroClass.CanSelectCombatSkills == false)
@@ -165,11 +165,11 @@ public static partial class StagecoachHeroCandidateFactory
         }
 
         var generatedSkillCount = generation.RandomCombatSkills ??
-            throw new InvalidOperationException($"职业 '{heroClass.Id}' 缺少 number_of_random_combat_skills。");
+            throw new InvalidOperationException(EditorText.Format("StagecoachHeroCandidateFactory_Progression_016", heroClass.Id));
         if (generatedSkillCount <= 0)
         {
             throw new InvalidOperationException(
-                $"职业 '{heroClass.Id}' 要求生成 {generatedSkillCount} 个战斗技能，但只有 {heroClass.CombatSkillIds.Count} 个 0 级技能。");
+                EditorText.Format("StagecoachHeroCandidateFactory_Progression_017", heroClass.Id, generatedSkillCount, heroClass.CombatSkillIds.Count));
         }
 
         var target = heroClass.SelectedCombatSkillsMax is { } maximum
@@ -178,12 +178,12 @@ public static partial class StagecoachHeroCandidateFactory
         if (target <= 0)
         {
             throw new InvalidOperationException(
-                $"职业 '{heroClass.Id}' 的可选战斗技能上限无效：{target}。");
+                EditorText.Format("StagecoachHeroCandidateFactory_Progression_018", heroClass.Id, target));
         }
 
         if (generatedSkillCount > heroClass.CombatSkillIds.Count)
         {
-            warnings.Add($"战斗技能要求 {generatedSkillCount} 个、活动内容仅有 {heroClass.CombatSkillIds.Count} 个；装备数量按实际技能池和选择上限确定。");
+            warnings.Add(EditorText.Format("StagecoachHeroCandidateFactory_Progression_019", generatedSkillCount, heroClass.CombatSkillIds.Count));
         }
         target = Math.Min(target, heroClass.CombatSkillIds.Count);
 
@@ -217,7 +217,7 @@ public static partial class StagecoachHeroCandidateFactory
         if (actualClassCount < classSpecificCount)
         {
             warnings.Add(
-                $"职业露营技能要求 {classSpecificCount} 个、活动内容仅有 {heroClass.ClassCampingSkillIds.Count} 个；按实际技能池少取，不用共享技能补位。");
+                EditorText.Format("StagecoachHeroCandidateFactory_Progression_020", classSpecificCount, heroClass.ClassCampingSkillIds.Count));
         }
 
         var selectedClass = TakeRandom(heroClass.ClassCampingSkillIds, actualClassCount, random);
@@ -225,7 +225,7 @@ public static partial class StagecoachHeroCandidateFactory
         if (actualSharedCount < sharedCount)
         {
             warnings.Add(
-                $"共享露营技能要求 {sharedCount} 个、活动内容仅有 {heroClass.SharedCampingSkillIds.Count} 个；按游戏样本少取，不用职业技能补位。");
+                EditorText.Format("StagecoachHeroCandidateFactory_Progression_021", sharedCount, heroClass.SharedCampingSkillIds.Count));
         }
 
         var selectedShared = TakeRandom(heroClass.SharedCampingSkillIds, actualSharedCount, random);

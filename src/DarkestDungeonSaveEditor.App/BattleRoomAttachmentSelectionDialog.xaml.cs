@@ -25,10 +25,11 @@ public partial class BattleRoomAttachmentSelectionDialog : Window
         _kindLabel = kindLabel;
         _preserveBattle = preserveBattle;
         InitializeComponent();
-        Title = $"选择{kindLabel}";
-        HeaderTitleTextBlock.Text = $"选择{kindLabel}";
+        EditorNameColumns.Apply(AttachmentGrid);
+        Title = EditorText.Format("BattleRoomAttachmentSelectionDialog_001", kindLabel);
+        HeaderTitleTextBlock.Text = EditorText.Format("BattleRoomAttachmentSelectionDialog_001", kindLabel);
         SelectionTextBlock.Text = SelectionHint;
-        ConfirmButton.Content = $"应用{kindLabel}";
+        ConfirmButton.Content = EditorText.Format("BattleRoomAttachmentSelectionDialog_002", kindLabel);
         foreach (var definition in definitions)
         {
             _rows.Add(new AttachmentChoiceRow(definition));
@@ -45,8 +46,8 @@ public partial class BattleRoomAttachmentSelectionDialog : Window
     public BattleRoomAttachmentDefinition? SelectedAttachment { get; private set; }
 
     private string SelectionHint => _preserveBattle
-        ? $"选择一项{_kindLabel}；现有战斗及敌方组合不会改变。"
-        : $"选择一项{_kindLabel}替换目标格内容。";
+        ? EditorText.Format("BattleRoomAttachmentSelectionDialog_003", _kindLabel)
+        : EditorText.Format("BattleRoomAttachmentSelectionDialog_004", _kindLabel);
 
     protected override void OnSourceInitialized(EventArgs e)
     {
@@ -79,7 +80,7 @@ public partial class BattleRoomAttachmentSelectionDialog : Window
         ConfirmButton.IsEnabled = selected is not null;
         SelectionTextBlock.Text = selected is null
             ? SelectionHint
-            : $"{selected.ChineseName} / {selected.EnglishName} · {selected.Id} · {selected.Source}";
+            : $"{EditorText.ContentName(selected.Definition.LocalizedName, selected.Id)} · {selected.Id} · {selected.Source}";
     }
 
     private void AttachmentGrid_MouseDoubleClick(object sender, MouseButtonEventArgs e)
@@ -108,7 +109,7 @@ public partial class BattleRoomAttachmentSelectionDialog : Window
     private void UpdateCount()
     {
         var visibleCount = _view?.Cast<object>().Count() ?? _rows.Count;
-        CountTextBlock.Text = $"显示 {visibleCount} / {_rows.Count} 项";
+        CountTextBlock.Text = EditorText.Format("BattleRoomAttachmentSelectionDialog_005", visibleCount, _rows.Count);
     }
 
     private sealed class AttachmentChoiceRow

@@ -1,6 +1,14 @@
 try
 {
+    // Legacy contracts intentionally assert the existing Simplified Chinese messages.
+    // The localization group switches both cultures explicitly and restores this baseline.
+    DarkestDungeonSaveEditor.Core.EditorText.Initialize("zh-CN", System.Globalization.CultureInfo.CurrentUICulture);
     if (await ContractSuite.TryRunCodecProcessProbeAsync(args)) return;
+    if (args.Length == 2 && args[1] == "--ui-localization")
+    {
+        await ContractSuite.RunEditorLocalizationOnlyAsync(Path.GetFullPath(args[0]));
+        return;
+    }
     if (args.Length is < 1 or > 2 || (args.Length == 2 && args[1] is not ("--maintenance" or "--manifests" or "--catalogs" or "--semantics" or "--capacities" or "--map-content" or "--raid-paths" or "--queries" or "--quirk-rules" or "--hero-selection" or "--overlay-slots" or "--canonical-resources" or "--encounter-queries" or "--case-identities" or "--inventory-persistence" or "--loot-references" or "--upgrade-references" or "--reference-consumers" or "--content-sync" or "--quirk-selection" or "--trinket-dependencies" or "--codec-cancellation" or "--save-replacement" or "--catalog-diagnostics")))
     {
         throw new InvalidOperationException("Usage: DarkestDungeonSaveEditor.ContractTests <repository-root> [--maintenance|--manifests|--catalogs|--semantics|--capacities|--map-content|--raid-paths|--queries|--quirk-rules|--hero-selection|--overlay-slots|--canonical-resources|--encounter-queries|--case-identities|--inventory-persistence|--loot-references|--upgrade-references|--reference-consumers|--content-sync|--quirk-selection|--trinket-dependencies|--codec-cancellation|--save-replacement|--catalog-diagnostics]");

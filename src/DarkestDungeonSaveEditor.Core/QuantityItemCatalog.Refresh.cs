@@ -42,14 +42,14 @@ public static partial class QuantityItemCatalog
                 "save", string.Empty, cached.DefinitionReadFailures.Count > 0, [])
             {
                 SourceLabel = cached.SaveContext == QuantityItemSaveContext.Raid
-                    ? "仅当前副本（活动内容未找到定义）" : "仅存档（当前内容未找到定义）",
+                    ? EditorText.Get("QuantityItemCatalog_Refresh_001") : EditorText.Get("QuantityItemCatalog_Refresh_002"),
                 IsPresentInSave = true,
                 SavedEntryCount = matches.Length,
                 ReferenceStatus = QuantityItemReferenceStatus.SaveOnly,
                 ReferenceEvidence = cached.DefinitionReadFailures.Count > 0
-                    ? ["活动物品定义读取不完整，无法确认该条目仅存在于存档，暂不可修改"]
+                    ? [EditorText.Get("QuantityItemCatalog_Refresh_003")]
                     : [cached.SaveContext == QuantityItemSaveContext.Raid
-                        ? "当前副本背包包含该条目" : "当前存档包含该条目"]
+                        ? EditorText.Get("QuantityItemCatalog_Refresh_004") : EditorText.Get("QuantityItemCatalog_Refresh_005")]
             });
         }
         // Only previously unseen save-only IDs need a name lookup. Never reclassify cached definitions.

@@ -20,7 +20,7 @@ public sealed record RaidSaveLocation(string ProfileDirectory, string RelativeDi
         if (root.TryGetPropertyValue("raid_save", out var node))
         {
             if (node is not JsonValue value || !value.TryGetValue<string>(out relative))
-                throw new InvalidDataException("persist.game.json 的 raid_save 不是有效的副本目录。");
+                throw new InvalidDataException(EditorText.Get("RaidSaveLocation_001"));
         }
         relative = NormalizeRelative(relative);
         _ = ResolvePath(profileDirectory, relative);
@@ -30,7 +30,7 @@ public sealed record RaidSaveLocation(string ProfileDirectory, string RelativeDi
     public SaveProfile Bind(SaveProfile profile)
     {
         if (!Path.GetFullPath(profile.ProfileDirectory).Equals(Path.GetFullPath(ProfileDirectory), StringComparison.OrdinalIgnoreCase))
-            throw new InvalidDataException("副本目录不属于所选档案。");
+            throw new InvalidDataException(EditorText.Get("RaidSaveLocation_002"));
         return profile with { RaidSaveRelativeDirectory = RelativeDirectory };
     }
 
@@ -72,20 +72,20 @@ public sealed record RaidSaveLocation(string ProfileDirectory, string RelativeDi
         if (GameSha256 is null) return;
         using var stream = File.OpenRead(GetPath("persist.game.json"));
         if (!Convert.ToHexString(SHA256.HashData(stream)).Equals(GameSha256, StringComparison.OrdinalIgnoreCase))
-            throw new IOException("副本入口在读取期间发生变化，请等待完整存档后重试。");
+            throw new IOException(EditorText.Get("RaidSaveLocation_003"));
     }
 
     internal static string NormalizeRelative(string value)
     {
         if (Path.IsPathRooted(value) || value.StartsWith('/') || value.StartsWith('\\'))
-            throw new InvalidDataException("副本存档路径必须位于当前档案内。");
+            throw new InvalidDataException(EditorText.Get("RaidSaveLocation_004"));
         value = value.Replace('\\', '/').TrimEnd('/');
         if (value.Length == 0) return string.Empty;
         var parts = value.Split('/');
         if (parts.Any(part => part.Length == 0 || part is "." or ".." ||
             part.EndsWith('.') || part.EndsWith(' ') || part.Contains(':') ||
             part.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0))
-            throw new InvalidDataException("副本存档目录包含无效路径，不能读取或写入。");
+            throw new InvalidDataException(EditorText.Get("RaidSaveLocation_005"));
         return Path.Combine(parts);
     }
 
@@ -108,7 +108,7 @@ public sealed record RaidSaveLocation(string ProfileDirectory, string RelativeDi
         try
         {
             if ((File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0)
-                throw new InvalidDataException($"副本存档路径不能经过符号链接或目录联接：{path}");
+                throw new InvalidDataException(EditorText.Format("RaidSaveLocation_006", path));
         }
         catch (FileNotFoundException) { }
         catch (DirectoryNotFoundException) { }

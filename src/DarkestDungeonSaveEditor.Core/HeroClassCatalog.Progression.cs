@@ -75,7 +75,7 @@ public static partial class HeroClassCatalog
         var collisions = NativeResourceIdentity.FindCollisions(result.Keys);
         foreach (var id in collisions)
         {
-            result[id] = result[id] with { UnsupportedReason = "升级树 ID 与其他 ID 的游戏哈希冲突" };
+            result[id] = result[id] with { UnsupportedReason = EditorText.Get("HeroClassCatalog_Progression_001") };
         }
         return new HeroUpgradeTreeResolution(result, reads);
     }
@@ -97,7 +97,7 @@ public static partial class HeroClassCatalog
                 {
                     Source = "unresolved",
                     SourcePath = candidates.GetValueOrDefault(id)?.SourcePath ?? string.Empty,
-                    UnsupportedReason = "升级树文件读取不完整，无法确认当前升级条件"
+                    UnsupportedReason = EditorText.Get("HeroClassCatalog_Progression_002")
                 });
                 issues.Add($"Hero upgrade tree '{id}' is unavailable because its effective definition could not be verified.");
                 return;
@@ -113,7 +113,7 @@ public static partial class HeroClassCatalog
                 {
                     Source = alias.Source,
                     SourcePath = alias.SourcePath,
-                    UnsupportedReason = $"升级购买目标 '{id}' 与定义 '{alias.Id}' 的游戏哈希冲突"
+                    UnsupportedReason = EditorText.Format("HeroClassCatalog_Progression_003", id, alias.Id)
                 });
                 return;
             }
@@ -260,7 +260,7 @@ public static partial class HeroClassCatalog
     {
         var equipment = CreateEquipmentDefinition(hero);
         if (equipment.Armour.FirstOrDefault()?.Hp is not (> 0 and < double.PositiveInfinity))
-            return new HeroProgressionBuildResult([], "缺少可验证的 0 级护甲 HP");
+            return new HeroProgressionBuildResult([], EditorText.Get("HeroClassCatalog_Progression_004"));
 
         IReadOnlyDictionary<string, string> targets;
         try
@@ -279,9 +279,9 @@ public static partial class HeroClassCatalog
                 string.Join("；", (upgrade?.Trees ?? [])
                     .Where(tree => tree.Kind is HeroUpgradeTreeKind.Weapon or HeroUpgradeTreeKind.Armour)
                     .Select(tree => tree.UnsupportedReason).Where(value => !string.IsNullOrWhiteSpace(value))),
-                ValidateEquipmentRequirements("武器", equipment.Weapon, upgrade?.WeaponRequirements, false),
-                ValidateEquipmentRequirements("护甲", equipment.Armour, upgrade?.ArmourRequirements, true),
-                resolveLevelThresholds.Count == 0 ? "缺少有效的 resolve_level_thresholds" : string.Empty
+                ValidateEquipmentRequirements(EditorText.Get("HeroClassCatalog_Progression_005"), equipment.Weapon, upgrade?.WeaponRequirements, false),
+                ValidateEquipmentRequirements(EditorText.Get("HeroClassCatalog_Progression_006"), equipment.Armour, upgrade?.ArmourRequirements, true),
+                resolveLevelThresholds.Count == 0 ? EditorText.Get("HeroClassCatalog_Progression_007") : string.Empty
             }
                 .Where(value => !string.IsNullOrWhiteSpace(value)));
         // Preserve the existing level-zero-only policy for incomplete templates,
@@ -321,17 +321,17 @@ public static partial class HeroClassCatalog
         for (var index = 0; index < ranks.Count; index++)
         {
             if (ranks[index].Rank != index)
-                return $"{label} rank 必须从 0 连续定义";
+                return EditorText.Format("HeroClassCatalog_Progression_008", label);
 
             if (requireHp && ranks[index].Hp is not (> 0 and < double.PositiveInfinity))
-                return $"{label} rank {index} 缺少有效 HP";
+                return EditorText.Format("HeroClassCatalog_Progression_009", label, index);
 
             var code = ranks[index].RequirementCode;
             if (code == 0) continue;
             if (code > 0x7F)
-                return $"{label} rank {index} 的购买码 0x{code:X2} 不能无损写入存档";
+                return EditorText.Format("HeroClassCatalog_Progression_010", label, index, code);
             if (requirements is null || !requirements.ContainsKey(((char)code).ToString()))
-                return $"{label} rank {index} 的 upgradeRequirementCode '{(char)code}' 无法解析";
+                return EditorText.Format("HeroClassCatalog_Progression_011", label, index, (char)code);
         }
         return string.Empty;
     }

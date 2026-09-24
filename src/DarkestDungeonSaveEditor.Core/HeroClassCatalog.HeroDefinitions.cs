@@ -50,7 +50,7 @@ public static partial class HeroClassCatalog
                 null,
                 [],
                 [],
-                "职业定义冲突，无法解析等级模板",
+                EditorText.Get("HeroClassCatalog_HeroDefinitions_001"),
                 0,
                 [],
                 [],

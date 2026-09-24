@@ -91,7 +91,7 @@ public sealed class ProfileCatalogSnapshotReader
             var profile = RaidSaveLocation.FromGame(_profile.ProfileDirectory, JsonSupport.ReadObject(gamePath)).Bind(_profile);
             var routedHashes = CaptureHashes(profile);
             if (routedHashes["persist.game.json"] != before["persist.game.json"])
-                throw new IOException("副本入口在同步期间发生变化，稍后自动重试。");
+                throw new IOException(EditorText.Get("ProfileCatalogSnapshotReader_001"));
             before = routedHashes;
             var content = _content with
             {
@@ -116,7 +116,7 @@ public sealed class ProfileCatalogSnapshotReader
             if (!contentChanged && _lastSnapshot is not null && HashesEqual(before, _lastSnapshot.FileHashes))
             {
                 if (!HashesEqual(before, CaptureHashes(profile)))
-                    throw new IOException("游戏仍在保存，等待完整存档后自动重试。");
+                    throw new IOException(EditorText.Get("MainWindow_ProfileSync_006"));
                 return _lastSnapshot with { ReadAtUtc = DateTime.UtcNow };
             }
             if (scene == QuantityItemSaveContext.Raid)
@@ -154,10 +154,10 @@ public sealed class ProfileCatalogSnapshotReader
             cancellationToken.ThrowIfCancellationRequested();
             if (!HashesEqual(before, CaptureHashes(profile)))
             {
-                throw new IOException("游戏仍在保存，等待完整存档后自动重试。");
+                throw new IOException(EditorText.Get("MainWindow_ProfileSync_006"));
             }
             if (contentChanged && contentFingerprint != ProfileCatalogContentFingerprint.Capture(content.Sources, cancellationToken))
-                throw new IOException("资源文件仍在更新，等待完整内容后自动重试。");
+                throw new IOException(EditorText.Get("MainWindow_ProfileSync_007"));
             if (checkContent)
                 ActiveContentResolver.ValidateSourceBindings(content.Resolution, content.Sources, cancellationToken);
             cache[scene] = quantities;
@@ -209,7 +209,7 @@ public sealed class ProfileCatalogSnapshotReader
     {
         if (hashes.GetValueOrDefault(name) is null)
         {
-            throw new IOException($"等待完整存档：{name} 尚不可用。");
+            throw new IOException(EditorText.Format("ProfileCatalogSnapshotReader_002", name));
         }
     }
 
@@ -227,7 +227,7 @@ public sealed class ProfileCatalogSnapshotReader
         {
             if (!Convert.ToHexString(SHA256.HashData(stream)).Equals(expected[name], StringComparison.OrdinalIgnoreCase))
             {
-                throw new IOException("存档复制期间发生变化，稍后自动重试。");
+                throw new IOException(EditorText.Get("ProfileCatalogSnapshotReader_003"));
             }
         }
         File.Delete(decoded); // Only this reader's inactive, generated scratch file.

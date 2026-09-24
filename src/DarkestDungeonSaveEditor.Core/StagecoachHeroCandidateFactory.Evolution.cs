@@ -50,11 +50,11 @@ public static partial class StagecoachHeroCandidateFactory
         var evolution = state.Definition.Evolution!;
         var outcome = evolution.CausesDeath
             ? string.IsNullOrWhiteSpace(evolution.TargetQuirkId)
-                ? "到期死亡"
-                : $"→ {evolution.TargetQuirkId} / 到期死亡"
+                ? EditorText.Get("StagecoachHeroCandidateFactory_Evolution_001")
+                : EditorText.Format("StagecoachHeroCandidateFactory_Evolution_002", evolution.TargetQuirkId)
             : $"→ {evolution.TargetQuirkId}";
         return $"{state.Definition.Id}={state.EvolutionDurationRemaining}" +
-               $"（配置 {evolution.DurationMin}–{evolution.DurationMax}，{outcome}）";
+               EditorText.Format("StagecoachHeroCandidateFactory_Evolution_003", evolution.DurationMin, evolution.DurationMax, outcome);
     }
 
 }

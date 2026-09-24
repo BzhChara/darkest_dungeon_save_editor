@@ -341,12 +341,12 @@ public sealed partial class SaveEditService
                 if (recovery is SaveFileRecovery.KeptExternal or SaveFileRecovery.RestoredExternal)
                     throw new IOException(
                         $"{replacement.TargetPath}：{GuardedSaveReplacement.DescribeRecovery(recovery)}；" +
-                        $"不能声明三个文件全部恢复原状。实际被替换版本：{replacement.DisplacedPath}");
+                        EditorText.Format("SaveEditService_StagecoachTransaction_001", replacement.DisplacedPath));
             }
             catch (Exception error)
             {
                 restoreErrors.Add(new IOException(
-                    $"恢复 {replacement.TargetPath} 未完成；实际被替换版本：{replacement.DisplacedPath}", error));
+                    EditorText.Format("SaveEditService_StagecoachTransaction_002", replacement.TargetPath, replacement.DisplacedPath), error));
             }
         }
 

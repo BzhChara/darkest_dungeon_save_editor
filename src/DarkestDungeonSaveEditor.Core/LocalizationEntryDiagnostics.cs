@@ -26,8 +26,9 @@ internal sealed class LocalizationEntryDiagnostics(string path)
     {
         if (_count > 0)
         {
-            issues.Add($"本地化部分读取：'{path}'；跳过 {_count} 个无效项，其余有效条目继续读取。" +
-                       $"示例：{string.Join("；", _samples)}" + (_count > SampleLimit ? "；…" : string.Empty));
+            issues.Add(CatalogIssueCode.PartialLocalization + path + "';" +
+                       EditorText.Format("LocalizationEntryDiagnostics_001", _count) +
+                       EditorText.Format("LocalizationEntryDiagnostics_002", string.Join("；", _samples)) + (_count > SampleLimit ? "；…" : string.Empty));
         }
     }
 }

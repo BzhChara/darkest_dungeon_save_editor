@@ -20,8 +20,8 @@ internal static class ContentSourceLabelFormatter
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToArray();
             return labels.Length == 0
-                ? "未解析"
-                : $"未解析：{string.Join("、", labels)}";
+                ? EditorText.Get("BattleMapLogTracker_017")
+                : EditorText.Format("ContentSourceLabelFormatter_001", string.Join("、", labels));
         }
 
         if (!sourcesById.TryGetValue(effectiveSourceId, out var declaredEffectiveSource))
@@ -52,7 +52,7 @@ internal static class ContentSourceLabelFormatter
             return FormatSingle(effectiveSource);
         }
 
-        return $"{FormatSingle(officialOrigin)}（当前由 {FormatSingle(effectiveSource)} 覆盖）";
+        return EditorText.Format("ContentSourceLabelFormatter_002", FormatSingle(officialOrigin), FormatSingle(effectiveSource));
     }
 
     private static bool IsOfficial(string kind) => kind is
@@ -67,11 +67,11 @@ internal static class ContentSourceLabelFormatter
 
     private static string FormatSingle(ActiveContentSource source) => source.Kind switch
     {
-        "base" => "原版",
-        "mode" => $"官方模式：{source.DisplayName}",
-        "dlc" or "dlc-package" or "dlc-feature" => $"官方 DLC：{source.DisplayName}",
-        "workshop" => $"创意工坊 Mod：{source.DisplayName}",
-        "local" => $"本地 Mod：{source.DisplayName}",
+        "base" => EditorText.Get("ContentSourceLabelFormatter_003"),
+        "mode" => EditorText.Format("ContentSourceLabelFormatter_004", source.DisplayName),
+        "dlc" or "dlc-package" or "dlc-feature" => EditorText.Format("ContentSourceLabelFormatter_005", source.DisplayName),
+        "workshop" => EditorText.Format("ContentSourceLabelFormatter_006", source.DisplayName),
+        "local" => EditorText.Format("ContentSourceLabelFormatter_007", source.DisplayName),
         _ => source.DisplayName
     };
 }

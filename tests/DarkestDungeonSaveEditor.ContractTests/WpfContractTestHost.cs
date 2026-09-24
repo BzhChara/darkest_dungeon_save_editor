@@ -23,13 +23,7 @@ internal static partial class ContractSuite
                     app = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
                     var directory = new DirectoryInfo(Path.GetDirectoryName(typeof(MainWindow).Assembly.Location)!);
                     while (!File.Exists(Path.Combine(directory.FullName, "DarkestDungeonSaveEditor.sln"))) directory = directory.Parent!;
-                    var theme = XDocument.Load(Path.Combine(directory.FullName, "src/DarkestDungeonSaveEditor.App/App.xaml")).Root!;
-                    var resources = new XElement(theme.Name.Namespace + "ResourceDictionary",
-                        theme.Attributes().Where(a => a.IsNamespaceDeclaration), theme.Element(theme.Name.Namespace + "Application.Resources")!.Elements());
-                    app.Resources = (ResourceDictionary)XamlReader.Parse(resources.ToString(), new ParserContext
-                    {
-                        BaseUri = new Uri("pack://application:,,,/DarkestDungeonSaveEditor.App;component/")
-                    });
+                    app.Resources = LoadContractTheme(directory.FullName);
                     await verify();
                 }
                 catch (Exception ex) { failure = ex; }
@@ -47,5 +41,17 @@ internal static partial class ContractSuite
         thread.IsBackground = true;
         thread.Start();
         return completion.Task;
+    }
+
+    private static ResourceDictionary LoadContractTheme(string repositoryRoot)
+    {
+        var theme = XDocument.Load(Path.Combine(repositoryRoot, "src/DarkestDungeonSaveEditor.App/App.xaml")).Root!;
+        var resources = new XElement(theme.Name.Namespace + "ResourceDictionary",
+            theme.Attributes().Where(a => a.IsNamespaceDeclaration), theme.Element(theme.Name.Namespace + "Application.Resources")!.Elements());
+        resources.SetAttributeValue(XNamespace.Xmlns + "local", "clr-namespace:DarkestDungeonSaveEditor.App;assembly=DarkestDungeonSaveEditor.App");
+        return (ResourceDictionary)XamlReader.Parse(resources.ToString(), new ParserContext
+        {
+            BaseUri = new Uri("pack://application:,,,/DarkestDungeonSaveEditor.App;component/")
+        });
     }
 }

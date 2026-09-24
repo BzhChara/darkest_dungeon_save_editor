@@ -21,7 +21,7 @@ public partial class BattleMapView : UserControl
 
         MapSelectionTextBlock.Text =
             $"{cell.DisplayName} · {FormatKind(cell.Kind)} · {FormatKnowledge(cell.Knowledge)} · " +
-            $"{FormatContent(cell)}；右击查看可用操作。";
+            EditorText.Format("BattleMapView_CellVisuals_001", FormatContent(cell));
     }
 
     private void RefreshCellVisual(PrototypeMapCell cell)
@@ -71,9 +71,9 @@ public partial class BattleMapView : UserControl
                 : FormatContentColor(cell.Content));
         var tooltip =
             $"{cell.DisplayName} ({cell.Id})\n{FormatKind(cell.Kind)} · {FormatKnowledge(cell.Knowledge)}\n" +
-            $"内容：{FormatContent(cell)}" +
-            (cell.MashIndex >= 0 ? $" · 遭遇索引 {cell.MashIndex} / 类型 {cell.MashType}" : string.Empty) +
-            $"\n右击打开操作菜单";
+            EditorText.Format("BattleMapView_CellVisuals_002", FormatContent(cell)) +
+            (cell.MashIndex >= 0 ? EditorText.Format("BattleMapView_CellVisuals_003", cell.MashIndex, cell.MashType) : string.Empty) +
+            EditorText.Format("BattleMapView_CellVisuals_004");
         cell.Visual.ToolTip = tooltip;
     }
 
@@ -121,16 +121,16 @@ public partial class BattleMapView : UserControl
 
     private static string FormatKind(PrototypeCellKind kind) => kind switch
     {
-        PrototypeCellKind.Room => "房间",
-        _ => "普通走廊格"
+        PrototypeCellKind.Room => EditorText.Get("BattleEncounterSelectionDialog_016"),
+        _ => EditorText.Get("BattleMapView_CellVisuals_005")
     };
 
     private static string FormatKnowledge(PrototypeKnowledge knowledge) => knowledge switch
     {
-        PrototypeKnowledge.Unknown => "未探索（全局视野已显示）",
-        PrototypeKnowledge.Scouted => "已侦察",
-        PrototypeKnowledge.Completed => "已完成",
-        _ => "已探索"
+        PrototypeKnowledge.Unknown => EditorText.Get("BattleMapView_CellVisuals_006"),
+        PrototypeKnowledge.Scouted => EditorText.Get("BattleMapView_CellVisuals_007"),
+        PrototypeKnowledge.Completed => EditorText.Get("BattleMapView_CellVisuals_008"),
+        _ => EditorText.Get("BattleMapView_CellVisuals_009")
     };
 
     private static string FormatContent(PrototypeMapCell cell)
@@ -142,17 +142,17 @@ public partial class BattleMapView : UserControl
 
         return cell.Content switch
         {
-            PrototypeContent.None => "空白",
-            PrototypeContent.Entrance => "入口",
-            PrototypeContent.Curio => "奇物",
-            PrototypeContent.Battle => "战斗",
-            PrototypeContent.Trap => "陷阱",
-            PrototypeContent.Treasure => "宝藏",
-            PrototypeContent.Boss => "首领遭遇",
-            PrototypeContent.Obstacle => "障碍",
-            PrototypeContent.Hunger => "进食格",
-            PrototypeContent.SecretDoor => "秘密房间入口",
-            _ => "未知"
+            PrototypeContent.None => EditorText.Get("BattleMapView_CellVisuals_010"),
+            PrototypeContent.Entrance => EditorText.Get("BattleMapView_CellVisuals_011"),
+            PrototypeContent.Curio => EditorText.Get("BattleMapView_CellVisuals_012"),
+            PrototypeContent.Battle => EditorText.Get("BattleMapView_CellVisuals_013"),
+            PrototypeContent.Trap => EditorText.Get("BattleMapView_CellVisuals_014"),
+            PrototypeContent.Treasure => EditorText.Get("BattleMapView_CellVisuals_015"),
+            PrototypeContent.Boss => EditorText.Get("BattleMapView_CellVisuals_016"),
+            PrototypeContent.Obstacle => EditorText.Get("BattleMapView_CellVisuals_017"),
+            PrototypeContent.Hunger => EditorText.Get("BattleMapView_CellVisuals_018"),
+            PrototypeContent.SecretDoor => EditorText.Get("BattleMapView_CellVisuals_019"),
+            _ => EditorText.Get("BattleEncounterSelectionDialog_017")
         };
     }
 
@@ -166,7 +166,7 @@ public partial class BattleMapView : UserControl
         PrototypeContent.Treasure => "✦",
         PrototypeContent.Boss => "☠",
         PrototypeContent.Obstacle => "▰",
-        PrototypeContent.Hunger => "食",
+        PrototypeContent.Hunger => EditorText.Get("BattleMapView_CellVisuals_020"),
         PrototypeContent.SecretDoor => "◆",
         _ => "·"
     };

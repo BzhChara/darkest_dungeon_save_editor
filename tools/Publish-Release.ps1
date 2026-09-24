@@ -56,6 +56,7 @@ if ($LASTEXITCODE -ne 0) {
 $requiredFiles = @(
     'DarkestDungeonSaveEditor.App.exe', 'DarkestDungeonSaveEditor.App.dll',
     'DarkestDungeonSaveEditor.Core.dll', 'DarkestDungeonSaveEditor.App.deps.json',
+    'zh-CN/DarkestDungeonSaveEditor.Core.resources.dll',
     'DarkestDungeonSaveEditor.App.runtimeconfig.json', 'coreclr.dll', 'hostfxr.dll', 'hostpolicy.dll',
     'System.Private.CoreLib.dll', 'PresentationFramework.dll', 'LICENSE', 'NOTICE',
     'tools/DDSaveEditor/DDSaveEditor.jar', 'tools/DDSaveEditor/LICENSE',

@@ -52,7 +52,7 @@ public partial class BattleMapView : UserControl
         catch (Exception ex)
         {
             StopProfileMonitoring();
-            LiveStatusTextBlock.Text = $"自动刷新不可用：{ex.Message}";
+            LiveStatusTextBlock.Text = EditorText.Format("BattleMapView_LiveRefresh_001", ex.Message);
         }
     }
 
@@ -171,12 +171,12 @@ public partial class BattleMapView : UserControl
                     if (_currentSnapshot is null)
                     {
                         ShowUnavailableState(
-                            "副本存档尚未写完整；编辑器会保留监听并自动重试。",
-                            "等待完整存档");
+                            EditorText.Get("BattleMapView_LiveRefresh_002"),
+                            EditorText.Get("BattleMapView_LiveRefresh_003"));
                     }
                     else
                     {
-                        LiveStatusTextBlock.Text = "保留上一快照 · 等待另一份副本存档";
+                        LiveStatusTextBlock.Text = EditorText.Get("BattleMapView_LiveRefresh_004");
                     }
                     ScheduleRefreshRetry(generation);
                     return;
@@ -184,12 +184,12 @@ public partial class BattleMapView : UserControl
 
                 CancelScheduledRefreshRetry();
                 ShowUnavailableState(
-                    "当前档案已返回小镇；下一次进入副本并写盘后，地图会自动出现。",
-                    "等待副本");
+                    EditorText.Get("BattleMapView_LiveRefresh_005"),
+                    EditorText.Get("BattleMapView_LiveRefresh_006"));
                 return;
             }
 
-            LiveStatusTextBlock.Text = "检测到存档变化 · 正在安全重读";
+            LiveStatusTextBlock.Text = EditorText.Get("BattleMapView_LiveRefresh_007");
             var snapshot = await LoadSnapshotWithRetryAsync(
                 _snapshotReader,
                 _profileDirectory,
@@ -205,7 +205,7 @@ public partial class BattleMapView : UserControl
                 _currentSnapshot.RaidSha256.Equals(snapshot.RaidSha256, StringComparison.OrdinalIgnoreCase))
             {
                 LiveStatusTextBlock.Text =
-                    $"已同步 {snapshot.ReadAtUtc.ToLocalTime():HH:mm:ss}";
+                    EditorText.Format("BattleMapView_LiveRefresh_008", snapshot.ReadAtUtc.ToLocalTime());
                 CancelScheduledRefreshRetry();
                 return;
             }
@@ -222,12 +222,12 @@ public partial class BattleMapView : UserControl
             if (_currentSnapshot is null)
             {
                 ShowUnavailableState(
-                    "游戏正在写入地图，暂时无法取得完整快照；编辑器会继续自动重试。",
-                    "等待完整存档");
+                    EditorText.Get("BattleMapView_LiveRefresh_009"),
+                    EditorText.Get("BattleMapView_LiveRefresh_003"));
             }
             else
             {
-                LiveStatusTextBlock.Text = $"保留上一快照 · 等待重试：{ex.Message}";
+                LiveStatusTextBlock.Text = EditorText.Format("BattleMapView_LiveRefresh_010", ex.Message);
             }
             ScheduleRefreshRetry(generation);
         }

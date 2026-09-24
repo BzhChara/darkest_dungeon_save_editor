@@ -123,7 +123,7 @@ public static class ActiveContentResolver
         if (current.Sources.Count != expectedSources.Count ||
             current.Sources.Where((source, index) => !SameBinding(source, expectedSources[index])).Any() ||
             current.Sources.Any(source => !Directory.Exists(source.Directory)))
-            throw new InvalidOperationException("活动 Mod/DLC 的来源映射已变化，请重新加载内容目录并重新生成预览。");
+            throw new InvalidOperationException(EditorText.Get("ActiveContentResolver_001"));
     }
 
     private static bool SameBinding(ActiveContentSource left, ActiveContentSource right) =>

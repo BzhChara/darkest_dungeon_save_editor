@@ -12,11 +12,11 @@ public sealed record EditorBattleMaintenanceResult(bool Changed, bool Deferred, 
     public bool RequiresWrite { get; init; }
     public bool RecoveryPerformed { get; init; }
     public string Message => RecoveryPerformed && !Deferred && RemovedCombinations == 0 && ReindexedCombinations == 0 && ClearedBattles == 0
-        ? "已恢复中断的战斗维护，正在重新同步档案。"
+        ? EditorText.Get("ManagedBattleEncounterBridgeService_Maintenance_001")
         : Deferred
-        ? DeferredReason ?? "检测到编辑器战斗记录失效，已暂缓自动清理；退出游戏后将自动重试。"
-        : $"战斗记录自动维护：删除失效 Bridge 组合 {RemovedCombinations} 条，更新编号 {ReindexedCombinations} 条，" +
-          $"清空编辑器放置的战斗 {ClearedBattles} 场；备份={BackupDirectory}；原因={string.Join("；", Reasons)}";
+        ? DeferredReason ?? EditorText.Get("ManagedBattleEncounterBridgeService_Maintenance_002")
+        : EditorText.Format("ManagedBattleEncounterBridgeService_Maintenance_003", RemovedCombinations, ReindexedCombinations) +
+          EditorText.Format("ManagedBattleEncounterBridgeService_Maintenance_004", ClearedBattles, BackupDirectory, string.Join("；", Reasons));
 }
 
 public sealed partial class ManagedBattleEncounterBridgeService
@@ -74,7 +74,7 @@ public sealed partial class ManagedBattleEncounterBridgeService
             issue.Contains("Ignored", StringComparison.OrdinalIgnoreCase) ||
             issue.Contains("invalid", StringComparison.OrdinalIgnoreCase));
         if (unresolved is not null)
-            throw new InvalidOperationException("战斗自动清理暂缓，活动来源尚未完整识别：" + unresolved);
+            throw new InvalidOperationException(EditorText.Get("ManagedBattleEncounterBridgeService_Maintenance_005") + unresolved);
         var title = GetProjectTitle(profile);
         var installRoot = Path.GetFullPath(string.IsNullOrWhiteSpace(localModDirectory) ||
             File.Exists(Path.Combine(localModDirectory, "project.xml")) ? Path.Combine(gameDirectory, "mods") : localModDirectory);
@@ -83,7 +83,7 @@ public sealed partial class ManagedBattleEncounterBridgeService
         var manifestPath = Path.Combine(package, ManifestFileName);
         var hashes = ProfileCatalogSnapshotReader.CaptureHashes(profile);
         if (hashes["persist.game.json"] != content.SourceGameSha256)
-            throw new IOException("活动配置在战斗清理检查前发生变化，请重新同步。");
+            throw new IOException(EditorText.Get("ManagedBattleEncounterBridgeService_Maintenance_006"));
         var fingerprint = BattleEncounterCatalog.CaptureContentFingerprint(content.Sources);
         var externalSources = content.Sources.Where(source => !Path.GetFullPath(source.Directory)
             .Equals(package, StringComparison.OrdinalIgnoreCase)).ToArray();
@@ -128,14 +128,14 @@ public sealed partial class ManagedBattleEncounterBridgeService
             if (row is null || !row.CanPlaceDirectly || !row.MonsterIds.SequenceEqual(placement.MonsterIds, StringComparer.Ordinal))
             {
                 invalidated = true;
-                reasons.Add($"{placement.AreaId}.{placement.TileId} 的原编号 {placement.MashType}/{placement.MashIndex} 已变化或组合缺失");
+                reasons.Add(EditorText.Format("ManagedBattleEncounterBridgeService_Maintenance_007", placement.AreaId, placement.TileId, placement.MashType, placement.MashIndex));
             }
         }
 
         if (Directory.Exists(package))
         {
-            RejectReparsePoint(installRoot, "本地 Mod 根目录");
-            RejectReparsePoint(package, "托管 Bridge 目录");
+            RejectReparsePoint(installRoot, EditorText.Get("ManagedBattleEncounterBridgeService_Maintenance_008"));
+            RejectReparsePoint(package, EditorText.Get("ManagedBattleEncounterBridgeService_Maintenance_009"));
             var manifest = ReadManifest(manifestPath);
             ValidateManifestIdentity(manifest, profile, title);
             foreach (var table in manifest.Tables)
@@ -181,12 +181,12 @@ public sealed partial class ManagedBattleEncounterBridgeService
                         .OrderBy(row => row.SourceRecordIndex).ToArray();
                     var entries = table.Entries.Where(entry => entry.MashType == type).OrderBy(entry => entry.FileRowIndex).ToArray();
                     if (authored.Length != entries.Length || entries.Where((entry, index) => entry.FileRowIndex != index).Any())
-                        throw new InvalidDataException("Bridge 清单与专用文件的组合记录不一致，暂缓自动清理。");
+                        throw new InvalidDataException(EditorText.Get("ManagedBattleEncounterBridgeService_Maintenance_010"));
                     foreach (var (entry, index) in entries.Select((entry, index) => (entry, index)))
                     {
                         if (entry.MonsterIds.SequenceEqual(authored[index].MonsterIds, StringComparer.Ordinal)) continue;
                         if (!oldGeneratedFile)
-                            throw new InvalidDataException("Bridge 清单与专用文件的组合记录不一致，暂缓自动清理。");
+                            throw new InvalidDataException(EditorText.Get("ManagedBattleEncounterBridgeService_Maintenance_010"));
                         obsoleteEntries.Add(entry);
                     }
                 }
@@ -198,19 +198,19 @@ public sealed partial class ManagedBattleEncounterBridgeService
                         affectedBridgeTables.Add((table.DungeonId, table.Difficulty, entry.MashType));
                         removed++;
                         invalidated = true;
-                        reasons.Add($"{table.DungeonId}/{table.Difficulty}/{entry.MashType}/{entry.MashIndex}：旧版 Bridge 的实际怪物槽与记录不同，清除旧记录后可重新放置");
+                        reasons.Add(EditorText.Format("ManagedBattleEncounterBridgeService_Maintenance_011", table.DungeonId, table.Difficulty, entry.MashType, entry.MashIndex));
                         continue;
                     }
                     var missing = entry.MonsterIds.Where(id => !monsters.ContainsKey(id)).ToArray();
                     if (missing.Length == 0 && entry.MonsterIds.Any(id => monsters[id] is null))
-                        throw new InvalidOperationException("战斗自动清理暂缓，怪物体型尚无法确认：" + string.Join(", ", entry.MonsterIds));
+                        throw new InvalidOperationException(EditorText.Get("ManagedBattleEncounterBridgeService_Maintenance_012") + string.Join(", ", entry.MonsterIds));
                     if (missing.Length > 0 || entry.MonsterIds.Count > 4 || entry.MonsterIds.Sum(id => monsters[id] ?? 0) > 4)
                     {
                         affectedBridgeTables.Add((table.DungeonId, table.Difficulty, entry.MashType));
                         removed++;
                         invalidated = true;
                         reasons.Add($"{table.DungeonId}/{table.Difficulty}/{entry.MashType}/{entry.MashIndex}：" +
-                            (missing.Length > 0 ? "缺少 " + string.Join(", ", missing) : "组合超过四格"));
+                            (missing.Length > 0 ? EditorText.Get("ManagedBattleEncounterBridgeService_Maintenance_013") + string.Join(", ", missing) : EditorText.Get("ManagedBattleEncounterBridgeService_Maintenance_014")));
                     }
                     else retained.Add(entry);
                 }
@@ -249,7 +249,7 @@ public sealed partial class ManagedBattleEncounterBridgeService
                 {
                     var row = rows.ElementAtOrDefault(entry.FileRowIndex!.Value);
                     if (row is null || !row.CanPlaceDirectly || !row.MonsterIds.SequenceEqual(entry.MonsterIds, StringComparer.Ordinal))
-                        throw new InvalidOperationException("战斗自动清理暂缓，重建的专用文件未得到可验证的运行时编号。");
+                        throw new InvalidOperationException(EditorText.Get("ManagedBattleEncounterBridgeService_Maintenance_015"));
                     if (entry.MashIndex != row.MashIndex)
                     {
                         affectedBridgeTables.Add((table.DungeonId, table.Difficulty, type));
@@ -280,8 +280,8 @@ public sealed partial class ManagedBattleEncounterBridgeService
                     oldBridgeBindings.Contains((cell.Tile.MashType, cell.Tile.MashIndex)) &&
                     !ownedCells.Contains((cell.Area.AreaId, cell.Tile.TileId)));
             if (unproven.Tile is not null)
-                throw new InvalidOperationException($"战斗自动清理暂缓：{unproven.Area.AreaId}.{unproven.Tile.TileId} 可能引用旧 Bridge，" +
-                    "但缺少当前副本的成功放置记录，无法确认归属。请恢复对应记录或离开该副本后重试；不会按编号猜测删除，也不会压缩 Bridge。");
+                throw new InvalidOperationException(EditorText.Format("ManagedBattleEncounterBridgeService_Maintenance_016", unproven.Area.AreaId, unproven.Tile.TileId) +
+                    EditorText.Get("ManagedBattleEncounterBridgeService_Maintenance_017"));
         }
         if (!invalidated && stagedFiles.Count == 0)
         {
@@ -310,8 +310,8 @@ public sealed partial class ManagedBattleEncounterBridgeService
                     pendingRaids.Add(relative);
             }
         }
-        string PendingMessage(int count) => $"已清理当前副本的编辑器战斗 {count} 场；持久副本 {string.Join("、", pendingRaids)} " +
-            "仍引用待维护的 Bridge 编号，暂缓删除和重排这些条目；在对应副本状态下关闭游戏后继续清理。";
+        string PendingMessage(int count) => EditorText.Format("ManagedBattleEncounterBridgeService_Maintenance_018", count, string.Join("、", pendingRaids)) +
+            EditorText.Get("ManagedBattleEncounterBridgeService_Maintenance_019");
         if (pendingRaids.Count > 0)
         {
             // Clear the active map first without compacting the shared package. Visiting
@@ -335,7 +335,7 @@ public sealed partial class ManagedBattleEncounterBridgeService
         using var gameLock = new FileStream(Path.Combine(profile.ProfileDirectory, "persist.game.json"),
             FileMode.Open, FileAccess.Read, FileShare.Read);
         if (ComputeSha256(Path.Combine(profile.ProfileDirectory, "persist.game.json")) != content.SourceGameSha256)
-            throw new IOException("游戏状态在战斗清理前发生变化。");
+            throw new IOException(EditorText.Get("ManagedBattleEncounterBridgeService_Maintenance_020"));
         BattleMapWriteGuard? mapGuard = null;
         var replacements = new List<GuardedSaveReplacement>();
         var unchangedPackageLocks = new List<FileStream>();
@@ -356,13 +356,13 @@ public sealed partial class ManagedBattleEncounterBridgeService
                 await _codec.DecodeAsync(encoded, roundTrip, token).ConfigureAwait(false);
                 if (!JsonNode.DeepEquals(mapGuard.MapDocument, JsonSupport.ReadObject(roundTrip)) ||
                     (DsonSaveCodec.IsDson(snapshot.MapSavePath) && !RevisionMatches(snapshot.MapSavePath, encoded)))
-                    throw new InvalidDataException("自动清理地图未通过 DSON 编码回环验证。");
+                    throw new InvalidDataException(EditorText.Get("ManagedBattleEncounterBridgeService_Maintenance_021"));
                 originalFiles[snapshot.MapSavePath] = snapshot.MapSha256;
                 stagedFiles[snapshot.MapSavePath] = encoded;
             }
             if (!ProfileCatalogSnapshotReader.HashesEqual(hashes, ProfileCatalogSnapshotReader.CaptureHashes(profile)) ||
                 BattleEncounterCatalog.CaptureContentFingerprint(content.Sources) != fingerprint)
-                throw new IOException("存档或 Mod 文件在自动清理准备期间发生变化，等待稳定后重试。");
+                throw new IOException(EditorText.Get("ManagedBattleEncounterBridgeService_Maintenance_022"));
             token.ThrowIfCancellationRequested();
             EnsureGameIsNotRunning();
             ActiveContentResolver.ValidateSourceBindings(content.Resolution, content.Sources, token);
@@ -387,7 +387,7 @@ public sealed partial class ManagedBattleEncounterBridgeService
             {
                 var stream = new FileStream(pair.Key, FileMode.Open, FileAccess.Read, FileShare.Read);
                 unchangedPackageLocks.Add(stream);
-                if (ComputeSha256(pair.Key) != pair.Value) throw new IOException("Bridge 或保留副本在清理准备期间被外部修改。");
+                if (ComputeSha256(pair.Key) != pair.Value) throw new IOException(EditorText.Get("ManagedBattleEncounterBridgeService_Maintenance_023"));
             }
             mapGuard?.ReleaseMapLock();
             // The map is cleared before indexes are compacted. All replacements
@@ -400,7 +400,7 @@ public sealed partial class ManagedBattleEncounterBridgeService
                 replacement.Replace();
             }
             if (BattleEncounterCatalog.CaptureContentFingerprint(externalSources) != externalFingerprint)
-                throw new IOException("来源 Mod 在自动清理写入期间发生变化。");
+                throw new IOException(EditorText.Get("ManagedBattleEncounterBridgeService_Maintenance_024"));
             foreach (var replacement in replacements) replacement.Verify();
             EnsureGameIsNotRunning();
             var target = snapshot?.MapSavePath ?? Path.Combine(profile.ProfileDirectory, "persist.game.json");
@@ -428,9 +428,9 @@ public sealed partial class ManagedBattleEncounterBridgeService
                 catch (Exception recoveryError) { failures.Add(recoveryError); }
             }
             if (failures.Count > 0)
-                throw new AggregateException($"战斗清理未能完整恢复，已保留外部版本及备份：{backup}", new[] { error }.Concat(failures));
+                throw new AggregateException(EditorText.Format("ManagedBattleEncounterBridgeService_Maintenance_025", backup), new[] { error }.Concat(failures));
             if (backup is not null) File.WriteAllText(Path.Combine(backup, "maintenance-recovered.json"), "{}", Utf8NoBom);
-            throw new InvalidOperationException($"战斗自动清理失败，本次已写入文件已恢复；备份：{backup ?? "尚未写入"}。{error.Message}", error);
+            throw new InvalidOperationException(EditorText.Format("ManagedBattleEncounterBridgeService_Maintenance_027", backup ?? EditorText.Get("ManagedBattleEncounterBridgeService_Maintenance_026"), error.Message), error);
         }
         finally
         {

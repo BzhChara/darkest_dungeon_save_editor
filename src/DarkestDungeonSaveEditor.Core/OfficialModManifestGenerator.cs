@@ -14,12 +14,12 @@ internal static class OfficialModManifestGenerator
     {
         var tools = Path.Combine(game, "_windows", "win32");
         var executable = Path.Combine(tools, RuntimeFiles[0]);
-        if (!File.Exists(executable)) throw new FileNotFoundException("找不到游戏附带的官方清单生成工具。", executable);
+        if (!File.Exists(executable)) throw new FileNotFoundException(EditorText.Get("OfficialModManifestGenerator_001"), executable);
         if (ModManifestFiles.Hash(executable) != VerifiedUploaderHash)
-            throw new InvalidDataException("当前官方上传工具版本尚未验证，不能自动生成清单。");
+            throw new InvalidDataException(EditorText.Get("OfficialModManifestGenerator_002"));
         var stage = Path.GetFullPath(Path.Combine(Path.GetTempPath(), "DDSEManifest_" + Guid.NewGuid().ToString("N")));
         if (stage.Any(character => character > 127))
-            throw new IOException("官方工具需要纯英文临时路径，请将 TEMP 配置为英文路径后重试。");
+            throw new IOException(EditorText.Get("OfficialModManifestGenerator_003"));
         Directory.CreateDirectory(stage);
         try
         {
@@ -36,12 +36,12 @@ internal static class OfficialModManifestGenerator
                 var hash = ModManifestFiles.Hash(from);
                 Directory.CreateDirectory(Path.GetDirectoryName(to)!);
                 File.Copy(from, to, overwrite: false);
-                if (ModManifestFiles.Hash(to) != hash) throw new IOException($"文件在复制期间变化：{from}");
+                if (ModManifestFiles.Hash(to) != hash) throw new IOException(EditorText.Format("OfficialModManifestGenerator_004", from));
                 inputs[from] = hash;
             }
             foreach (var name in RuntimeFiles) Copy(Path.Combine(tools, name), Path.Combine(runtime, name));
             if (ModManifestFiles.Hash(Path.Combine(runtime, RuntimeFiles[0])) != VerifiedUploaderHash)
-                throw new IOException("官方工具在准备期间发生变化，停止生成清单。");
+                throw new IOException(EditorText.Get("OfficialModManifestGenerator_005"));
             Copy(Path.Combine(game, "colours", "base.colours.darkest"), Path.Combine(baseline, "colours", "base.colours.darkest"));
             Copy(Path.Combine(game, "mods", "preview_icon.png"), Path.Combine(baseline, "mods", "preview_icon.png"));
             // Native startup appends these bytes to the EXE directory. No BOM or newline.
@@ -78,7 +78,7 @@ internal static class OfficialModManifestGenerator
             start.ArgumentList.Add(Path.Combine(mod, "project.xml"));
             Process process;
             var previous = SetErrorMode(3); // Suppress native crash UI in this child; restore immediately.
-            try { process = Process.Start(start) ?? throw new IOException("无法启动官方清单生成工具。"); }
+            try { process = Process.Start(start) ?? throw new IOException(EditorText.Get("OfficialModManifestGenerator_006")); }
             finally { SetErrorMode(previous); }
             using (process)
             {
@@ -96,7 +96,7 @@ internal static class OfficialModManifestGenerator
                 catch (OperationCanceledException)
                 {
                     if (token.IsCancellationRequested) throw;
-                    throw new TimeoutException("官方清单生成超时，已停止工具。");
+                    throw new TimeoutException(EditorText.Get("OfficialModManifestGenerator_007"));
                 }
                 finally
                 {
@@ -105,13 +105,13 @@ internal static class OfficialModManifestGenerator
                     await File.WriteAllTextAsync(Path.Combine(evidence, "stdout.txt"), await stdout, CancellationToken.None);
                     await File.WriteAllTextAsync(Path.Combine(evidence, "stderr.txt"), await stderr, CancellationToken.None);
                 }
-                if (process.ExitCode != 0) throw new IOException($"官方清单工具返回错误 {process.ExitCode}；日志：{evidence}");
+                if (process.ExitCode != 0) throw new IOException(EditorText.Format("OfficialModManifestGenerator_008", process.ExitCode, evidence));
             }
             token.ThrowIfCancellationRequested();
             ModManifestFiles.RequireSnapshot(payload, original, token);
             ModManifestFiles.RequireSnapshot(source, original, token);
             foreach (var (path, hash) in inputs)
-                if (ModManifestFiles.Hash(path) != hash) throw new IOException($"生成期间输入文件发生变化：{path}");
+                if (ModManifestFiles.Hash(path) != hash) throw new IOException(EditorText.Format("OfficialModManifestGenerator_009", path));
             var raw = await File.ReadAllBytesAsync(Path.Combine(mod, "modfiles.txt"), token);
             await File.WriteAllBytesAsync(Path.Combine(evidence, "official-modfiles.txt"), raw, token);
             var rows = new UTF8Encoding(false, true).GetString(raw).Split('\n')
@@ -120,7 +120,7 @@ internal static class OfficialModManifestGenerator
             var bytes = Encoding.UTF8.GetBytes(string.Join('\n', rows) + "\n");
             ModManifestFiles.Validate(bytes, original);
             if (!expected.SetEquals(rows.Select(line => line[..line.LastIndexOf(' ')])))
-                throw new InvalidDataException("官方清单与已验证的文件枚举、原版差异规则不一致，停止写入。");
+                throw new InvalidDataException(EditorText.Get("OfficialModManifestGenerator_010"));
             return bytes;
         }
         finally

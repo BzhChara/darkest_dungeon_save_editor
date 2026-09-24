@@ -46,12 +46,12 @@ internal sealed class BattleMapWriteGuard : IDisposable
                     if (!Path.GetFullPath(expected.ProfileDirectory).Equals(directory, StringComparison.OrdinalIgnoreCase) ||
                         !Path.GetFullPath(expected.MapSavePath).Equals(location.MapPath, StringComparison.OrdinalIgnoreCase) ||
                         !Path.GetFullPath(expected.RaidSavePath).Equals(location.RaidPath, StringComparison.OrdinalIgnoreCase))
-                        throw new InvalidOperationException("当前地图快照不属于所选档案或当前副本目录，请重新加载。");
+                        throw new InvalidOperationException(EditorText.Get("BattleMapWriteGuard_001"));
                 }
             }
             if (!hashes["persist.map.json"].Equals(expected.MapSha256, StringComparison.OrdinalIgnoreCase) ||
                 !hashes["persist.raid.json"].Equals(expected.RaidSha256, StringComparison.OrdinalIgnoreCase))
-                throw new InvalidOperationException("地图或副本存档在显示后已经变化，请等待地图刷新后重试。");
+                throw new InvalidOperationException(EditorText.Get("BattleMapWriteGuard_002"));
 
             guard.MapDocument = JsonSupport.ReadObject(Path.Combine(decodedDirectory, "persist.map.json"));
             guard.RaidDocument = JsonSupport.ReadObject(Path.Combine(decodedDirectory, "persist.raid.json"));
@@ -61,11 +61,11 @@ internal sealed class BattleMapWriteGuard : IDisposable
             if (game["inraid"] is not JsonValue inRaid || !inRaid.TryGetValue<bool>(out var isInRaid) ||
                 game["raiddungeon"] is not JsonValue dungeon || !dungeon.TryGetValue<string>(out var dungeonId) ||
                 string.IsNullOrWhiteSpace(dungeonId))
-                throw new InvalidDataException("persist.game.json 缺少有效的小镇／副本状态，不能修改地图。");
+                throw new InvalidDataException(EditorText.Get("BattleMapWriteGuard_003"));
             if (!isInRaid || dungeonId.Equals("none", StringComparison.Ordinal))
-                throw new InvalidOperationException("所选档案已经不在副本中，不能修改残留地图。");
+                throw new InvalidOperationException(EditorText.Get("BattleMapWriteGuard_004"));
             if (!dungeonId.Equals(guard.Snapshot.DungeonId, StringComparison.Ordinal))
-                throw new InvalidOperationException("游戏入口与地图副本不一致，请等待完整存档后重试。");
+                throw new InvalidOperationException(EditorText.Get("BattleMapWriteGuard_005"));
             BattleMapSaveEditor.ValidateStationaryRaidState(guard.RaidDocument);
             guard.GameSha256 = hashes["persist.game.json"];
             return guard;

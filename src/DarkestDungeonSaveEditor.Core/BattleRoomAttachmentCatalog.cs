@@ -69,7 +69,7 @@ public sealed record BattleRoomAttachmentDefinition(
         BattleRoomAttachmentKind.Curio or BattleRoomAttachmentKind.Treasure => BattleMapAreaKind.Room,
         BattleRoomAttachmentKind.HallCurio or BattleRoomAttachmentKind.Trap or
             BattleRoomAttachmentKind.Obstacle => BattleMapAreaKind.Corridor,
-        _ => throw new InvalidOperationException("未知的地图内容类型。")
+        _ => throw new InvalidOperationException(EditorText.Get("BattleMapSaveEditor_Content_008"))
     };
 
     public BattleMapTileContent StandaloneContent => Kind switch
@@ -78,16 +78,16 @@ public sealed record BattleRoomAttachmentDefinition(
         BattleRoomAttachmentKind.Treasure => BattleMapTileContent.Treasure,
         BattleRoomAttachmentKind.Trap => BattleMapTileContent.Trap,
         BattleRoomAttachmentKind.Obstacle => BattleMapTileContent.Obstacle,
-        _ => throw new InvalidOperationException("未知的地图内容类型。")
+        _ => throw new InvalidOperationException(EditorText.Get("BattleMapSaveEditor_Content_008"))
     };
 
     public string KindLabel => StandaloneContent switch
     {
-        BattleMapTileContent.Curio => "奇物",
-        BattleMapTileContent.Treasure => "宝箱",
-        BattleMapTileContent.Trap => "陷阱",
-        BattleMapTileContent.Obstacle => "障碍",
-        _ => throw new InvalidOperationException("未知的地图内容类型。")
+        BattleMapTileContent.Curio => EditorText.Get("BattleMapView_CellVisuals_012"),
+        BattleMapTileContent.Treasure => EditorText.Get("BattleMapView_Commands_007"),
+        BattleMapTileContent.Trap => EditorText.Get("BattleMapView_CellVisuals_014"),
+        BattleMapTileContent.Obstacle => EditorText.Get("BattleMapView_CellVisuals_017"),
+        _ => throw new InvalidOperationException(EditorText.Get("BattleMapSaveEditor_Content_008"))
     };
 
     public string ChineseName => string.IsNullOrWhiteSpace(LocalizedName.Chinese)
@@ -141,14 +141,14 @@ public static partial class BattleRoomAttachmentCatalog
         var gameSavePath = Path.Combine(profileDirectory, "persist.game.json");
         if (!File.Exists(gameSavePath))
         {
-            throw new FileNotFoundException("当前档案缺少 persist.game.json。", gameSavePath);
+            throw new FileNotFoundException(EditorText.Get("BattleEncounterCatalog_003"), gameSavePath);
         }
         if (!ComputeSha256(gameSavePath).Equals(
                 activeContent.SourceGameSha256,
                 StringComparison.OrdinalIgnoreCase))
         {
             throw new InvalidOperationException(
-                "活动 Mod 配置在地图内容目录加载前已经变化，请重新加载内容目录。");
+                EditorText.Get("BattleRoomAttachmentCatalog_001"));
         }
 
         var issues = new List<string>();
@@ -216,8 +216,8 @@ public static partial class BattleRoomAttachmentCatalog
                 {
                     return true;
                 }
-                issues.Add($"地图内容候选未纳入：{definition.KindLabel}/{definition.Id}；原因={reason}；" +
-                    $"来源={definition.SourcePath}:{definition.SourceLine}");
+                issues.Add(EditorText.Format("BattleRoomAttachmentCatalog_002", definition.KindLabel, definition.Id, reason) +
+                    EditorText.Format("BattleRoomAttachmentCatalog_003", definition.SourcePath, definition.SourceLine));
                 return false;
             })
             .ToArray();
@@ -259,7 +259,7 @@ public static partial class BattleRoomAttachmentCatalog
                 StringComparison.OrdinalIgnoreCase))
         {
             throw new InvalidOperationException(
-                "活动 Mod 配置在地图内容选择后已经变化，请重新加载内容目录。");
+                EditorText.Get("BattleRoomAttachmentCatalog_004"));
         }
 
         var issues = new List<string>();
@@ -281,7 +281,7 @@ public static partial class BattleRoomAttachmentCatalog
                 StringComparison.OrdinalIgnoreCase))
         {
             throw new InvalidOperationException(
-                "有效地图内容定义在选择后已经变化，请重新加载内容目录。");
+                EditorText.Get("BattleRoomAttachmentCatalog_005"));
         }
     }
 
@@ -291,7 +291,7 @@ public static partial class BattleRoomAttachmentCatalog
         catch (Exception error) when (error is IOException or UnauthorizedAccessException)
         {
             throw new InvalidOperationException(
-                $"有效地图内容定义在选择后已经变化或无法读取，请重新加载内容目录：{path}", error);
+                EditorText.Format("BattleRoomAttachmentCatalog_006", path), error);
         }
     }
 
@@ -301,7 +301,7 @@ public static partial class BattleRoomAttachmentCatalog
         ValidateGuard(definition.CatalogGuard);
         if (definition.PropHash == 0 || definition.PropHash != ComputePropHash(definition.Id))
         {
-            throw new InvalidOperationException("所选地图内容的 ID 与存档哈希无效或不一致。");
+            throw new InvalidOperationException(EditorText.Get("BattleRoomAttachmentCatalog_007"));
         }
 
         var issues = new List<string>();
@@ -315,14 +315,14 @@ public static partial class BattleRoomAttachmentCatalog
         if (parsed.Any(candidate => candidate.Definition.PropHash == definition.PropHash &&
                 !candidate.Definition.Id.Equals(definition.Id, StringComparison.Ordinal)))
         {
-            throw new InvalidOperationException("所选地图内容的存档哈希与另一项资源冲突。");
+            throw new InvalidOperationException(EditorText.Get("BattleRoomAttachmentCatalog_008"));
         }
         var resources = ReadResources(ResolveEffectiveResourceFiles(definition.CatalogGuard.ActiveSources, issues));
         var curios = ReadCurioResources(ResolveEffectiveCurioFiles(definition.CatalogGuard.ActiveSources, issues), resources, issues,
             ContentFileOverlay.GetEnabledDlcPrefixes(definition.CatalogGuard.ActiveSources));
         if (GetResourceRejection(definition, resources, curios) is { } rejection)
         {
-            throw new InvalidOperationException($"所选地图内容不可写入：{rejection}");
+            throw new InvalidOperationException(EditorText.Format("BattleRoomAttachmentCatalog_009", rejection));
         }
         var matches = parsed.Any(candidate =>
                 candidate.Definition.Kind == definition.Kind &&
@@ -343,7 +343,7 @@ public static partial class BattleRoomAttachmentCatalog
         if (!matches)
         {
             throw new InvalidOperationException(
-                "所选地图内容已变化、消失或存在歧义，请重新加载内容目录。");
+                EditorText.Get("BattleRoomAttachmentCatalog_010"));
         }
     }
 
@@ -403,7 +403,7 @@ public static partial class BattleRoomAttachmentCatalog
         if (!string.IsNullOrWhiteSpace(dungeonId) && !dungeonId.Equals("arena", StringComparison.Ordinal))
         {
             if (dungeonId is "." or ".." || dungeonId.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
-                throw new InvalidDataException("副本区域 ID 不是有效的资源路径名称。");
+                throw new InvalidDataException(EditorText.Get("BattleRoomAttachmentCatalog_011"));
             // Dungeon::Load uses the current dungeon ID, which need not have
             // the spelling of a directory returned by physical discovery.
             requests.Add($"dungeons/{dungeonId}/{dungeonId}.props.darkest");
@@ -554,7 +554,7 @@ public static partial class BattleRoomAttachmentCatalog
         }
         catch (DecoderFallbackException)
         {
-            issues.Add($"地图资源池包含无效 UTF-8，无法安全识别原始 ID，已跳过：{file.Path}");
+            issues.Add(EditorText.Format("BattleRoomAttachmentCatalog_012", file.Path));
             yield break;
         }
 
@@ -586,7 +586,7 @@ public static partial class BattleRoomAttachmentCatalog
 
             if (NativeDarkestReader.FindValue(body, ".types") < 0)
             {
-                issues.Add($"地图内容记录缺少资源列表（.types），已跳过：{file.Path}:{sourceLine}");
+                issues.Add(EditorText.Format("BattleRoomAttachmentCatalog_013", file.Path, sourceLine));
                 continue;
             }
 
@@ -599,16 +599,16 @@ public static partial class BattleRoomAttachmentCatalog
                 {
                     var id = StrictUtf8.GetString(encoded, 0, Math.Min(encoded.Length, 63));
                     if (!string.IsNullOrWhiteSpace(id)) ids.Add(id);
-                    else issues.Add($"地图资源 ID 仅含空白，未纳入：{file.Path}:{sourceLine}");
+                    else issues.Add(EditorText.Format("BattleRoomAttachmentCatalog_014", file.Path, sourceLine));
                 }
                 catch (DecoderFallbackException)
                 {
-                    issues.Add($"地图资源 ID 的原生 63 字节边界截断了 UTF-8 字符，无法安全写入：{file.Path}:{sourceLine}");
+                    issues.Add(EditorText.Format("BattleRoomAttachmentCatalog_015", file.Path, sourceLine));
                 }
             }
             if (ids.Count == 0)
             {
-                issues.Add($"地图内容记录的资源列表（.types）没有可用 ID，已跳过：{file.Path}:{sourceLine}");
+                issues.Add(EditorText.Format("BattleRoomAttachmentCatalog_016", file.Path, sourceLine));
                 continue;
             }
 

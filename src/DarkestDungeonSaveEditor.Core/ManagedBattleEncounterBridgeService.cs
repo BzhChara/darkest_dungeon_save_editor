@@ -95,13 +95,13 @@ public sealed partial class ManagedBattleEncounterBridgeService
         var oldPackageDirectory = Path.Combine(installRoot,
             $"DDSE_Managed_Encounter_Bridge_{ShortHash($"{profile.SteamUserId}/{profile.ProfileId}")}");
         if (Directory.Exists(oldPackageDirectory))
-            throw new InvalidOperationException("检测到旧版托管 Bridge。请先完成旧文件清理和地图引用处理，本次不会生成第二份 Bridge。");
+            throw new InvalidOperationException(EditorText.Get("ManagedBattleEncounterBridgeService_001"));
         foreach (var source in activeContent.Sources.Where(IsManagedBridgeSource))
         {
             if (!Path.GetFullPath(source.Directory).Equals(packageDirectory, StringComparison.OrdinalIgnoreCase))
                 throw new InvalidOperationException(
-                    $"当前启用的托管 Bridge 不在本档案的专用位置：{source.DisplayName}。" +
-                    "请先清理旧版或其他档案的 Bridge 启用项及地图引用，本次不会生成第二份 Bridge。");
+                    EditorText.Format("ManagedBattleEncounterBridgeService_002", source.DisplayName) +
+                    EditorText.Get("ManagedBattleEncounterBridgeService_003"));
             ValidateManifestIdentity(ReadManifest(Path.Combine(source.Directory, ManifestFileName)), profile, projectTitle);
         }
 
@@ -116,7 +116,7 @@ public sealed partial class ManagedBattleEncounterBridgeService
         using var writeGuard = await BattleMapWriteGuard.LoadAsync(
             profile, snapshot, _codec, Path.Combine(workspace, "map-input"), cancellationToken).ConfigureAwait(false);
         if (!writeGuard.GameSha256.Equals(activeContent.SourceGameSha256, StringComparison.OrdinalIgnoreCase))
-            throw new InvalidOperationException("档案状态在 Bridge 准备前发生变化，请重新加载地图。");
+            throw new InvalidOperationException(EditorText.Get("ManagedBattleEncounterBridgeService_004"));
         if (placementTarget is not null)
             BattleMapSaveEditor.ValidateBattlePlacementTarget(writeGuard.MapDocument, writeGuard.Snapshot,
                 placementTarget.AreaId, placementTarget.TileId, encounter.MashType);
@@ -125,7 +125,7 @@ public sealed partial class ManagedBattleEncounterBridgeService
         ManagedBridgeManifest manifest;
         if (packageExisted)
         {
-            RejectReparsePoint(packageDirectory, "托管 Encounter Bridge 目录");
+            RejectReparsePoint(packageDirectory, EditorText.Get("ManagedBattleEncounterBridgeService_005"));
             CopyDirectory(packageDirectory, stagedPackage);
             CopyDirectory(packageDirectory, rollbackPackage);
             manifest = ReadManifest(Path.Combine(stagedPackage, ManifestFileName));
@@ -201,7 +201,7 @@ public sealed partial class ManagedBattleEncounterBridgeService
                     candidate.MashIndex == expectedMashIndex))
             {
                 throw new InvalidDataException(
-                    "托管 Encounter Bridge 清单中的索引与实际遭遇表不一致，本次不会覆盖已有条目。");
+                    EditorText.Get("ManagedBattleEncounterBridgeService_006"));
             }
 
             AppendEncounterRow(stagedMashPath, encounter);
@@ -297,7 +297,7 @@ public sealed partial class ManagedBattleEncounterBridgeService
             if (directEncounter is null)
             {
                 throw new InvalidOperationException(
-                    "托管 Encounter Bridge 已生成，但重新解析后没有得到预期的稳定索引；程序将尝试恢复本次更改。");
+                    EditorText.Get("ManagedBattleEncounterBridgeService_007"));
             }
 
             BattleEncounterCatalog.ValidateDirectEncounter(directEncounter);
@@ -360,14 +360,14 @@ public sealed partial class ManagedBattleEncounterBridgeService
             else if (packageCommitted)
             {
                 rollbackErrors.Add(new IOException(
-                    $"外部游戏配置或恢复状态尚未确认，已保留可能被引用的 Bridge：{packageDirectory}；" +
-                    $"原包副本：{rollbackPackage}；实际被替换存档：{gameReplacement?.DisplacedPath}"));
+                    EditorText.Format("ManagedBattleEncounterBridgeService_008", packageDirectory) +
+                    EditorText.Format("ManagedBattleEncounterBridgeService_009", rollbackPackage, gameReplacement?.DisplacedPath)));
             }
 
             if (rollbackErrors.Count > 0)
             {
                 throw new AggregateException(
-                    $"托管 Encounter Bridge 更新失败，自动恢复也未能完整完成。备份：{profileBackupDirectory}；工作目录：{workspace}。",
+                    EditorText.Format("ManagedBattleEncounterBridgeService_010", profileBackupDirectory, workspace),
                     [primaryError, .. rollbackErrors]);
             }
 
@@ -386,10 +386,10 @@ public sealed partial class ManagedBattleEncounterBridgeService
         // packages distinct. Reject lossy/overlong names instead of creating aliases.
         if (SanitizeSegment(profile.ProfileId, 64) != profile.ProfileId ||
             SanitizeSegment(profile.SteamUserId, 32) != profile.SteamUserId)
-            throw new InvalidOperationException("档案或 Steam 账户标识不能用于生成可区分的 Bridge 名称。");
+            throw new InvalidOperationException(EditorText.Get("ManagedBattleEncounterBridgeService_011"));
         var title = $"{ProjectTitlePrefix}（{profile.ProfileId} - {profile.SteamUserId}）";
         if (Utf8NoBom.GetByteCount(title) >= 128)
-            throw new InvalidOperationException("Bridge 名称超过游戏支持的长度，无法安全启用。");
+            throw new InvalidOperationException(EditorText.Get("ManagedBattleEncounterBridgeService_012"));
         return title;
     }
 
@@ -419,7 +419,7 @@ public sealed partial class ManagedBattleEncounterBridgeService
                 profileDirectory,
                 StringComparison.OrdinalIgnoreCase))
         {
-            throw new InvalidOperationException("地图、活动内容与所选档案不属于同一个 Profile。");
+            throw new InvalidOperationException(EditorText.Get("ManagedBattleEncounterBridgeService_013"));
         }
 
         if (!catalog.DungeonId.Equals(snapshot.DungeonId, StringComparison.Ordinal) ||
@@ -428,7 +428,7 @@ public sealed partial class ManagedBattleEncounterBridgeService
                 catalog.TableGuard.Fingerprint,
                 StringComparison.OrdinalIgnoreCase))
         {
-            throw new InvalidOperationException("所选遭遇不属于当前副本的最新目录快照。");
+            throw new InvalidOperationException(EditorText.Get("ManagedBattleEncounterBridgeService_014"));
         }
 
         var gameSavePath = Path.Combine(profileDirectory, "persist.game.json");
@@ -437,7 +437,7 @@ public sealed partial class ManagedBattleEncounterBridgeService
                 activeContent.SourceGameSha256,
                 StringComparison.OrdinalIgnoreCase))
         {
-            throw new InvalidOperationException("活动 Mod 配置已经变化，请重新加载内容目录。");
+            throw new InvalidOperationException(EditorText.Get("ManagedBattleEncounterBridgeService_015"));
         }
     }
 
@@ -459,7 +459,7 @@ public sealed partial class ManagedBattleEncounterBridgeService
                     .OrderBy(row => row.SourceRecordIndex).ElementAtOrDefault(entry.FileRowIndex!.Value);
                 if (row is null || row.MashIndex != entry.MashIndex ||
                     !row.MonsterIds.SequenceEqual(entry.MonsterIds, StringComparer.Ordinal))
-                    throw new InvalidOperationException("托管 Bridge 的已有索引与当前多文件遭遇表不一致，本次不会写入。");
+                    throw new InvalidOperationException(EditorText.Get("ManagedBattleEncounterBridgeService_016"));
             }
         }
     }
@@ -474,8 +474,8 @@ public sealed partial class ManagedBattleEncounterBridgeService
             !table.ContentFingerprint.Equals(contentFingerprint, StringComparison.OrdinalIgnoreCase))
         {
             throw new InvalidOperationException(
-                "启用 Mod 的集合或顺序已在托管 Bridge 建立后变化。为避免重排仍被存档引用的索引，" +
-                "本次不会自动重建旧遭遇表。");
+                EditorText.Get("ManagedBattleEncounterBridgeService_017") +
+                EditorText.Get("ManagedBattleEncounterBridgeService_018"));
         }
         if (!File.Exists(stagedMashPath) ||
             !ComputeSha256(stagedMashPath).Equals(
@@ -483,13 +483,13 @@ public sealed partial class ManagedBattleEncounterBridgeService
                 StringComparison.OrdinalIgnoreCase))
         {
             throw new InvalidDataException(
-                "托管 Encounter Bridge 的遭遇表已被外部修改，无法安全追加新索引。");
+                EditorText.Get("ManagedBattleEncounterBridgeService_019"));
         }
         if (table.Entries
             .GroupBy(entry => (entry.MashType, entry.MashIndex))
             .Any(group => group.Count() > 1))
         {
-            throw new InvalidDataException("托管 Encounter Bridge 清单包含重复索引。");
+            throw new InvalidDataException(EditorText.Get("ManagedBattleEncounterBridgeService_020"));
         }
     }
 
@@ -504,7 +504,7 @@ public sealed partial class ManagedBattleEncounterBridgeService
         var originalHash = ComputeSha256(gamePath);
         if (!originalHash.Equals(activeContent.SourceGameSha256, StringComparison.OrdinalIgnoreCase))
         {
-            throw new InvalidOperationException("活动 Mod 配置在托管 Bridge 准备期间已经变化。");
+            throw new InvalidOperationException(EditorText.Get("ManagedBattleEncounterBridgeService_021"));
         }
 
         var gameWorkspace = Path.Combine(workspace, "game");
@@ -526,7 +526,7 @@ public sealed partial class ManagedBattleEncounterBridgeService
                 pair.Value is not JsonObject value)
             {
                 throw new InvalidDataException(
-                    $"活动 Mod 列表包含无法安全重排的条目：{pair.Key}");
+                    EditorText.Format("ManagedBattleEncounterBridgeService_022", pair.Key));
             }
             orderedEntries.Add((order, (JsonObject)value.DeepClone()));
         }
@@ -570,11 +570,11 @@ public sealed partial class ManagedBattleEncounterBridgeService
         if (!JsonNode.DeepEquals(root, JsonSupport.ReadObject(roundTripPath)))
         {
             throw new InvalidDataException(
-                "托管 Bridge 的活动 Mod 配置未通过 DSON 编码回环验证。");
+                EditorText.Get("ManagedBattleEncounterBridgeService_023"));
         }
         if (sourceWasDson && !RevisionMatches(sourcePath, encodedPath))
         {
-            throw new InvalidDataException("编码后的 persist.game.json 未保留原始 DSON 修订字段。");
+            throw new InvalidDataException(EditorText.Get("ManagedBattleEncounterBridgeService_024"));
         }
 
         return new PreparedManagedGameUpdate(
@@ -608,7 +608,7 @@ public sealed partial class ManagedBattleEncounterBridgeService
                 if (!before.Equals(backupHash, StringComparison.OrdinalIgnoreCase) ||
                     !after.Equals(backupHash, StringComparison.OrdinalIgnoreCase))
                 {
-                    throw new IOException($"备份期间存档发生了变化：{path}");
+                    throw new IOException(EditorText.Format("BattleMapEditService_029", path));
                 }
                 return new
                 {
@@ -622,7 +622,7 @@ public sealed partial class ManagedBattleEncounterBridgeService
         if (!File.Exists(gameBackup) ||
             !ComputeSha256(gameBackup).Equals(expectedGameSha256, StringComparison.OrdinalIgnoreCase))
         {
-            throw new IOException("完整档案备份中的 persist.game.json 与目录快照不一致。");
+            throw new IOException(EditorText.Get("ManagedBattleEncounterBridgeService_025"));
         }
 
         File.WriteAllText(
@@ -669,7 +669,7 @@ public sealed partial class ManagedBattleEncounterBridgeService
             0 => "hall",
             1 => "room",
             2 => "boss",
-            _ => throw new InvalidOperationException("托管 Encounter Bridge 不支持该 mash_type。")
+            _ => throw new InvalidOperationException(EditorText.Get("EncounterBridgeRow_001"))
         };
         return NativeDarkestReader.ReadRecords(path)
             .Count(record => record.Kind == expectedKind && NativeDarkestReader.FindValue(record.Body, ".types") >= 0);
@@ -691,7 +691,7 @@ public sealed partial class ManagedBattleEncounterBridgeService
             <?xml version="1.0" encoding="utf-8"?>
             <project>
               <PreviewIconFile>{SecurityElement.Escape(modDataPath + EncounterBridgeBranding.PreviewFileName)}</PreviewIconFile>
-              <ItemDescriptionShort>为存档编辑器添加的跨地区战斗提供支持。</ItemDescriptionShort>
+              <ItemDescriptionShort>{SecurityElement.Escape(EditorText.Get("ManagedBattleEncounterBridgeService_026"))}</ItemDescriptionShort>
               <ModDataPath>{SecurityElement.Escape(modDataPath)}</ModDataPath>
               <Title>{SecurityElement.Escape(manifest.ProjectTitle)}</Title>
               <Language>english</Language>
@@ -701,7 +701,7 @@ public sealed partial class ManagedBattleEncounterBridgeService
               <VersionMinor>0</VersionMinor>
               <TargetBuild>0</TargetBuild>
               <Tags><Tags>Gameplay Tweaks</Tags></Tags>
-              <ItemDescription>由暗黑地牢存档编辑器自动维护。地图仍包含编辑器添加的战斗时，请保持启用并置于 Mod 列表顶部。怪物资源仍由对应的来源 Mod 提供。</ItemDescription>
+              <ItemDescription>{SecurityElement.Escape(EditorText.Get("ManagedBattleEncounterBridgeService_027"))}</ItemDescription>
               <PublishedFileId>0</PublishedFileId>
             </project>
             """,
@@ -720,7 +720,7 @@ public sealed partial class ManagedBattleEncounterBridgeService
                 if (!File.Exists(path))
                 {
                     throw new InvalidDataException(
-                        $"托管 Encounter Bridge 清单引用了不存在的文件：{table.RelativeMashPath}");
+                        EditorText.Format("ManagedBattleEncounterBridgeService_028", table.RelativeMashPath));
                 }
                 return $"{table.RelativeMashPath} {new FileInfo(path).Length}";
             })
@@ -736,18 +736,18 @@ public sealed partial class ManagedBattleEncounterBridgeService
         if (!File.Exists(path))
         {
             throw new InvalidDataException(
-                $"现有托管 Bridge 目录缺少 {ManifestFileName}，程序不会覆盖它。");
+                EditorText.Format("ManagedBattleEncounterBridgeService_029", ManifestFileName));
         }
         try
         {
             return JsonSerializer.Deserialize<ManagedBridgeManifest>(
                        File.ReadAllText(path, Encoding.UTF8),
                        ManifestJsonOptions)
-                   ?? throw new InvalidDataException("托管 Encounter Bridge 清单为空。");
+                   ?? throw new InvalidDataException(EditorText.Get("ManagedBattleEncounterBridgeService_030"));
         }
         catch (JsonException ex)
         {
-            throw new InvalidDataException("托管 Encounter Bridge 清单不是有效 JSON。", ex);
+            throw new InvalidDataException(EditorText.Get("ManagedBattleEncounterBridgeService_031"), ex);
         }
     }
 
@@ -762,11 +762,11 @@ public sealed partial class ManagedBattleEncounterBridgeService
             !string.Equals(manifest.SteamUserId, profile.SteamUserId, StringComparison.Ordinal))
         {
             throw new InvalidDataException(
-                "现有托管 Encounter Bridge 不属于当前档案或版本不兼容，程序不会覆盖它。");
+                EditorText.Get("ManagedBattleEncounterBridgeService_032"));
         }
         if (manifest.Tables is null || manifest.Tables.Any(table => table is null))
         {
-            throw new InvalidDataException("托管 Encounter Bridge 清单缺少有效的遭遇表列表。");
+            throw new InvalidDataException(EditorText.Get("ManagedBattleEncounterBridgeService_033"));
         }
         foreach (var table in manifest.Tables)
         {
@@ -787,24 +787,24 @@ public sealed partial class ManagedBattleEncounterBridgeService
                     entry.MonsterIds.Count == 0 ||
                     entry.MonsterIds.Any(string.IsNullOrWhiteSpace)))
             {
-                throw new InvalidDataException("托管 Encounter Bridge 清单包含无效的遭遇表或条目。");
+                throw new InvalidDataException(EditorText.Get("ManagedBattleEncounterBridgeService_034"));
             }
             if (table.Entries
                 .GroupBy(entry => $"{entry.MashType}\n{string.Join('\n', entry.MonsterIds)}")
                 .Any(group => group.Count() > 1))
             {
-                throw new InvalidDataException("托管 Encounter Bridge 清单包含重复的完整遭遇。");
+                throw new InvalidDataException(EditorText.Get("ManagedBattleEncounterBridgeService_035"));
             }
         }
         if (manifest.Tables.GroupBy(table => (table.DungeonId, table.Difficulty)).Any(group => group.Count() > 1))
-            throw new InvalidDataException("托管 Encounter Bridge 清单包含重复的地区与难度。");
+            throw new InvalidDataException(EditorText.Get("ManagedBattleEncounterBridgeService_036"));
         if (manifest.Tables
             .GroupBy(
                 table => table.RelativeMashPath,
                 StringComparer.OrdinalIgnoreCase)
             .Any(group => group.Count() > 1))
         {
-            throw new InvalidDataException("托管 Encounter Bridge 清单包含重复的遭遇表路径。");
+            throw new InvalidDataException(EditorText.Get("ManagedBattleEncounterBridgeService_037"));
         }
     }
 
@@ -834,10 +834,10 @@ public sealed partial class ManagedBattleEncounterBridgeService
         var root = Path.GetFullPath(candidate ?? defaultRoot);
         if (File.Exists(root))
         {
-            throw new IOException($"本地 Mod 根目录被同名文件占用：{root}");
+            throw new IOException(EditorText.Format("ManagedBattleEncounterBridgeService_038", root));
         }
         Directory.CreateDirectory(root);
-        RejectReparsePoint(root, "本地 Mod 根目录");
+        RejectReparsePoint(root, EditorText.Get("ManagedBattleEncounterBridgeService_Maintenance_008"));
         return root;
     }
 
@@ -873,7 +873,7 @@ public sealed partial class ManagedBattleEncounterBridgeService
                 Path.GetFullPath(installRoot),
                 StringComparison.OrdinalIgnoreCase))
         {
-            throw new InvalidOperationException("托管 Encounter Bridge 的目标目录超出了本地 Mod 根目录。");
+            throw new InvalidOperationException(EditorText.Get("ManagedBattleEncounterBridgeService_039"));
         }
     }
 
@@ -904,7 +904,7 @@ public sealed partial class ManagedBattleEncounterBridgeService
         if (Directory.Exists(path) &&
             (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0)
         {
-            throw new IOException($"{label}不能是符号链接或目录联接：{path}");
+            throw new IOException(EditorText.Format("ManagedBattleEncounterBridgeService_040", label, path));
         }
     }
 
@@ -916,7 +916,7 @@ public sealed partial class ManagedBattleEncounterBridgeService
             return;
         }
 
-        RejectReparsePoint(destination, "托管 Encounter Bridge 目录");
+        RejectReparsePoint(destination, EditorText.Get("ManagedBattleEncounterBridgeService_005"));
         foreach (var sourcePath in Directory.EnumerateFiles(source, "*", SearchOption.AllDirectories))
         {
             var relative = Path.GetRelativePath(source, sourcePath);
@@ -950,7 +950,7 @@ public sealed partial class ManagedBattleEncounterBridgeService
     {
         if (Directory.Exists(packageDirectory))
         {
-            RejectReparsePoint(packageDirectory, "托管 Encounter Bridge 目录");
+            RejectReparsePoint(packageDirectory, EditorText.Get("ManagedBattleEncounterBridgeService_005"));
             Directory.Delete(packageDirectory, recursive: true);
         }
         if (rollbackPackage is not null)
@@ -961,18 +961,18 @@ public sealed partial class ManagedBattleEncounterBridgeService
 
     private static void CopyDirectory(string source, string destination)
     {
-        RejectReparsePoint(source, "复制源目录");
+        RejectReparsePoint(source, EditorText.Get("ManagedBattleEncounterBridgeService_041"));
         Directory.CreateDirectory(destination);
         foreach (var directory in Directory.EnumerateDirectories(source, "*", SearchOption.AllDirectories))
         {
-            RejectReparsePoint(directory, "复制源子目录");
+            RejectReparsePoint(directory, EditorText.Get("ManagedBattleEncounterBridgeService_042"));
             Directory.CreateDirectory(Path.Combine(destination, Path.GetRelativePath(source, directory)));
         }
         foreach (var file in Directory.EnumerateFiles(source, "*", SearchOption.AllDirectories))
         {
             if ((File.GetAttributes(file) & FileAttributes.ReparsePoint) != 0)
             {
-                throw new IOException($"复制源文件不能是符号链接：{file}");
+                throw new IOException(EditorText.Format("ManagedBattleEncounterBridgeService_043", file));
             }
             var destinationPath = Path.Combine(destination, Path.GetRelativePath(source, file));
             Directory.CreateDirectory(Path.GetDirectoryName(destinationPath)!);
@@ -1007,7 +1007,7 @@ public sealed partial class ManagedBattleEncounterBridgeService
         if (_gameRunningProbe())
         {
             throw new InvalidOperationException(
-                "检测到《暗黑地牢》仍在运行。请完全退出游戏后再修改遭遇。");
+                EditorText.Get("ManagedBattleEncounterBridgeService_044"));
         }
     }
 

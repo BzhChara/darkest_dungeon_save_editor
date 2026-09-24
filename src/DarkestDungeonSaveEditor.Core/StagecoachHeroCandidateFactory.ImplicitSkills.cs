@@ -25,20 +25,20 @@ public static partial class StagecoachHeroCandidateFactory
         if (!heroClass.CombatSkillLevels.TryGetValue(skillId, out var levels) ||
             !HasContiguousNumericSkillLevels(levels))
         {
-            reason = "技能等级定义不连续或缺失";
+            reason = EditorText.Get("StagecoachHeroCandidateFactory_ImplicitSkills_001");
         }
         else if (!TryGetImplicitCombatSchedule(heroClass, combatTargets, out schedule))
         {
-            reason = "同职业没有获得有效技能严格过半支持的升级规则";
+            reason = EditorText.Get("StagecoachHeroCandidateFactory_ImplicitSkills_002");
         }
         else if (levels.Count > schedule.Count)
         {
-            reason = "技能档数超出同职业已知升级规则";
+            reason = EditorText.Get("StagecoachHeroCandidateFactory_ImplicitSkills_003");
         }
 
         if (reason.Length > 0)
         {
-            warnings?.Add($"无购买升级树的技能仅做基础解锁：{skillId}（{reason}）。");
+            warnings?.Add(EditorText.Format("StagecoachHeroCandidateFactory_ImplicitSkills_004", skillId, reason));
             return [new HeroUpgradePurchase(treeId, "0")];
         }
 
@@ -47,7 +47,7 @@ public static partial class StagecoachHeroCandidateFactory
             .TakeWhile(requirement => requirement.PrerequisiteResolveLevel <= resolveLevel)
             .Select(requirement => new HeroUpgradePurchase(treeId, requirement.Code))
             .ToArray();
-        warnings?.Add($"无购买升级树的技能已按同职业多数规则补齐至技能 {purchases.Length} 级：{skillId}。");
+        warnings?.Add(EditorText.Format("StagecoachHeroCandidateFactory_ImplicitSkills_005", purchases.Length, skillId));
         return purchases;
     }
 

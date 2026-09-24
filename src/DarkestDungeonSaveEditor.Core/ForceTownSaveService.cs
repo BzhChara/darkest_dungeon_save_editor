@@ -83,22 +83,22 @@ public sealed class ForceTownSaveService
         var gameDocument = JsonSupport.ReadObject(decodedPath);
         var capturedLocation = RaidSaveLocation.FromGame(profile.ProfileDirectory, gameDocument);
         if (!capturedLocation.MapPath.Equals(paths.MapPath, StringComparison.OrdinalIgnoreCase))
-            throw new IOException("副本目录在准备强制回城时发生变化，请重新加载。");
+            throw new IOException(EditorText.Get("ForceTownSaveService_001"));
         var baseRoot = JsonSupport.RequireObject(gameDocument, "base_root");
         if (baseRoot["inraid"] is not JsonValue inRaidNode ||
             !inRaidNode.TryGetValue<bool>(out var previousInRaid))
         {
-            throw new InvalidDataException("persist.game.json 缺少有效的 inraid 状态，无法安全设置回城。");
+            throw new InvalidDataException(EditorText.Get("ForceTownSaveService_002"));
         }
         if (baseRoot["raiddungeon"] is not JsonValue raidDungeonNode ||
             !raidDungeonNode.TryGetValue<string>(out var previousRaidDungeon) ||
             string.IsNullOrWhiteSpace(previousRaidDungeon))
         {
-            throw new InvalidDataException("persist.game.json 缺少有效的 raiddungeon 状态，无法安全设置回城。");
+            throw new InvalidDataException(EditorText.Get("ForceTownSaveService_003"));
         }
         if (!previousInRaid)
         {
-            throw new InvalidOperationException("所选档案的读档入口已经是城镇，无需再次强制回城。");
+            throw new InvalidOperationException(EditorText.Get("ForceTownSaveService_004"));
         }
 
         baseRoot["inraid"] = false;
@@ -115,11 +115,11 @@ public sealed class ForceTownSaveService
         var roundTripDocument = JsonSupport.ReadObject(roundTripPath);
         if (!JsonNode.DeepEquals(gameDocument, roundTripDocument))
         {
-            throw new InvalidDataException("强制回城修改未通过 DSON 编码回环验证，本次修改未写入。");
+            throw new InvalidDataException(EditorText.Get("ForceTownSaveService_005"));
         }
         if (sourceWasDson && !RevisionMatches(sourceCopyPath, encodedPath))
         {
-            throw new InvalidDataException("编码后的 persist.game.json 未保留原始 DSON 修订字段，本次修改未写入。");
+            throw new InvalidDataException(EditorText.Get("ForceTownSaveService_006"));
         }
 
         ValidateCapturedState(paths, sourceCopyPath, gameHash, mapHash, raidHash);
@@ -155,21 +155,21 @@ public sealed class ForceTownSaveService
         EnsureGameIsNotRunning();
         var paths = ValidateProfile(prepared.Profile, expectedSnapshot: null);
         ValidatePreparedTarget(prepared, paths.GamePath);
-        ValidateLiveState(prepared, paths, "准备完成后");
+        ValidateLiveState(prepared, paths, EditorText.Get("BattleMapEditService_001"));
         if (!File.Exists(prepared.GameFile.EncodedPath) ||
             !ComputeSha256(prepared.GameFile.EncodedPath).Equals(
                 prepared.GameFile.EncodedSha256,
                 StringComparison.OrdinalIgnoreCase))
         {
-            throw new InvalidOperationException("已验证的强制回城结果已经变化或丢失，请重新执行操作。");
+            throw new InvalidOperationException(EditorText.Get("ForceTownSaveService_007"));
         }
 
         var backupDirectory = CreateBackup(prepared.Profile, prepared);
-        ValidateLiveState(prepared, paths, "创建档案备份期间");
+        ValidateLiveState(prepared, paths, EditorText.Get("BattleMapEditService_003"));
         EnsureGameIsNotRunning();
 
         var targetDirectory = Path.GetDirectoryName(paths.GamePath)
-            ?? throw new InvalidOperationException($"无法确定存档目标目录：{paths.GamePath}");
+            ?? throw new InvalidOperationException(EditorText.Format("ForceTownSaveService_008", paths.GamePath));
         var temporaryTarget = Path.Combine(
             targetDirectory,
             $".persist.game.json.ddse-{Guid.NewGuid():N}.tmp");
@@ -197,7 +197,7 @@ public sealed class ForceTownSaveService
                 !ComputeSha256(gameLock).Equals(prepared.GameFile.OriginalSha256, StringComparison.OrdinalIgnoreCase))
             {
                 throw new InvalidOperationException(
-                    "游戏、地图或副本存档在写入前发生了变化，本次修改未应用。请重新加载内容目录后重试。");
+                    EditorText.Get("ForceTownSaveService_009"));
             }
 
             _beforeTargetReplace?.Invoke(paths.GamePath);
@@ -220,13 +220,13 @@ public sealed class ForceTownSaveService
                 {
                     preserveDisplacedTarget = true;
                     throw new AggregateException(
-                        $"persist.game.json 在最终写入瞬间被其他进程替换，程序无法自动恢复较新的版本。" +
-                        $"该版本保留在：{displacedTarget}",
+                        EditorText.Format("ForceTownSaveService_010") +
+                        EditorText.Format("ForceTownSaveService_011", displacedTarget),
                         restoreError);
                 }
 
                 throw new InvalidOperationException(
-                    "persist.game.json 在最终写入瞬间发生了变化；程序已恢复变化后的版本，本次强制回城未应用。");
+                    EditorText.Get("ForceTownSaveService_012"));
             }
 
             using var finalGameLock = new FileStream(
@@ -241,13 +241,13 @@ public sealed class ForceTownSaveService
             {
                 replacementSucceeded = false;
                 throw new InvalidOperationException(
-                    "persist.game.json 在原子替换后又被其他进程更新；程序保留了更新后的版本，本次强制回城未生效。");
+                    EditorText.Get("ForceTownSaveService_013"));
             }
             if (
                 !ComputeSha256(mapLock).Equals(prepared.MapOriginalSha256, StringComparison.OrdinalIgnoreCase) ||
                 !ComputeSha256(raidLock).Equals(prepared.RaidOriginalSha256, StringComparison.OrdinalIgnoreCase))
             {
-                throw new IOException("写入后的回城状态不符合已验证结果，程序将尝试自动恢复。");
+                throw new IOException(EditorText.Get("ForceTownSaveService_014"));
             }
 
             var result = new SaveCommitResult(
@@ -274,7 +274,7 @@ public sealed class ForceTownSaveService
                         : backupTargetPath;
                     RestoreTarget(restoreSource, prepared.GameFile);
                     throw new InvalidOperationException(
-                        $"强制回城写入失败，已恢复原 persist.game.json；完整档案备份位于：{backupDirectory}",
+                        EditorText.Format("ForceTownSaveService_015", backupDirectory),
                         commitError);
                 }
                 catch (InvalidOperationException ex) when (ReferenceEquals(ex.InnerException, commitError))
@@ -285,8 +285,8 @@ public sealed class ForceTownSaveService
                 {
                     preserveDisplacedTarget = true;
                     throw new AggregateException(
-                        $"强制回城写入失败，自动恢复也未能完成。请保留并使用完整备份：{backupDirectory}" +
-                        (File.Exists(displacedTarget) ? $"；被替换文件：{displacedTarget}" : string.Empty),
+                        EditorText.Format("ForceTownSaveService_016", backupDirectory) +
+                        (File.Exists(displacedTarget) ? EditorText.Format("ForceTownSaveService_017", displacedTarget) : string.Empty),
                         commitError,
                         restoreError);
                 }
@@ -311,7 +311,7 @@ public sealed class ForceTownSaveService
         var profileDirectory = Path.GetFullPath(profile.ProfileDirectory);
         if (!Directory.Exists(profileDirectory))
         {
-            throw new DirectoryNotFoundException($"找不到档案目录：{profileDirectory}");
+            throw new DirectoryNotFoundException(EditorText.Format("BattleMapEditService_015", profileDirectory));
         }
 
         var estatePath = Path.Combine(profileDirectory, "persist.estate.json");
@@ -321,18 +321,18 @@ public sealed class ForceTownSaveService
         if (!Path.GetFullPath(profile.EstateSavePath).Equals(estatePath, StringComparison.OrdinalIgnoreCase) ||
             !File.Exists(estatePath))
         {
-            throw new InvalidOperationException("所选档案缺少预期的 persist.estate.json 文件。");
+            throw new InvalidOperationException(EditorText.Get("BattleMapEditService_016"));
         }
         if (!File.Exists(gamePath) || !File.Exists(mapPath) || !File.Exists(raidPath))
         {
-            throw new InvalidOperationException("所选档案已经不再处于完整的副本状态。");
+            throw new InvalidOperationException(EditorText.Get("BattleMapEditService_017"));
         }
         if (expectedSnapshot is not null &&
             (!Path.GetFullPath(expectedSnapshot.ProfileDirectory).Equals(profileDirectory, StringComparison.OrdinalIgnoreCase) ||
              !Path.GetFullPath(expectedSnapshot.MapSavePath).Equals(mapPath, StringComparison.OrdinalIgnoreCase) ||
              !Path.GetFullPath(expectedSnapshot.RaidSavePath).Equals(raidPath, StringComparison.OrdinalIgnoreCase)))
         {
-            throw new InvalidOperationException("当前显示的战斗地图属于另一个档案，请重新加载内容目录。");
+            throw new InvalidOperationException(EditorText.Get("BattleMapEditService_020"));
         }
 
         return new ForceTownProfilePaths(gamePath, mapPath, raidPath);
@@ -346,7 +346,7 @@ public sealed class ForceTownSaveService
         if (!mapHash.Equals(snapshot.MapSha256, StringComparison.OrdinalIgnoreCase) ||
             !raidHash.Equals(snapshot.RaidSha256, StringComparison.OrdinalIgnoreCase))
         {
-            throw new InvalidOperationException("地图或副本存档在显示后已经变化，请等待地图刷新后重新操作。");
+            throw new InvalidOperationException(EditorText.Get("BattleMapEditService_012"));
         }
     }
 
@@ -362,7 +362,7 @@ public sealed class ForceTownSaveService
             !ComputeSha256(paths.MapPath).Equals(mapHash, StringComparison.OrdinalIgnoreCase) ||
             !ComputeSha256(paths.RaidPath).Equals(raidHash, StringComparison.OrdinalIgnoreCase))
         {
-            throw new InvalidOperationException("准备强制回城期间存档发生了变化，本次修改未写入。");
+            throw new InvalidOperationException(EditorText.Get("ForceTownSaveService_018"));
         }
     }
 
@@ -371,7 +371,7 @@ public sealed class ForceTownSaveService
         if (!Path.GetFullPath(prepared.GameFile.TargetPath).Equals(gamePath, StringComparison.OrdinalIgnoreCase) ||
             !prepared.GameFile.FileName.Equals("persist.game.json", StringComparison.OrdinalIgnoreCase))
         {
-            throw new InvalidOperationException("准备写入的强制回城目标不属于所选档案。");
+            throw new InvalidOperationException(EditorText.Get("ForceTownSaveService_019"));
         }
     }
 
@@ -385,7 +385,7 @@ public sealed class ForceTownSaveService
             !ComputeSha256(paths.RaidPath).Equals(prepared.RaidOriginalSha256, StringComparison.OrdinalIgnoreCase))
         {
             throw new InvalidOperationException(
-                $"游戏、地图或副本存档在“{phase}”阶段发生了变化。为避免覆盖较新的游戏数据，请重新执行操作。");
+                EditorText.Format("ForceTownSaveService_020", phase));
         }
     }
 
@@ -409,7 +409,7 @@ public sealed class ForceTownSaveService
                 if (!before.Equals(backup, StringComparison.OrdinalIgnoreCase) ||
                     !after.Equals(backup, StringComparison.OrdinalIgnoreCase))
                 {
-                    throw new IOException($"备份期间存档发生了变化：{path}");
+                    throw new IOException(EditorText.Format("BattleMapEditService_029", path));
                 }
 
                 return new
@@ -431,7 +431,7 @@ public sealed class ForceTownSaveService
         {
             if (!files.Any(file => file.fileName.Equals(required, StringComparison.OrdinalIgnoreCase)))
             {
-                throw new InvalidOperationException($"完整档案备份缺少 {required}，本次修改未写入。");
+                throw new InvalidOperationException(EditorText.Format("ForceTownSaveService_021", required));
             }
         }
 
@@ -460,7 +460,7 @@ public sealed class ForceTownSaveService
     {
         if (_gameRunningProbe())
         {
-            throw new InvalidOperationException("检测到《暗黑地牢》仍在运行。请完全退出游戏后再强制返回城镇。");
+            throw new InvalidOperationException(EditorText.Get("ForceTownSaveService_022"));
         }
     }
 
@@ -510,11 +510,11 @@ public sealed class ForceTownSaveService
         if (!File.Exists(backupPath) ||
             !ComputeSha256(backupPath).Equals(targetFile.OriginalSha256, StringComparison.OrdinalIgnoreCase))
         {
-            throw new InvalidDataException("persist.game.json 的备份丢失或与原始存档不一致。");
+            throw new InvalidDataException(EditorText.Get("ForceTownSaveService_023"));
         }
 
         var targetDirectory = Path.GetDirectoryName(targetFile.TargetPath)
-            ?? throw new InvalidOperationException($"无法确定存档目标目录：{targetFile.TargetPath}");
+            ?? throw new InvalidOperationException(EditorText.Format("ForceTownSaveService_008", targetFile.TargetPath));
         var temporaryTarget = Path.Combine(
             targetDirectory,
             $".persist.game.json.ddse-restore-{Guid.NewGuid():N}.tmp");
@@ -530,7 +530,7 @@ public sealed class ForceTownSaveService
                     targetFile.OriginalSha256,
                     StringComparison.OrdinalIgnoreCase))
             {
-                throw new IOException("恢复后的 persist.game.json 与原始存档哈希不一致。");
+                throw new IOException(EditorText.Get("ForceTownSaveService_024"));
             }
         }
         finally
@@ -547,11 +547,11 @@ public sealed class ForceTownSaveService
         if (!File.Exists(sourcePath) ||
             !ComputeSha256(sourcePath).Equals(expectedSha256, StringComparison.OrdinalIgnoreCase))
         {
-            throw new InvalidDataException("需要恢复的 persist.game.json 版本丢失或已经变化。");
+            throw new InvalidDataException(EditorText.Get("ForceTownSaveService_025"));
         }
 
         var targetDirectory = Path.GetDirectoryName(targetPath)
-            ?? throw new InvalidOperationException($"无法确定存档目标目录：{targetPath}");
+            ?? throw new InvalidOperationException(EditorText.Format("ForceTownSaveService_008", targetPath));
         var temporaryTarget = Path.Combine(
             targetDirectory,
             $".persist.game.json.ddse-race-restore-{Guid.NewGuid():N}.tmp");
@@ -565,7 +565,7 @@ public sealed class ForceTownSaveService
                 ignoreMetadataErrors: true);
             if (!ComputeSha256(targetPath).Equals(expectedSha256, StringComparison.OrdinalIgnoreCase))
             {
-                throw new IOException("恢复后的 persist.game.json 与变化后的版本哈希不一致。");
+                throw new IOException(EditorText.Get("ForceTownSaveService_026"));
             }
         }
         finally

@@ -62,14 +62,14 @@ public static partial class BattleRoomAttachmentCatalog
         { AllowTrailingCommas = true, CommentHandling = JsonCommentHandling.Skip });
         var root = document.RootElement;
         if (root.ValueKind != JsonValueKind.Object)
-            throw new InvalidDataException($"地图资源 JSON 根节点不是对象：{file.Path}");
+            throw new InvalidDataException(EditorText.Format("BattleRoomAttachmentCatalog_PropLibrary_001", file.Path));
         var fileDefault = ApplyPropData(new PropData(), root, "default_data", resources);
         foreach (var prop in NativeJsonReader.Array(root, "props").Where(value => value.ValueKind == JsonValueKind.Object))
         {
             var name = NativeJsonReader.ReadString(prop, "name");
             if (string.IsNullOrWhiteSpace(name) || name.Contains('\0'))
             {
-                throw new InvalidDataException($"地图资源名称无效：{file.Path}");
+                throw new InvalidDataException(EditorText.Format("BattleRoomAttachmentCatalog_PropLibrary_002", file.Path));
             }
             var id = JsonPropRegistrationId(name, file.Path);
             var data = ApplyPropData(fileDefault, prop, "default_data", resources);
@@ -86,7 +86,7 @@ public static partial class BattleRoomAttachmentCatalog
                     if (!NativeJsonReader.TryGetProperty(variation, "level", out var levelNode) ||
                         levelNode.ValueKind != JsonValueKind.Number || !levelNode.TryGetInt32(out var level) || level is < 1 or > 7)
                     {
-                        throw new InvalidDataException($"地图资源难度变化无效：{file.Path}；{id}");
+                        throw new InvalidDataException(EditorText.Format("BattleRoomAttachmentCatalog_PropLibrary_003", file.Path, id));
                     }
                     levels[level - 1] = ApplyPropData(levels[level - 1], variation, resources);
                 }
@@ -94,7 +94,7 @@ public static partial class BattleRoomAttachmentCatalog
             }
             else
             {
-                throw new InvalidDataException($"地图资源 difficulty_variations 不是数组：{file.Path}；{id}");
+                throw new InvalidDataException(EditorText.Format("BattleRoomAttachmentCatalog_PropLibrary_004", file.Path, id));
             }
             // Diagnose unresolved metadata when a supported pool actually references it.
             // Native system props (for example doors) are outside this placement catalog.
@@ -112,19 +112,19 @@ public static partial class BattleRoomAttachmentCatalog
         {
             var bytes = StrictUtf8.GetBytes(name);
             var id = StrictUtf8.GetString(bytes, 0, Math.Min(63, bytes.Length));
-            if (string.IsNullOrWhiteSpace(id)) throw new InvalidDataException($"地图资源截断后的名称为空白：{path}");
+            if (string.IsNullOrWhiteSpace(id)) throw new InvalidDataException(EditorText.Format("BattleRoomAttachmentCatalog_PropLibrary_005", path));
             return id;
         }
         catch (Exception error) when (error is EncoderFallbackException or DecoderFallbackException)
         {
-            throw new InvalidDataException($"地图资源名称的原生 63 字节边界不是完整 UTF-8：{path}", error);
+            throw new InvalidDataException(EditorText.Format("BattleRoomAttachmentCatalog_PropLibrary_006", path), error);
         }
     }
 
     private static PropData ApplyPropData(PropData current, JsonElement owner, string key, PropResources resources) =>
         !NativeJsonReader.TryGetProperty(owner, key, out var data) ? current : data.ValueKind == JsonValueKind.Object
             ? ApplyPropData(current, data, resources)
-            : current with { Rejection = $"{key} 不是对象" };
+            : current with { Rejection = EditorText.Format("BattleRoomAttachmentCatalog_PropLibrary_007", key) };
 
     private static PropData ApplyPropData(PropData current, JsonElement data, PropResources resources)
     {
@@ -132,11 +132,11 @@ public static partial class BattleRoomAttachmentCatalog
         {
             var parent = NativeJsonReader.ReadString(inherits, "prop_type_name");
             if (!IsPropIdentity(parent))
-                return current with { Rejection = "资源继承缺少有效父名称" };
+                return current with { Rejection = EditorText.Get("BattleRoomAttachmentCatalog_PropLibrary_008") };
             // Copy the already loaded default query result; never resolve a future parent
             // or recursively merge the JSON. A parent copy replaces earlier defaults.
             var parentResource = resources.Find(parent);
-            if (parentResource is null) return current with { Rejection = $"未找到已加载父资源 {parent}" };
+            if (parentResource is null) return current with { Rejection = EditorText.Format("BattleRoomAttachmentCatalog_PropLibrary_009", parent) };
             current = parentResource.Data with { Parents = [.. parentResource.Data.Parents, parent] };
         }
         string StringField(string key, string previous)
@@ -144,14 +144,14 @@ public static partial class BattleRoomAttachmentCatalog
             if (!NativeJsonReader.TryGetProperty(data, key, out var value)) return previous;
             if (value.ValueKind == JsonValueKind.String && !value.GetString()!.Contains('\0'))
                 return value.GetString()!;
-            current = current with { Rejection = $"{key} 不是有效字符串" };
+            current = current with { Rejection = EditorText.Format("BattleRoomAttachmentCatalog_PropLibrary_010", key) };
             return previous;
         }
         bool BoolField(string key, bool previous)
         {
             if (!NativeJsonReader.TryGetProperty(data, key, out var value)) return previous;
             if (value.ValueKind is JsonValueKind.True or JsonValueKind.False) return value.GetBoolean();
-            current = current with { Rejection = $"{key} 不是布尔值" };
+            current = current with { Rejection = EditorText.Format("BattleRoomAttachmentCatalog_PropLibrary_011", key) };
             return previous;
         }
         var instanceType = StringField("instance_type", current.InstanceType);

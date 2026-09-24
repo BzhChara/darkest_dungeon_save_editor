@@ -28,7 +28,7 @@ public partial class MainWindow : Window
         _quantitySaveContext = QuantityItemSaveContext.Town;
         if (ItemTab is not null)
         {
-            ItemTab.Header = "物品  /  ITEMS";
+            ItemTab.Header = EditorText.Get("MainWindow_State_001");
         }
         _allItems = [];
         _allTrinkets = [];
@@ -57,7 +57,7 @@ public partial class MainWindow : Window
         if (ShowUnusedItemsCheckBox is not null)
         {
             ShowUnusedItemsCheckBox.IsChecked = false;
-            ShowUnusedItemsCheckBox.Content = "显示当前场景隐藏项（0）";
+            ShowUnusedItemsCheckBox.Content = EditorText.Get("MainWindow_State_002");
         }
         if (BattleMapPanel is not null)
         {
@@ -179,14 +179,14 @@ public partial class MainWindow : Window
         if (_catalogProfileDirectory is null || _catalogGameSaveSha256 is null ||
             (_allItems.Count == 0 && _allTrinkets.Count == 0 && _heroCatalog is null))
         {
-            throw new InvalidOperationException("请先为当前档案加载内容目录。");
+            throw new InvalidOperationException(EditorText.Get("MainWindow_State_003"));
         }
 
         if (!Path.GetFullPath(profile.ProfileDirectory)
                 .Equals(Path.GetFullPath(_catalogProfileDirectory), StringComparison.OrdinalIgnoreCase))
         {
             InvalidateCatalog();
-            throw new InvalidOperationException("档案目录已变化，请重新加载内容目录。");
+            throw new InvalidOperationException(EditorText.Get("MainWindow_State_004"));
         }
 
         profile = _activeContentSnapshot?.Profile ?? profile;
@@ -196,13 +196,13 @@ public partial class MainWindow : Window
                 ProfileCatalogSnapshotReader.CaptureHashes(profile)))
         {
             RequestProfileSync();
-            throw new InvalidOperationException("存档已变化，正在自动同步；同步完成后请重新生成预览，无需重新加载目录。");
+            throw new InvalidOperationException(EditorText.Get("MainWindow_State_005"));
         }
         if (!File.Exists(gameSavePath) ||
             !ComputeSha256(gameSavePath).Equals(_catalogGameSaveSha256, StringComparison.OrdinalIgnoreCase))
         {
             RequestProfileSync();
-            throw new InvalidOperationException("档案状态已变化，正在自动同步，请稍后重新生成预览。");
+            throw new InvalidOperationException(EditorText.Get("MainWindow_State_006"));
         }
 
         if (requireCurrentQuantitySnapshot)
@@ -219,7 +219,7 @@ public partial class MainWindow : Window
             {
                 RequestProfileSync();
                 throw new InvalidOperationException(
-                    "当前档案的小镇/副本状态或物品数量已变化，正在自动同步。");
+                    EditorText.Get("MainWindow_State_007"));
             }
         }
 
@@ -231,7 +231,7 @@ public partial class MainWindow : Window
                  StringComparison.OrdinalIgnoreCase)))
         {
             RequestProfileSync();
-            throw new InvalidOperationException("当前档案的物品数量已变化，正在自动同步，请稍后重新生成预览。");
+            throw new InvalidOperationException(EditorText.Get("MainWindow_State_008"));
         }
     }
 
@@ -266,11 +266,11 @@ public partial class MainWindow : Window
         CatalogToolsPanel.Visibility = isBattleTab ? Visibility.Collapsed : Visibility.Visible;
         CatalogActionPanel.Visibility = isBattleTab ? Visibility.Collapsed : Visibility.Visible;
         PreviewButton.Content = isHeroTab
-            ? "生成候选人物安全预览"
+            ? EditorText.Get("MainWindow_State_009")
             : isItemTab
-                ? "生成物品数量安全预览"
-                : "生成饰品安全预览";
-        CopiesLabel.Text = isItemTab ? "目标数量" : "添加数量";
+                ? EditorText.Get("MainWindow_State_010")
+                : EditorText.Get("MainWindow_State_011");
+        CopiesLabel.Text = isItemTab ? EditorText.Get("MainWindow_State_012") : EditorText.Get("MainWindow_State_013");
         CopiesLabel.Visibility = isHeroTab || isBattleTab ? Visibility.Collapsed : Visibility.Visible;
         CopiesTextBox.Visibility = isHeroTab || isBattleTab ? Visibility.Collapsed : Visibility.Visible;
         HeroLevelLabel.Visibility = isHeroTab ? Visibility.Visible : Visibility.Collapsed;
@@ -282,7 +282,7 @@ public partial class MainWindow : Window
         ShowUnusedItemsCheckBox.Visibility = isItemTab ? Visibility.Visible : Visibility.Collapsed;
         ShowUnusedItemsCheckBox.IsEnabled = isItemTab && _allItems.Count > 0 && CatalogTabs.IsEnabled;
         ShowUnusedItemsCheckBox.Content =
-            $"显示当前场景隐藏项（{_allItems.Count(item => item.IsHiddenByDefault)}）";
+            EditorText.Format("MainWindow_State_014", _allItems.Count(item => item.IsHiddenByDefault));
         InitialQuirkSelectionSummaryTextBlock.Visibility = isHeroTab ? Visibility.Visible : Visibility.Collapsed;
         InitialQuirksButton.IsEnabled = isHeroTab &&
             _heroCatalog is not null &&

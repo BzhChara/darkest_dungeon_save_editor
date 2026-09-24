@@ -12,7 +12,7 @@ public static partial class StagecoachHeroCandidateFactory
     {
         if (!double.IsFinite(baseHp) || baseHp <= 0.0)
         {
-            throw new InvalidOperationException($"职业 '{heroClassId}' 的基础生命无效：{baseHp}。");
+            throw new InvalidOperationException(EditorText.Format("StagecoachHeroCandidateFactory_HitPoints_001", heroClassId, baseHp));
         }
 
         var modifiers = selectedQuirks
@@ -207,12 +207,12 @@ public static partial class StagecoachHeroCandidateFactory
             currentHp <= HpSafetyTolerance)
         {
             var activeBuffs = activeModifiers.Count == 0
-                ? "无"
+                ? EditorText.Get("InitialQuirkSelectionDialog_016")
                 : string.Join(", ", activeModifiers.Select(modifier => modifier.BuffId));
             throw new InvalidOperationException(
-                $"职业 '{heroClassId}' 的初始怪癖合计 HP 修正无效：存在可达条件会使生命不大于 0 或超出存档数值范围；" +
-                $"基础 {baseHp}，固定 {flatTotal:+0.###;-0.###;0}，" +
-                $"百分比 {percentageTotal:+0.###%;-0.###%;0%}，活动 Buff：{activeBuffs}。");
+                EditorText.Format("StagecoachHeroCandidateFactory_HitPoints_002", heroClassId) +
+                EditorText.Format("StagecoachHeroCandidateFactory_HitPoints_003", baseHp, flatTotal) +
+                EditorText.Format("StagecoachHeroCandidateFactory_HitPoints_004", percentageTotal, activeBuffs));
         }
 
         return currentHp;

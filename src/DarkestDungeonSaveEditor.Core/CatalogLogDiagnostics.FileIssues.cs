@@ -6,8 +6,8 @@ public static partial class CatalogLogDiagnostics
 {
     private static bool AddEncounterSlotNotice(string raw, string module, Dictionary<string, LogGroup> groups)
     {
-        const string prefix = "遭遇槽位截取：";
-        const string recordMarker = "；记录=";
+        const string prefix = CatalogIssueCode.EncounterSlots;
+        const string recordMarker = CatalogIssueCode.Record;
         if (!raw.StartsWith(prefix, StringComparison.Ordinal)) return false;
         var recordStart = raw.LastIndexOf(recordMarker, StringComparison.Ordinal);
         if (recordStart < prefix.Length) return false;
@@ -23,8 +23,8 @@ public static partial class CatalogLogDiagnostics
         if (!groups.TryGetValue(key, out var group))
         {
             group = new LogGroup(DiagnosticLogLevel.Information,
-                $"遭遇槽位截取；文件={Clean(path)}；.types 后存在第五项，原生只读取前四个原始槽位；" +
-                "后续项可能是条件字段或额外 ID，不据此判断超过四只怪物；此截取提示本身不影响候选资格");
+                EditorText.Format("CatalogLogDiagnostics_FileIssues_001", Clean(path)) +
+                EditorText.Get("CatalogLogDiagnostics_FileIssues_002"));
             groups.Add(key, group);
         }
         group.Modules.Add(module);
@@ -33,7 +33,7 @@ public static partial class CatalogLogDiagnostics
     }
 
     private static string FormatLocations(LogGroup group) => group.Locations.Count == 0 ? string.Empty :
-        $"；涉及记录 {group.Locations.Count} 条；位置（行/从零计的记录号）=" +
+        EditorText.Format("CatalogLogDiagnostics_FileIssues_003", group.Locations.Count) +
         string.Join(", ", group.Locations.Select(location => $"{location.Line}/{location.Record}"));
 
     private static string? ReadMissingFilePath(string raw)
@@ -71,7 +71,7 @@ public static partial class CatalogLogDiagnostics
         // Only an explicit missing-file report joins dependent read failures.
         // Keep every original reason/module; unrelated read errors stay separate.
         return ("missing-file\0" + path.ToUpperInvariant(), DiagnosticLogLevel.Warning,
-            $"文件访问问题；文件={Clean(path)}；清单缺失与该文件的读取失败合并展示；" +
-            "具体原因见各模块记录，不能据此判断整个 Mod 不可用", Clean(raw));
+            EditorText.Format("CatalogLogDiagnostics_FileIssues_004", Clean(path)) +
+            EditorText.Get("CatalogLogDiagnostics_FileIssues_005"), Clean(raw));
     }
 }

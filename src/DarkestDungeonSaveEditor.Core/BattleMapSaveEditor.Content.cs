@@ -17,38 +17,38 @@ internal static partial class BattleMapSaveEditor
         ValidateStationaryRaidState(raidDocument);
         if (area.Kind != definition.TargetAreaKind)
         {
-            throw new InvalidOperationException("所选地图内容与目标位置不符；房间和走廊必须使用各自的候选目录。");
+            throw new InvalidOperationException(EditorText.Get("BattleMapSaveEditor_Content_001"));
         }
         if (!definition.IsAvailableInDungeon(snapshot.DungeonId))
         {
-            throw new InvalidOperationException("陷阱和障碍只能使用当前副本区域的资源，请重新选择。");
+            throw new InvalidOperationException(EditorText.Get("BattleMapSaveEditor_Content_002"));
         }
         if (string.Equals(area.AreaId, snapshot.EntranceAreaId, StringComparison.Ordinal))
         {
-            throw new InvalidOperationException("出生房间不能新建或替换地图内容。");
+            throw new InvalidOperationException(EditorText.Get("BattleMapSaveEditor_Content_003"));
         }
         if (string.Equals(area.AreaId, snapshot.FinalRoomId, StringComparison.Ordinal))
         {
-            throw new InvalidOperationException("最终房间不能替换为普通奇物、宝箱、陷阱或障碍。");
+            throw new InvalidOperationException(EditorText.Get("BattleMapSaveEditor_Content_004"));
         }
         if (tile.Content is BattleMapTileContent.Hunger or BattleMapTileContent.SecretDoor or
             BattleMapTileContent.Ambush or BattleMapTileContent.Happening or
             BattleMapTileContent.AmbushCurio or BattleMapTileContent.AmbushTreasure or
             BattleMapTileContent.Unknown)
         {
-            throw new InvalidOperationException("该格属于系统或脚本内容，不能新建或替换普通地图内容。");
+            throw new InvalidOperationException(EditorText.Get("BattleMapSaveEditor_Content_005"));
         }
         if (definition.PropHash == 0 ||
             definition.PropHash != BattleRoomAttachmentCatalog.ComputePropHash(definition.Id))
         {
-            throw new InvalidOperationException("所选地图内容的存档哈希无效。");
+            throw new InvalidOperationException(EditorText.Get("BattleMapSaveEditor_Content_006"));
         }
 
         var staticTile = ResolveStaticTile(mapDocument, area.AreaId, tile.TileId);
         var dynamicTile = ResolveDynamicTile(mapDocument, area.AreaId, tile.TileId);
         if (ReadRequiredInt(dynamicTile, "content") != tile.RawContent)
         {
-            throw new InvalidOperationException("目标地图格在显示后已经变化，请刷新后重试。");
+            throw new InvalidOperationException(EditorText.Get("BattleMapSaveEditor_Content_007"));
         }
 
         // A whole-cell replacement is not an attachment edit. Clear every old event
@@ -74,7 +74,7 @@ internal static partial class BattleMapSaveEditor
                 staticTile["obstacle"] = definition.PropHash;
                 break;
             default:
-                throw new InvalidOperationException("未知的地图内容类型。");
+                throw new InvalidOperationException(EditorText.Get("BattleMapSaveEditor_Content_008"));
         }
 
         return new BattleMapEditPreview(

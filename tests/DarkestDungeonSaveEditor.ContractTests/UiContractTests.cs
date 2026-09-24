@@ -9,7 +9,7 @@ internal static partial class ContractSuite
         var mainWindowXamlPath = Path.Combine(
             appSourceDirectory,
             "MainWindow.xaml");
-        var mainWindowXaml = System.Xml.Linq.XDocument.Load(mainWindowXamlPath);
+        var mainWindowXaml = LoadLocalizedContractXaml(mainWindowXamlPath);
         var mainWindowCode = string.Join(
             Environment.NewLine,
             Directory.EnumerateFiles(
@@ -33,7 +33,7 @@ internal static partial class ContractSuite
         var battleMapXamlPath = Path.Combine(
             appSourceDirectory,
             "BattleMapView.xaml");
-        var battleMapXaml = System.Xml.Linq.XDocument.Load(battleMapXamlPath);
+        var battleMapXaml = LoadLocalizedContractXaml(battleMapXamlPath);
         var battleMapXamlText = File.ReadAllText(battleMapXamlPath);
         var battleMapCode = string.Join(
             Environment.NewLine,
@@ -96,7 +96,7 @@ internal static partial class ContractSuite
             "src",
             "DarkestDungeonSaveEditor.App",
             "App.xaml");
-        var appXaml = System.Xml.Linq.XDocument.Load(appXamlPath);
+        var appXaml = LoadLocalizedContractXaml(appXamlPath);
         var appXamlText = File.ReadAllText(appXamlPath);
         var appProjectPath = Path.Combine(
             repositoryRoot,
@@ -114,7 +114,7 @@ internal static partial class ContractSuite
             "src",
             "DarkestDungeonSaveEditor.App",
             "ThemedDialog.xaml");
-        var themedDialogXaml = System.Xml.Linq.XDocument.Load(themedDialogXamlPath);
+        var themedDialogXaml = LoadLocalizedContractXaml(themedDialogXamlPath);
         var themedDialogCode = File.ReadAllText(Path.Combine(
             repositoryRoot,
             "src",
@@ -129,13 +129,13 @@ internal static partial class ContractSuite
         var battleEncounterDialogPath = Path.Combine(
             appSourceDirectory,
             "BattleEncounterSelectionDialog.xaml");
-        var battleEncounterDialog = System.Xml.Linq.XDocument.Load(battleEncounterDialogPath);
+        var battleEncounterDialog = LoadLocalizedContractXaml(battleEncounterDialogPath);
         var battleEncounterDialogCode = File.ReadAllText(
             battleEncounterDialogPath + ".cs");
         var battleAttachmentDialogPath = Path.Combine(
             appSourceDirectory,
             "BattleRoomAttachmentSelectionDialog.xaml");
-        var battleAttachmentDialog = System.Xml.Linq.XDocument.Load(battleAttachmentDialogPath);
+        var battleAttachmentDialog = LoadLocalizedContractXaml(battleAttachmentDialogPath);
         var battleAttachmentDialogCode = File.ReadAllText(
             battleAttachmentDialogPath + ".cs");
         var presentationNamespace = mainWindowXaml.Root?.Name.Namespace ??
@@ -146,10 +146,10 @@ internal static partial class ContractSuite
             mainWindowCode.Contains("Discover_Click(object sender, RoutedEventArgs e) => Discover();", StringComparison.Ordinal) &&
             mainWindowCode.Contains("WorkshopDirectoryTextBox.Text = game.WorkshopDirectory;", StringComparison.Ordinal) &&
             mainWindowCode.Contains("LocalModDirectoryTextBox.Text = game.DefaultLocalModDirectory;", StringComparison.Ordinal) &&
-            mainWindowCode.Contains("自动发现完成：{discoverySummary}", StringComparison.Ordinal) &&
-            mainWindowCode.Contains("已填写默认路径并选择 {selectedProfile.ProfileId}", StringComparison.Ordinal) &&
-            mainWindowCode.Contains("未找到游戏安装目录", StringComparison.Ordinal) &&
-            mainWindowCode.Contains("未找到存档", StringComparison.Ordinal) &&
+            mainWindowCode.Contains("MainWindow_Discovery_006", StringComparison.Ordinal) &&
+            mainWindowCode.Contains("MainWindow_Discovery_002", StringComparison.Ordinal) &&
+            mainWindowCode.Contains("MainWindow_Discovery_004", StringComparison.Ordinal) &&
+            mainWindowCode.Contains("MainWindow_Discovery_003", StringComparison.Ordinal) &&
             !mainWindowCode.Contains("自动发现：游戏=", StringComparison.Ordinal),
             "Path discovery must run only after the user clicks the button, fill the derived Workshop/local Mod paths, and report its result in user-facing language instead of terse counters.");
         Assert(
@@ -159,11 +159,11 @@ internal static partial class ContractSuite
             appCode.Contains("foreach (var entry in batch.Drain())", StringComparison.Ordinal),
             "Project-local logging must persist ordinary UI status and all grouped catalog diagnostics, including those outside the visible-message limit.");
         Assert(
-            mainWindowCode.Contains("内容目录档案：ID={activeContent.Profile.ProfileId}", StringComparison.Ordinal) &&
-            mainWindowCode.Contains("档案目录={activeContent.Profile.ProfileDirectory}", StringComparison.Ordinal) &&
+            mainWindowCode.Contains("MainWindow_CatalogLoading_006", StringComparison.Ordinal) &&
+            mainWindowCode.Contains("MainWindow_CatalogLoading_007", StringComparison.Ordinal) &&
             mainWindowCode.Contains("persist.game.json SHA-256={activeContent.SourceGameSha256}", StringComparison.Ordinal) &&
-            mainWindowCode.Contains("内容目录数量快照：场景={FormatQuantitySaveContext(_quantitySaveContext)}", StringComparison.Ordinal) &&
-            mainWindowCode.Contains("数量来源文件={Path.GetFullPath(quantitySourcePath)}", StringComparison.Ordinal) &&
+            mainWindowCode.Contains("MainWindow_CatalogLoading_015", StringComparison.Ordinal) &&
+            mainWindowCode.Contains("MainWindow_CatalogLoading_016", StringComparison.Ordinal) &&
             mainWindowCode.Contains("SHA-256={quantityItems.SourceSaveSha256}", StringComparison.Ordinal) &&
             mainWindowCode.Contains("persist.estate.json SHA-256={estateSaveSha256}", StringComparison.Ordinal),
             "Catalog loading must persist the selected profile path, game hash, active town/raid quantity-save path and hash, plus the estate hash needed alongside a raid catalog.");
@@ -172,23 +172,23 @@ internal static partial class ContractSuite
                 .Any(element => element.Attribute(xamlName)?.Value == "CatalogSummaryTextBlock") &&
             !mainWindowCode.Contains("CatalogSummaryTextBlock", StringComparison.Ordinal) &&
             !mainWindowCode.Contains("UpdateCatalogSummary", StringComparison.Ordinal) &&
-            mainWindowCode.Contains("目录扫描完成：档案 {profile.ProfileId}；模式 {catalogs.Heroes.GameMode}", StringComparison.Ordinal) &&
-            mainWindowCode.Contains("目录统计：{FormatQuantitySaveContext(_quantitySaveContext)}物品", StringComparison.Ordinal) &&
-            mainWindowCode.Contains("当前场景隐藏项 {hiddenItemCount} 个", StringComparison.Ordinal) &&
-            mainWindowCode.Contains("副本格位 {quantityItems.RaidOccupiedSlots}/", StringComparison.Ordinal) &&
+            mainWindowCode.Contains("MainWindow_CatalogLoading_017", StringComparison.Ordinal) &&
+            mainWindowCode.Contains("MainWindow_CatalogLoading_020", StringComparison.Ordinal) &&
+            mainWindowCode.Contains("MainWindow_CatalogLoading_021", StringComparison.Ordinal) &&
+            mainWindowCode.Contains("MainWindow_CatalogLoading_022", StringComparison.Ordinal) &&
             !mainWindowCode.Contains("Sum(item => item.SavedEntryCount)", StringComparison.Ordinal) &&
-            mainWindowCode.Contains("怪癖定义 {catalogs.Heroes.InitialQuirks.Count} 个", StringComparison.Ordinal) &&
-            mainWindowCode.Contains("姓名 {catalogs.Heroes.HeroNames.Count} 个", StringComparison.Ordinal) &&
-            mainWindowCode.Contains("有招募事件的人物", StringComparison.Ordinal) &&
-            mainWindowCode.Contains("有后续玩法怪癖线索的人物", StringComparison.Ordinal),
+            mainWindowCode.Contains("MainWindow_CatalogLoading_024", StringComparison.Ordinal) &&
+            mainWindowCode.Contains("MainWindow_CatalogLoading_025", StringComparison.Ordinal) &&
+            mainWindowCode.Contains("MainWindow_CatalogLoading_027", StringComparison.Ordinal) &&
+            mainWindowCode.Contains("MainWindow_CatalogLoading_028", StringComparison.Ordinal),
             "The crowded top catalog summary must be removed; the runtime log must retain current scene, visible/hidden item, raid-slot, trinket, hero, quirk, name, level, and runtime-signal diagnostics.");
         Assert(
             mainWindowXaml.Descendants(presentationNamespace + "Run")
                 .Any(run => run.Attribute("Text")?.Value == "{Binding GenerationMode, Mode=OneWay}") &&
             !mainWindowXaml.Descendants(presentationNamespace + "DataGridCheckBoxColumn").Any() &&
-            mainWindowCode.Contains("{ IsEnabled: true } => \"普通招募开启 / 编辑器手动\"", StringComparison.Ordinal) &&
-            mainWindowCode.Contains("{ IsEnabled: false } => \"普通招募关闭 / 编辑器手动\"", StringComparison.Ordinal) &&
-            mainWindowCode.Contains("_ => \"自然状态未知 / 编辑器手动\"", StringComparison.Ordinal),
+            mainWindowCode.Contains("{ IsEnabled: true } => EditorText.Get(\"MainWindow_RowModels_010\")", StringComparison.Ordinal) &&
+            mainWindowCode.Contains("{ IsEnabled: false } => EditorText.Get(\"MainWindow_RowModels_011\")", StringComparison.Ordinal) &&
+            mainWindowCode.Contains("_ => EditorText.Get(\"MainWindow_RowModels_012\")", StringComparison.Ordinal),
             "The hero catalog must distinguish game-side natural generation from editor-side manual generation instead of showing a misleading availability checkbox.");
         Assert(
             mainWindowXaml.Descendants(presentationNamespace + "ComboBox")
@@ -221,32 +221,32 @@ internal static partial class ContractSuite
         Assert(
             mainWindowXaml.Descendants(presentationNamespace + "Run")
                 .Any(run => run.Attribute("Text")?.Value == "{Binding LimitDisplay, Mode=OneWay}") &&
-            mainWindowCode.Contains("0 => \"无限\"", StringComparison.Ordinal) &&
+            mainWindowCode.Contains("0 => EditorText.Get(\"MainWindow_Presentation_009\")", StringComparison.Ordinal) &&
             mainWindowCode.Contains("PreviewWarningTextBlock", StringComparison.Ordinal),
             "The trinket UI must render limit zero as unlimited and expose a dedicated preview warning area.");
         Assert(
             mainWindowCode.Contains(
                 "FormatHeroPreviewWarnings(preparedHeroEdit.Preview)",
                 StringComparison.Ordinal) &&
-            mainWindowCode.Contains("全部马车池", StringComparison.Ordinal) &&
-            mainWindowCode.Contains("（singleton）", StringComparison.Ordinal) &&
-            mainWindowCode.Contains("编辑器会按控制台模式保留写入能力", StringComparison.Ordinal) &&
+            mainWindowCode.Contains("MainWindow_Presentation_007", StringComparison.Ordinal) &&
+            mainWindowCode.Contains("MainWindow_Presentation_006", StringComparison.Ordinal) &&
+            mainWindowCode.Contains("MainWindow_Presentation_008", StringComparison.Ordinal) &&
             !mainWindowCode.Contains("HeroQuirkLimitKind.RosterLimit", StringComparison.Ordinal),
             "Hero quirk warnings must remain scoped to singleton duplication across the roster and all stagecoach pools.");
         Assert(
             mainWindowCode.Contains("preview.MayRefreshOnTownReturn", StringComparison.Ordinal) &&
-            mainWindowCode.Contains("回城过周刷新马车时，新人物可能被清除", StringComparison.Ordinal) &&
+            mainWindowCode.Contains("MainWindow_Presentation_005", StringComparison.Ordinal) &&
             mainWindowCode.Contains("FormatHeroQuirkLimitWarnings(preview)", StringComparison.Ordinal) &&
             mainWindowCode.Contains("FormatHeroPreviewWarnings(_preparedHeroEdit.Preview)", StringComparison.Ordinal) &&
             mainWindowCode.Contains("PreviewWarningTextBlock.Text = heroWarning", StringComparison.Ordinal) &&
-            mainWindowCode.Contains("人物预览警告：", StringComparison.Ordinal),
+            mainWindowCode.Contains("MainWindow_EditWorkflow_024", StringComparison.Ordinal),
             "Hero refresh risk must share the existing preview warning, confirmation, and log path without replacing singleton warnings.");
         Assert(
             mainWindowCode.Contains(
                 "preparedHeroEdit.Preview.TargetPool == StagecoachRecruitPool.Shard",
                 StringComparison.Ordinal) &&
-            mainWindowCode.Contains("\"碎片马车\"", StringComparison.Ordinal) &&
-            mainWindowCode.Contains("\"普通马车\"", StringComparison.Ordinal) &&
+            mainWindowCode.Contains("EditorText.Get(\"MainWindow_EditWorkflow_025\")", StringComparison.Ordinal) &&
+            mainWindowCode.Contains("EditorText.Get(\"MainWindow_EditWorkflow_026\")", StringComparison.Ordinal) &&
             !mainWindowCode.Contains("向普通马车加入", StringComparison.Ordinal),
             "Hero preview and confirmation must name the actual ordinary or shard destination selected by the save mutation.");
         System.Xml.Linq.XElement ReadNamedMainElement(string elementName, string name) => mainWindowXaml
@@ -324,7 +324,7 @@ internal static partial class ContractSuite
             applicationResourceKeys.Contains("OlivePanelHeaderStyle") &&
             applicationResourceKeys.Contains("LogTextBoxStyle") &&
             mainWindowCode.Contains(
-                "仓库槽位 {FormatStorageCapacity(_trinketStorage)}",
+                "MainWindow_CatalogLoading_023",
                 StringComparison.Ordinal),
             "The game-panel application shell and effective storage-capacity diagnostic must remain wired into the runtime log.");
         var mainWindowRoot = mainWindowXaml.Root
@@ -370,7 +370,7 @@ internal static partial class ContractSuite
         Assert(
             mainWindowRoot.Attribute("Background")?.Value == "{StaticResource AppTextureBrush}" &&
             mainWindowRoot.Attribute("Foreground")?.Value == "{StaticResource TextPrimaryBrush}" &&
-            mainWindowRoot.Attribute("FontFamily")?.Value == "SimHei, Microsoft YaHei UI" &&
+            mainWindowRoot.Attribute("FontFamily")?.Value == "{x:Static local:EditorTypography.Body}" &&
             mainWindowRoot.Attribute("FontSize")?.Value == "14" &&
             applicationResourceKeys.Contains("AppTextureBrush") &&
                 appTextureBrush.Attribute("Stretch")?.Value == "UniformToFill" &&
@@ -499,9 +499,9 @@ internal static partial class ContractSuite
         var panelHeaderStyle = ReadAppStyle("PanelHeaderStyle");
         var logTextBoxStyle = ReadAppStyle("LogTextBoxStyle");
         Assert(
-            ReadStyleSetter(pageTitleStyle, "FontFamily") == "SimSun, Microsoft YaHei UI" &&
-            ReadStyleSetter(panelHeaderStyle, "FontFamily") == "SimSun, Microsoft YaHei UI" &&
-            ReadStyleSetter(logTextBoxStyle, "FontFamily") == "SimHei, Microsoft YaHei UI" &&
+            ReadStyleSetter(pageTitleStyle, "FontFamily") == "{x:Static local:EditorTypography.Heading}" &&
+            ReadStyleSetter(panelHeaderStyle, "FontFamily") == "{x:Static local:EditorTypography.Heading}" &&
+            ReadStyleSetter(logTextBoxStyle, "FontFamily") == "{x:Static local:EditorTypography.Body}" &&
             applicationResourceKeys.Contains("StoneBandBrush") &&
             applicationResourceKeys.Contains("RedBandBrush") &&
             applicationResourceKeys.Contains("BandVignetteBrush") &&
@@ -738,7 +738,7 @@ internal static partial class ContractSuite
             mainWindowCode.Contains(
                 "definition.IsHiddenByDefault == showHiddenItemsOnly",
                 StringComparison.Ordinal) &&
-            mainWindowCode.Contains("显示当前场景隐藏项（", StringComparison.Ordinal) &&
+            mainWindowCode.Contains("MainWindow_State_002", StringComparison.Ordinal) &&
             !mainWindowCode.Contains("显示未使用定义", StringComparison.Ordinal) &&
             loadCatalogRowsStage >= 0 &&
             loadCatalogModeRefresh > loadCatalogRowsStage &&
@@ -746,7 +746,7 @@ internal static partial class ContractSuite
             mainWindowCode.Contains("IsPresentInSave = resultingEntryCount > 0", StringComparison.Ordinal) &&
             mainWindowCode.Contains("SavedEntryCount = resultingEntryCount", StringComparison.Ordinal) &&
             mainWindowCode.Contains("PrepareQuantityItemEditAsync(", StringComparison.Ordinal) &&
-            mainWindowCode.Contains("CopiesLabel.Text = isItemTab ? \"目标数量\" : \"添加数量\"", StringComparison.Ordinal) &&
+            mainWindowCode.Contains("CopiesLabel.Text = isItemTab ? EditorText.Get(\"MainWindow_State_012\") : EditorText.Get(\"MainWindow_State_013\")", StringComparison.Ordinal) &&
             ReadNamedMainElement("TextBox", "CopiesTextBox").Attribute("TextChanged")?.Value ==
             "CopiesTextBox_TextChanged" &&
             ReadNamedMainElement("TextBox", "CopiesTextBox").Attribute("PreviewMouseLeftButtonDown")?.Value ==
@@ -757,21 +757,21 @@ internal static partial class ContractSuite
             mainWindowCode.Contains("textBox.SelectAll();", StringComparison.Ordinal) &&
             mainWindowCode.Contains("ResetQuantityInputForCurrentTab();", StringComparison.Ordinal) &&
             mainWindowCode.Contains("1 => \"1\"", StringComparison.Ordinal) &&
-            mainWindowCode.Contains("庄园库存 / 可手动配给", StringComparison.Ordinal) &&
-            mainWindowCode.Contains("庄园库存 / 不可手动配给", StringComparison.Ordinal) &&
-            mainWindowCode.Contains("庄园库存 / 手动配给未声明", StringComparison.Ordinal) &&
-            mainWindowCode.Contains("人物自带或副本中生成的数量不受本次修改影响。", StringComparison.Ordinal) &&
-            mainWindowCode.Contains("是否可手动配给未声明，且不会直接修改副本背包。", StringComparison.Ordinal) &&
+            mainWindowCode.Contains("MainWindow_Presentation_015", StringComparison.Ordinal) &&
+            mainWindowCode.Contains("MainWindow_Presentation_016", StringComparison.Ordinal) &&
+            mainWindowCode.Contains("MainWindow_Presentation_017", StringComparison.Ordinal) &&
+            mainWindowCode.Contains("MainWindow_Presentation_019", StringComparison.Ordinal) &&
+            mainWindowCode.Contains("MainWindow_Presentation_020", StringComparison.Ordinal) &&
             !mainWindowCode.Contains("不可配给进副本", StringComparison.Ordinal) &&
             !mainWindowCode.Contains("该物品不可从庄园携入远征。", StringComparison.Ordinal) &&
             mainWindowCode.Contains("string.IsNullOrWhiteSpace(itemWarning)", StringComparison.Ordinal) &&
-            mainWindowCode.Contains("程序会先完整备份当前档案。", StringComparison.Ordinal) &&
+            mainWindowCode.Contains("MainWindow_EditWorkflow_056", StringComparison.Ordinal) &&
             !mainWindowCode.Contains("此功能只修改 persist.estate.json", StringComparison.Ordinal) &&
             !mainWindowCode.Contains("persist.raid.json 不会变化", StringComparison.Ordinal) &&
             !mainWindowCode.Contains("estate 类型能表示庄园计数", StringComparison.Ordinal) &&
             mainWindowCode.Contains("requireCurrentQuantitySnapshot: CatalogTabs.SelectedIndex == 0", StringComparison.Ordinal) &&
             mainWindowCode.Contains("expectedInRaid ? profile.RaidSavePath : profile.EstateSavePath", StringComparison.Ordinal) &&
-            mainWindowCode.Contains("副本背包  /  RAID ITEMS", StringComparison.Ordinal),
+            mainWindowCode.Contains("MainWindow_CatalogLoading_011", StringComparison.Ordinal),
             "The quantity editor must appear immediately left of trinkets, use an absolute target amount, switch between town storage and the current raid inventory, keep only concise user-facing risks, retain persisted unused definitions, invalidate stale previews when input changes, and reject stale displayed quantities or a changed town/raid state.");
         var battleMapRoot = battleMapXaml.Root ??
             throw new InvalidDataException("BattleMapView.xaml has no root element.");
@@ -799,11 +799,11 @@ internal static partial class ContractSuite
             battleMapCode.Contains("MinimumZoom = 0.45", StringComparison.Ordinal) &&
             battleMapCode.Contains("MaximumZoom = 2.40", StringComparison.Ordinal) &&
             battleMapCode.Contains("FitMapToViewport", StringComparison.Ordinal) &&
-            battleMapCode.Contains("hasPersistedContent ? \"替换\" : \"新建\"", StringComparison.Ordinal) &&
+            battleMapCode.Contains("hasPersistedContent ? EditorText.Get(\"BattleMapView_Commands_001\") : EditorText.Get(\"BattleMapView_Commands_002\")", StringComparison.Ordinal) &&
             battleMapCode.Contains(
                 "hasPersistedContent || cell.HasResidualContentBinding",
                 StringComparison.Ordinal) &&
-            battleMapCode.Contains("移动队伍到此", StringComparison.Ordinal) &&
+            battleMapCode.Contains("BattleMapView_Commands_005", StringComparison.Ordinal) &&
             !battleMapCode.Contains("PrototypeCellKind.CorridorEndpoint", StringComparison.Ordinal) &&
             !battleMapCode.Contains("PrototypeCellKind.DoorTransition", StringComparison.Ordinal) &&
             !battleMapCode.Contains("EndpointInteractionTarget", StringComparison.Ordinal) &&
@@ -814,18 +814,18 @@ internal static partial class ContractSuite
             battleMapCode.Contains("area.Kind != BattleMapAreaKind.Corridor || tile.StaticType == 1", StringComparison.Ordinal) &&
             battleMapCode.Contains("tile.MapY - minimumY", StringComparison.Ordinal) &&
             !battleMapCode.Contains("maximumY - tile.MapY", StringComparison.Ordinal) &&
-            battleMapCode.Contains("_cells.Count} 个可操作格", StringComparison.Ordinal) &&
+            battleMapCode.Contains("BattleMapView_MapConstruction_004", StringComparison.Ordinal) &&
             battleMapCode.Contains("_selectedCell = null;", StringComparison.Ordinal) &&
             battleMapCode.Contains("BuildPrototypeMap();", StringComparison.Ordinal) &&
             battleMapCode.Contains("BattleEncounterCatalog", StringComparison.Ordinal) &&
-            battleMapCode.Contains("普通战斗", StringComparison.Ordinal) &&
+            battleMapCode.Contains("BattleEncounterSelectionDialog_014", StringComparison.Ordinal) &&
             battleMapCode.Contains("BattleEncounterClassification.Ordinary", StringComparison.Ordinal) &&
             !battleMapCode.Contains("随机（仅界面预览）", StringComparison.Ordinal) &&
             !battleMapCode.Contains("AddDirectEncounterItems", StringComparison.Ordinal) &&
             !battleMapCode.Contains("FormatEncounterHeader", StringComparison.Ordinal) &&
             !battleMapCode.Contains("）…", StringComparison.Ordinal) &&
-            battleMapCode.Contains("游荡首领 / 特殊遭遇", StringComparison.Ordinal) &&
-            battleMapCode.Contains("固定首领", StringComparison.Ordinal) &&
+            battleMapCode.Contains("BattleMapView_Commands_006", StringComparison.Ordinal) &&
+            battleMapCode.Contains("BattleEncounterSelectionDialog_005", StringComparison.Ordinal) &&
             battleMapCode.Contains("BattleEncounterClassification.RoamingBoss", StringComparison.Ordinal) &&
             battleMapCode.Contains("BattleEncounterClassification.RoamingEncounter", StringComparison.Ordinal) &&
             battleMapCode.Contains("BattleEncounterClassification.ConditionalOrAdditional", StringComparison.Ordinal) &&
@@ -855,21 +855,21 @@ internal static partial class ContractSuite
             battleMapCode.Contains("marker_curio.png", StringComparison.Ordinal) &&
             battleMapCode.Contains("PrototypeContent.Hunger => \"marker_hunger.png\"", StringComparison.Ordinal) &&
             battleMapCode.Contains("BattleMapTileContent.Hunger => PrototypeContent.Hunger", StringComparison.Ordinal) &&
-            battleMapCode.Contains("BattleMapTileContent.Hunger => \"进食格\"", StringComparison.Ordinal) &&
+            battleMapCode.Contains("BattleMapTileContent.Hunger => EditorText.Get(\"BattleMapView_CellVisuals_018\")", StringComparison.Ordinal) &&
             battleMapCode.Contains("IsHungerContent", StringComparison.Ordinal) &&
             !battleMapCode.Contains("isHiddenSystemContent", StringComparison.Ordinal) &&
             battleMapCode.Contains("cell.RawContent == (int)BattleMapTileContent.Hunger", StringComparison.Ordinal) &&
             battleMapCode.Contains("if (!isProtectedContent)", StringComparison.Ordinal) &&
             battleMapCode.Contains("marker_secret.png", StringComparison.Ordinal) &&
             battleMapCode.Contains("indicator.png", StringComparison.Ordinal) &&
-            battleMapCode.Contains("PrototypeBadgeTextBlock.Text = \"全局视野\"", StringComparison.Ordinal) &&
+            battleMapCode.Contains("PrototypeBadgeTextBlock.Text = EditorText.Get(\"BattleMapView_Assets_001\")", StringComparison.Ordinal) &&
             battleMapCode.Contains("PrototypeBadge.ToolTip = _usesOriginalMapAssets", StringComparison.Ordinal) &&
             !battleMapCode.Contains("全局视野 · 预览模式 · 占位素材", StringComparison.Ordinal) &&
             !battleMapCode.Contains("实时只读 · 全局视野 · 操作不写入", StringComparison.Ordinal) &&
             !battleMapCode.Contains("只读监听 · 已同步", StringComparison.Ordinal) &&
             !battleMapCode.Contains("真实地图：", StringComparison.Ordinal) &&
             !battleMapCode.Contains("右击操作仍只作用于界面预览", StringComparison.Ordinal) &&
-            battleMapCode.Split("存档未发生变化。", StringSplitOptions.None).Length - 1 == 2 &&
+            new[] { "BattleMapView_Commands_034", "BattleMapView_Commands_103" }.All(key => battleMapCode.Contains(key, StringComparison.Ordinal)) &&
             battleMapCode.Contains("cell.Knowledge is PrototypeKnowledge.Unknown or PrototypeKnowledge.Scouted", StringComparison.Ordinal) &&
             !battleMapCode.Contains("return TryLoadMapIcon(\"room_unknown.png\")", StringComparison.Ordinal) &&
             !battleMapCode.Contains("return TryLoadMapIcon(\"hall_dark.png\")", StringComparison.Ordinal) &&
@@ -892,7 +892,7 @@ internal static partial class ContractSuite
             battleMapCode.Contains("ScheduleRefreshRetry", StringComparison.Ordinal) &&
             battleMapCode.Contains("RetryLiveSnapshotAfterDelayAsync", StringComparison.Ordinal) &&
             battleMapCode.Contains("mapExists != raidExists", StringComparison.Ordinal) &&
-            battleMapCode.Contains("保留上一快照 · 等待另一份副本存档", StringComparison.Ordinal) &&
+            battleMapCode.Contains("BattleMapView_LiveRefresh_004", StringComparison.Ordinal) &&
             battleMapReaderCode.Contains("sourceHashBefore", StringComparison.Ordinal) &&
             battleMapReaderCode.Contains("sourceHashAfter", StringComparison.Ordinal) &&
             battleMapReaderCode.Contains("PairVerificationDelay", StringComparison.Ordinal) &&
@@ -907,7 +907,7 @@ internal static partial class ContractSuite
             battleMapCode.Contains("BattleMapEditService", StringComparison.Ordinal) &&
             battleMapCode.Contains("ForceTownSaveService", StringComparison.Ordinal) &&
             battleMapCode.Contains("ForceTownButton_Click", StringComparison.Ordinal) &&
-            battleMapCode.Contains("这不是正常撤退结算", StringComparison.Ordinal) &&
+            battleMapCode.Contains("BattleMapView_ForceTown_003", StringComparison.Ordinal) &&
             !battleMapCode.Contains("if (!committed && generation == _profileGeneration)", StringComparison.Ordinal) &&
             battleMapCode.Contains("PrepareDeleteContentAsync", StringComparison.Ordinal) &&
             battleMapCode.Contains("PrepareMovePartyAsync", StringComparison.Ordinal) &&
@@ -915,14 +915,14 @@ internal static partial class ContractSuite
             battleMapCode.Contains("PreparePlaceContentAsync", StringComparison.Ordinal) &&
             battleMapCode.Contains("preserveBattle: false", StringComparison.Ordinal) &&
             !battleMapCode.Contains("ApplyContentPreview", StringComparison.Ordinal) &&
-            battleMapCode.Contains("CreateRegionalContentItem(cell, \"陷阱\"", StringComparison.Ordinal) &&
-            battleMapCode.Contains("CreateRegionalContentItem(cell, \"障碍\"", StringComparison.Ordinal) &&
+            battleMapCode.Contains("CreateRegionalContentItem(cell, EditorText.Get(\"BattleMapView_CellVisuals_014\")", StringComparison.Ordinal) &&
+            battleMapCode.Contains("CreateRegionalContentItem(cell, EditorText.Get(\"BattleMapView_CellVisuals_017\")", StringComparison.Ordinal) &&
             battleMapCode.Contains("GetRegionalCandidates(kind, _currentSnapshot?.DungeonId", StringComparison.Ordinal) &&
             battleMapCode.Contains("CreateAsyncActionMenuItem(label, icon, () => PlaceRegionalContentAsync(target, kind))", StringComparison.Ordinal) &&
             battleMapCode.Contains("SelectRegionalContent(kind, snapshot.DungeonId, Random.Shared.NextDouble())", StringComparison.Ordinal) &&
             battleMapCode.Contains("await PlaceContentAsync(target, definition);", StringComparison.Ordinal) &&
             battleMapCode.Contains("!definition.IsAvailableInDungeon(snapshot.DungeonId)", StringComparison.Ordinal) &&
-            battleMapCode.Contains("战斗附加内容", StringComparison.Ordinal) &&
+            battleMapCode.Contains("BattleMapView_Commands_003", StringComparison.Ordinal) &&
             battleMapCode.Contains("PrepareSetBattleAttachmentAsync", StringComparison.Ordinal) &&
             battleMapCode.Contains("PrepareRemoveBattleAttachmentAsync", StringComparison.Ordinal) &&
             battleMapCode.Contains("ThemedDialog.Confirm", StringComparison.Ordinal) &&
@@ -943,10 +943,10 @@ internal static partial class ContractSuite
             battleMapEditorCode.Contains("SetScalarToZero(dynamicTile, \"trap\")", StringComparison.Ordinal) &&
             battleMapEditorCode.Contains("area.Tiles.Count - 1 - physicalOrdinal", StringComparison.Ordinal) &&
             battleMapEditorCode.Contains("ValidateStationaryRaidState", StringComparison.Ordinal) &&
-            battleMapEditorCode.Contains("当前正在战斗，不能修改地图", StringComparison.Ordinal) &&
-            battleMapEditorCode.Contains("饥饿节点不属于地图编辑范围", StringComparison.Ordinal) &&
+            battleMapEditorCode.Contains("BattleMapSaveEditor_037", StringComparison.Ordinal) &&
+            battleMapEditorCode.Contains("BattleMapSaveEditor_001", StringComparison.Ordinal) &&
             battleMapEditServiceCode.Contains("EnsureGameIsNotRunning", StringComparison.Ordinal) &&
-            battleMapEditServiceCode.Contains("检测到《暗黑地牢》仍在运行", StringComparison.Ordinal) &&
+            battleMapEditServiceCode.Contains("BattleMapEditService_030", StringComparison.Ordinal) &&
             battleMapEditServiceCode.Contains("ValidateLivePair", StringComparison.Ordinal) &&
             battleMapEditServiceCode.Contains("CreateBackup", StringComparison.Ordinal) &&
             battleMapEditServiceCode.Contains("GuardedSaveReplacement", StringComparison.Ordinal) &&
@@ -994,7 +994,7 @@ internal static partial class ContractSuite
             battleEncounterDialog.Descendants()
                 .Any(element => element.Name.LocalName == "TextBlock" &&
                                 ((string?)element.Attribute("Text"))?.Contains(
-                                    "ChineseComposition",
+                                    "PreferredComposition",
                                     StringComparison.Ordinal) == true) &&
             !battleEncounterDialog.Descendants()
                 .Any(element => (string?)element.Attribute("Header") == "游荡 ID") &&
@@ -1118,7 +1118,7 @@ internal static partial class ContractSuite
             "Ordinary main-window regions must use open-sided separators instead of nested closed cards; important controls keep their own button frames.");
         Assert(
             mainWindowCode.Contains("if (_trinketStorage is null)", StringComparison.Ordinal) &&
-            mainWindowCode.Contains("饰品预览与应用已禁用", StringComparison.Ordinal),
+            mainWindowCode.Contains("MainWindow_EditWorkflow_014", StringComparison.Ordinal),
             "The UI must fail closed when the effective trinket storage capacity cannot be resolved.");
 
         var discoveredGame = new GameInstallation(
@@ -1143,7 +1143,7 @@ internal static partial class ContractSuite
             SteamDiscovery.SelectDefaultProfile(discoveryProfiles.Take(1).ToArray()) == discoveryProfiles[0] &&
             SteamDiscovery.SelectDefaultProfile([]) is null,
             "Automatic save selection must fall back to the first discovered profile and support an empty result.");
-        var initialQuirkDialogXaml = System.Xml.Linq.XDocument.Load(Path.Combine(
+        var initialQuirkDialogXaml = LoadLocalizedContractXaml(Path.Combine(
             repositoryRoot,
             "src",
             "DarkestDungeonSaveEditor.App",
@@ -1159,7 +1159,7 @@ internal static partial class ContractSuite
             .Select(control => control.Ancestors(presentationNamespace + "Border").First())
             .ToArray();
         Assert(
-            initialQuirkDialogXaml.Root?.Attribute("FontFamily")?.Value == "SimHei, Microsoft YaHei UI" &&
+            initialQuirkDialogXaml.Root?.Attribute("FontFamily")?.Value == "{x:Static local:EditorTypography.Body}" &&
             initialQuirkDialogXaml.Root?.Attribute("Icon")?.Value == "Assets/save-editor.ico" &&
             initialQuirkDialogXaml.Root?.Attribute("Width")?.Value == "1220" &&
             initialQuirkDialogXaml.Root?.Attribute("MinWidth")?.Value == "900" &&
@@ -1267,14 +1267,14 @@ internal static partial class ContractSuite
                 "CompactRowReason(definition.WriteStatusReason)",
                 StringComparison.Ordinal) &&
             initialQuirkDialogCode.Contains(
-                "private const string CompactSingletonReason = \"singleton 定义上限 1\"",
+                "private static string CompactSingletonReason => EditorText.Get(\"InitialQuirkSelectionDialog_002\")",
                 StringComparison.Ordinal) &&
             unknownHpDisplayIndex >= 0 &&
             knownHpDisplayIndex > unknownHpDisplayIndex &&
-            initialQuirkDialogCode.Contains("? \"待验证\"", StringComparison.Ordinal) &&
-                initialQuirkDialogCode.Contains("? \"无\"", StringComparison.Ordinal) &&
+            initialQuirkDialogCode.Contains("? EditorText.Get(\"InitialQuirkSelectionDialog_015\")", StringComparison.Ordinal) &&
+                initialQuirkDialogCode.Contains("? EditorText.Get(\"InitialQuirkSelectionDialog_016\")", StringComparison.Ordinal) &&
                 initialQuirkDialogCode.Contains("FormatMaxHpModifier", StringComparison.Ordinal) &&
-                initialQuirkDialogCode.Contains("火光 ≤", StringComparison.Ordinal) &&
+                initialQuirkDialogCode.Contains("InitialQuirkSelectionDialog_025", StringComparison.Ordinal) &&
                 initialQuirkDialogCode.Contains("_resolveLevel", StringComparison.Ordinal) &&
                 initialQuirkDialogCode.Contains("if (requestedValue)", StringComparison.Ordinal) &&
                 !initialQuirkDialogCode.Contains("row.IsSelected = !requestedValue", StringComparison.Ordinal) &&

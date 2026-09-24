@@ -11,7 +11,7 @@ public static partial class StagecoachHeroCandidateFactory
         var codes = purchases.Select(purchase => purchase.RequirementCode).ToHashSet(StringComparer.Ordinal);
         if (!codes.Contains("0"))
             throw new InvalidOperationException(
-                $"职业 '{heroClass.Id}' 的战斗技能 '{skillId}' 在 {resolveLevel} 级缺少可购买的基础购买码 '0'（升级树 '{tree.Id}'），不能生成未解锁的技能。");
+                EditorText.Format("StagecoachHeroCandidateFactory_CombatUpgrades_001", heroClass.Id, skillId, resolveLevel, tree.Id));
 
         // Native 0x14058EA10 reads consecutive ASCII codes from '0', bounded
         // by the actual variant count. Authored letters are not renamed or
@@ -23,7 +23,7 @@ public static partial class StagecoachHeroCandidateFactory
                 reachable++;
             if (codes.Any(code => code.Length == 1 && code[0] - '0' >= reachable && code[0] - '0' < levels.Count))
                 warnings?.Add(
-                    $"战斗技能 '{skillId}' 的购买码存在空洞，缺少代码 '{(char)('0' + reachable)}'；游戏只能读取第 {reachable - 1} 档（技能 {reachable} 级），后续已购条目暂不生效。");
+                    EditorText.Format("StagecoachHeroCandidateFactory_CombatUpgrades_002", skillId, (char)('0' + reachable), reachable - 1, reachable));
         }
         return purchases;
     }

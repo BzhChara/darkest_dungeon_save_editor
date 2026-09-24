@@ -63,11 +63,11 @@ internal static class NativeCurioCsvReader
             void Emit()
             {
                 if (field.Count > 511)
-                    throw new InvalidDataException($"奇物 CSV 字段超过原生缓冲区：{path}:{sourceLine}");
+                    throw new InvalidDataException(EditorText.Format("NativeCurioCsvReader_001", path, sourceLine));
                 while (field.Count > 0 && field[^1] == 0x20) field.RemoveAt(field.Count - 1);
                 try { fields[count++] = StrictUtf8.GetString(field.ToArray()); }
                 catch (DecoderFallbackException error)
-                { throw new InvalidDataException($"奇物 CSV 字段不是完整 UTF-8：{path}:{sourceLine}", error); }
+                { throw new InvalidDataException(EditorText.Format("NativeCurioCsvReader_002", path, sourceLine), error); }
                 field.Clear();
             }
             for (var index = start; index < offset; index++)

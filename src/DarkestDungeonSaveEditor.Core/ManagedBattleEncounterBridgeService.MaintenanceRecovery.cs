@@ -33,7 +33,7 @@ public sealed partial class ManagedBattleEncounterBridgeService
             using var raidLock = File.Exists(raidPath) ? new FileStream(raidPath, FileMode.Open, FileAccess.Read, sharing) : null;
             if (ComputeSha256(Path.Combine(profile.ProfileDirectory, "persist.game.json")) != JsonSupport.ReadString(manifest, "GameSha256") ||
                 (File.Exists(raidPath) ? ComputeSha256(raidPath) : null) != manifest["RaidSha256"]?.GetValue<string>())
-                throw new IOException($"存档在清理中断后已变化，不能自动恢复旧地图；请检查备份：{backup}");
+                throw new IOException(EditorText.Format("ManagedBattleEncounterBridgeService_MaintenanceRecovery_001", backup));
             var plan = new List<(string Target, string Original, string OriginalHash, string FinalHash)>();
             foreach (var file in manifest["Files"]!.AsArray().OfType<JsonObject>())
             {
@@ -41,16 +41,16 @@ public sealed partial class ManagedBattleEncounterBridgeService
                 var mapPath = profile.MapSavePath;
                 var isMap = target.Equals(mapPath, StringComparison.OrdinalIgnoreCase);
                 if (!isMap && !IsWithinDirectory(target, package))
-                    throw new InvalidDataException($"中断清理计划包含不属于本档案的路径：{target}");
+                    throw new InvalidDataException(EditorText.Format("ManagedBattleEncounterBridgeService_MaintenanceRecovery_002", target));
                 var original = isMap ? RaidSaveLocation.ResolvePath(backup, Path.GetRelativePath(profile.ProfileDirectory, mapPath)) :
                     Path.Combine(backup, "bridge-package", Path.GetRelativePath(package, target));
                 var before = JsonSupport.ReadString(file, "OriginalSha256");
                 var after = JsonSupport.ReadString(file, "FinalSha256");
                 if (!File.Exists(original) || ComputeSha256(original) != before || !File.Exists(target))
-                    throw new IOException($"中断清理的文件或备份不完整，需检查备份后恢复：{backup}");
+                    throw new IOException(EditorText.Format("ManagedBattleEncounterBridgeService_MaintenanceRecovery_003", backup));
                 var current = ComputeSha256(target);
                 if (current != before && current != after)
-                    throw new IOException($"检测到清理中断后的外部修改，已保留该版本；请检查备份：{backup}");
+                    throw new IOException(EditorText.Format("ManagedBattleEncounterBridgeService_MaintenanceRecovery_004", backup));
                 if (current == after && before != after) plan.Add((target, original, before, after));
             }
             var replacements = new List<GuardedSaveReplacement>();
@@ -61,7 +61,7 @@ public sealed partial class ManagedBattleEncounterBridgeService
                 // Revalidate and lock every unchanged package/retained-raid dependency
                 // before restoring any old map references.
                 if (JsonSupport.ReadInt(manifest, "version") >= 2 && manifest["ReadOnlyFiles"] is not JsonArray)
-                    throw new InvalidDataException($"中断清理缺少依赖版本记录，不能自动恢复旧地图：{backup}");
+                    throw new InvalidDataException(EditorText.Format("ManagedBattleEncounterBridgeService_MaintenanceRecovery_005", backup));
                 if (manifest["ReadOnlyFiles"] is JsonArray dependencies)
                 {
                     var writtenTargets = manifest["Files"]!.AsArray().OfType<JsonObject>()
@@ -73,16 +73,16 @@ public sealed partial class ManagedBattleEncounterBridgeService
                     foreach (var node in dependencies)
                     {
                         if (node is not JsonObject dependency)
-                            throw new InvalidDataException($"中断清理包含无效的依赖记录：{backup}");
+                            throw new InvalidDataException(EditorText.Format("ManagedBattleEncounterBridgeService_MaintenanceRecovery_006", backup));
                         var target = Path.GetFullPath(JsonSupport.ReadString(dependency, "TargetPath"));
                         if (writtenTargets.Contains(target) || (!IsWithinDirectory(target, package) && !retainedPaths.Contains(target)))
-                            throw new InvalidDataException($"中断清理包含无效的只读依赖路径：{target}");
+                            throw new InvalidDataException(EditorText.Format("ManagedBattleEncounterBridgeService_MaintenanceRecovery_007", target));
                         if (IsWithinDirectory(target, package))
                             _ = RaidSaveLocation.ResolvePath(package, Path.GetRelativePath(package, target));
                         var stream = new FileStream(target, FileMode.Open, FileAccess.Read, sharing);
                         dependencyLocks.Add(stream);
                         if (ComputeSha256(target) != JsonSupport.ReadString(dependency, "Sha256"))
-                            throw new IOException($"Bridge 或保留副本在清理中断后已变化，已保留当前状态并暂缓恢复；请检查备份：{backup}");
+                            throw new IOException(EditorText.Format("ManagedBattleEncounterBridgeService_MaintenanceRecovery_008", backup));
                     }
                 }
                 // Restore the old package before restoring its map references.

@@ -38,46 +38,46 @@ public partial class MainWindow : Window
             var discoverySummary = (game is not null, profile) switch
             {
                 (true, { } selectedProfile) =>
-                    $"找到 {snapshot.GameInstallations.Count} 个游戏安装目录和 " +
-                    $"{snapshot.Profiles.Count} 个存档；已填写默认路径并选择 {selectedProfile.ProfileId}",
+                    EditorText.Format("MainWindow_Discovery_001", snapshot.GameInstallations.Count) +
+                    EditorText.Format("MainWindow_Discovery_002", snapshot.Profiles.Count, selectedProfile.ProfileId),
                 (true, null) =>
-                    $"找到 {snapshot.GameInstallations.Count} 个游戏安装目录，已填写默认路径；未找到存档",
+                    EditorText.Format("MainWindow_Discovery_003", snapshot.GameInstallations.Count),
                 (false, { } selectedProfile) =>
-                    $"未找到游戏安装目录；找到 {snapshot.Profiles.Count} 个存档并选择 {selectedProfile.ProfileId}",
-                _ => "未找到游戏安装目录；未找到存档"
+                    EditorText.Format("MainWindow_Discovery_004", snapshot.Profiles.Count, selectedProfile.ProfileId),
+                _ => EditorText.Get("MainWindow_Discovery_005")
             };
             AppendStatus(
-                $"自动发现完成：{discoverySummary}。" +
+                EditorText.Format("MainWindow_Discovery_006", discoverySummary) +
                 (snapshot.Issues.Count == 0
                     ? string.Empty
-                    : $" 另有提示：{string.Join(" | ", snapshot.Issues)}"),
+                    : EditorText.Format("MainWindow_Discovery_007", string.Join(" | ", snapshot.Issues))),
                 level: snapshot.Issues.Count == 0 ? DiagnosticLogLevel.Information : DiagnosticLogLevel.Warning);
         }
         catch (Exception ex)
         {
             CrashDiagnostics.RecordException("Discover: handled exception", ex);
-            AppendStatusSafely($"自动发现失败：{ex.Message}", "Discover: failure status", DiagnosticLogLevel.Error);
+            AppendStatusSafely(EditorText.Format("MainWindow_Discovery_008", ex.Message), "Discover: failure status", DiagnosticLogLevel.Error);
         }
     }
 
     private void BrowseGame_Click(object sender, RoutedEventArgs e)
     {
-        BrowseInto(GameDirectoryTextBox, "选择 DarkestDungeon 游戏目录");
+        BrowseInto(GameDirectoryTextBox, EditorText.Get("MainWindow_Discovery_009"));
     }
 
     private void BrowseWorkshop_Click(object sender, RoutedEventArgs e)
     {
-        BrowseInto(WorkshopDirectoryTextBox, "选择 262060 工坊内容目录");
+        BrowseInto(WorkshopDirectoryTextBox, EditorText.Get("MainWindow_Discovery_010"));
     }
 
     private void BrowseLocalMods_Click(object sender, RoutedEventArgs e)
     {
-        BrowseInto(LocalModDirectoryTextBox, "选择本地 Mod 根目录或单个 Mod 目录");
+        BrowseInto(LocalModDirectoryTextBox, EditorText.Get("MainWindow_Discovery_011"));
     }
 
     private void BrowseProfile_Click(object sender, RoutedEventArgs e)
     {
-        BrowseInto(ProfileDirectoryTextBox, "选择 profile_* 存档目录");
+        BrowseInto(ProfileDirectoryTextBox, EditorText.Get("MainWindow_Discovery_012"));
     }
 
     private static void BrowseInto(TextBox target, string title)

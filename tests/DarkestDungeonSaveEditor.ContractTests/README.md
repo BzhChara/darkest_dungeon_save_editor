@@ -4,6 +4,8 @@
 
 The suite is split by responsibility:
 
+- `EditorLocalizationContractTests.cs`: `--ui-localization` validates compiled English/Chinese resources, matching keys/placeholders, culture and name fallback, invariant diagnostic classification, atomic language preferences, next-start selection behavior, and WPF rendering at normal/minimum sizes. The legacy groups explicitly use Chinese for existing message assertions. See [UI localization](../../docs/ui-localization.md).
+
 - `LoggingContractTests.cs`, `EncounterDiagnosticContractTests.cs`: `--catalog-diagnostics` covers file-scoped issue grouping, informational fifth-slot notices, field-slot clues, unchanged direct/Bridge eligibility and preflight checks. It also runs the encounter record, Bridge lifecycle and map persistence contracts; all fixtures are isolated.
 - `ContractFixture.cs`: isolated game, Mod, profile, localization, and DSON fixtures;
 - `CodecCancellationContractTests.cs`: pre-cancelled DSON/JSON operations leave no output directory; running encode/decode cancellation terminates an isolated test process and its child, drains both redirected pipes and prevents late writes (`--codec-cancellation`, `--content-sync` and the full suite). The test executable supplies the deterministic process fixture; no real save or Java installation is modified.

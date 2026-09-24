@@ -123,7 +123,7 @@ public sealed class BattleMapEditService
         var (mapPath, raidPath) = ValidateBattleProfile(prepared.Profile);
         ValidatePreparedTarget(prepared, mapPath, raidPath);
         ValidateContentGuards(prepared);
-        ValidateLivePair(prepared, mapPath, raidPath, "准备完成后");
+        ValidateLivePair(prepared, mapPath, raidPath, EditorText.Get("BattleMapEditService_001"));
         using var gameGuard = OpenGameGuard(prepared);
 
         if (!File.Exists(prepared.TargetFile.EncodedPath) ||
@@ -131,12 +131,12 @@ public sealed class BattleMapEditService
                 prepared.TargetFile.EncodedSha256,
                 StringComparison.OrdinalIgnoreCase))
         {
-            throw new InvalidOperationException("已验证的地图修改结果已经变化或丢失，请重新执行操作。");
+            throw new InvalidOperationException(EditorText.Get("BattleMapEditService_002"));
         }
 
         var backupDirectory = CreateBackup(prepared.Profile, prepared);
         ValidateContentGuards(prepared);
-        ValidateLivePair(prepared, mapPath, raidPath, "创建档案备份期间");
+        ValidateLivePair(prepared, mapPath, raidPath, EditorText.Get("BattleMapEditService_003"));
         EnsureGameIsNotRunning();
 
         var targetPath = prepared.TargetFile.TargetPath;
@@ -160,7 +160,7 @@ public sealed class BattleMapEditService
             if (!ComputeSha256(guardLock).Equals(expectedGuardHash, StringComparison.OrdinalIgnoreCase))
             {
                 throw new InvalidOperationException(
-                    "地图或副本存档在写入前发生了变化，本次修改未应用。请等待地图刷新后重试。");
+                    EditorText.Get("BattleMapEditService_004"));
             }
             ValidateContentGuards(prepared);
 
@@ -170,7 +170,7 @@ public sealed class BattleMapEditService
                 !ComputeSha256(guardLock).Equals(expectedGuardHash, StringComparison.OrdinalIgnoreCase))
             {
                 throw new IOException(
-                    "写入后的地图与副本存档组合不符合已验证结果，程序将尝试自动恢复。");
+                    EditorText.Get("BattleMapEditService_005"));
             }
             ValidateContentGuards(prepared);
 
@@ -194,8 +194,8 @@ public sealed class BattleMapEditService
                 {
                     var recovery = replacement.Recover();
                     throw new InvalidOperationException(
-                        $"地图存档写入失败；{GuardedSaveReplacement.DescribeRecovery(recovery)}。" +
-                        $"完整备份：{backupDirectory}；实际被替换版本：{replacement.DisplacedPath}",
+                        EditorText.Format("BattleMapEditService_006", GuardedSaveReplacement.DescribeRecovery(recovery)) +
+                        EditorText.Format("BattleMapEditService_007", backupDirectory, replacement.DisplacedPath),
                         commitError);
                 }
                 catch (InvalidOperationException ex) when (ReferenceEquals(ex.InnerException, commitError))
@@ -205,7 +205,7 @@ public sealed class BattleMapEditService
                 catch (Exception restoreError)
                 {
                     throw new AggregateException(
-                        $"地图存档写入失败，自动恢复也未能完成。完整备份：{backupDirectory}；实际被替换版本：{replacement.DisplacedPath}",
+                        EditorText.Format("BattleMapEditService_008", backupDirectory, replacement.DisplacedPath),
                         commitError,
                         restoreError);
                 }
@@ -242,7 +242,7 @@ public sealed class BattleMapEditService
         }
         else if (encounter is not null)
         {
-            throw new ArgumentException("只有遭遇写入操作可以携带遭遇定义。", nameof(encounter));
+            throw new ArgumentException(EditorText.Get("BattleMapEditService_009"), nameof(encounter));
         }
         if (kind is BattleMapEditKind.SetBattleAttachment or BattleMapEditKind.PlaceContent)
         {
@@ -259,13 +259,13 @@ public sealed class BattleMapEditService
                     StringComparison.OrdinalIgnoreCase))
             {
                 throw new InvalidOperationException(
-                    "所选地图内容目录属于另一个档案，请重新加载内容目录。");
+                    EditorText.Get("BattleMapEditService_010"));
             }
         }
         else if (attachment is not null)
         {
             throw new ArgumentException(
-                "只有地图内容或战斗附加内容写入操作可以携带资源定义。",
+                EditorText.Get("BattleMapEditService_011"),
                 nameof(attachment));
         }
 
@@ -275,7 +275,7 @@ public sealed class BattleMapEditService
             !raidHash.Equals(expectedSnapshot.RaidSha256, StringComparison.OrdinalIgnoreCase))
         {
             throw new InvalidOperationException(
-                "地图或副本存档在显示后已经变化，请等待地图刷新后重新操作。");
+                EditorText.Get("BattleMapEditService_012"));
         }
 
         var sessionId = $"{DateTime.UtcNow:yyyyMMdd_HHmmss_fff}_{Guid.NewGuid():N}";
@@ -360,12 +360,12 @@ public sealed class BattleMapEditService
         if (!JsonNode.DeepEquals(updatedDocument, roundTripDocument))
         {
             throw new InvalidDataException(
-                $"地图修改（{kind}）未通过 DSON 编码回环验证，本次修改未写入。");
+                EditorText.Format("BattleMapEditService_013", kind));
         }
         if (sourceWasDson && !RevisionMatches(targetSourceCopy, encodedPath))
         {
             throw new InvalidDataException(
-                $"编码后的 {targetFileName} 未保留原始 DSON 修订字段，本次修改未写入。");
+                EditorText.Format("BattleMapEditService_014", targetFileName));
         }
 
         ValidateCapturedPair(mapPath, raidPath, mapSourceCopy, raidSourceCopy, mapHash, raidHash);
@@ -411,7 +411,7 @@ public sealed class BattleMapEditService
         var profileDirectory = Path.GetFullPath(profile.ProfileDirectory);
         if (!Directory.Exists(profileDirectory))
         {
-            throw new DirectoryNotFoundException($"找不到档案目录：{profileDirectory}");
+            throw new DirectoryNotFoundException(EditorText.Format("BattleMapEditService_015", profileDirectory));
         }
 
         var expectedEstatePath = Path.Combine(profileDirectory, "persist.estate.json");
@@ -420,7 +420,7 @@ public sealed class BattleMapEditService
             !File.Exists(expectedEstatePath))
         {
             throw new InvalidOperationException(
-                "所选档案缺少预期的 persist.estate.json 文件。");
+                EditorText.Get("BattleMapEditService_016"));
         }
 
         var mapPath = profile.MapSavePath;
@@ -428,7 +428,7 @@ public sealed class BattleMapEditService
         if (!File.Exists(mapPath) || !File.Exists(raidPath))
         {
             throw new InvalidOperationException(
-                "所选档案已经不再处于完整的副本状态。");
+                EditorText.Get("BattleMapEditService_017"));
         }
 
         return (mapPath, raidPath);
@@ -437,13 +437,13 @@ public sealed class BattleMapEditService
     private static FileStream OpenGameGuard(PreparedBattleMapEdit prepared)
     {
         if (string.IsNullOrWhiteSpace(prepared.GameOriginalSha256))
-            throw new InvalidDataException("地图修改缺少游戏状态校验，请重新准备操作。");
+            throw new InvalidDataException(EditorText.Get("BattleMapEditService_018"));
         var stream = new FileStream(Path.Combine(prepared.Profile.ProfileDirectory, "persist.game.json"),
             FileMode.Open, FileAccess.Read, FileShare.Read);
         try
         {
             if (!ComputeSha256(stream).Equals(prepared.GameOriginalSha256, StringComparison.OrdinalIgnoreCase))
-                throw new InvalidOperationException("档案的小镇／副本状态或活动配置在准备后已变化，请重新加载地图。");
+                throw new InvalidOperationException(EditorText.Get("BattleMapEditService_019"));
             return stream;
         }
         catch
@@ -466,7 +466,7 @@ public sealed class BattleMapEditService
             !Path.GetFullPath(snapshot.RaidSavePath).Equals(raidPath, StringComparison.OrdinalIgnoreCase))
         {
             throw new InvalidOperationException(
-                "当前显示的战斗地图属于另一个档案，请重新加载内容目录。");
+                EditorText.Get("BattleMapEditService_020"));
         }
     }
 
@@ -483,7 +483,7 @@ public sealed class BattleMapEditService
             !prepared.TargetFile.FileName.Equals(expectedFileName, StringComparison.OrdinalIgnoreCase))
         {
             throw new InvalidOperationException(
-                "准备写入的地图目标不属于所选档案，或存档类型不正确。");
+                EditorText.Get("BattleMapEditService_021"));
         }
     }
 
@@ -493,21 +493,21 @@ public sealed class BattleMapEditService
         {
             if (prepared.Encounter is null)
             {
-                throw new InvalidDataException("遭遇写入会话缺少已验证的遭遇定义。");
+                throw new InvalidDataException(EditorText.Get("BattleMapEditService_022"));
             }
 
             BattleEncounterCatalog.ValidateDirectEncounter(prepared.Encounter);
         }
         else if (prepared.Encounter is not null)
         {
-            throw new InvalidDataException("非遭遇写入会话意外包含遭遇定义。");
+            throw new InvalidDataException(EditorText.Get("BattleMapEditService_023"));
         }
 
         if (prepared.Preview.Kind is BattleMapEditKind.SetBattleAttachment or BattleMapEditKind.PlaceContent)
         {
             if (prepared.Attachment is null)
             {
-                throw new InvalidDataException("地图内容写入会话缺少已验证的资源定义。");
+                throw new InvalidDataException(EditorText.Get("BattleMapEditService_024"));
             }
 
             var expectedProfileDirectory = Path.GetFullPath(prepared.Profile.ProfileDirectory);
@@ -519,14 +519,14 @@ public sealed class BattleMapEditService
                     expectedGamePath,
                     StringComparison.OrdinalIgnoreCase))
             {
-                throw new InvalidDataException("地图内容写入会话属于另一个档案。");
+                throw new InvalidDataException(EditorText.Get("BattleMapEditService_025"));
             }
 
             BattleRoomAttachmentCatalog.ValidateDefinition(prepared.Attachment);
         }
         else if (prepared.Attachment is not null)
         {
-            throw new InvalidDataException("非内容写入会话意外包含地图资源定义。");
+            throw new InvalidDataException(EditorText.Get("BattleMapEditService_026"));
         }
     }
 
@@ -551,7 +551,7 @@ public sealed class BattleMapEditService
             !ComputeSha256(raidPath).Equals(expectedRaidHash, StringComparison.OrdinalIgnoreCase))
         {
             throw new InvalidOperationException(
-                "准备修改文件期间地图或副本存档发生了变化，本次修改未写入。");
+                EditorText.Get("BattleMapEditService_027"));
         }
     }
 
@@ -569,7 +569,7 @@ public sealed class BattleMapEditService
                 StringComparison.OrdinalIgnoreCase))
         {
             throw new InvalidOperationException(
-                $"地图或副本存档在“{phase}”阶段发生了变化。为避免覆盖较新的游戏数据，请重新执行操作。");
+                EditorText.Format("BattleMapEditService_028", phase));
         }
     }
 
@@ -593,7 +593,7 @@ public sealed class BattleMapEditService
                 if (!before.Equals(backup, StringComparison.OrdinalIgnoreCase) ||
                     !after.Equals(backup, StringComparison.OrdinalIgnoreCase))
                 {
-                    throw new IOException($"备份期间存档发生了变化：{path}");
+                    throw new IOException(EditorText.Format("BattleMapEditService_029", path));
                 }
 
                 return new
@@ -667,7 +667,7 @@ public sealed class BattleMapEditService
                 if (processes.Length > 0)
                 {
                     throw new InvalidOperationException(
-                        "检测到《暗黑地牢》仍在运行。请完全退出游戏后再修改存档。");
+                        EditorText.Get("BattleMapEditService_030"));
                 }
             }
             finally

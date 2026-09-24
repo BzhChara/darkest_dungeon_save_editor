@@ -51,7 +51,7 @@ public partial class BattleMapView : UserControl
                     _roomAttachmentCatalog = null;
                 }
                 if (_currentSnapshot is not null || _isRaidAvailable)
-                    ShowUnavailableState("当前档案处于小镇；进入副本并写盘后，地图会自动出现。", "等待副本");
+                    ShowUnavailableState(EditorText.Get("BattleMapView_ProfileSync_001"), EditorText.Get("BattleMapView_LiveRefresh_006"));
                 return;
             }
 
@@ -64,7 +64,7 @@ public partial class BattleMapView : UserControl
             if (!snapshot.MapSavePath.Equals(content.Profile.MapSavePath, StringComparison.OrdinalIgnoreCase) ||
                 !snapshot.MapSha256.Equals(profileSnapshot.FileHashes["persist.map.json"], StringComparison.OrdinalIgnoreCase) ||
                 !snapshot.RaidSha256.Equals(profileSnapshot.FileHashes["persist.raid.json"], StringComparison.OrdinalIgnoreCase))
-                throw new IOException("地图仍在保存，稍后自动重试。");
+                throw new IOException(EditorText.Get("BattleMapView_ProfileSync_002"));
 
             var encounters = _encounterCatalog;
             if (contentChanged || encounters is null || encounters.DungeonId != snapshot.DungeonId ||
@@ -88,7 +88,7 @@ public partial class BattleMapView : UserControl
                     if (generation != _profileGeneration) return;
                     attachments = null;
                     CrashDiagnostics.RecordException("BattleMap: room attachment catalog", error,
-                        $"档案={content.Profile.ProfileId}；地区={snapshot.DungeonId}；难度={snapshot.Difficulty}");
+                        EditorText.Format("BattleMapView_ProfileLifecycle_014", content.Profile.ProfileId, snapshot.DungeonId, snapshot.Difficulty));
                 }
             }
             cancellationToken.ThrowIfCancellationRequested();
