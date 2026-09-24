@@ -179,8 +179,12 @@ internal static partial class ContractSuite
         File.AppendAllText(path, "room: .chance 1 .types base_hall low_a high_z last_hall ignored_fifth\n");
         var truncated = BattleEncounterCatalog.Load(content, snapshot);
         var four = truncated.DirectEncounters.Single(row => row.MashType == 1 && row.MashIndex == 3);
+        var slotLog = CatalogLogDiagnostics.Summarize([("战斗遭遇", truncated.Issues)])
+            .Single(entry => entry.Message.Contains("遭遇槽位截取", StringComparison.Ordinal));
         Assert(four.MonsterIds.SequenceEqual(["base_hall", "low_a", "high_z", "last_hall"]) &&
-               truncated.Issues.Any(issue => issue.Contains("只读取前四个", StringComparison.Ordinal)),
+               slotLog.Level == DiagnosticLogLevel.Information &&
+               slotLog.Message.Contains("只读取前四个原始槽位", StringComparison.Ordinal) &&
+               slotLog.Message.Contains(path, StringComparison.OrdinalIgnoreCase),
             "Rows with five authored IDs must use exactly the four native slots and disclose the ignored suffix.");
         BattleEncounterCatalog.ValidateDirectEncounter(four);
         File.WriteAllBytes(path, original);
