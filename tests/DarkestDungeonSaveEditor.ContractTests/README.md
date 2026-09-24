@@ -85,38 +85,38 @@ dotnet run --project tests\DarkestDungeonSaveEditor.ContractTests\DarkestDungeon
 
 Close Darkest Dungeon before the suite: save transaction contracts exercise the real process guard even with isolated fixtures. `--catalogs` selects the catalog/save group, `--maintenance` selects encounter maintenance, `--manifests` selects manifest preparation, `--semantics` selects duplicate Buff/Effect/skill/event rules, exact identities, shared record/curio consumers, empty encounter slots and logical encounter/Bridge contracts, and `--map-content` selects the battle-map group including standalone JSON/DSON placements and native prop pools; these partial runs do not replace the complete suite. Set `DDSE_TEST_GAME_DIRECTORY` to the installed game root to additionally exercise the verified official uploader against isolated samples.
 
-## 资源文件查询验证
+## Resource-file query validation
 
-非人物引用专项：`dotnet run --project tests/DarkestDungeonSaveEditor.ContractTests -c Release -- . --reference-consumers`。覆盖 228 个内容样例、876 次小镇／副本目录检查及 12 次 DSON 保存回读；`--queries` 和完整套件也包含这一组。样例只写隔离资源与存档，验证无关文本及缺失清单项不会误确认引用或污染其他物品，同时保留未验证来源的不确定性和合法伴生掉落。
+Non-actor references: `dotnet run --project tests/DarkestDungeonSaveEditor.ContractTests -c Release -- . --reference-consumers`. This covers 228 content samples, 876 town/raid catalog checks, and 12 DSON save round trips. `--queries` and the full suite also include this group. Samples write only isolated resources and saves, verifying that unrelated text and missing manifest entries neither falsely confirm references nor contaminate other items, while retaining uncertainty for unverified sources and legitimate companion loot.
 
-该专项还执行物品引用提供者与钱包身份的 136 个新增场景，包含 4 次隔离存档实际提交及 DSON 回读；完整套件也执行这些新增测试。`--queries` 保持原有非人物引用测试范围。逐项结果保存在本次测试工件目录的 `results.json` 中；这些是编辑器契约测试，不代表新增了游戏实机实验。
+This targeted run also executes 136 additional item-reference provider and wallet-identity scenarios, including 4 actual isolated commits with DSON readback; the full suite includes these additions. `--queries` retains the original non-actor reference coverage. Per-case results are written to `results.json` in that run's artifact directory. These are editor contract tests, not new live-game experiments.
 
-大小写专项：`dotnet run --project tests/DarkestDungeonSaveEditor.ContractTests -c Release -- . --case-identities`。同时运行既有容量矩阵。完整套件还运行 `CanonicalResourceContractTests` 中原生 `arena` 精确排除、`ARENA` 物理别名及 Mod 清单对照；此部分也可用 `--canonical-resources` 单独执行。专项不能替代整套测试。
+Case identities: `dotnet run --project tests/DarkestDungeonSaveEditor.ContractTests -c Release -- . --case-identities`. This also runs the existing capacity matrix. The full suite additionally runs `CanonicalResourceContractTests` for native exact `arena` exclusion, physical `ARENA` aliases, and Mod-manifest controls; that group can run separately with `--canonical-resources`. Targeted runs do not replace the full suite.
 
 `dotnet run --project tests/DarkestDungeonSaveEditor.ContractTests -c Release -- . --queries`
 
-只运行上述物品、容量、Effect、奇物和战斗文件查询两组新契约，包含隔离 DSON 保存与 Bridge 安装；不修改真实档案或活动 Mod。完整套件也包含这两组。构建后可添加 `--no-build` 执行。
+Runs the resource-query groups described above for items, capacity, effects, curios, and encounters, including isolated DSON saves and Bridge installation, without modifying real profiles or active Mods. The full suite also includes these groups. After building, add `--no-build` before `--` to reuse the build.
 
-其中 `ResourceDirectoryQueryContractTests` 覆盖六种来源的清单／物理目录大小写、Buff 与实际人物 HP、物品堆叠及背包容量的 DSON 往返、饰品／技能／奇物资源、引用消费、DLC 前缀和缺失文件诊断。`ActorDiscoveryQueryContractTests` 覆盖人物／怪物不同的文件名表达式、注册与标准路径打开的区别、饰品职业要求、人物伴生物品、三类战斗编号及自动维护。`EncounterFileQueryContractTests` 额外验证未注册大写怪物文件后的正常战斗替换、Bridge 新建和删除。
+`ResourceDirectoryQueryContractTests` covers manifest/physical directory case rules across six source kinds, Buffs and actual hero HP, DSON round trips for item stacks and inventory capacity, trinket/skill/curio resources, reference consumers, DLC prefixes, and missing-file diagnostics. `ActorDiscoveryQueryContractTests` covers different hero/monster filename expressions, registration versus canonical-path opening, trinket class requirements, hero companion items, all three encounter index types, and automatic maintenance. `EncounterFileQueryContractTests` additionally verifies ordinary battle replacement, new Bridge placement, and deletion with an unregistered uppercase monster file.
 
-资源目录测试还包含 24 组清单别名排列对照：错误大小写条目在合法条目之前或之后时，Loot、Curio、配给 JSON 与 DLC 前缀的有效引用必须一致，防止筛选前去重造成漏读。
+Resource-directory tests also include 24 manifest-alias permutations: whether a wrong-case entry precedes or follows a valid entry, effective Loot, Curio, provisioning-JSON, and DLC-prefixed references must agree. This prevents deduplication before filtering from dropping valid reads.
 
-## 持久副本目录验证
+## Persistent raid-directory validation
 
 `dotnet run --project tests/DarkestDungeonSaveEditor.ContractTests -c Release -- . --raid-paths`
 
-`NestedRaidSaveContractTests` 覆盖 `raid_save` 子目录读取、背包和地图 DSON 写入、备份、回滚、目录切换保护、自动同步和强制回城。并复用维护契约验证子目录下的直接写入及 Bridge 放置、失效清理、回城和 A→B 后保留引用、两个持久副本共用表时逐图清理，以及中断恢复和外部修改保留。共享表恢复分别验证依赖未变、冻结包改变、未激活地图改变；不会操作真实档案。
+`NestedRaidSaveContractTests` covers reads under `raid_save`, inventory/map DSON writes, backups, rollback, directory-switch guards, synchronization, and force-town recovery. It also reuses maintenance contracts for direct and Bridge placements in subdirectories, invalid-entry cleanup, retained references after returning to town or switching A→B, per-map cleanup when two persistent raids share a table, interrupted recovery, and preservation of external edits. Shared-table recovery separately tests unchanged dependencies, a changed frozen package, and a changed inactive map. Real profiles are not modified.
 
-## 人物怪癖上限与进化验证
+## Hero quirk limits and evolution validation
 
 `dotnet run --project tests/DarkestDungeonSaveEditor.ContractTests -c Release -- . --quirk-rules`
 
-运行上述三组怪癖规则测试；完整套件也包含它们。目录矩阵覆盖原版、模式、官方 DLC、本地 Mod、工坊 Mod、带启用 DLC 前缀的 Mod。共 90 个 shared 文件查询对照、36 次 town / roster / upgrades DSON 往返，并验证实际提交与旧预览保护。全部使用隔离数据，不修改真实存档或 Mod。
+Runs the three quirk-rule groups described above, also included in the full suite. The catalog matrix covers the base game, game modes, official DLC, local Mods, Workshop Mods, and Mods with enabled-DLC prefixes: 90 shared-file query comparisons and 36 town/roster/upgrades DSON round trips, plus actual commits and stale-preview guards. All data is isolated; real saves and Mods remain unchanged.
 
-## 掉落引用验证
+## Loot-reference validation
 
 `dotnet run --project tests/DarkestDungeonSaveEditor.ContractTests -c Release -- . --loot-references`
 
-本地、工坊和 DLC 前缀 Mod 各运行 58 个权重／同名表／条件与子表对照；另以 32 个随机种子固定的掉落图分别枚举 216 个具体条件，独立对照范围算法。每条表使用独立物品 ID，避免不同错误路径被同一个物品结果掩盖。还验证同路径覆盖、不同路径先匹配、未列清单文件、清单不变时的内容刷新、已有隐藏物品可见，以及 3 次保留 ID 和堆叠的真实 DSON 写入预览。只使用隔离资源和存档；完整套件也包含这些测试。
+Local, Workshop, and DLC-prefixed Mods each run 58 weight, duplicate-table, condition, and subtable comparisons. Another 32 loot graphs generated with fixed random seeds each enumerate 216 concrete conditions against an independent oracle for the range algorithm. Every table uses independent item IDs so one item result cannot hide different incorrect paths. Tests also cover same-path overlays, first matches across different paths, unlisted files, content refresh with unchanged manifests, visibility of existing hidden items, and 3 real DSON write previews that preserve IDs and stacks. Only isolated resources and saves are used; the full suite includes these tests.
 
-另包含三类来源各 26 个掉落身份样本：类别／物品类型／ID 的 NUL、哈希别名、63 字节与 UTF-8 边界、重复字段、空 ID、零权重和不确定权重。验证同哈希的多个定义继续只读，权重与定义不确定原因分别正确记录，重复同 ID 保持首定义数值，内容字节改变但清单／长度／时间戳不变时仍更新引用。三个真实 DSON 提交确认写入定义 ID 而非引用别名；每个样本还验证堆叠、输入不变、数量刷新和小镇／副本边界。
+Each of the three source kinds also has 26 loot-identity samples covering NULs in category/item-type/ID fields, hash aliases, the 63-byte limit and UTF-8 boundaries, duplicate fields, empty IDs, zero weights, and uncertain weights. They verify that colliding definitions remain read-only, weight and definition uncertainty have separate reasons, repeated identical IDs retain the first definition's values, and content-byte changes refresh references even when manifest, length, and timestamp are unchanged. Three real DSON commits confirm that saved IDs come from the definition rather than a reference alias. Each sample also checks stacks, input preservation, quantity refresh, and town/raid boundaries.

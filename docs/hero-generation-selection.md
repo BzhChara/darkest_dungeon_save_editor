@@ -1,46 +1,46 @@
-# 人物皮肤与初始技能选择
+# Hero Skins and Initial Skill Selection
 
-更新：2026-09-14。适用于编辑器创建新马车候选；技能购买、人物升级和怪癖选择仍使用各自规则。
+Updated: 2026-09-14. These rules apply to new stagecoach candidates created by the editor. Skill purchases, hero progression, and quirk selection continue to use their respective rules.
 
-## 证据范围
+## Evidence scope
 
-依据 Windows x64 build 27890 原生反汇编及隔离目录、候选生成和 DSON 编码解码测试。`Darkest.exe` SHA-256：`35E5A653279992564809FF8406FEBD5A02A7D6961044781B1296B38A7096F59B`。这是静态原生分支核对，不是新的游戏实测；不承诺编辑器与游戏使用同一个随机种子就得到同一结果。
+Evidence consists of native disassembly of Windows x64 build 27890 and isolated catalog, candidate-generation, and DSON encode/decode tests. `Darkest.exe` SHA-256: `35E5A653279992564809FF8406FEBD5A02A7D6961044781B1296B38A7096F59B`. This is a static check of native branches, not a new live-game experiment. It does not guarantee identical results when the editor and game use the same random seed.
 
-[历史反例和地址](change-history/hero-generation-selection-audit-2026-09-14.md)与[修复验证](change-history/hero-generation-selection-fixes-2026-09-14.md)另行保存。
+Historical counterexamples, native addresses, and fix validation are kept in the local-only records `hero-generation-selection-audit-2026-09-14.md` and `hero-generation-selection-fixes-2026-09-14.md` under `docs/change-history/`. They are not included in a new clone. UI labels below are English descriptions of the localized controls.
 
-## 皮肤目录与存档编号
+## Skin directories and saved indexes
 
-读取皮肤是为生成候选填写 `actor.colour_variation`，不修改图片，也不增加皮肤选择界面。该值是游戏挂载皮肤列表的下标，生成范围为 `0..数量-1`。
+Skin discovery supplies `actor.colour_variation` for a new candidate; it does not modify images or add a skin-selection UI. The value is an index into the game's mounted skin list, with a generation range of `0..count-1`.
 
-`0x140485410` 从 `heroes/<class>/` 查询直接子目录，使用 `(.*)<class>_([A-Z])(\\|/)` 正则；查询处 `0x1404857C6`，加入列表处 `0x140485871`。目录名中的职业 ID 与大写字母按正则匹配，也可以带前缀；更深层的同名目录不作为直接皮肤项。
+`0x140485410` queries direct subdirectories of `heroes/<class>/` using the regex `(.*)<class>_([A-Z])(\\|/)`; the query is at `0x1404857C6` and list insertion at `0x140485871`. The class ID and uppercase letter must match the regex, and a prefix is permitted. Deeper directories with matching names are not direct skin entries.
 
-- 查询全部活动来源，包括独立皮肤 Mod，不要求它同时提供 info、art 或 override。
-- 本地／工坊 Mod 的虚拟目录来自 `modfiles.txt` 列出的后代路径；不要求后代是 PNG，也不以图片是否存在决定虚拟目录是否占位。物理存在但未列入清单的目录不能由该 Mod 增加皮肤项。
-- 本体、模式和官方 DLC 使用物理目录入口；空的直接子目录也可被枚举。目录查找采用 Windows 大小写规则，但皮肤名称正则仍区分大小写。直接子目录的点前缀、`_template` 和原生字符转换限制沿用物理发现规则；这些过滤不套用到清单目录树。
-- Mod 清单查询的 `heroes/<class>/` 目录段区分大小写；DLC 别名只参与已启用挂载。返回的直接目录名称精确比较合并，相同拼写只占一个位置；`Pack_<class>_C` 和 `pack_<class>_C` 是不同位置。Windows 同一物理位置的大小写别名只枚举一次，但独立来源或清单目录树可以提供这两个名称。此处统计目录位置，不进行文件内容提供者选择。
-- A、C 两个目录有两个位置，允许 0、1；只有 C 时有一个位置，允许 0。字母不直接换算为存档编号，也不要求从 A 连续排列。
-- 自动刷新观察相同目录入口；不为计算数量读取图片像素。清单仍保留目录时，删除一个贴图不会让这个位置消失。目录存在不证明该皮肤的骨骼、贴图和动画完整。
+- Query every active source, including standalone skin Mods; a source need not also provide info, art, or override files.
+- Local/Workshop Mod virtual directories come from descendant paths listed in `modfiles.txt`. Descendants need not be PNG files, and image existence does not determine whether a virtual directory occupies a slot. A physically present but unlisted directory cannot add a skin entry through that Mod.
+- Base-game, game-mode, and official-DLC mounts use physical directories, including empty direct subdirectories. Directory lookup follows Windows case rules, while the skin-name regex remains case-sensitive. Dot-prefixed names, `_template`, and native character-conversion limits follow physical discovery rules; those filters do not apply to the manifest directory tree.
+- The `heroes/<class>/` directory segment is case-sensitive in Mod-manifest queries. DLC aliases participate only for enabled mounts. Returned direct-directory names are merged by exact comparison: identical spelling occupies one slot, but `Pack_<class>_C` and `pack_<class>_C` occupy different slots. Case aliases for one Windows physical directory are enumerated once, while separate sources or manifest directory trees can provide both names. This counts directory slots rather than selecting file-content providers.
+- Directories A and C produce two slots, allowing indexes 0 and 1. C alone produces one slot, allowing index 0. Letters do not convert directly to saved indexes and need not be contiguous from A.
+- Refresh observes the same directory queries without reading image pixels to count slots. Deleting a texture does not remove its slot while the manifest retains that directory. Directory existence does not prove complete skeleton, texture, or animation assets.
 
-原生生成按列表长度抽取，见 `0x14057E24E`–`0x14057E28D`；读取保存下标和查找目录分别见 `0x1405C6051`–`0x1405C6086`、`0x140479930`。当前编辑器只需要准确数量，随机选择任意有效位置；它不承诺某个下标对应的图片名称。
+Native generation samples by list length at `0x14057E24E`–`0x14057E28D`. Saved-index reading and directory lookup are at `0x1405C6051`–`0x1405C6086` and `0x140479930`, respectively. The editor currently needs the exact count and chooses any valid slot randomly; it does not promise a particular image name for an index.
 
-目录合并的比较点为 `0x140247C90`，长度参数为 `0x100`，调用 `0x140B91D12` 跳板后经 IAT `0x140C63378` 进入 CRT `strncmp`。皮肤查询使用返回路径模式 0，因此走这条区分大小写的名称合并分支，不能复用文件覆盖器中忽略大小写的键。
+Directory merging compares names at `0x140247C90` with a length argument of `0x100`, calling trampoline `0x140B91D12` and then CRT `strncmp` through IAT `0x140C63378`. Skin queries use return-path mode 0 and therefore follow this case-sensitive name-merging branch. They cannot reuse the file overlay resolver's case-insensitive keys.
 
-## generation_guaranteed 的含义
+## Meaning of generation_guaranteed
 
-该布尔字段的解析规则不变。对尚未拥有技能的新人物，标记表示“初始结果至少包含一个带标记技能”，不表示所有标记技能都必须选中。
+Boolean parsing is unchanged. For a new hero without existing skills, a mark means that the initial selection must include at least one marked skill; it does not require every marked skill to be selected.
 
-原生 `0x1405C7B10` 先从技能池不放回抽取。达到目标数量后，如果池内存在标记但结果尚未包含标记，就继续抽取并替换第一个临时选择位置，直到获得标记或池耗尽。条件判断 `0x1405C7CF0`–`0x1405C7D14`，替换 `0x1405C7D36`；抽取器 `0x140440BE0` 同时移除技能和权重。
+Native function `0x1405C7B10` first samples the skill pool without replacement. After reaching the target count, if the pool has marked skills but the result contains none, it continues drawing and replaces the first temporary selection until it obtains a marked skill or exhausts the pool. Conditions are checked at `0x1405C7CF0`–`0x1405C7D14`, with replacement at `0x1405C7D36`. Draw helper `0x140440BE0` removes both the skill and its weight.
 
-例如 s0、s1 有标记，s2 无标记：目标为 1 时可选 s0 或 s1；目标为 2 时可选 s0+s1、s0+s2 或 s1+s2。编辑器界面因此显示“标记 N（至少选一项）”。
+For example, if s0 and s1 are marked and s2 is not, a target of 1 can select s0 or s1; a target of 2 can select s0+s1, s0+s2, or s1+s2. The editor's label therefore means **Marked N (select at least one)**.
 
-当前编辑器保留生成数量与选中上限的较小值作为装备目标；不可自行选择技能的职业继续保留全部技能。这些装备选择不改变现有的技能等级／购买记录策略。
+The editor retains the smaller of the generation count and selection limit as the equipped target. Classes without selectable skills continue to retain every skill. These equipped selections do not change the existing skill-level or purchase-record policy.
 
-## 技能池不足
+## Insufficient skill pools
 
-战斗技能和两类露营技能均按实际可用数量有界抽取，并给出少取提示。职业与共享露营池各自独立，不从另一类补位。例如请求 3 个职业技能，但只有 2 个，共享请求 1 且有 1 个，结果为 2+1。
+Combat skills and both camping pools use bounded draws from the actual available entries and warn when fewer can be selected. Class and shared camping pools remain independent, without filling shortages from the other pool. For example, requesting 3 class skills when only 2 exist, plus 1 shared skill when 1 exists, produces 2+1.
 
-战斗少取提示比较原始生成请求与池大小：请求 4、池内 3、选中上限 2 时，仍提示请求超过池大小，实际装备 2 项。
+The combat shortage warning compares the original generation request with pool size. With a request of 4, a pool of 3, and a selection limit of 2, the editor still warns that the request exceeds the pool while equipping 2 skills.
 
-战斗空池结束分支见 `0x1405C7D10`，露营两个池见 `0x1405C80D0`–`0x1405C80F8` 与 `0x1405C8120`–`0x1405C814B`。这只撤销“请求数超过池大小”导致的整个人物禁用；零／负数战斗目标、负数露营目标、零选中上限、缺失技能身份、无可用战斗能力等原有检查仍保留。
+The combat empty-pool exit is at `0x1405C7D10`; the two camping-pool branches are at `0x1405C80D0`–`0x1405C80F8` and `0x1405C8120`–`0x1405C814B`. This removes only the whole-hero rejection caused by a request larger than the pool. Existing guards remain for non-positive combat targets, negative camping targets, zero selection limits, missing skill identities, and no usable combat capability.
 
-保存时，选中技能继续写为原生零值映射；升级与解锁由个人购买记录表达。全部有效露营技能仍按编辑器原有策略解锁，和本次装备几项无关。不迁移或重新检查旧候选。
+Selected skills still serialize as native zero-valued mappings. Personal purchase records express progression and unlocks. All valid camping skills remain unlocked under the editor's existing policy, regardless of how many are equipped. Existing candidates are neither migrated nor rechecked.

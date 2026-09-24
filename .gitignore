@@ -23,6 +23,9 @@ logs/
 local-analysis/
 *.log
 
+# Local review, experiment and change-history records
+/docs/change-history/
+
 # Local-only configuration and transient files
 .env
 .env.*
