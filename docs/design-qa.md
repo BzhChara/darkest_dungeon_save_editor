@@ -1,5 +1,7 @@
 # Visual Design and QA Record
 
+UI labels in this document are English descriptions of localized controls, not a change to the application language.
+
 This document records the Darkest Dungeon Save Editor's accepted visual direction, historical failures, technical fixes, and regression checks. Chat screenshots and temporary render workspaces remain historical analysis material; durable conclusions must be reproducible from tracked assets, code, or tests.
 
 - Last updated: 2026-09-05
@@ -67,7 +69,7 @@ The relevant assertions live in [UiContractTests.cs](../tests/DarkestDungeonSave
 
 ### 3.1 Main catalogs
 
-- The first tab is `小镇物品 / ESTATE ITEMS` or `副本背包 / RAID ITEMS` after catalog load (and the neutral `物品 / ITEMS` before load); it remains left of `饰品 / TRINKETS`, `人物 / HEROES`, and `战斗 / BATTLE`. All four tab headers are centered, equally sized, and fully visible. Battle uses a map workspace rather than the other tabs' catalog tables.
+- The first tab is `ESTATE ITEMS` or `RAID ITEMS` after catalog load (and the neutral `ITEMS` before load); it remains left of `TRINKETS`, `HEROES`, and `BATTLE`. All four tab headers are centered, equally sized, and fully visible. Battle uses a map workspace rather than the other tabs' catalog tables.
 - Catalog content is top-left aligned. A filter yielding fewer results must not recenter the result grid.
 - Row text is vertically centered. ID, bilingual names, source, and operation-relevant state take priority.
 - Selecting an item, trinket, hero, or quirk uses only the full-row red fill. Cell, row, and keyboard-focus outlines must not add a white or gold frame; automatic gridlines remain visible.
@@ -98,17 +100,17 @@ The relevant assertions live in [UiContractTests.cs](../tests/DarkestDungeonSave
 - The quirk selector has no static rules section or rules disclosure. Keep the quota summary, actual incompatibility/unavailability reasons, and live validation messages; the directory title remains the main separator.
 - Empty quirk validation messages take no layout space. Non-empty messages must remain visible above the dialog actions.
 - Item-filter and quirk checkboxes share fixed-size dark chrome, a clear checked mark, and visible disabled/keyboard-focus states without click scaling.
-- `自然怪癖范围` is rendered as `正面 n–m / 负面 n–m`, not the ambiguous `+1-2 -1-2` shorthand.
-- Hero generation status uses `普通招募开启 / 编辑器手动`, `普通招募关闭 / 编辑器手动`, or `自然状态未知 / 编辑器手动`; an absent flag is not treated as proof of natural generation. A disabled ordinary generation flag does not rule out explicit-class events or other special acquisition paths.
-- If no level passes the candidate-factory preflight, the hero instead shows `暂不可生成` and `不可生成`. Partial support lists only available levels; selecting a failed level disables preview and shows its actual failure in the existing warning area, without adding a new panel or weakening generation checks.
+- `Natural quirk range` is rendered as `Positive n–m / Negative n–m`, not the ambiguous `+1-2 -1-2` shorthand.
+- Hero generation status uses `Ordinary recruitment enabled / Manual editor creation`, `Ordinary recruitment disabled / Manual editor creation`, or `Natural recruitment unknown / Manual editor creation`; an absent flag is not treated as proof of natural generation. A disabled ordinary generation flag does not rule out explicit-class events or other special acquisition paths.
+- If no level passes the candidate-factory preflight, the hero instead shows `Temporarily unavailable` and `Cannot generate`. Partial support lists only available levels; selecting a failed level disables preview and shows its actual failure in the existing warning area, without adding a new panel or weakening generation checks.
 
 ### 3.4 Application dialogs
 
 - Confirmation, success, and failure messages use the application's square dark double frame instead of the default Windows `MessageBox` surface.
 - The message body uses an original, subdued parchment texture with dark text and no additional nested frame; the header marker is also unboxed.
 - The footer contains only the required actions. Do not add a lower-left Enter/Escape helper or another framed footer region.
-- Destructive save confirmation defaults to `返回`: pressing Enter without moving focus must not approve a write. Escape also returns without writing.
-- Informational dialogs expose one `知道了` action and support both Enter and Escape.
+- Destructive save confirmation defaults to `Return`: pressing Enter without moving focus must not approve a write. Escape also returns without writing.
+- Informational dialogs expose one `Got it` action and support both Enter and Escape.
 - Long messages scroll inside the parchment surface instead of growing beyond the display.
 - The native folder picker remains an operating-system dialog because it provides filesystem navigation rather than an in-application message.
 

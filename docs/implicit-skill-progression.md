@@ -4,7 +4,7 @@
 
 This concerns generated heroes that define a combat skill without a corresponding guild upgrade tree. Skill selectability does not determine eligibility: `true`, `false`, and unspecified classes use the same implicit purchase policy. Their existing equipped-skill selection rules remain unchanged. This does not add or alter a Mod, an existing hero, or a building tree.
 
-The previous base-only policy made Kaltsit's `Kaltsit_Ranged_8` usable but did not upgrade it. The user cast `指令: 回收` with generated level-6 hero GUID 894; the saved party received `Kaltsit_PROT5` and `Kaltsit_StressHealRec5`, each `0.05`. The Mod's defined level 4 instead references the `25` buffs. Purchases remained intact: only code `0` for skill 8. The captured report is `workspaces/hero_live_verification_20260906/recall_20260906_055044/analysis.md` (ignored local evidence).
+The previous base-only policy made Kaltsit's `Kaltsit_Ranged_8` usable but did not upgrade it. The user cast this recall command with generated level-6 hero GUID 894; the saved party received `Kaltsit_PROT5` and `Kaltsit_StressHealRec5`, each `0.05`. The Mod's defined level 4 instead references the `25` buffs. Purchases remained intact: only code `0` for skill 8. The captured report is `workspaces/hero_live_verification_20260906/recall_20260906_055044/analysis.md` (ignored local evidence).
 
 ## Native evidence, not a guessed save field
 

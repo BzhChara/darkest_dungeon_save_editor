@@ -23,11 +23,24 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Content Include="..\..\LICENSE"
+             Link="LICENSE"
+             CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="..\..\NOTICE"
+             Link="NOTICE"
+             CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="PreserveNewest" />
     <Content Include="..\..\tools\DDSaveEditor\DDSaveEditor.jar"
              Link="tools\DDSaveEditor\DDSaveEditor.jar"
              CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\..\tools\DDSaveEditor\LICENSE"
              Link="tools\DDSaveEditor\LICENSE"
-             CopyToOutputDirectory="PreserveNewest" />
+             CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="..\..\tools\DDSaveEditor\THIRD-PARTY-NOTICES.md"
+             Link="tools\DDSaveEditor\THIRD-PARTY-NOTICES.md"
+             CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>
