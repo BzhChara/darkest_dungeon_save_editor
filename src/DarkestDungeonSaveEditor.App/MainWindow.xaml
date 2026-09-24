@@ -2,7 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:DarkestDungeonSaveEditor.App"
-        Title="Darkest Dungeon 存档修改器"
+        Title="{local:Text MainWindow_001}"
         Width="1440"
         Height="900"
         MinWidth="1120"
@@ -10,11 +10,45 @@
         Icon="Assets/save-editor.ico"
         Background="{StaticResource AppTextureBrush}"
         Foreground="{StaticResource TextPrimaryBrush}"
-        FontFamily="SimHei, Microsoft YaHei UI"
+        FontFamily="{x:Static local:EditorTypography.Body}"
         FontSize="14"
         UseLayoutRounding="True"
         SnapsToDevicePixels="True"
         WindowStartupLocation="CenterScreen">
+    <Window.Resources>
+        <Style x:Key="LanguageMenuItemStyle" TargetType="MenuItem">
+            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+            <Setter Property="Padding" Value="12,9" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="MenuItem">
+                        <Border x:Name="ItemChrome" Padding="{TemplateBinding Padding}" Background="Transparent">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="24" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock x:Name="CheckMark" Text="✓" Foreground="{StaticResource GoldBrush}"
+                                           Visibility="Hidden" VerticalAlignment="Center" />
+                                <ContentPresenter Grid.Column="1" ContentSource="Header" VerticalAlignment="Center" />
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="CheckMark" Property="Visibility" Value="Visible" />
+                            </Trigger>
+                            <Trigger Property="IsHighlighted" Value="True">
+                                <Setter TargetName="ItemChrome" Property="Background" Value="#541112" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
     <Grid Background="{StaticResource AppTextureBrush}">
         <Border Margin="8"
                 Background="#90050505"
@@ -39,6 +73,7 @@
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <Grid Grid.Column="0"
                       Width="320" Height="100"
@@ -53,23 +88,50 @@
                            SnapsToDevicePixels="True"
                            RenderOptions.BitmapScalingMode="HighQuality" />
                 </Grid>
-                <Button x:Name="BuyCoffeeButton" Grid.Column="1"
+                <Button x:Name="LanguageButton" Grid.Column="1"
+                        MinWidth="100" Margin="0,0,10,0" VerticalAlignment="Center"
+                        Style="{StaticResource GhostButtonStyle}"
+                        Content="{local:Text Language_Label}" ToolTip="{local:Text Language_RestartRequired}"
+                        AutomationProperties.Name="{local:Text Language_Label}"
+                        Click="LanguageButton_Click">
+                    <Button.ContextMenu>
+                        <ContextMenu Placement="Bottom" MinWidth="220" Padding="4"
+                                     Background="#FA0A0A09" BorderBrush="{StaticResource GoldDarkBrush}"
+                                     BorderThickness="1" HasDropShadow="False"
+                                     FontFamily="{x:Static local:EditorTypography.Body}" FontSize="14"
+                                     ItemContainerStyle="{StaticResource LanguageMenuItemStyle}">
+                            <ContextMenu.Template>
+                                <ControlTemplate TargetType="ContextMenu">
+                                    <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                                            BorderThickness="{TemplateBinding BorderThickness}" Padding="{TemplateBinding Padding}">
+                                        <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Cycle" />
+                                    </Border>
+                                </ControlTemplate>
+                            </ContextMenu.Template>
+                            <MenuItem Header="{local:Text Language_System}" Tag="system" IsCheckable="True" Click="LanguageMenuItem_Click" />
+                            <MenuItem Header="{local:Text Language_Chinese}" Tag="zh-CN" IsCheckable="True" Click="LanguageMenuItem_Click" />
+                            <MenuItem Header="{local:Text Language_English}" Tag="en" IsCheckable="True" Click="LanguageMenuItem_Click" />
+                            <MenuItem Header="{local:Text Language_RestartRequired}" IsEnabled="False" FontSize="12" />
+                        </ContextMenu>
+                    </Button.ContextMenu>
+                </Button>
+                <Button x:Name="BuyCoffeeButton" Grid.Column="2"
                         Width="100" Margin="0,0,16,0" VerticalAlignment="Center"
                         Style="{StaticResource GhostButtonStyle}"
-                        Content="赞助" ToolTip="赞助支持"
-                        AutomationProperties.Name="赞助支持"
+                        Content="{local:Text MainWindow_002}" ToolTip="{local:Text MainWindow_003}"
+                        AutomationProperties.Name="{local:Text MainWindow_003}"
                         Click="BuyCoffee_Click" />
-                <Border Grid.Column="2" Padding="17,9" VerticalAlignment="Center"
+                <Border Grid.Column="3" Padding="17,9" VerticalAlignment="Center"
                         Background="{StaticResource RedBandBrush}"
                         BorderBrush="#8F2826"
                         BorderThickness="1" CornerRadius="0">
                     <StackPanel>
-                        <TextBlock HorizontalAlignment="Center" FontFamily="SimSun, Microsoft YaHei UI"
+                        <TextBlock HorizontalAlignment="Center" FontFamily="{x:Static local:EditorTypography.Heading}"
                                    FontSize="16" FontWeight="Bold"
-                                   Foreground="{StaticResource GoldBrush}" Text="写入前自动备份" />
+                                   Foreground="{StaticResource GoldBrush}" Text="{local:Text MainWindow_004}" />
                         <TextBlock Margin="0,2,0,0" HorizontalAlignment="Center" FontSize="12"
                                    Foreground="{StaticResource TextSecondaryBrush}"
-                                   Text="仅在游戏完全关闭时操作" />
+                                   Text="{local:Text MainWindow_005}" />
                     </StackPanel>
                 </Border>
             </Grid>
@@ -94,21 +156,21 @@
 
                     <StackPanel Grid.Row="0">
                         <ContentControl Style="{StaticResource PanelHeaderStyle}"
-                                        Content="档案与内容来源" />
+                                        Content="{local:Text MainWindow_006}" />
                         <TextBlock Margin="18,10,18,11"
                                    Style="{StaticResource MutedTextStyle}"
                                    TextWrapping="Wrap"
-                                   Text="自动发现或手动选择目录，载入所选存档的活动内容。" />
+                                   Text="{local:Text MainWindow_007}" />
                     </StackPanel>
 
                     <ScrollViewer x:Name="PathInputsScrollViewer" Grid.Row="1" VerticalScrollBarVisibility="Auto"
                                   HorizontalScrollBarVisibility="Disabled">
                         <StackPanel Margin="18,6,18,0">
                             <Button Style="{StaticResource GoldButtonStyle}" Margin="0,0,0,16"
-                                    Content="自动发现游戏、Mod 与 profile_0"
+                                    Content="{local:Text MainWindow_008}"
                                     Click="Discover_Click" />
 
-                            <TextBlock Style="{StaticResource FieldLabelStyle}" Text="游戏根目录" />
+                            <TextBlock Style="{StaticResource FieldLabelStyle}" Text="{local:Text MainWindow_009}" />
                             <Grid Margin="0,4,0,0">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
@@ -116,15 +178,15 @@
                                 </Grid.ColumnDefinitions>
                                 <TextBox x:Name="GameDirectoryTextBox" Grid.Column="0" Margin="0,0,8,0"
                                          TextChanged="InputPath_TextChanged"
-                                         ToolTip="启动时保持为空；点击自动发现后按 Steam 库填写" />
+                                         ToolTip="{local:Text MainWindow_010}" />
                                 <Button Grid.Column="1" MinWidth="82" Margin="0"
                                         Style="{StaticResource GhostButtonStyle}"
-                                        Content="浏览…" Click="BrowseGame_Click" />
+                                        Content="{local:Text MainWindow_011}" Click="BrowseGame_Click" />
                             </Grid>
                             <TextBlock Margin="1,4,0,12" Style="{StaticResource MutedTextStyle}"
-                                       Text="DarkestDungeon 安装目录" />
+                                       Text="{local:Text MainWindow_012}" />
 
-                            <TextBlock Style="{StaticResource FieldLabelStyle}" Text="Steam 创意工坊目录（可选）" />
+                            <TextBlock Style="{StaticResource FieldLabelStyle}" Text="{local:Text MainWindow_013}" />
                             <Grid Margin="0,4,0,0">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
@@ -132,15 +194,15 @@
                                 </Grid.ColumnDefinitions>
                                 <TextBox x:Name="WorkshopDirectoryTextBox" Grid.Column="0" Margin="0,0,8,0"
                                          TextChanged="InputPath_TextChanged"
-                                         ToolTip="启动时保持为空；点击自动发现后按 Steam 库默认路径填写，之后仍可手动修改" />
+                                         ToolTip="{local:Text MainWindow_014}" />
                                 <Button Grid.Column="1" MinWidth="82" Margin="0"
                                         Style="{StaticResource GhostButtonStyle}"
-                                        Content="浏览…" Click="BrowseWorkshop_Click" />
+                                        Content="{local:Text MainWindow_011}" Click="BrowseWorkshop_Click" />
                             </Grid>
                             <TextBlock Margin="1,4,0,12" Style="{StaticResource MutedTextStyle}"
                                        Text="Steam Workshop / content / 262060" />
 
-                            <TextBlock Style="{StaticResource FieldLabelStyle}" Text="额外本地 Mod 目录（可选）" />
+                            <TextBlock Style="{StaticResource FieldLabelStyle}" Text="{local:Text MainWindow_015}" />
                             <Grid Margin="0,4,0,0">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
@@ -148,16 +210,16 @@
                                 </Grid.ColumnDefinitions>
                                 <TextBox x:Name="LocalModDirectoryTextBox" Grid.Column="0" Margin="0,0,8,0"
                                          TextChanged="InputPath_TextChanged"
-                                         ToolTip="启动时保持为空；点击自动发现后填写游戏目录下的 mods，也可改选其他根目录或含 project.xml 的单个 Mod 目录" />
+                                         ToolTip="{local:Text MainWindow_016}" />
                                 <Button Grid.Column="1" MinWidth="82" Margin="0"
                                         Style="{StaticResource GhostButtonStyle}"
-                                        Content="浏览…" Click="BrowseLocalMods_Click" />
+                                        Content="{local:Text MainWindow_011}" Click="BrowseLocalMods_Click" />
                             </Grid>
                             <TextBlock Margin="1,4,0,12" Style="{StaticResource MutedTextStyle}"
                                        TextWrapping="Wrap"
-                                       Text="默认 mods 目录仍会扫描；这里可补充其他位置。" />
+                                       Text="{local:Text MainWindow_017}" />
 
-                            <TextBlock Style="{StaticResource FieldLabelStyle}" Text="存档 Profile 目录" />
+                            <TextBlock Style="{StaticResource FieldLabelStyle}" Text="{local:Text MainWindow_018}" />
                             <Grid Margin="0,4,0,0">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
@@ -165,21 +227,21 @@
                                 </Grid.ColumnDefinitions>
                                 <TextBox x:Name="ProfileDirectoryTextBox" Grid.Column="0" Margin="0,0,8,0"
                                          TextChanged="InputPath_TextChanged"
-                                         ToolTip="启动时保持为空；点击自动发现后优先填写 profile_0" />
+                                         ToolTip="{local:Text MainWindow_019}" />
                                 <Button Grid.Column="1" MinWidth="82" Margin="0"
                                         Style="{StaticResource GhostButtonStyle}"
-                                        Content="浏览…" Click="BrowseProfile_Click" />
+                                        Content="{local:Text MainWindow_011}" Click="BrowseProfile_Click" />
                             </Grid>
                             <TextBlock Margin="1,4,0,0" Style="{StaticResource MutedTextStyle}"
-                                       Text="当前要读取和修改的 profile_* 目录" />
+                                       Text="{local:Text MainWindow_020}" />
                         </StackPanel>
                     </ScrollViewer>
                     <StackPanel Grid.Row="2" Margin="18,12,18,18">
                         <TextBlock x:Name="ProfileSyncStatusTextBlock" Margin="0,0,0,8"
-                                   Style="{StaticResource MutedTextStyle}" Text="尚未加载档案" />
+                                   Style="{StaticResource MutedTextStyle}" Text="{local:Text MainWindow_ProfileSync_002}" />
                     <Button x:Name="LoadCatalogButton" Margin="0"
                             Style="{StaticResource PrimaryButtonStyle}"
-                            Content="载入当前档案的内容目录"
+                            Content="{local:Text MainWindow_021}"
                             Click="LoadCatalog_Click" />
                     </StackPanel>
                 </Grid>
@@ -203,7 +265,7 @@
                         </Grid.RowDefinitions>
                         <ContentControl Grid.Row="0"
                                         Style="{StaticResource RedPanelHeaderStyle}"
-                                        Content="选择要生成的内容" />
+                                        Content="{local:Text MainWindow_022}" />
                         <Grid Grid.Row="1" Margin="14,12,14,12">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
@@ -213,33 +275,33 @@
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
                             <TextBlock Grid.Column="0" Margin="2,0,8,0"
-                                       Style="{StaticResource FieldLabelStyle}" Text="筛选" />
+                                       Style="{StaticResource FieldLabelStyle}" Text="{local:Text BattleEncounterSelectionDialog_023}" />
                             <TextBox x:Name="SearchTextBox" Grid.Column="1" Margin="0,0,8,0"
                                      TextChanged="SearchTextBox_TextChanged"
-                                     ToolTip="按 ID、中文名、英文名、类型、稀有度或来源筛选" />
+                                     ToolTip="{local:Text MainWindow_023}" />
                             <TextBlock x:Name="CopiesLabel" Grid.Column="2" Margin="8,0,6,0"
-                                       Style="{StaticResource FieldLabelStyle}" Text="添加数量" />
+                                       Style="{StaticResource FieldLabelStyle}" Text="{local:Text MainWindow_State_013}" />
                             <TextBox x:Name="CopiesTextBox" Grid.Column="3" Width="116"
                                      HorizontalAlignment="Left" Margin="0" Text="1"
                                      TextChanged="CopiesTextBox_TextChanged"
                                      PreviewMouseLeftButtonDown="SelectAllTextOnFirstClick"
                                      GotKeyboardFocus="SelectAllTextOnKeyboardFocus" />
                             <TextBlock x:Name="HeroLevelLabel" Grid.Column="2" Margin="8,0,6,0"
-                                       Style="{StaticResource FieldLabelStyle}" Text="人物等级"
+                                       Style="{StaticResource FieldLabelStyle}" Text="{local:Text MainWindow_024}"
                                        Visibility="Collapsed" />
                             <ComboBox x:Name="HeroLevelComboBox" Grid.Column="3" Margin="0"
                                       Visibility="Collapsed" DisplayMemberPath="DisplayName"
                                       SelectionChanged="HeroLevelComboBox_SelectionChanged"
-                                      ToolTip="XP、武器 rank、护甲 rank 与 HP 将按当前存档游戏模式和职业模板联动" />
+                                      ToolTip="{local:Text MainWindow_025}" />
                             <Button x:Name="InitialQuirksButton" Grid.Column="4" Margin="12,0,0,0"
                                     Style="{StaticResource GhostButtonStyle}"
-                                    Content="选择初始怪癖… (0)"
+                                    Content="{local:Text MainWindow_026}"
                                     Visibility="Collapsed" IsEnabled="False"
                                     Click="SelectInitialQuirks_Click" />
                             <CheckBox x:Name="ShowUnusedItemsCheckBox" Grid.Column="4" Margin="12,0,0,0"
                                       VerticalAlignment="Center"
-                                      Content="显示当前场景隐藏项（0）"
-                                      ToolTip="切换为只显示当前场景默认隐藏的物品定义"
+                                      Content="{local:Text MainWindow_State_002}"
+                                      ToolTip="{local:Text MainWindow_027}"
                                       Checked="ShowUnusedItemsCheckBox_Changed"
                                       Unchecked="ShowUnusedItemsCheckBox_Changed" />
                         </Grid>
@@ -258,7 +320,7 @@
 
                     <TabControl x:Name="CatalogTabs" Grid.Row="0" Margin="0,0,0,8"
                                 SelectionChanged="CatalogTabs_SelectionChanged">
-                        <TabItem x:Name="ItemTab" Header="物品  /  ITEMS">
+                        <TabItem x:Name="ItemTab" Header="{local:Text MainWindow_State_001}">
                             <DataGrid x:Name="ItemGrid"
                                       AutoGenerateColumns="False"
                                       IsReadOnly="True"
@@ -274,15 +336,15 @@
                                         <WrapPanel Margin="12,6,12,8">
                                             <TextBlock Margin="0,0,24,0" TextWrapping="Wrap"
                                                        Foreground="{StaticResource TextSecondaryBrush}">
-                                                <Run Text="位置：" /><Run Text="{Binding Location, Mode=OneWay}" />
+                                                <Run Text="{local:Text MainWindow_028}" /><Run Text="{Binding Location, Mode=OneWay}" />
                                             </TextBlock>
                                             <TextBlock Margin="0,0,24,0" TextWrapping="Wrap"
                                                        Foreground="{StaticResource TextSecondaryBrush}">
-                                                <Run Text="类型：" /><Run Text="{Binding InventoryType, Mode=OneWay}" />
+                                                <Run Text="{local:Text MainWindow_029}" /><Run Text="{Binding InventoryType, Mode=OneWay}" />
                                             </TextBlock>
                                             <TextBlock Margin="0,0,24,0" TextWrapping="Wrap"
                                                        Foreground="{StaticResource TextSecondaryBrush}">
-                                                <Run Text="堆叠：" /><Run Text="{Binding StackSummary, Mode=OneWay}" />
+                                                <Run Text="{local:Text MainWindow_030}" /><Run Text="{Binding StackSummary, Mode=OneWay}" />
                                             </TextBlock>
                                             <TextBlock Text="{Binding ProvisionSummary}" TextWrapping="Wrap"
                                                        Foreground="{StaticResource TextSecondaryBrush}">
@@ -300,20 +362,20 @@
                                     </DataTemplate>
                                 </DataGrid.RowDetailsTemplate>
                                 <DataGrid.Columns>
-                                    <DataGridTextColumn Header="物品 ID" Binding="{Binding Id}" Width="1.25*" MinWidth="105"
+                                    <DataGridTextColumn Header="{local:Text MainWindow_031}" Binding="{Binding Id}" Width="1.25*" MinWidth="105"
                                                         ElementStyle="{StaticResource DataGridTextElementStyle}" />
-                                    <DataGridTextColumn Header="中文名" Binding="{Binding ChineseName}" Width="1.2*" MinWidth="110"
+                                    <DataGridTextColumn Header="{local:Text BattleRoomAttachmentSelectionDialog_009}" Binding="{Binding ChineseName}" Width="1.2*" MinWidth="110"
                                                         ElementStyle="{StaticResource DataGridTextElementStyle}" />
                                     <DataGridTextColumn Header="English" Binding="{Binding EnglishName}" Width="1.2*" MinWidth="110"
                                                         ElementStyle="{StaticResource DataGridTextElementStyle}" />
-                                    <DataGridTextColumn Header="当前数量" Binding="{Binding CurrentAmount}" Width="88"
+                                    <DataGridTextColumn Header="{local:Text MainWindow_032}" Binding="{Binding CurrentAmount}" Width="88"
                                                         ElementStyle="{StaticResource DataGridTextElementStyle}" />
-                                    <DataGridTextColumn Header="来源" Binding="{Binding Source}" Width="1.75*" MinWidth="135"
+                                    <DataGridTextColumn Header="{local:Text BattleEncounterSelectionDialog_029}" Binding="{Binding Source}" Width="1.75*" MinWidth="135"
                                                         ElementStyle="{StaticResource DataGridTextElementStyle}" />
                                 </DataGrid.Columns>
                             </DataGrid>
                         </TabItem>
-                        <TabItem Header="饰品  /  TRINKETS">
+                        <TabItem Header="{local:Text MainWindow_033}">
                             <DataGrid x:Name="TrinketGrid"
                                       AutoGenerateColumns="False"
                                       IsReadOnly="True"
@@ -328,24 +390,24 @@
                                     <DataTemplate>
                                         <TextBlock Margin="12,6,12,8" TextWrapping="Wrap"
                                                    Foreground="{StaticResource TextSecondaryBrush}">
-                                            <Run Text="稀有度：" /><Run Text="{Binding Rarity, Mode=OneWay}" />
-                                            <Run Text="　　定义上限：" /><Run Text="{Binding LimitDisplay, Mode=OneWay}" />
+                                            <Run Text="{local:Text MainWindow_034}" /><Run Text="{Binding Rarity, Mode=OneWay}" />
+                                            <Run Text="{local:Text MainWindow_035}" /><Run Text="{Binding LimitDisplay, Mode=OneWay}" />
                                         </TextBlock>
                                     </DataTemplate>
                                 </DataGrid.RowDetailsTemplate>
                                 <DataGrid.Columns>
-                                    <DataGridTextColumn Header="饰品 ID" Binding="{Binding Id}" Width="1.3*" MinWidth="105"
+                                    <DataGridTextColumn Header="{local:Text MainWindow_036}" Binding="{Binding Id}" Width="1.3*" MinWidth="105"
                                                         ElementStyle="{StaticResource DataGridTextElementStyle}" />
-                                    <DataGridTextColumn Header="中文名" Binding="{Binding ChineseName}" Width="1.2*" MinWidth="110"
+                                    <DataGridTextColumn Header="{local:Text BattleRoomAttachmentSelectionDialog_009}" Binding="{Binding ChineseName}" Width="1.2*" MinWidth="110"
                                                         ElementStyle="{StaticResource DataGridTextElementStyle}" />
                                     <DataGridTextColumn Header="English" Binding="{Binding EnglishName}" Width="1.2*" MinWidth="110"
                                                         ElementStyle="{StaticResource DataGridTextElementStyle}" />
-                                    <DataGridTextColumn Header="来源" Binding="{Binding Source}" Width="1.8*" MinWidth="180"
+                                    <DataGridTextColumn Header="{local:Text BattleEncounterSelectionDialog_029}" Binding="{Binding Source}" Width="1.8*" MinWidth="180"
                                                         ElementStyle="{StaticResource DataGridTextElementStyle}" />
                                     </DataGrid.Columns>
                             </DataGrid>
                         </TabItem>
-                        <TabItem Header="人物  /  HEROES">
+                        <TabItem Header="{local:Text MainWindow_037}">
                             <DataGrid x:Name="HeroGrid"
                                       AutoGenerateColumns="False"
                                       IsReadOnly="True"
@@ -360,29 +422,29 @@
                                     <DataTemplate>
                                         <WrapPanel Margin="12,6,12,8">
                                             <TextBlock Margin="0,0,24,0" Foreground="{StaticResource TextSecondaryBrush}">
-                                                <Run Text="生成方式：" /><Run Text="{Binding GenerationMode, Mode=OneWay}" />
+                                                <Run Text="{local:Text MainWindow_038}" /><Run Text="{Binding GenerationMode, Mode=OneWay}" />
                                             </TextBlock>
                                             <TextBlock Foreground="{StaticResource TextSecondaryBrush}">
-                                                <Run Text="自然怪癖范围：" /><Run Text="{Binding QuirkRange, Mode=OneWay}" />
+                                                <Run Text="{local:Text MainWindow_039}" /><Run Text="{Binding QuirkRange, Mode=OneWay}" />
                                             </TextBlock>
                                         </WrapPanel>
                                     </DataTemplate>
                                 </DataGrid.RowDetailsTemplate>
                                 <DataGrid.Columns>
-                                    <DataGridTextColumn Header="职业 ID" Binding="{Binding Id}" Width="1.15*" MinWidth="105"
+                                    <DataGridTextColumn Header="{local:Text MainWindow_040}" Binding="{Binding Id}" Width="1.15*" MinWidth="105"
                                                         ElementStyle="{StaticResource DataGridTextElementStyle}" />
-                                    <DataGridTextColumn Header="中文名" Binding="{Binding ChineseName}" Width="1.05*" MinWidth="110"
+                                    <DataGridTextColumn Header="{local:Text BattleRoomAttachmentSelectionDialog_009}" Binding="{Binding ChineseName}" Width="1.05*" MinWidth="110"
                                                         ElementStyle="{StaticResource DataGridTextElementStyle}" />
                                     <DataGridTextColumn Header="English" Binding="{Binding EnglishName}" Width="1.05*" MinWidth="110"
                                                         ElementStyle="{StaticResource DataGridTextElementStyle}" />
-                                    <DataGridTextColumn Header="来源" Binding="{Binding Source}" Width="2*" MinWidth="180"
+                                    <DataGridTextColumn Header="{local:Text BattleEncounterSelectionDialog_029}" Binding="{Binding Source}" Width="2*" MinWidth="180"
                                                         ElementStyle="{StaticResource DataGridTextElementStyle}" />
-                                    <DataGridTextColumn Header="等级范围" Binding="{Binding LevelSummary}" Width="1.0*" MinWidth="90"
+                                    <DataGridTextColumn Header="{local:Text MainWindow_041}" Binding="{Binding LevelSummary}" Width="1.0*" MinWidth="90"
                                                         ElementStyle="{StaticResource DataGridTextElementStyle}" />
                                     </DataGrid.Columns>
                             </DataGrid>
                         </TabItem>
-                        <TabItem Header="战斗  /  BATTLE">
+                        <TabItem Header="{local:Text MainWindow_042}">
                             <local:BattleMapView x:Name="BattleMapPanel" />
                         </TabItem>
                     </TabControl>
@@ -403,12 +465,12 @@
                         <Button x:Name="PreviewButton" Grid.Row="0" Grid.Column="1"
                                 MinWidth="210" Margin="0,0,8,0"
                                 Style="{StaticResource GoldButtonStyle}"
-                                Content="生成饰品安全预览"
+                                Content="{local:Text MainWindow_State_011}"
                                 IsEnabled="False" Click="Preview_Click" />
                         <Button x:Name="ApplyButton" Grid.Row="0" Grid.Column="2"
                                 MinWidth="140" Margin="0"
                                 Style="{StaticResource PrimaryButtonStyle}"
-                                Content="应用到存档"
+                                Content="{local:Text MainWindow_043}"
                                 IsEnabled="False" Click="Apply_Click" />
                         <TextBlock x:Name="PreviewWarningTextBlock" Grid.Row="1" Grid.ColumnSpan="3"
                                    Margin="2,8,2,0" Padding="10,7"
@@ -426,7 +488,7 @@
                             <RowDefinition Height="*" />
                         </Grid.RowDefinitions>
                         <ContentControl Grid.Row="0" Style="{StaticResource PanelHeaderStyle}"
-                                        Content="运行日志" />
+                                        Content="{local:Text MainWindow_044}" />
                         <TextBox x:Name="StatusTextBox" Grid.Row="1" Margin="10"
                                  Style="{StaticResource LogTextBoxStyle}"
                                  IsReadOnly="True"

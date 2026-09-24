@@ -7,7 +7,7 @@ internal static class ModManifestFile
     public static void Require(string manifestPath)
     {
         if (!Exists(manifestPath))
-            throw new InvalidDataException($"Mod 缺少 modfiles.txt：{Path.GetDirectoryName(manifestPath)}。请关闭游戏后点击载入存档自动补齐清单。");
+            throw new InvalidDataException(EditorText.Format("ModManifestFile_001", Path.GetDirectoryName(manifestPath)));
     }
 
     public static bool Exists(string manifestPath)
@@ -16,7 +16,7 @@ internal static class ModManifestFile
         {
             if ((File.GetAttributes(manifestPath) & FileAttributes.Directory) != 0)
             {
-                throw new InvalidDataException($"Mod 清单路径不是文件：{manifestPath}。目录加载已停止。");
+                throw new InvalidDataException(EditorText.Format("ModManifestFile_002", manifestPath));
             }
 
             return true;
@@ -68,7 +68,7 @@ internal static class ModManifestFile
             catch (Exception ex) when (ex is ArgumentException or NotSupportedException or IOException)
             {
                 throw new InvalidDataException(
-                    $"Mod 清单第 {index + 1} 行路径无效：{manifestPath}。目录加载已停止。", ex);
+                    EditorText.Format("ModManifestFile_003", index + 1, manifestPath), ex);
             }
         }
 
@@ -76,5 +76,5 @@ internal static class ModManifestFile
     }
 
     private static InvalidDataException Unreadable(string manifestPath, Exception exception) =>
-        new($"无法读取 Mod 清单：{manifestPath}。目录加载已停止；请确认文件可访问后重新加载。", exception);
+        new(EditorText.Format("ModManifestFile_004", manifestPath), exception);
 }

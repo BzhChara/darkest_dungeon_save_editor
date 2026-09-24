@@ -334,7 +334,7 @@ public sealed partial class SaveEditService
                 quirkState["evolution_duration_remaining"] is not JsonValue duration ||
                 !duration.TryGetValue<int>(out var remaining) || remaining < minimum || remaining > maximum)
                 throw new InvalidOperationException(
-                    $"初始怪癖 '{id}' 的进化剩余时间不符合当前配置（{minimum}–{maximum}），请重新生成候选。");
+                    EditorText.Format("SaveEditService_StagecoachHeroes_001", id, minimum, maximum));
         }
     }
 

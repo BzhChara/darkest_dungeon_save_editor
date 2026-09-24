@@ -20,12 +20,12 @@ public partial class BattleMapView : UserControl
         ShowMapSurface();
         UpdateMapBadge();
         MapTitleTextBlock.Text =
-            $"{_profileId ?? "当前档案"} · {FormatDungeon(snapshot.DungeonId)} · 等级 {snapshot.Difficulty}";
+            EditorText.Format("BattleMapView_MapConstruction_002", _profileId ?? EditorText.Get("BattleMapView_MapConstruction_001"), FormatDungeon(snapshot.DungeonId), snapshot.Difficulty);
         MapSelectionTextBlock.Text =
-            $"{snapshot.RoomCount} 个房间 · {snapshot.CorridorCount} 条走廊 · " +
-            $"{_cells.Count} 个可操作格";
+            EditorText.Format("BattleMapView_MapConstruction_003", snapshot.RoomCount, snapshot.CorridorCount) +
+            EditorText.Format("BattleMapView_MapConstruction_004", _cells.Count);
         LiveStatusTextBlock.Text =
-            $"已同步 {snapshot.ReadAtUtc.ToLocalTime():HH:mm:ss}";
+            EditorText.Format("BattleMapView_LiveRefresh_008", snapshot.ReadAtUtc.ToLocalTime());
         SnapshotRefreshed?.Invoke(snapshot);
 
         if (fitToView)
@@ -44,7 +44,7 @@ public partial class BattleMapView : UserControl
             .ToArray();
         if (visibleTiles.Length == 0)
         {
-            throw new InvalidDataException("当前地图没有可读取的房间或走廊格。");
+            throw new InvalidDataException(EditorText.Get("BattleMapView_MapConstruction_005"));
         }
 
         var minimumX = visibleTiles.Min(tile => tile.MapX);
@@ -69,21 +69,21 @@ public partial class BattleMapView : UserControl
                     string.Equals(area.AreaId, snapshot.EntranceAreaId, StringComparison.Ordinal))
                 {
                     content = PrototypeContent.Entrance;
-                    contentLabel = "入口";
+                    contentLabel = EditorText.Get("BattleMapView_CellVisuals_011");
                 }
                 else if (kind == PrototypeCellKind.Room &&
                          string.Equals(area.AreaId, snapshot.FinalRoomId, StringComparison.Ordinal))
                 {
                     content = PrototypeContent.Boss;
-                    contentLabel = "首领房间";
+                    contentLabel = EditorText.Get("BattleMapView_MapConstruction_006");
                 }
 
                 var centerX = MapContentMargin + (tile.MapX - minimumX) * MapGridTileSize;
                 var centerY = MapContentMargin + (tile.MapY - minimumY) * MapGridTileSize;
                 var displayName = kind switch
                 {
-                    PrototypeCellKind.Room => $"房间 {area.AreaId}",
-                    _ => $"走廊格 {area.AreaId}.{tile.TileId}"
+                    PrototypeCellKind.Room => EditorText.Format("BattleMapView_MapConstruction_007", area.AreaId),
+                    _ => EditorText.Format("BattleMapView_MapConstruction_008", area.AreaId, tile.TileId)
                 };
                 var hasParty =
                     string.Equals(area.AreaId, snapshot.PartyAreaId, StringComparison.Ordinal) &&
@@ -147,34 +147,34 @@ public partial class BattleMapView : UserControl
 
     private static string FormatSnapshotContent(BattleMapTileContent content, int rawContent) => content switch
     {
-        BattleMapTileContent.Nothing => "空白",
-        BattleMapTileContent.Battle => "战斗",
-        BattleMapTileContent.Ambush => "伏击",
-        BattleMapTileContent.Trap => "陷阱",
-        BattleMapTileContent.Obstacle => "障碍",
-        BattleMapTileContent.Happening => "事件",
-        BattleMapTileContent.GuardedCurio => "守卫奇物",
-        BattleMapTileContent.Curio => "奇物",
-        BattleMapTileContent.Hunger => "进食格",
-        BattleMapTileContent.Treasure => "宝藏",
-        BattleMapTileContent.GuardedTreasure => "守卫宝藏",
-        BattleMapTileContent.AmbushCurio => "伏击奇物",
-        BattleMapTileContent.AmbushTreasure => "伏击宝藏",
-        BattleMapTileContent.SecretDoor => "秘密房间入口",
-        _ => $"未知内容（{rawContent}）"
+        BattleMapTileContent.Nothing => EditorText.Get("BattleMapView_CellVisuals_010"),
+        BattleMapTileContent.Battle => EditorText.Get("BattleMapView_CellVisuals_013"),
+        BattleMapTileContent.Ambush => EditorText.Get("BattleMapView_MapConstruction_009"),
+        BattleMapTileContent.Trap => EditorText.Get("BattleMapView_CellVisuals_014"),
+        BattleMapTileContent.Obstacle => EditorText.Get("BattleMapView_CellVisuals_017"),
+        BattleMapTileContent.Happening => EditorText.Get("BattleMapView_MapConstruction_010"),
+        BattleMapTileContent.GuardedCurio => EditorText.Get("BattleMapView_MapConstruction_011"),
+        BattleMapTileContent.Curio => EditorText.Get("BattleMapView_CellVisuals_012"),
+        BattleMapTileContent.Hunger => EditorText.Get("BattleMapView_CellVisuals_018"),
+        BattleMapTileContent.Treasure => EditorText.Get("BattleMapView_CellVisuals_015"),
+        BattleMapTileContent.GuardedTreasure => EditorText.Get("BattleMapView_MapConstruction_012"),
+        BattleMapTileContent.AmbushCurio => EditorText.Get("BattleMapView_MapConstruction_013"),
+        BattleMapTileContent.AmbushTreasure => EditorText.Get("BattleMapView_MapConstruction_014"),
+        BattleMapTileContent.SecretDoor => EditorText.Get("BattleMapView_CellVisuals_019"),
+        _ => EditorText.Format("BattleMapView_MapConstruction_015", rawContent)
     };
 
     private static string FormatDungeon(string dungeonId)
     {
         var name = dungeonId switch
         {
-            "ruins" => "遗迹",
-            "warrens" => "兽窟",
-            "weald" => "荒野",
-            "cove" => "海湾",
-            "courtyard" => "庭院",
-            "farmstead" => "农场",
-            "darkestdungeon" => "极暗地牢",
+            "ruins" => EditorText.Get("BattleMapView_MapConstruction_016"),
+            "warrens" => EditorText.Get("BattleMapView_MapConstruction_017"),
+            "weald" => EditorText.Get("BattleMapView_MapConstruction_018"),
+            "cove" => EditorText.Get("BattleMapView_MapConstruction_019"),
+            "courtyard" => EditorText.Get("BattleMapView_MapConstruction_020"),
+            "farmstead" => EditorText.Get("BattleMapView_MapConstruction_021"),
+            "darkestdungeon" => EditorText.Get("BattleMapView_MapConstruction_022"),
             _ => string.Empty
         };
         return string.IsNullOrWhiteSpace(name) ? dungeonId : $"{name} / {dungeonId}";
@@ -186,101 +186,101 @@ public partial class BattleMapView : UserControl
         MapCanvas.Children.Clear();
         _cells.Clear();
 
-        AddCell("rooA", "入口房间", PrototypeCellKind.Room, 80, 80,
+        AddCell("rooA", EditorText.Get("BattleMapView_MapConstruction_023"), PrototypeCellKind.Room, 80, 80,
             PrototypeKnowledge.Visited, PrototypeContent.Entrance, hasParty: false);
-        AddCell("coAB.0", "走廊", PrototypeCellKind.Corridor, 124, 80,
+        AddCell("coAB.0", EditorText.Get("BattleEncounterSelectionDialog_015"), PrototypeCellKind.Corridor, 124, 80,
             PrototypeKnowledge.Visited, PrototypeContent.None, hasParty: false);
-        AddCell("coAB.1", "走廊", PrototypeCellKind.Corridor, 148, 80,
+        AddCell("coAB.1", EditorText.Get("BattleEncounterSelectionDialog_015"), PrototypeCellKind.Corridor, 148, 80,
             PrototypeKnowledge.Visited, PrototypeContent.Curio, hasParty: false);
-        AddCell("coAB.2", "走廊", PrototypeCellKind.Corridor, 172, 80,
+        AddCell("coAB.2", EditorText.Get("BattleEncounterSelectionDialog_015"), PrototypeCellKind.Corridor, 172, 80,
             PrototypeKnowledge.Visited, PrototypeContent.None, hasParty: false);
-        AddCell("coAB.3", "走廊", PrototypeCellKind.Corridor, 196, 80,
+        AddCell("coAB.3", EditorText.Get("BattleEncounterSelectionDialog_015"), PrototypeCellKind.Corridor, 196, 80,
             PrototypeKnowledge.Visited, PrototypeContent.None, hasParty: true);
-        AddCell("coAB.4", "走廊", PrototypeCellKind.Corridor, 220, 80,
+        AddCell("coAB.4", EditorText.Get("BattleEncounterSelectionDialog_015"), PrototypeCellKind.Corridor, 220, 80,
             PrototypeKnowledge.Scouted, PrototypeContent.None, hasParty: false);
-        AddCell("coAB.5", "走廊", PrototypeCellKind.Corridor, 244, 80,
+        AddCell("coAB.5", EditorText.Get("BattleEncounterSelectionDialog_015"), PrototypeCellKind.Corridor, 244, 80,
             PrototypeKnowledge.Scouted, PrototypeContent.Trap, hasParty: false);
-        AddCell("coAB.6", "走廊", PrototypeCellKind.Corridor, 268, 80,
+        AddCell("coAB.6", EditorText.Get("BattleEncounterSelectionDialog_015"), PrototypeCellKind.Corridor, 268, 80,
             PrototypeKnowledge.Scouted, PrototypeContent.None, hasParty: false);
-        AddCell("coAB.7", "走廊", PrototypeCellKind.Corridor, 292, 80,
+        AddCell("coAB.7", EditorText.Get("BattleEncounterSelectionDialog_015"), PrototypeCellKind.Corridor, 292, 80,
             PrototypeKnowledge.Scouted, PrototypeContent.None, hasParty: false);
-        AddCell("rooB", "十字房间", PrototypeCellKind.Room, 336, 80,
+        AddCell("rooB", EditorText.Get("BattleMapView_MapConstruction_024"), PrototypeCellKind.Room, 336, 80,
             PrototypeKnowledge.Scouted, PrototypeContent.Battle, hasParty: false);
 
-        AddCell("coBC.0", "走廊", PrototypeCellKind.Corridor, 380, 80,
+        AddCell("coBC.0", EditorText.Get("BattleEncounterSelectionDialog_015"), PrototypeCellKind.Corridor, 380, 80,
             PrototypeKnowledge.Unknown, PrototypeContent.None, hasParty: false);
-        AddCell("coBC.1", "未知走廊", PrototypeCellKind.Corridor, 404, 80,
+        AddCell("coBC.1", EditorText.Get("BattleMapView_MapConstruction_025"), PrototypeCellKind.Corridor, 404, 80,
             PrototypeKnowledge.Unknown, PrototypeContent.None, hasParty: false);
-        AddCell("coBC.2", "未知走廊", PrototypeCellKind.Corridor, 428, 80,
+        AddCell("coBC.2", EditorText.Get("BattleMapView_MapConstruction_025"), PrototypeCellKind.Corridor, 428, 80,
             PrototypeKnowledge.Unknown, PrototypeContent.None, hasParty: false);
-        AddCell("coBC.3", "未知走廊", PrototypeCellKind.Corridor, 452, 80,
+        AddCell("coBC.3", EditorText.Get("BattleMapView_MapConstruction_025"), PrototypeCellKind.Corridor, 452, 80,
             PrototypeKnowledge.Unknown, PrototypeContent.None, hasParty: false);
-        AddCell("coBC.4", "未知走廊", PrototypeCellKind.Corridor, 476, 80,
+        AddCell("coBC.4", EditorText.Get("BattleMapView_MapConstruction_025"), PrototypeCellKind.Corridor, 476, 80,
             PrototypeKnowledge.Unknown, PrototypeContent.None, hasParty: false);
-        AddCell("coBC.5", "未知走廊", PrototypeCellKind.Corridor, 500, 80,
+        AddCell("coBC.5", EditorText.Get("BattleMapView_MapConstruction_025"), PrototypeCellKind.Corridor, 500, 80,
             PrototypeKnowledge.Unknown, PrototypeContent.None, hasParty: false);
-        AddCell("coBC.6", "未知走廊", PrototypeCellKind.Corridor, 524, 80,
+        AddCell("coBC.6", EditorText.Get("BattleMapView_MapConstruction_025"), PrototypeCellKind.Corridor, 524, 80,
             PrototypeKnowledge.Unknown, PrototypeContent.None, hasParty: false);
-        AddCell("coBC.7", "走廊", PrototypeCellKind.Corridor, 548, 80,
+        AddCell("coBC.7", EditorText.Get("BattleEncounterSelectionDialog_015"), PrototypeCellKind.Corridor, 548, 80,
             PrototypeKnowledge.Unknown, PrototypeContent.None, hasParty: false);
-        AddCell("rooC", "宝藏房间", PrototypeCellKind.Room, 592, 80,
+        AddCell("rooC", EditorText.Get("BattleMapView_MapConstruction_026"), PrototypeCellKind.Room, 592, 80,
             PrototypeKnowledge.Unknown, PrototypeContent.Treasure, hasParty: false);
 
-        AddCell("coBD.0", "走廊", PrototypeCellKind.Corridor, 336, 124,
+        AddCell("coBD.0", EditorText.Get("BattleEncounterSelectionDialog_015"), PrototypeCellKind.Corridor, 336, 124,
             PrototypeKnowledge.Visited, PrototypeContent.None, hasParty: false);
-        AddCell("coBD.1", "走廊", PrototypeCellKind.Corridor, 336, 148,
+        AddCell("coBD.1", EditorText.Get("BattleEncounterSelectionDialog_015"), PrototypeCellKind.Corridor, 336, 148,
             PrototypeKnowledge.Visited, PrototypeContent.None, hasParty: false);
-        AddCell("coBD.2", "走廊", PrototypeCellKind.Corridor, 336, 172,
+        AddCell("coBD.2", EditorText.Get("BattleEncounterSelectionDialog_015"), PrototypeCellKind.Corridor, 336, 172,
             PrototypeKnowledge.Visited, PrototypeContent.None, hasParty: false);
-        AddCell("coBD.3", "走廊", PrototypeCellKind.Corridor, 336, 196,
+        AddCell("coBD.3", EditorText.Get("BattleEncounterSelectionDialog_015"), PrototypeCellKind.Corridor, 336, 196,
             PrototypeKnowledge.Visited, PrototypeContent.None, hasParty: false);
-        AddCell("coBD.4", "走廊", PrototypeCellKind.Corridor, 336, 220,
+        AddCell("coBD.4", EditorText.Get("BattleEncounterSelectionDialog_015"), PrototypeCellKind.Corridor, 336, 220,
             PrototypeKnowledge.Completed, PrototypeContent.None, hasParty: false);
-        AddCell("coBD.5", "走廊", PrototypeCellKind.Corridor, 336, 244,
+        AddCell("coBD.5", EditorText.Get("BattleEncounterSelectionDialog_015"), PrototypeCellKind.Corridor, 336, 244,
             PrototypeKnowledge.Completed, PrototypeContent.Curio, hasParty: false);
-        AddCell("coBD.6", "走廊", PrototypeCellKind.Corridor, 336, 268,
+        AddCell("coBD.6", EditorText.Get("BattleEncounterSelectionDialog_015"), PrototypeCellKind.Corridor, 336, 268,
             PrototypeKnowledge.Completed, PrototypeContent.None, hasParty: false);
-        AddCell("coBD.7", "走廊", PrototypeCellKind.Corridor, 336, 292,
+        AddCell("coBD.7", EditorText.Get("BattleEncounterSelectionDialog_015"), PrototypeCellKind.Corridor, 336, 292,
             PrototypeKnowledge.Completed, PrototypeContent.None, hasParty: false);
-        AddCell("rooD", "已完成房间", PrototypeCellKind.Room, 336, 336,
+        AddCell("rooD", EditorText.Get("BattleMapView_MapConstruction_027"), PrototypeCellKind.Room, 336, 336,
             PrototypeKnowledge.Completed, PrototypeContent.Curio, hasParty: false);
 
-        AddCell("coDE.0", "走廊", PrototypeCellKind.Corridor, 380, 336,
+        AddCell("coDE.0", EditorText.Get("BattleEncounterSelectionDialog_015"), PrototypeCellKind.Corridor, 380, 336,
             PrototypeKnowledge.Visited, PrototypeContent.None, hasParty: false);
-        AddCell("coDE.1", "走廊", PrototypeCellKind.Corridor, 404, 336,
+        AddCell("coDE.1", EditorText.Get("BattleEncounterSelectionDialog_015"), PrototypeCellKind.Corridor, 404, 336,
             PrototypeKnowledge.Visited, PrototypeContent.Obstacle, hasParty: false);
-        AddCell("coDE.2", "走廊", PrototypeCellKind.Corridor, 428, 336,
+        AddCell("coDE.2", EditorText.Get("BattleEncounterSelectionDialog_015"), PrototypeCellKind.Corridor, 428, 336,
             PrototypeKnowledge.Visited, PrototypeContent.None, hasParty: false);
-        AddCell("coDE.3", "走廊", PrototypeCellKind.Corridor, 452, 336,
+        AddCell("coDE.3", EditorText.Get("BattleEncounterSelectionDialog_015"), PrototypeCellKind.Corridor, 452, 336,
             PrototypeKnowledge.Visited, PrototypeContent.None, hasParty: false);
-        AddCell("coDE.4", "走廊", PrototypeCellKind.Corridor, 476, 336,
+        AddCell("coDE.4", EditorText.Get("BattleEncounterSelectionDialog_015"), PrototypeCellKind.Corridor, 476, 336,
             PrototypeKnowledge.Visited, PrototypeContent.None, hasParty: false);
-        AddCell("coDE.5", "走廊", PrototypeCellKind.Corridor, 500, 336,
+        AddCell("coDE.5", EditorText.Get("BattleEncounterSelectionDialog_015"), PrototypeCellKind.Corridor, 500, 336,
             PrototypeKnowledge.Visited, PrototypeContent.None, hasParty: false);
-        AddCell("coDE.6", "走廊", PrototypeCellKind.Corridor, 524, 336,
+        AddCell("coDE.6", EditorText.Get("BattleEncounterSelectionDialog_015"), PrototypeCellKind.Corridor, 524, 336,
             PrototypeKnowledge.Visited, PrototypeContent.None, hasParty: false);
-        AddCell("coDE.7", "走廊", PrototypeCellKind.Corridor, 548, 336,
+        AddCell("coDE.7", EditorText.Get("BattleEncounterSelectionDialog_015"), PrototypeCellKind.Corridor, 548, 336,
             PrototypeKnowledge.Visited, PrototypeContent.None, hasParty: false);
-        AddCell("rooE", "首领预览房间", PrototypeCellKind.Room, 592, 336,
+        AddCell("rooE", EditorText.Get("BattleMapView_MapConstruction_028"), PrototypeCellKind.Room, 592, 336,
             PrototypeKnowledge.Visited, PrototypeContent.Boss, hasParty: false);
 
-        AddCell("coAF.0", "走廊", PrototypeCellKind.Corridor, 80, 124,
+        AddCell("coAF.0", EditorText.Get("BattleEncounterSelectionDialog_015"), PrototypeCellKind.Corridor, 80, 124,
             PrototypeKnowledge.Scouted, PrototypeContent.None, hasParty: false);
-        AddCell("coAF.1", "走廊", PrototypeCellKind.Corridor, 80, 148,
+        AddCell("coAF.1", EditorText.Get("BattleEncounterSelectionDialog_015"), PrototypeCellKind.Corridor, 80, 148,
             PrototypeKnowledge.Scouted, PrototypeContent.Curio, hasParty: false);
-        AddCell("coAF.2", "走廊", PrototypeCellKind.Corridor, 80, 172,
+        AddCell("coAF.2", EditorText.Get("BattleEncounterSelectionDialog_015"), PrototypeCellKind.Corridor, 80, 172,
             PrototypeKnowledge.Scouted, PrototypeContent.None, hasParty: false);
-        AddCell("coAF.3", "走廊", PrototypeCellKind.Corridor, 80, 196,
+        AddCell("coAF.3", EditorText.Get("BattleEncounterSelectionDialog_015"), PrototypeCellKind.Corridor, 80, 196,
             PrototypeKnowledge.Scouted, PrototypeContent.None, hasParty: false);
-        AddCell("coAF.4", "走廊", PrototypeCellKind.Corridor, 80, 220,
+        AddCell("coAF.4", EditorText.Get("BattleEncounterSelectionDialog_015"), PrototypeCellKind.Corridor, 80, 220,
             PrototypeKnowledge.Scouted, PrototypeContent.None, hasParty: false);
-        AddCell("coAF.5", "走廊", PrototypeCellKind.Corridor, 80, 244,
+        AddCell("coAF.5", EditorText.Get("BattleEncounterSelectionDialog_015"), PrototypeCellKind.Corridor, 80, 244,
             PrototypeKnowledge.Scouted, PrototypeContent.None, hasParty: false);
-        AddCell("coAF.6", "走廊", PrototypeCellKind.Corridor, 80, 268,
+        AddCell("coAF.6", EditorText.Get("BattleEncounterSelectionDialog_015"), PrototypeCellKind.Corridor, 80, 268,
             PrototypeKnowledge.Scouted, PrototypeContent.None, hasParty: false);
-        AddCell("coAF.7", "走廊", PrototypeCellKind.Corridor, 80, 292,
+        AddCell("coAF.7", EditorText.Get("BattleEncounterSelectionDialog_015"), PrototypeCellKind.Corridor, 80, 292,
             PrototypeKnowledge.Scouted, PrototypeContent.None, hasParty: false);
-        AddCell("rooF", "支路房间", PrototypeCellKind.Room, 80, 336,
+        AddCell("rooF", EditorText.Get("BattleMapView_MapConstruction_029"), PrototypeCellKind.Room, 80, 336,
             PrototypeKnowledge.Scouted, PrototypeContent.None, hasParty: false);
     }
 

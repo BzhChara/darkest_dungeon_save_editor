@@ -18,17 +18,17 @@ internal static class NativeInventoryIdentity
     private static string GetFieldIssue(string value, string field)
     {
         if (value.Contains('\0'))
-            return $"存档物品的 {field} 包含 NUL，游戏读取时会提前结束，无法安全修改。";
+            return EditorText.Format("NativeInventoryIdentity_001", field);
         try
         {
             var bytes = Utf8.GetByteCount(value);
             return bytes > MaximumSaveBytes
-                ? $"存档物品的 {field} 为 {bytes} 个 UTF-8 字节，超过游戏可读取的 {MaximumSaveBytes} 字节，无法安全修改。"
+                ? EditorText.Format("NativeInventoryIdentity_002", field, bytes, MaximumSaveBytes)
                 : string.Empty;
         }
         catch (EncoderFallbackException)
         {
-            return $"存档物品的 {field} 无法完整编码为 UTF-8，无法安全修改。";
+            return EditorText.Format("NativeInventoryIdentity_003", field);
         }
     }
 

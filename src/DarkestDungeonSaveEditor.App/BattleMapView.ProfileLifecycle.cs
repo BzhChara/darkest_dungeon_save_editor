@@ -43,16 +43,16 @@ public partial class BattleMapView : UserControl
             BuildPrototypeMap();
             ShowMapSurface();
             MapTitleTextBlock.Text =
-                $"{(string.IsNullOrWhiteSpace(profileId) ? "当前档案" : profileId)} · 副本地图交互原型";
-            MapSelectionTextBlock.Text = "右击房间或走廊格查看操作。";
-            LiveStatusTextBlock.Text = "原型数据 · 未绑定存档";
+                EditorText.Format("BattleMapView_ProfileLifecycle_001", (string.IsNullOrWhiteSpace(profileId) ? EditorText.Get("BattleMapView_MapConstruction_001") : profileId));
+            MapSelectionTextBlock.Text = EditorText.Get("BattleMapView_ProfileLifecycle_002");
+            LiveStatusTextBlock.Text = EditorText.Get("BattleMapView_ProfileLifecycle_003");
             UpdateMapBadge();
             _fitToView = true;
             _ = Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(FitMapToViewport));
             return;
         }
 
-        ShowUnavailableState("载入 Profile 后，这里会在副本期间读取真实地图。", "尚未绑定存档");
+        ShowUnavailableState(EditorText.Get("BattleMapView_ProfileLifecycle_004"), EditorText.Get("BattleMapView_ProfileLifecycle_005"));
     }
 
     public async Task<BattleMapSnapshot?> LoadProfileAsync(
@@ -94,7 +94,7 @@ public partial class BattleMapView : UserControl
         _roomAttachmentCatalog = null;
         _currentSnapshot = null;
         ConfigureOriginalMapAssets(gameDirectory);
-        ShowUnavailableState("正在安全读取当前副本地图……", "正在读取存档");
+        ShowUnavailableState(EditorText.Get("BattleMapView_ProfileLifecycle_006"), EditorText.Get("BattleMapView_ProfileLifecycle_007"));
 
         BattleMapSnapshot? snapshot = null;
         try
@@ -124,16 +124,16 @@ public partial class BattleMapView : UserControl
                         var bridgeByType = _encounterCatalog.BridgeEncounters
                             .GroupBy(encounter => encounter.MashType)
                             .ToDictionary(group => group.Key, group => group.Count());
-                        diagnosticBatch.Add("战斗遭遇", _encounterCatalog.Issues);
+                        diagnosticBatch.Add(EditorText.Get("BattleMapView_Commands_032"), _encounterCatalog.Issues);
                         CrashDiagnostics.RecordStatus(
-                            $"战斗遭遇目录：地区={snapshot.DungeonId}；难度={snapshot.Difficulty}；" +
-                            $"无需 Bridge 的直接索引：走廊={directByType.GetValueOrDefault(0)}，" +
-                            $"房间={directByType.GetValueOrDefault(1)}，" +
-                            $"首领房间={directByType.GetValueOrDefault(2)}；" +
-                            $"全局 Bridge 候选：走廊={bridgeByType.GetValueOrDefault(0)}，" +
-                            $"房间={bridgeByType.GetValueOrDefault(1)}，" +
-                            $"首领房间={bridgeByType.GetValueOrDefault(2)}；" +
-                            "直接索引为 0 不代表没有 Bridge 候选；实际写入仍需满足存档状态和安全检查。诊断并入本轮目录日志。");
+                            EditorText.Format("BattleMapView_ProfileLifecycle_008", snapshot.DungeonId, snapshot.Difficulty) +
+                            EditorText.Format("BattleMapView_ProfileLifecycle_009", directByType.GetValueOrDefault(0)) +
+                            EditorText.Format("BattleMapView_ProfileLifecycle_010", directByType.GetValueOrDefault(1)) +
+                            EditorText.Format("BattleMapView_ProfileLifecycle_011", directByType.GetValueOrDefault(2)) +
+                            EditorText.Format("BattleMapView_ProfileLifecycle_012", bridgeByType.GetValueOrDefault(0)) +
+                            EditorText.Format("BattleMapView_ProfileLifecycle_010", bridgeByType.GetValueOrDefault(1)) +
+                            EditorText.Format("BattleMapView_ProfileLifecycle_011", bridgeByType.GetValueOrDefault(2)) +
+                            EditorText.Get("BattleMapView_ProfileLifecycle_013"));
                     }
                     catch (OperationCanceledException)
                     {
@@ -145,7 +145,7 @@ public partial class BattleMapView : UserControl
                         CrashDiagnostics.RecordException(
                             "BattleMap: encounter catalog",
                             ex,
-                            $"档案={profile.ProfileId}；地区={snapshot.DungeonId}；难度={snapshot.Difficulty}");
+                            EditorText.Format("BattleMapView_ProfileLifecycle_014", profile.ProfileId, snapshot.DungeonId, snapshot.Difficulty));
                     }
                     if (generation != _profileGeneration)
                     {
@@ -157,15 +157,15 @@ public partial class BattleMapView : UserControl
                         _roomAttachmentCatalog = await Task.Run(
                             () => BattleRoomAttachmentCatalog.Load(activeContent, snapshot.DungeonId),
                             cancellationToken);
-                        diagnosticBatch.Add("地图内容", _roomAttachmentCatalog.Issues);
+                        diagnosticBatch.Add(EditorText.Get("BattleMapView_ProfileLifecycle_015"), _roomAttachmentCatalog.Issues);
                         CrashDiagnostics.RecordStatus(
-                            $"地图内容目录：房间奇物={_roomAttachmentCatalog.Curios.Count}；" +
-                            $"房间宝箱={_roomAttachmentCatalog.Treasures.Count}；" +
-                            $"走廊奇物={_roomAttachmentCatalog.HallCurios.Count}；" +
-                            $"当前区域={snapshot.DungeonId}；" +
-                            $"陷阱={_roomAttachmentCatalog.GetCandidates(BattleRoomAttachmentKind.Trap, snapshot.DungeonId).Count}；" +
-                            $"障碍={_roomAttachmentCatalog.GetCandidates(BattleRoomAttachmentKind.Obstacle, snapshot.DungeonId).Count}；" +
-                            "诊断并入本轮目录日志。");
+                            EditorText.Format("BattleMapView_ProfileLifecycle_016", _roomAttachmentCatalog.Curios.Count) +
+                            EditorText.Format("BattleMapView_ProfileLifecycle_017", _roomAttachmentCatalog.Treasures.Count) +
+                            EditorText.Format("BattleMapView_ProfileLifecycle_018", _roomAttachmentCatalog.HallCurios.Count) +
+                            EditorText.Format("BattleMapView_ProfileLifecycle_019", snapshot.DungeonId) +
+                            EditorText.Format("BattleMapView_ProfileLifecycle_020", _roomAttachmentCatalog.GetCandidates(BattleRoomAttachmentKind.Trap, snapshot.DungeonId).Count) +
+                            EditorText.Format("BattleMapView_ProfileLifecycle_021", _roomAttachmentCatalog.GetCandidates(BattleRoomAttachmentKind.Obstacle, snapshot.DungeonId).Count) +
+                            EditorText.Get("BattleMapView_ProfileLifecycle_022"));
                     }
                     catch (OperationCanceledException)
                     {
@@ -177,7 +177,7 @@ public partial class BattleMapView : UserControl
                         CrashDiagnostics.RecordException(
                             "BattleMap: room attachment catalog",
                             ex,
-                            $"档案={profile.ProfileId}；地区={snapshot.DungeonId}；难度={snapshot.Difficulty}");
+                            EditorText.Format("BattleMapView_ProfileLifecycle_014", profile.ProfileId, snapshot.DungeonId, snapshot.Difficulty));
                     }
                     if (generation != _profileGeneration)
                     {
@@ -190,14 +190,14 @@ public partial class BattleMapView : UserControl
             else if (!mapExists && !raidExists)
             {
                 ShowUnavailableState(
-                    "当前档案处于小镇；进入副本并等待游戏写盘后，地图会自动出现。",
-                    "等待副本");
+                    EditorText.Get("BattleMapView_ProfileLifecycle_023"),
+                    EditorText.Get("BattleMapView_LiveRefresh_006"));
             }
             else
             {
                 ShowUnavailableState(
-                    "副本存档尚未写完整；编辑器会保留监听并自动重试。",
-                    "等待完整存档");
+                    EditorText.Get("BattleMapView_LiveRefresh_002"),
+                    EditorText.Get("BattleMapView_LiveRefresh_003"));
                 ScheduleRefreshRetry(generation);
             }
         }
@@ -206,8 +206,8 @@ public partial class BattleMapView : UserControl
             if (generation == _profileGeneration)
             {
                 ShowUnavailableState(
-                    "当前副本地图暂时无法读取；编辑器会继续监听下一次完整写盘。",
-                    "等待完整存档");
+                    EditorText.Get("BattleMapView_ProfileLifecycle_024"),
+                    EditorText.Get("BattleMapView_LiveRefresh_003"));
                 ScheduleRefreshRetry(generation);
             }
             throw;
@@ -267,8 +267,8 @@ public partial class BattleMapView : UserControl
         ResetZoomButton.IsEnabled = false;
         FitMapButton.IsEnabled = false;
         ForceTownButton.IsEnabled = false;
-        MapTitleTextBlock.Text = "当前副本地图";
-        MapSelectionTextBlock.Text = "当前没有副本地图。";
+        MapTitleTextBlock.Text = EditorText.Get("BattleMapView_ProfileLifecycle_025");
+        MapSelectionTextBlock.Text = EditorText.Get("BattleMapView_ProfileLifecycle_026");
         LiveStatusTextBlock.Text = liveStatus;
     }
 

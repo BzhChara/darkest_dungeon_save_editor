@@ -12,6 +12,7 @@ internal static partial class ContractSuite
         RunUiContracts(repositoryRoot);
         var fixture = BuildContractFixture(repositoryRoot);
         var runRoot = fixture.RunRoot;
+        VerifyEditorLocalizationResources(repositoryRoot, runRoot);
         var gameRoot = fixture.GameRoot;
         var workshopRoot = fixture.WorkshopRoot;
         var additionalLocalModDirectory = fixture.AdditionalLocalModDirectory;
@@ -133,6 +134,7 @@ internal static partial class ContractSuite
         await RunProfileSyncContractsAsync(fixture);
         await RunWpfContractsAsync(async () =>
         {
+            await VerifyEditorLocalizationUiAsync(repositoryRoot, runRoot);
             await VerifyQuirkSelectionInteractionAsync(repositoryRoot);
             await VerifyProfileSyncInteractionAsync(fixture);
         });

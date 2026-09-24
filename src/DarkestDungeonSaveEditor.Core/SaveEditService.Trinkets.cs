@@ -218,8 +218,8 @@ public sealed partial class SaveEditService
                 {
                     var recovery = replacement.Recover();
                     throw new InvalidOperationException(
-                        $"饰品写入失败；{GuardedSaveReplacement.DescribeRecovery(recovery)}。" +
-                        $"完整备份：{backupDirectory}；实际被替换版本：{replacement.DisplacedPath}",
+                        EditorText.Format("SaveEditService_Trinkets_001", GuardedSaveReplacement.DescribeRecovery(recovery)) +
+                        EditorText.Format("BattleMapEditService_007", backupDirectory, replacement.DisplacedPath),
                         commitError);
                 }
                 catch (InvalidOperationException ex) when (ReferenceEquals(ex.InnerException, commitError))
@@ -229,7 +229,7 @@ public sealed partial class SaveEditService
                 catch (Exception restoreError)
                 {
                     throw new AggregateException(
-                        $"饰品写入失败，自动恢复未能完成。完整备份：{backupDirectory}；实际被替换版本：{replacement.DisplacedPath}",
+                        EditorText.Format("SaveEditService_Trinkets_002", backupDirectory, replacement.DisplacedPath),
                         commitError,
                         restoreError);
                 }

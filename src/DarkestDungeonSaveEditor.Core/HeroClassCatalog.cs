@@ -400,9 +400,9 @@ public static partial class HeroClassCatalog
             {
                 var levels = hero.GenerationAvailability.Where(level => level.CanGenerate)
                     .Select(level => level.ResolveLevel).ToArray();
-                issues.Add($"人物生成预检：{hero.Id}；可用等级：" +
-                           (levels.Length == 0 ? "无" : string.Join(",", levels)) +
-                           $"；首个限制：{firstFailure.UnavailableReason}");
+                issues.Add(EditorText.Format("HeroClassCatalog_001", hero.Id) +
+                           (levels.Length == 0 ? EditorText.Get("InitialQuirkSelectionDialog_016") : string.Join(",", levels)) +
+                           EditorText.Format("HeroClassCatalog_002", firstFailure.UnavailableReason));
             }
         }
 

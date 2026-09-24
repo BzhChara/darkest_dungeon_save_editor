@@ -48,10 +48,10 @@ public partial class BattleMapView : UserControl
 
     private void UpdateMapBadge()
     {
-        PrototypeBadgeTextBlock.Text = "全局视野";
+        PrototypeBadgeTextBlock.Text = EditorText.Get("BattleMapView_Assets_001");
         PrototypeBadge.ToolTip = _usesOriginalMapAssets
             ? null
-            : "未找到完整的原版地图素材，当前使用简化占位显示。";
+            : EditorText.Get("BattleMapView_Assets_002");
     }
 
     private static ImageBrush? CreateOriginalMapBackdrop(ImageSource? source)

@@ -28,7 +28,7 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             CrashDiagnostics.RecordException("BattleMap: snapshot diagnostics", ex,
-                $"档案目录={snapshot.ProfileDirectory}；地图文件={snapshot.MapSavePath}；副本文件={snapshot.RaidSavePath}；" +
+                EditorText.Format("MainWindow_BattleMapIntegration_001", snapshot.ProfileDirectory, snapshot.MapSavePath, snapshot.RaidSavePath) +
                 $"persist.map.json SHA-256={snapshot.MapSha256}；persist.raid.json SHA-256={snapshot.RaidSha256}");
         }
     }
@@ -38,7 +38,7 @@ public partial class MainWindow : Window
         // A managed Bridge changes active sources. Publish all catalogs together after the write.
         RequestProfileSync(refreshContent: true);
         CrashDiagnostics.RecordStatus(
-            $"托管遭遇 Bridge 已同步活动内容：档案={activeContent.Profile.ProfileId}；" +
+            EditorText.Format("MainWindow_BattleMapIntegration_002", activeContent.Profile.ProfileId) +
             CatalogLogDiagnostics.FormatSourceCounts(activeContent) + "；" +
             $"persist.game.json SHA-256={activeContent.SourceGameSha256}");
     }

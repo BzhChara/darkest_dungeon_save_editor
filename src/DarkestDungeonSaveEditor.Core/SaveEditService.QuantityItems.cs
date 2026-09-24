@@ -46,8 +46,8 @@ public sealed partial class SaveEditService
         if (QuantityItemSaveScene.Read(activeContent).Context != saveContext)
         {
             throw new InvalidOperationException(saveContext == QuantityItemSaveContext.Town
-                ? "当前档案已经进入副本；请重新加载内容目录，程序将切换为当前背包修改模式。"
-                : "当前档案已不在副本中；请重新加载内容目录，程序不会把背包修改误写到小镇存档。");
+                ? EditorText.Get("SaveEditService_QuantityItems_001")
+                : EditorText.Get("SaveEditService_QuantityItems_002"));
         }
         ValidateQuantityItemSaveContext(profile, saveContext);
         var manifestFingerprints = CaptureManifestFingerprints(activeContent.Sources);
@@ -246,8 +246,8 @@ public sealed partial class SaveEditService
                 {
                     var recovery = replacement.Recover();
                     throw new InvalidOperationException(
-                        $"物品写入失败；{GuardedSaveReplacement.DescribeRecovery(recovery)}。" +
-                        $"完整备份：{backupDirectory}；实际被替换版本：{replacement.DisplacedPath}",
+                        EditorText.Format("SaveEditService_QuantityItems_003", GuardedSaveReplacement.DescribeRecovery(recovery)) +
+                        EditorText.Format("BattleMapEditService_007", backupDirectory, replacement.DisplacedPath),
                         commitError);
                 }
                 catch (InvalidOperationException ex) when (ReferenceEquals(ex.InnerException, commitError))
@@ -257,7 +257,7 @@ public sealed partial class SaveEditService
                 catch (Exception restoreError)
                 {
                     throw new AggregateException(
-                        $"物品写入失败，自动恢复未能完成。完整备份：{backupDirectory}；实际被替换版本：{replacement.DisplacedPath}",
+                        EditorText.Format("SaveEditService_QuantityItems_004", backupDirectory, replacement.DisplacedPath),
                         commitError,
                         restoreError);
                 }
@@ -341,7 +341,7 @@ public sealed partial class SaveEditService
         if (saveContext == QuantityItemSaveContext.Raid && !raidExists)
         {
             throw new InvalidOperationException(
-                "当前档案已不在副本中；请重新加载内容目录，程序不会把背包修改误写到小镇存档。");
+                EditorText.Get("SaveEditService_QuantityItems_002"));
         }
 
     }
@@ -428,7 +428,7 @@ public sealed partial class SaveEditService
     {
         if (readFailures.Count > 0)
             throw new InvalidOperationException(
-                "活动物品定义读取不完整，无法确认所选条目仅存在于存档；请检查目录诊断并重新加载。");
+                EditorText.Get("SaveEditService_QuantityItems_005"));
     }
 
     private static bool QuantityItemDefinitionMatches(

@@ -3,7 +3,7 @@ namespace DarkestDungeonSaveEditor.Core;
 /// <summary>Presentation-only grouping; the catalogs' original Issues remain authoritative.</summary>
 public static partial class CatalogLogDiagnostics
 {
-    internal const string LocalizationEvidenceMarker = "\n本地化读取补充：";
+    internal const string LocalizationEvidenceMarker = CatalogIssueCode.LocalizationEvidence;
 
     public static IReadOnlyList<DiagnosticLogEntry> Summarize(
         IEnumerable<(string Module, IReadOnlyList<string> Issues)> inputs)
@@ -37,10 +37,10 @@ public static partial class CatalogLogDiagnostics
         }
 
         return groups.Values.Select(group => new DiagnosticLogEntry(group.Level,
-                (group.Level == DiagnosticLogLevel.Information ? "目录说明：" : "目录警告：") +
-                group.Message + FormatLocations(group) + "；报告模块=" + string.Join("、", group.Modules.Order(StringComparer.Ordinal)) +
+                (group.Level == DiagnosticLogLevel.Information ? EditorText.Get("CatalogLogDiagnostics_001") : EditorText.Get("CatalogLogDiagnostics_002")) +
+                group.Message + FormatLocations(group) + EditorText.Get("CatalogLogDiagnostics_003") + string.Join("、", group.Modules.Order(StringComparer.Ordinal)) +
                 (group.Evidence.Count == 0 ? string.Empty : "；" + string.Join("；", group.Evidence.OrderBy(pair => pair.Key, StringComparer.Ordinal)
-                    .Select(pair => $"读取范围[{string.Join("、", pair.Value.Order(StringComparer.Ordinal))}]：{pair.Key}")))))
+                    .Select(pair => EditorText.Format("CatalogLogDiagnostics_004", string.Join("、", pair.Value.Order(StringComparer.Ordinal)), pair.Key))))))
             .OrderByDescending(entry => entry.Level)
             .ThenBy(entry => entry.Message, StringComparer.Ordinal)
             .ToArray();
@@ -59,10 +59,10 @@ public static partial class CatalogLogDiagnostics
             issue.StartsWith("Unsupported enabled Mod source", StringComparison.Ordinal));
         var duplicates = content.Issues.Count(issue =>
             issue.StartsWith("Enabled content directory appears more than once and was scanned once:", StringComparison.Ordinal));
-        return $"存档启用记录 {(long)content.AppliedModCount + invalidRecords} 条（已解析 {content.AppliedModCount}，格式无效 {invalidRecords}）；" +
-            $"已定位 Mod 来源 {modSources} 个；" +
-            $"无法定位/识别记录 {unresolved} 条；重复来源合并 {duplicates} 条；" +
-            $"活动来源共 {content.Sources.Count} 个（含本体、模式和 DLC）";
+        return EditorText.Format("CatalogLogDiagnostics_005", (long)content.AppliedModCount + invalidRecords, content.AppliedModCount, invalidRecords) +
+            EditorText.Format("CatalogLogDiagnostics_006", modSources) +
+            EditorText.Format("CatalogLogDiagnostics_007", unresolved, duplicates) +
+            EditorText.Format("CatalogLogDiagnostics_008", content.Sources.Count);
     }
 
     private static (string Key, DiagnosticLogLevel Level, string Message, string? Evidence) Describe(string raw)
@@ -85,32 +85,36 @@ public static partial class CatalogLogDiagnostics
             var evidence = marker < 0 ? null : Clean(reasonAndEvidence[(marker + LocalizationEvidenceMarker.Length)..]);
             // Same Windows path + exact failure reason. Different reasons are not collapsed.
             return ("localization\0" + path.ToUpperInvariant() + "\0" + reason, DiagnosticLogLevel.Warning,
-                $"本地化文件读取失败；文件={Clean(path)}；原因={Clean(reason)}；" +
-                "其他有效译文仍按既定规则使用，不代表所有名称缺失；人物随机姓名候选另由 XML 提供",
+                EditorText.Format("CatalogLogDiagnostics_009", Clean(path), Clean(reason)) +
+                EditorText.Get("CatalogLogDiagnostics_010"),
                 evidence);
         }
 
-        const string partialPrefix = "本地化部分读取：'";
+        const string partialPrefix = CatalogIssueCode.PartialLocalization;
         if (raw.StartsWith(partialPrefix, StringComparison.Ordinal))
         {
-            var end = raw.IndexOf("'；", partialPrefix.Length, StringComparison.Ordinal);
+            var end = raw.IndexOf("';", partialPrefix.Length, StringComparison.Ordinal);
             if (end >= 0)
             {
                 return ("localization-partial\0" + raw[partialPrefix.Length..end].ToUpperInvariant() + "\0" + raw[(end + 2)..],
-                    DiagnosticLogLevel.Warning, Clean(raw), null);
+                    DiagnosticLogLevel.Warning,
+                    EditorText.Format("CatalogLogDiagnostics_PartialFile", Clean(raw[partialPrefix.Length..end]), Clean(raw[(end + 2)..])), null);
             }
         }
 
-        if (raw.StartsWith("当前为小镇状态；残留副本文件已忽略", StringComparison.Ordinal) ||
-            raw.StartsWith("Enabled content directory appears more than once and was scanned once:", StringComparison.Ordinal))
+        if (raw.StartsWith(CatalogIssueCode.TownRaidResidue, StringComparison.Ordinal))
+        {
+            return (raw, DiagnosticLogLevel.Information, Clean(raw[CatalogIssueCode.TownRaidResidue.Length..]), null);
+        }
+        if (raw.StartsWith("Enabled content directory appears more than once and was scanned once:", StringComparison.Ordinal))
         {
             return (raw, DiagnosticLogLevel.Information, Clean(raw), null);
         }
         if (raw.StartsWith("Enabled Workshop item is not installed: ", StringComparison.Ordinal))
         {
             return (raw, DiagnosticLogLevel.Warning,
-                "存档仍启用该工坊项目，但本机未找到安装目录；项目=" + raw["Enabled Workshop item is not installed: ".Length..] +
-                "；该来源未加载，请核对订阅/安装状态；其余来源继续加载", null);
+                EditorText.Get("CatalogLogDiagnostics_011") + raw["Enabled Workshop item is not installed: ".Length..] +
+                EditorText.Get("CatalogLogDiagnostics_012"), null);
         }
         return (raw, DiagnosticLogLevel.Warning, Clean(raw), null);
     }

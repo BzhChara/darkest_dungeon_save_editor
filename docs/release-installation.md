@@ -14,7 +14,7 @@ The Windows x64 release includes the .NET 8 runtime. You do not need to install 
 2. Download `DarkestDungeonSaveEditor-v<version>-win-x64.zip` and `SHA256SUMS.txt` from the same release. The automatically generated **Source code** archives are for developers; they do not contain the runnable application.
 3. Optionally verify the ZIP in PowerShell with `Get-FileHash -Algorithm SHA256 .\DarkestDungeonSaveEditor-v<version>-win-x64.zip`. Replace `<version>` with the downloaded version and compare the complete hash with `SHA256SUMS.txt`.
 4. Extract the entire ZIP to a writable folder. Do not run the EXE inside the archive or copy it out alone.
-5. Run `DarkestDungeonSaveEditor.App.exe` from the extracted folder. The UI is currently localized in Simplified Chinese; these English instructions describe the controls by their meaning.
+5. Run `DarkestDungeonSaveEditor.App.exe` from the extracted folder. The original `v0.1.0-beta.1` ZIP uses Simplified Chinese. Current source builds offer a compact **Language** menu for English, Simplified Chinese, or the system default; changes apply on the next startup. Keep the `zh-CN` resource directory with builds that include it.
 
 ## First use
 

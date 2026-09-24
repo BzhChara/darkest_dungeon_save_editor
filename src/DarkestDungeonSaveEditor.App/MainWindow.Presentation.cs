@@ -32,7 +32,7 @@ public partial class MainWindow : Window
     {
         return HeroLevelComboBox.SelectedItem is HeroLevelChoice choice
             ? choice.ResolveLevel
-            : throw new InvalidOperationException("请选择要生成的人物等级。");
+            : throw new InvalidOperationException(EditorText.Get("MainWindow_Presentation_001"));
     }
 
     private void UpdateInitialQuirkSelectionSummary()
@@ -42,11 +42,11 @@ public partial class MainWindow : Window
             return;
         }
 
-        InitialQuirksButton.Content = $"选择初始怪癖… ({_selectedInitialQuirkIds.Count})";
+        InitialQuirksButton.Content = EditorText.Format("MainWindow_Presentation_002", _selectedInitialQuirkIds.Count);
         if (HeroGrid is null || HeroGrid.SelectedItem is not HeroRow)
         {
             InitialQuirksButton.IsEnabled = false;
-            InitialQuirkSelectionSummaryTextBlock.Text = "请先选择人物职业；默认生成空白怪癖。";
+            InitialQuirkSelectionSummaryTextBlock.Text = EditorText.Get("MainWindow_Presentation_003");
             return;
         }
 
@@ -69,14 +69,14 @@ public partial class MainWindow : Window
         }
 
         InitialQuirkSelectionSummaryTextBlock.Text =
-            $"已选 +{positiveCount}/-{negativeCount}/疾病 {diseaseCount}：" +
+            EditorText.Format("MainWindow_Presentation_004", positiveCount, negativeCount, diseaseCount) +
             FormatSelectedQuirks(_selectedInitialQuirkIds);
     }
 
     private static string FormatSelectedQuirks(StagecoachHeroCandidatePreview? preview)
     {
         return preview is null
-            ? "未知"
+            ? EditorText.Get("BattleEncounterSelectionDialog_017")
             : FormatSelectedQuirks(
                 preview.PositiveQuirks.Concat(preview.NegativeQuirks).Concat(preview.Diseases));
     }
@@ -84,7 +84,7 @@ public partial class MainWindow : Window
     private static string FormatSelectedQuirks(IEnumerable<string> quirkIds)
     {
         var ids = quirkIds.Distinct(StringComparer.Ordinal).ToArray();
-        return ids.Length == 0 ? "空白" : string.Join(", ", ids);
+        return ids.Length == 0 ? EditorText.Get("BattleMapView_CellVisuals_010") : string.Join(", ", ids);
     }
 
     private static string FormatHeroPreviewWarnings(StagecoachHeroMutationPreview preview)
@@ -92,7 +92,7 @@ public partial class MainWindow : Window
         var warnings = new List<string>();
         if (preview.MayRefreshOnTownReturn)
         {
-            warnings.Add("当前档案仍在副本中；回城过周刷新马车时，新人物可能被清除。建议回到小镇后再生成。");
+            warnings.Add(EditorText.Get("MainWindow_Presentation_005"));
         }
 
         var quirkLimitWarnings = FormatHeroQuirkLimitWarnings(preview);
@@ -111,26 +111,26 @@ public partial class MainWindow : Window
             preview.QuirkLimits
                 .Where(limit => limit.ExceedsDefinitionLimit)
                 .Select(limit =>
-                    $"怪癖 {limit.QuirkId}（singleton）：当前 roster {limit.ExistingRosterHeroes} 名、" +
-                    $"全部马车池 {limit.ExistingStagecoachCandidates} 名；写入后合计 {limit.ResultingHeroes} 名，" +
-                    $"超过定义上限 {limit.DefinitionLimit}。编辑器会按控制台模式保留写入能力。"));
+                    EditorText.Format("MainWindow_Presentation_006", limit.QuirkId, limit.ExistingRosterHeroes) +
+                    EditorText.Format("MainWindow_Presentation_007", limit.ExistingStagecoachCandidates, limit.ResultingHeroes) +
+                    EditorText.Format("MainWindow_Presentation_008", limit.DefinitionLimit)));
     }
 
     private static string FormatDefinitionLimit(int? limit)
     {
         return limit switch
         {
-            0 => "无限",
-            null => "未知",
+            0 => EditorText.Get("MainWindow_Presentation_009"),
+            null => EditorText.Get("BattleEncounterSelectionDialog_017"),
             _ => limit.Value.ToString(CultureInfo.InvariantCulture)
         };
     }
 
     private static string FormatItemStorage(QuantityItemStorageKind storageKind) => storageKind switch
     {
-        QuantityItemStorageKind.Wallet => "钱包",
-        QuantityItemStorageKind.EstateItems => "庄园物品",
-        QuantityItemStorageKind.RaidInventory => "当前副本背包",
+        QuantityItemStorageKind.Wallet => EditorText.Get("MainWindow_Presentation_010"),
+        QuantityItemStorageKind.EstateItems => EditorText.Get("MainWindow_Presentation_011"),
+        QuantityItemStorageKind.RaidInventory => EditorText.Get("MainWindow_Presentation_012"),
         _ => storageKind.ToString()
     };
 
@@ -139,9 +139,9 @@ public partial class MainWindow : Window
         if (definition.StorageKind == QuantityItemStorageKind.RaidInventory)
         {
             return definition.BaseStackLimit is > 0
-                ? $"背包 / {definition.InventoryType} / 每格 " +
+                ? EditorText.Format("MainWindow_Presentation_013", definition.InventoryType) +
                   definition.BaseStackLimit.Value.ToString(CultureInfo.InvariantCulture)
-                : $"背包 / {definition.InventoryType} / 堆叠未知";
+                : EditorText.Format("MainWindow_Presentation_014", definition.InventoryType);
         }
 
         if (definition.StorageKind != QuantityItemStorageKind.EstateItems)
@@ -151,9 +151,9 @@ public partial class MainWindow : Window
 
         return definition.EstateCanBeProvision switch
         {
-            true => "庄园库存 / 可手动配给",
-            false => "庄园库存 / 不可手动配给",
-            null => "庄园库存 / 手动配给未声明"
+            true => EditorText.Get("MainWindow_Presentation_015"),
+            false => EditorText.Get("MainWindow_Presentation_016"),
+            null => EditorText.Get("MainWindow_Presentation_017")
         };
     }
 
@@ -162,7 +162,7 @@ public partial class MainWindow : Window
         if (definition.StorageKind == QuantityItemStorageKind.RaidInventory)
         {
             return definition.InventoryType.Equals("quest_item", StringComparison.Ordinal)
-                ? "任务物品可能影响当前任务目标，请确认所选 ID 与当前副本相符。"
+                ? EditorText.Get("MainWindow_Presentation_018")
                 : string.Empty;
         }
 
@@ -173,8 +173,8 @@ public partial class MainWindow : Window
 
         return definition.EstateCanBeProvision switch
         {
-            false => "该庄园库存不可手动配给；人物自带或副本中生成的数量不受本次修改影响。",
-            null => "这里只修改小镇庄园库存；是否可手动配给未声明，且不会直接修改副本背包。",
+            false => EditorText.Get("MainWindow_Presentation_019"),
+            null => EditorText.Get("MainWindow_Presentation_020"),
             true => string.Empty
         };
     }
@@ -182,20 +182,20 @@ public partial class MainWindow : Window
     private static string FormatStorageCapacity(TrinketStorageDefinition? storage)
     {
         return storage is null
-            ? "未知"
+            ? EditorText.Get("BattleEncounterSelectionDialog_017")
             : $"{storage.MaxSlots.ToString(CultureInfo.InvariantCulture)}（{storage.ContentSource.DisplayName}）";
     }
 
     private static string FormatStorageCapacity(int? capacity)
     {
-        return capacity?.ToString(CultureInfo.InvariantCulture) ?? "未知";
+        return capacity?.ToString(CultureInfo.InvariantCulture) ?? EditorText.Get("BattleEncounterSelectionDialog_017");
     }
 
     private static string FormatRaidInventoryCapacity(RaidInventoryStorageDefinition? storage) =>
-        storage?.MaxSlots.ToString(CultureInfo.InvariantCulture) ?? "未知";
+        storage?.MaxSlots.ToString(CultureInfo.InvariantCulture) ?? EditorText.Get("BattleEncounterSelectionDialog_017");
 
     private static string FormatQuantitySaveContext(QuantityItemSaveContext saveContext) =>
-        saveContext == QuantityItemSaveContext.Raid ? "副本背包" : "小镇庄园";
+        saveContext == QuantityItemSaveContext.Raid ? EditorText.Get("MainWindow_Presentation_021") : EditorText.Get("MainWindow_Presentation_022");
 
     private static string ComputeSha256(string path)
     {
@@ -207,7 +207,7 @@ public partial class MainWindow : Window
     {
         if (string.IsNullOrWhiteSpace(value) || !Directory.Exists(value.Trim()))
         {
-            throw new DirectoryNotFoundException($"{label}不存在：{value}");
+            throw new DirectoryNotFoundException(EditorText.Format("MainWindow_Presentation_023", label, value));
         }
 
         return Path.GetFullPath(value.Trim());

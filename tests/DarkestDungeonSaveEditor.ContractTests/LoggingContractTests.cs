@@ -36,13 +36,13 @@ internal static partial class ContractSuite
                maps.Contains("BattleMap: snapshot diagnostics", StringComparison.Ordinal) &&
                state.Contains("_battleMapLogTracker.Reset()", StringComparison.Ordinal),
             "App logging must wire build identity, diagnostic levels, grouped catalog counts and guarded per-window map-delta tracking.");
-        var success = workflow.IndexOf("AppendStatusSafely($\"应用成功：", StringComparison.Ordinal);
+        var success = workflow.IndexOf("AppendStatusSafely(EditorText.Format(\"MainWindow_EditWorkflow_061\"", StringComparison.Ordinal);
         var updateUi = workflow.IndexOf("if (isItemEdit && estateCommit is not null)", StringComparison.Ordinal);
         Assert(success > 0 && success < updateUi &&
                workflow.Contains("SaveEditLogFormatter.Describe(_preparedQuantityItemEdit!)", StringComparison.Ordinal) &&
                workflow.Contains("SaveEditLogFormatter.Describe(_preparedTrinketEdit!)", StringComparison.Ordinal) &&
                workflow.Contains("SaveEditLogFormatter.Describe(_preparedHeroEdit!, _preparedHeroCandidatePreview)", StringComparison.Ordinal) &&
-               workflow.Contains("committed ? \"存档已写入，但后续界面更新失败\" : \"应用失败\"", StringComparison.Ordinal),
+               workflow.Contains("committed ? EditorText.Get(\"MainWindow_EditWorkflow_064\") : EditorText.Get(\"MainWindow_EditWorkflow_065\")", StringComparison.Ordinal),
             "Successful commit details must be captured before fallible UI refresh, and post-commit UI failures must not be mislabeled as failed writes.");
         Assert(maps.Contains("CrashDiagnostics.RecordStatus(message, level)", StringComparison.Ordinal) &&
                maps.Contains("AppendStatus(message, level: level)", StringComparison.Ordinal) &&
@@ -56,7 +56,7 @@ internal static partial class ContractSuite
                interaction.Contains("CrashDiagnostics.RecordException(\"Initial quirks: selection dialog\", ex)", StringComparison.Ordinal) &&
                interaction.Contains("\"Initial quirks: failure status\", DiagnosticLogLevel.Error", StringComparison.Ordinal),
             "Status helpers must preserve explicit severity, and handled discovery, preview, dialog, load and commit failures must retain error summaries and exceptions.");
-        foreach (var prefix in new[] { "物品预览警告：", "饰品预览提示：", "人物预览警告：", "人物预览提示：" })
+        foreach (var prefix in new[] { "MainWindow_EditWorkflow_009", "MainWindow_EditWorkflow_022", "MainWindow_EditWorkflow_024", "MainWindow_EditWorkflow_040" })
         {
             Assert(workflow.Split('\n').Any(line => line.Contains(prefix, StringComparison.Ordinal) &&
                        line.Contains("level: DiagnosticLogLevel.Warning", StringComparison.Ordinal)),
@@ -68,21 +68,21 @@ internal static partial class ContractSuite
         Assert(app.Contains("Lazy<SessionLogFile>", StringComparison.Ordinal) &&
                app.Contains("SessionLog.Value.Append(builder.ToString())", StringComparison.Ordinal) &&
                !app.Contains("app-{DateTime.Now:yyyyMMdd}.log", StringComparison.Ordinal) &&
-               app.Contains("本次日志={CrashDiagnostics.LogFilePath}", StringComparison.Ordinal),
+               app.Contains("EditorText.Format(\"App_001\", CrashDiagnostics.LogFilePath)", StringComparison.Ordinal),
             "The application must create one lazy session writer, reuse it for all entries and identify the current file at startup rather than choosing a daily file per write.");
         Assert(loading.Contains("diagnosticBatch: diagnosticBatch", StringComparison.Ordinal) &&
-               loading.Contains("Trinkets = diagnosticBatch.Capture(\"饰品\"", StringComparison.Ordinal) &&
-               loading.Contains("Heroes = diagnosticBatch.Capture(\"人物/怪癖/姓名\"", StringComparison.Ordinal) &&
-               loading.Contains("quantityItemCatalogTask = diagnosticBatch.CaptureAsync(\"物品\"", StringComparison.Ordinal) &&
+               loading.Contains("Trinkets = diagnosticBatch.Capture(EditorText.Get(\"MainWindow_CatalogLoading_008\")", StringComparison.Ordinal) &&
+               loading.Contains("Heroes = diagnosticBatch.Capture(EditorText.Get(\"MainWindow_CatalogLoading_009\")", StringComparison.Ordinal) &&
+               loading.Contains("quantityItemCatalogTask = diagnosticBatch.CaptureAsync(EditorText.Get(\"MainWindow_CatalogLoading_010\")", StringComparison.Ordinal) &&
                loading.Replace("\r\n", "\n", StringComparison.Ordinal).Contains("finally\n        {\n            // Flush partial results", StringComparison.Ordinal) &&
-               battleLoading.Contains("diagnosticBatch.Add(\"战斗遭遇\", _encounterCatalog.Issues)", StringComparison.Ordinal) &&
-               battleLoading.Contains("diagnosticBatch.Add(\"地图内容\", _roomAttachmentCatalog.Issues)", StringComparison.Ordinal) &&
+               battleLoading.Contains("diagnosticBatch.Add(EditorText.Get(\"BattleMapView_Commands_032\"), _encounterCatalog.Issues)", StringComparison.Ordinal) &&
+               battleLoading.Contains("diagnosticBatch.Add(EditorText.Get(\"BattleMapView_ProfileLifecycle_015\"), _roomAttachmentCatalog.Issues)", StringComparison.Ordinal) &&
                battleLoading.Contains("if (ownsDiagnosticBatch)", StringComparison.Ordinal) &&
                app.Contains("foreach (var entry in batch.Drain())", StringComparison.Ordinal) &&
                app.Contains("RecordException(\"Catalog diagnostics: flush\", ex)", StringComparison.Ordinal),
             "Main and battle loads must share one diagnostic batch, flush partial results on exit, and give standalone battle loads their own guarded flush.");
-        Assert(battleLoading.Contains("无需 Bridge 的直接索引", StringComparison.Ordinal) &&
-               battleLoading.Contains("直接索引为 0 不代表没有 Bridge 候选", StringComparison.Ordinal) &&
+        Assert(battleLoading.Contains("BattleMapView_ProfileLifecycle_009", StringComparison.Ordinal) &&
+               battleLoading.Contains("BattleMapView_ProfileLifecycle_013", StringComparison.Ordinal) &&
                !battleLoading.Contains("当前可写 hall", StringComparison.Ordinal),
             "Encounter counts must explicitly distinguish direct indexes from Bridge candidates, not claim all writing is unavailable when direct indexes are zero.");
     }
@@ -156,15 +156,15 @@ internal static partial class ContractSuite
         var missing = $"Actor discovery file listed by Mod is missing: {path}";
         var quantity = $"Failed to read quantity-item reference file '{path.ToLowerInvariant()}': not found";
         var boss = $"Monster definition could not be read for boss classification: {path} (not found)";
-        var slot = $"遭遇槽位截取：{mash}:7；记录=3";
+        var slot = CatalogIssueCode.FormatEncounterSlots(mash, 7, 3);
         var raw = new[] { missing, quantity, boss, slot };
         var before = raw.ToArray();
         var logs = CatalogLogDiagnostics.Summarize([
             ("物品", raw),
-            ("战斗遭遇", new[] { boss, slot, $"遭遇槽位截取：{mash.ToLowerInvariant()}:7；记录=4",
+            ("战斗遭遇", new[] { boss, slot, CatalogIssueCode.FormatEncounterSlots(mash.ToLowerInvariant(), 7, 4),
                 $"Failed to read quantity-item reference file '{unreadable}': permission denied",
                 $"Failed to read quantity-item reference file '{unreadable}': sharing violation",
-                "遭遇槽位截取：malformed" })
+                CatalogIssueCode.EncounterSlots + "malformed" })
         ]);
         var access = logs.Single(entry => entry.Message.Contains("文件访问问题", StringComparison.Ordinal));
         var slots = logs.Single(entry => entry.Level == DiagnosticLogLevel.Information);
@@ -180,7 +180,7 @@ internal static partial class ContractSuite
                slots.Message.Contains("不据此判断超过四只怪物", StringComparison.Ordinal) &&
                logs.Count(entry => entry.Message.Contains(unreadable, StringComparison.Ordinal)) == 2 &&
                logs.Any(entry => entry.Level == DiagnosticLogLevel.Warning &&
-                   entry.Message.Contains("遭遇槽位截取：malformed", StringComparison.Ordinal)),
+                   entry.Message.Contains(CatalogIssueCode.EncounterSlots + "malformed", StringComparison.Ordinal)),
             "Slot notices must retain distinct logical records, and unconfirmed read failures or malformed diagnostics must not disappear into a missing-file group.");
         var fresh = CatalogLogDiagnostics.Summarize([("战斗遭遇", new[] { boss })]);
         Assert(fresh.Count == 1 && fresh[0].Message.Contains(boss, StringComparison.Ordinal) &&
@@ -215,7 +215,7 @@ internal static partial class ContractSuite
             "Adding compiler evidence must not prevent file-and-reason deduplication against the XML-only hero-name reader.");
         var differentScopes = CatalogLogDiagnostics.Summarize([
             ("人物", new[] { issue }),
-            ("物品", new[] { issue.Split('\n')[0] + "\n本地化读取补充：本次所请求的名称中，未取得有效编译条目" })
+            ("物品", new[] { issue.Split('\n')[0] + CatalogLogDiagnostics.LocalizationEvidenceMarker + "本次所请求的名称中，未取得有效编译条目" })
         ]);
         Assert(differentScopes.Count == 1 && differentScopes[0].Message.Contains("读取范围[人物]", StringComparison.Ordinal) &&
                differentScopes[0].Message.Contains("读取范围[物品]", StringComparison.Ordinal),

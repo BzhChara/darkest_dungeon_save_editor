@@ -92,8 +92,8 @@ public partial class BattleEncounterSelectionDialog : Window
         var selected = EncounterGrid.SelectedItem as EncounterChoiceRow;
         ConfirmButton.IsEnabled = selected is not null;
         SelectionTextBlock.Text = selected is null
-            ? "选择一个完整敌方组合；确认后会直接写入当前地图格。"
-            : $"{selected.Composition} · {selected.DungeonId} · 难度 {selected.Definition.OriginDifficulty} · {selected.Source}";
+            ? EditorText.Get("BattleEncounterSelectionDialog_001")
+            : EditorText.Format("BattleEncounterSelectionDialog_002", selected.Composition, selected.DungeonId, selected.Definition.OriginDifficulty, selected.Source);
     }
 
     private void EncounterGrid_MouseDoubleClick(object sender, MouseButtonEventArgs e)
@@ -125,12 +125,12 @@ public partial class BattleEncounterSelectionDialog : Window
         var difficultyCount = DifficultyComboBox.SelectedItem is DifficultyChoice selectedDifficulty
             ? _rows.Count(row => row.Definition.OriginDifficulty == selectedDifficulty.Value)
             : 0;
-        CountTextBlock.Text = $"显示 {visibleCount} / {difficultyCount} 个遭遇";
+        CountTextBlock.Text = EditorText.Format("BattleEncounterSelectionDialog_003", visibleCount, difficultyCount);
     }
 
     private sealed record DifficultyChoice(int Value, bool IsCurrent)
     {
-        public string DisplayName => IsCurrent ? $"{Value}（当前副本）" : Value.ToString();
+        public string DisplayName => IsCurrent ? EditorText.Format("BattleEncounterSelectionDialog_004", Value) : Value.ToString();
     }
 
     private sealed class EncounterChoiceRow
@@ -140,41 +140,45 @@ public partial class BattleEncounterSelectionDialog : Window
             Definition = definition;
             Composition = definition.DisplayName;
             ChineseComposition = definition.ChineseDisplayName;
+            EnglishComposition = string.Join(" + ", definition.MonsterNames.Select(name => name.English));
+            PreferredComposition = definition.MonsterNames.Count == definition.MonsterIds.Count
+                ? string.Join(" + ", definition.MonsterNames.Select((name, index) =>
+                    EditorText.ContentName(name, definition.MonsterIds[index])))
+                : Composition;
             SourceKind = definition.Classification switch
             {
-                BattleEncounterClassification.FixedBoss => "固定首领",
-                BattleEncounterClassification.RoamingBoss => "游荡首领",
-                BattleEncounterClassification.RoamingEncounter => "游荡遭遇",
+                BattleEncounterClassification.FixedBoss => EditorText.Get("BattleEncounterSelectionDialog_005"),
+                BattleEncounterClassification.RoamingBoss => EditorText.Get("BattleEncounterSelectionDialog_006"),
+                BattleEncounterClassification.RoamingEncounter => EditorText.Get("BattleEncounterSelectionDialog_007"),
                 BattleEncounterClassification.ConditionalOrAdditional when
                     definition.ContainsBossMonster &&
-                    definition.SourceKind == BattleEncounterSourceKind.Conditional => "条件首领",
+                    definition.SourceKind == BattleEncounterSourceKind.Conditional => EditorText.Get("BattleEncounterSelectionDialog_008"),
                 BattleEncounterClassification.ConditionalOrAdditional when
                     definition.ContainsBossMonster &&
-                    definition.SourceKind == BattleEncounterSourceKind.Additional => "额外首领",
+                    definition.SourceKind == BattleEncounterSourceKind.Additional => EditorText.Get("BattleEncounterSelectionDialog_009"),
                 BattleEncounterClassification.ConditionalOrAdditional when
-                    definition.ContainsBossMonster => "特殊首领",
+                    definition.ContainsBossMonster => EditorText.Get("BattleEncounterSelectionDialog_010"),
                 BattleEncounterClassification.ConditionalOrAdditional when
-                    definition.SourceKind == BattleEncounterSourceKind.Conditional => "条件战斗",
+                    definition.SourceKind == BattleEncounterSourceKind.Conditional => EditorText.Get("BattleEncounterSelectionDialog_011"),
                 BattleEncounterClassification.ConditionalOrAdditional when
-                    definition.SourceKind == BattleEncounterSourceKind.Additional => "额外战斗",
-                BattleEncounterClassification.ConditionalOrAdditional => "特殊战斗",
-                _ => "普通战斗"
+                    definition.SourceKind == BattleEncounterSourceKind.Additional => EditorText.Get("BattleEncounterSelectionDialog_012"),
+                BattleEncounterClassification.ConditionalOrAdditional => EditorText.Get("BattleEncounterSelectionDialog_013"),
+                _ => EditorText.Get("BattleEncounterSelectionDialog_014")
             };
             TargetKind = definition.MashType switch
             {
-                0 => "走廊",
-                1 => "房间",
-                2 => "房间",
-                _ => "未知"
+                0 => EditorText.Get("BattleEncounterSelectionDialog_015"),
+                1 => EditorText.Get("BattleEncounterSelectionDialog_016"),
+                2 => EditorText.Get("BattleEncounterSelectionDialog_016"),
+                _ => EditorText.Get("BattleEncounterSelectionDialog_017")
             };
             DungeonId = definition.OriginDungeonId;
             Source = definition.SourceLabel;
-            CompositionToolTip = string.IsNullOrWhiteSpace(ChineseComposition)
-                ? Composition
-                : $"{ChineseComposition}{Environment.NewLine}{Composition}";
+            CompositionToolTip = $"{PreferredComposition}{Environment.NewLine}{Composition}";
             SearchText = string.Join(
                 '\n',
                 ChineseComposition,
+                EnglishComposition,
                 Composition,
                 SourceKind,
                 definition.Classification,
@@ -191,6 +195,8 @@ public partial class BattleEncounterSelectionDialog : Window
         public BattleEncounterDefinition Definition { get; }
         public string Composition { get; }
         public string ChineseComposition { get; }
+        public string EnglishComposition { get; }
+        public string PreferredComposition { get; }
         public string CompositionToolTip { get; }
         public string SourceKind { get; }
         public string TargetKind { get; }

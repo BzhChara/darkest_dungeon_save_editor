@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Media;
+using DarkestDungeonSaveEditor.Core;
 
 namespace DarkestDungeonSaveEditor.App;
 
@@ -57,11 +58,11 @@ public partial class ThemedDialog : Window
         var (headerBrushKey, marker, label, markerBrush) = kind switch
         {
             ThemedDialogKind.Information =>
-                ("OliveBandBrush", "i", "信息  /  INFORMATION", FindResource("SuccessBrush") as Brush),
+                ("OliveBandBrush", "i", EditorText.Get("ThemedDialog_001"), FindResource("SuccessBrush") as Brush),
             ThemedDialogKind.Error =>
-                ("RedBandBrush", "×", "错误  /  ERROR", FindResource("DangerBrush") as Brush),
+                ("RedBandBrush", "×", EditorText.Get("ThemedDialog_002"), FindResource("DangerBrush") as Brush),
             _ =>
-                ("RedBandBrush", "!", "警示  /  WARNING", FindResource("WarningBrush") as Brush)
+                ("RedBandBrush", "!", EditorText.Get("ThemedDialog_003"), FindResource("WarningBrush") as Brush)
         };
 
         HeaderBackdrop.Background = FindResource(headerBrushKey) as Brush;
@@ -84,7 +85,7 @@ public partial class ThemedDialog : Window
 
         CancelButton.Visibility = Visibility.Collapsed;
         CancelButton.IsCancel = false;
-        ConfirmButton.Content = "知道了";
+        ConfirmButton.Content = EditorText.Get("ThemedDialog_004");
         ConfirmButton.IsDefault = true;
         ConfirmButton.IsCancel = true;
     }

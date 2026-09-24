@@ -73,7 +73,7 @@ internal sealed class GuardedSaveReplacement : IDisposable
         if (handle.IsInvalid)
         {
             var error = new Win32Exception(Marshal.GetLastWin32Error());
-            throw new IOException($"文件暂时不允许替换：{path}；{error.Message}", error);
+            throw new IOException(EditorText.Format("GuardedSaveReplacement_001", path, error.Message), error);
         }
     }
 
@@ -88,13 +88,13 @@ internal sealed class GuardedSaveReplacement : IDisposable
         using (var proposed = File.OpenRead(_temporaryPath))
         {
             if (!Hash(proposed).Equals(_encodedHash, StringComparison.OrdinalIgnoreCase))
-                throw new InvalidDataException("已验证的待写入文件发生变化，本次修改未应用。");
+                throw new InvalidDataException(EditorText.Get("GuardedSaveReplacement_002"));
         }
         using (var original = new FileStream(_targetPath, FileMode.Open, FileAccess.Read,
                    FileShare.Read | FileShare.Delete))
         {
             if (!Hash(original).Equals(_originalHash, StringComparison.OrdinalIgnoreCase))
-                throw new InvalidOperationException($"存档在最终写入前发生变化：{_targetPath}");
+                throw new InvalidOperationException(EditorText.Format("GuardedSaveReplacement_003", _targetPath));
             _beforeReplace?.Invoke(_targetPath);
             try
             {
@@ -123,7 +123,7 @@ internal sealed class GuardedSaveReplacement : IDisposable
         Verify();
         if (!_displacedHash.Equals(_originalHash, StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException(
-                $"存档在原子替换瞬间被外部更新；被替换的实际版本保留在：{DisplacedPath}");
+                EditorText.Format("GuardedSaveReplacement_004", DisplacedPath));
     }
 
     internal string Verify()
@@ -131,11 +131,11 @@ internal sealed class GuardedSaveReplacement : IDisposable
         var hash = CurrentHash();
         if (!hash.Equals(_encodedHash, StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException(
-                $"存档在原子替换后被外部更新，程序不会用旧备份覆盖它：{_targetPath}");
+                EditorText.Format("GuardedSaveReplacement_005", _targetPath));
         return hash;
     }
 
-    internal string CurrentHash() => Hash(_target ?? throw new InvalidOperationException("目标文件尚未锁定。"));
+    internal string CurrentHash() => Hash(_target ?? throw new InvalidOperationException(EditorText.Get("GuardedSaveReplacement_006")));
 
     internal SaveFileRecovery Recover()
     {
@@ -158,7 +158,7 @@ internal sealed class GuardedSaveReplacement : IDisposable
         using var displaced = File.OpenRead(DisplacedPath);
         var sourceHash = Hash(displaced);
         if (_displacedHash is not null && !sourceHash.Equals(_displacedHash, StringComparison.OrdinalIgnoreCase))
-            throw new InvalidDataException($"被替换版本已发生变化，不能自动恢复：{DisplacedPath}");
+            throw new InvalidDataException(EditorText.Format("GuardedSaveReplacement_007", DisplacedPath));
 
         return RestoreFrom(displaced, sourceHash);
     }
@@ -168,7 +168,7 @@ internal sealed class GuardedSaveReplacement : IDisposable
         using var displaced = File.OpenRead(DisplacedPath);
         var sourceHash = Hash(displaced);
         if (_displacedHash is null || !sourceHash.Equals(_displacedHash, StringComparison.OrdinalIgnoreCase))
-            throw new InvalidDataException($"被替换版本已发生变化，不能自动恢复：{DisplacedPath}");
+            throw new InvalidDataException(EditorText.Format("GuardedSaveReplacement_007", DisplacedPath));
 
         if (_target is null)
         {
@@ -200,7 +200,7 @@ internal sealed class GuardedSaveReplacement : IDisposable
         _target.SetLength(displaced.Length);
         _target.Flush(flushToDisk: true);
         if (!CurrentHash().Equals(sourceHash, StringComparison.OrdinalIgnoreCase))
-            throw new IOException($"恢复后的存档未通过校验；请保留实际被替换版本：{DisplacedPath}");
+            throw new IOException(EditorText.Format("GuardedSaveReplacement_008", DisplacedPath));
         return (_recovery = sourceHash.Equals(_originalHash, StringComparison.OrdinalIgnoreCase)
             ? SaveFileRecovery.RestoredOriginal : SaveFileRecovery.RestoredExternal).Value;
     }
@@ -215,10 +215,10 @@ internal sealed class GuardedSaveReplacement : IDisposable
 
     internal static string DescribeRecovery(SaveFileRecovery recovery) => recovery switch
     {
-        SaveFileRecovery.RestoredOriginal => "已恢复写入前版本",
-        SaveFileRecovery.RestoredExternal => "已恢复最终替换前的外部更新版本",
-        SaveFileRecovery.KeptExternal => "已保留写入后出现的外部更新版本，未用旧备份覆盖",
-        _ => "未替换存档"
+        SaveFileRecovery.RestoredOriginal => EditorText.Get("GuardedSaveReplacement_009"),
+        SaveFileRecovery.RestoredExternal => EditorText.Get("GuardedSaveReplacement_010"),
+        SaveFileRecovery.KeptExternal => EditorText.Get("GuardedSaveReplacement_011"),
+        _ => EditorText.Get("GuardedSaveReplacement_012")
     };
 
     private static string Hash(Stream stream)

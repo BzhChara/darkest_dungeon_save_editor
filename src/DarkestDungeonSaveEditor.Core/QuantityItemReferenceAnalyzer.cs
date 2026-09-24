@@ -59,8 +59,8 @@ internal static partial class QuantityItemReferenceAnalyzer
                 activeEvidence,
                 definition.CatalogKey,
                 saveContext == QuantityItemSaveContext.Town
-                    ? "物品定义明确允许从庄园库存手动配给"
-                    : "物品定义明确允许从庄园配给进副本");
+                    ? EditorText.Get("QuantityItemReferenceAnalyzer_001")
+                    : EditorText.Get("QuantityItemReferenceAnalyzer_002"));
         }
 
         var lootFilesComplete = true;
@@ -109,7 +109,7 @@ internal static partial class QuantityItemReferenceAnalyzer
             {
                 result[definition.CatalogKey] = new QuantityItemReferenceAnalysis(
                     QuantityItemReferenceStatus.OfficialContent,
-                    ["原版或官方 DLC 内容定义"]);
+                    [EditorText.Get("QuantityItemReferenceAnalyzer_003")]);
                 continue;
             }
 
@@ -127,15 +127,15 @@ internal static partial class QuantityItemReferenceAnalyzer
                 result[definition.CatalogKey] = new QuantityItemReferenceAnalysis(
                     QuantityItemReferenceStatus.AnalysisIncomplete,
                     evidence?.Distinct(StringComparer.OrdinalIgnoreCase).Take(8).ToArray() ??
-                    ["活动内容引用扫描未完整完成"]);
+                    [EditorText.Get("QuantityItemReferenceAnalyzer_004")]);
                 continue;
             }
 
             result[definition.CatalogKey] = new QuantityItemReferenceAnalysis(
                 QuantityItemReferenceStatus.SuspectedUnused,
                 [saveContext == QuantityItemSaveContext.Raid
-                    ? "未发现从活动配给、技能、英雄、怪物、任务、场景或掉落入口进入副本的引用"
-                    : "未发现从活动事件、建筑、配给、任务、掉落或其他小镇持久化入口可达的引用"]);
+                    ? EditorText.Get("QuantityItemReferenceAnalyzer_005")
+                    : EditorText.Get("QuantityItemReferenceAnalyzer_006")]);
         }
 
         return result;

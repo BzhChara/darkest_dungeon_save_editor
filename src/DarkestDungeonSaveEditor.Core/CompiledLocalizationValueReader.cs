@@ -47,12 +47,12 @@ internal static class CompiledLocalizationValueReader
             catch (DecoderFallbackException)
             {
                 values[index] = string.Empty;
-                diagnostics.Skip($"值索引 {index}", "UTF-8 编码无效");
+                diagnostics.Skip(EditorText.Format("CompiledLocalizationValueReader_001", index), EditorText.Get("CompiledLocalizationValueReader_002"));
             }
             catch (InvalidDataException)
             {
                 values[index] = string.Empty;
-                diagnostics.Skip($"值索引 {index}", "编译色码不完整");
+                diagnostics.Skip(EditorText.Format("CompiledLocalizationValueReader_001", index), EditorText.Get("CompiledLocalizationValueReader_003"));
             }
         }
 

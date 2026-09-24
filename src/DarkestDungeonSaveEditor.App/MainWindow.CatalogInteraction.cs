@@ -136,7 +136,7 @@ public partial class MainWindow : Window
     {
         if (HeroGrid.SelectedItem is not HeroRow selectedHero || _heroCatalog is null)
         {
-            AppendStatus("请先选择一个人物职业。", level: DiagnosticLogLevel.Warning);
+            AppendStatus(EditorText.Get("MainWindow_CatalogInteraction_001"), level: DiagnosticLogLevel.Warning);
             return;
         }
 
@@ -159,7 +159,7 @@ public partial class MainWindow : Window
 
             if (!ReferenceEquals(catalog, _heroCatalog))
             {
-                AppendStatus("活动内容已更新，请重新选择初始怪癖。", level: DiagnosticLogLevel.Warning);
+                AppendStatus(EditorText.Get("MainWindow_CatalogInteraction_002"), level: DiagnosticLogLevel.Warning);
                 return;
             }
 
@@ -172,7 +172,7 @@ public partial class MainWindow : Window
             _selectedInitialQuirkIds = selectedIds;
             InvalidatePreparedEdit();
             UpdateInitialQuirkSelectionSummary();
-            AppendStatus($"已选择初始怪癖：{FormatSelectedQuirks(_selectedInitialQuirkIds)}。");
+            AppendStatus(EditorText.Format("MainWindow_CatalogInteraction_003", FormatSelectedQuirks(_selectedInitialQuirkIds)));
         }
         catch (Exception ex)
         {
@@ -182,7 +182,7 @@ public partial class MainWindow : Window
                 dialog.Close();
             }
 
-            AppendStatusSafely($"打开初始怪癖选择失败：{ex.Message}", "Initial quirks: failure status", DiagnosticLogLevel.Error);
+            AppendStatusSafely(EditorText.Format("MainWindow_CatalogInteraction_004", ex.Message), "Initial quirks: failure status", DiagnosticLogLevel.Error);
         }
     }
 

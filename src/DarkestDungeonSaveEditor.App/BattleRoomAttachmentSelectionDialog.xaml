@@ -1,7 +1,8 @@
 <Window x:Class="DarkestDungeonSaveEditor.App.BattleRoomAttachmentSelectionDialog"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:local="clr-namespace:DarkestDungeonSaveEditor.App"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="选择战斗附加内容"
+        Title="{local:Text BattleRoomAttachmentSelectionDialog_006}"
         Width="1080"
         Height="690"
         MinWidth="820"
@@ -9,7 +10,7 @@
         Icon="Assets/save-editor.ico"
         Background="{StaticResource AppTextureBrush}"
         Foreground="{StaticResource TextPrimaryBrush}"
-        FontFamily="SimHei, Microsoft YaHei UI"
+        FontFamily="{x:Static local:EditorTypography.Body}"
         FontSize="14"
         UseLayoutRounding="True"
         SnapsToDevicePixels="True"
@@ -39,10 +40,10 @@
                             <TextBlock x:Name="HeaderTitleTextBlock"
                                        Style="{StaticResource PageTitleStyle}"
                                        FontSize="27"
-                                       Text="选择战斗附加内容" />
+                                       Text="{local:Text BattleRoomAttachmentSelectionDialog_006}" />
                             <TextBlock Margin="1,2,0,0"
                                        Style="{StaticResource KickerTextStyle}"
-                                       Text="来自当前档案启用的原版、DLC 与 Mod" />
+                                       Text="{local:Text BattleRoomAttachmentSelectionDialog_007}" />
                         </StackPanel>
                     </Border>
 
@@ -55,12 +56,12 @@
                         <TextBlock Grid.Column="0"
                                    Margin="2,0,10,0"
                                    Style="{StaticResource FieldLabelStyle}"
-                                   Text="筛选" />
+                                   Text="{local:Text BattleEncounterSelectionDialog_023}" />
                         <TextBox x:Name="SearchTextBox"
                                  Grid.Column="1"
                                  Margin="0"
                                  TextChanged="SearchTextBox_TextChanged"
-                                 ToolTip="按中文名、英文名、ID 或来源筛选" />
+                                 ToolTip="{local:Text BattleRoomAttachmentSelectionDialog_008}" />
                         <TextBlock x:Name="CountTextBlock"
                                    Grid.Column="2"
                                    Margin="16,0,2,0"
@@ -85,10 +86,10 @@
                               RowHeight="44"
                               ScrollViewer.HorizontalScrollBarVisibility="Auto">
                         <DataGrid.Columns>
-                            <DataGridTextColumn Header="中文名" Binding="{Binding ChineseName}" Width="1.35*" MinWidth="170" ElementStyle="{StaticResource DataGridTextElementStyle}" />
+                            <DataGridTextColumn Header="{local:Text BattleRoomAttachmentSelectionDialog_009}" Binding="{Binding ChineseName}" Width="1.35*" MinWidth="170" ElementStyle="{StaticResource DataGridTextElementStyle}" />
                             <DataGridTextColumn Header="English" Binding="{Binding EnglishName}" Width="1.35*" MinWidth="190" ElementStyle="{StaticResource DataGridTextElementStyle}" />
                             <DataGridTextColumn Header="ID" Binding="{Binding Id}" Width="1.45*" MinWidth="210" ElementStyle="{StaticResource DataGridTextElementStyle}" />
-                            <DataGridTextColumn Header="来源" Binding="{Binding Source}" Width="1.55*" MinWidth="220" ElementStyle="{StaticResource DataGridTextElementStyle}" />
+                            <DataGridTextColumn Header="{local:Text BattleEncounterSelectionDialog_029}" Binding="{Binding Source}" Width="1.55*" MinWidth="220" ElementStyle="{StaticResource DataGridTextElementStyle}" />
                         </DataGrid.Columns>
                     </DataGrid>
 
@@ -96,7 +97,7 @@
                                Grid.Row="3"
                                Margin="18,10,18,0"
                                Foreground="{StaticResource TextSecondaryBrush}"
-                               Text="选择一项；现有战斗及敌方组合不会改变。"
+                               Text="{local:Text BattleRoomAttachmentSelectionDialog_010}"
                                TextTrimming="CharacterEllipsis" />
 
                     <Grid Grid.Row="4" Margin="16,14,16,14">
@@ -109,7 +110,7 @@
                                 MinWidth="104"
                                 Margin="0,0,10,0"
                                 Style="{StaticResource GhostButtonStyle}"
-                                Content="取消"
+                                Content="{local:Text BattleEncounterSelectionDialog_030}"
                                 IsCancel="True"
                                 Click="Cancel_Click" />
                         <Button x:Name="ConfirmButton"
@@ -117,7 +118,7 @@
                                 MinWidth="150"
                                 Margin="0"
                                 Style="{StaticResource PrimaryButtonStyle}"
-                                Content="应用附加内容"
+                                Content="{local:Text BattleRoomAttachmentSelectionDialog_011}"
                                 IsDefault="True"
                                 IsEnabled="False"
                                 Click="Confirm_Click" />

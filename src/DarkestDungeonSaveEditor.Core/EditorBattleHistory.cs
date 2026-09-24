@@ -24,7 +24,7 @@ internal sealed class EditorBattleHistory(DsonSaveCodec codec, SaveEditorLocatio
         var topology = new JsonObject();
         foreach (var area in staticAreas.OrderBy(pair => pair.Key, StringComparer.Ordinal))
         {
-            if (area.Value is not JsonObject value) throw new InvalidDataException("地图区域结构不完整。");
+            if (area.Value is not JsonObject value) throw new InvalidDataException(EditorText.Get("EditorBattleHistory_001"));
             var tiles = new JsonObject();
             foreach (var tile in JsonSupport.RequireObject(value, "tiles").OrderBy(pair => pair.Key, StringComparer.Ordinal))
                 tiles[tile.Key] = new JsonObject { ["type"] = tile.Value?["type"]?.DeepClone(),
@@ -61,10 +61,10 @@ internal sealed class EditorBattleHistory(DsonSaveCodec codec, SaveEditorLocatio
                     JsonSupport.ReadString(manifest, "RaidIdentity") != snapshot.RaidIdentity)) continue;
             if (operation == CleanupOperation && File.Exists(Path.Combine(backup, "maintenance-recovered.json"))) continue;
             if (!SaveCommitMarker.IsComplete(marker, profile.ProfileDirectory))
-                throw new InvalidDataException($"历史写入提交记录不完整，不能据此删除地图战斗：{marker}");
+                throw new InvalidDataException(EditorText.Format("EditorBattleHistory_002", marker));
             var commit = JsonSupport.ReadObject(marker);
             if (!SamePath(JsonSupport.ReadString(commit, "ProfileDirectory"), profile.ProfileDirectory)) continue;
-            var time = commit["CommittedAtUtc"]?.GetValue<DateTime>() ?? throw new InvalidDataException($"写入记录缺少完成时间：{marker}");
+            var time = commit["CommittedAtUtc"]?.GetValue<DateTime>() ?? throw new InvalidDataException(EditorText.Format("EditorBattleHistory_003", marker));
             records.Add((manifest, backup, time));
         }
         var placements = new Dictionary<(string, string), EditorBattlePlacement>();
@@ -83,7 +83,7 @@ internal sealed class EditorBattleHistory(DsonSaveCodec codec, SaveEditorLocatio
             var identity = JsonSupport.ReadString(data, "RaidIdentity");
             if (identity.Length == 0) identity = await ReadLegacyIdentityAsync(record.Directory, data, cancellationToken).ConfigureAwait(false);
             if (identity.Length == 0 || snapshot.RaidIdentity.Length == 0)
-                throw new InvalidOperationException("战斗自动清理暂缓，历史写入记录缺少可核对的副本实例标识。");
+                throw new InvalidOperationException(EditorText.Get("EditorBattleHistory_004"));
             if (identity != snapshot.RaidIdentity) continue;
             var area = JsonSupport.ReadString(data, "AreaId");
             var tile = JsonSupport.ReadString(data, "TileId");
@@ -110,7 +110,7 @@ internal sealed class EditorBattleHistory(DsonSaveCodec codec, SaveEditorLocatio
         var raidHash = Hash(raidPath);
         if (!mapHash.Equals(JsonSupport.ReadString(manifest, "MapOriginalSha256"), StringComparison.OrdinalIgnoreCase) ||
             !raidHash.Equals(JsonSupport.ReadString(manifest, "RaidOriginalSha256"), StringComparison.OrdinalIgnoreCase))
-            throw new InvalidDataException($"历史写入备份已改变，不能据此删除地图战斗：{directory}");
+            throw new InvalidDataException(EditorText.Format("EditorBattleHistory_005", directory));
         var key = mapHash + raidHash;
         if (_legacyIdentities.TryGetValue(directory, out var cached) && cached.Hash == key) return cached.Identity;
         var captured = await new BattleMapSnapshotReader(codec).LoadAsync(directory, token).ConfigureAwait(false);

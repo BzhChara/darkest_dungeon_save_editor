@@ -7,7 +7,7 @@ internal static class EncounterBridgeRow
         var kind = mashType switch
         {
             0 => "hall", 1 => "room", 2 => "boss",
-            _ => throw new InvalidOperationException("托管 Encounter Bridge 不支持该 mash_type。")
+            _ => throw new InvalidOperationException(EditorText.Get("EncounterBridgeRow_001"))
         };
         // MashGuide takes four raw tokens after .types; any options written
         // there would themselves become monster IDs in a short formation.
@@ -19,7 +19,7 @@ internal static class EncounterBridgeRow
     {
         if (id.Contains('"') || id.Contains(':') || id.Contains('/') || id.Contains('\\') ||
             id.Any(character => character is '\r' or '\n' or '\0'))
-            throw new InvalidOperationException("怪物 ID 无法无损写入原生遭遇声明。");
+            throw new InvalidOperationException(EditorText.Get("EncounterBridgeRow_002"));
         return id.Any(NativeDarkestReader.IsWhitespace) ? $"\"{id}\"" : id;
     }
 }

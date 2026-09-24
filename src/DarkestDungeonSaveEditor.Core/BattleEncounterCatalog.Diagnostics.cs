@@ -59,14 +59,14 @@ public static partial class BattleEncounterCatalog
         var unresolvedTokenCount = rows.SelectMany(row => row.UnresolvedTokens)
             .Distinct(StringComparer.Ordinal).Count();
         issues.Add(
-            $"遭遇排除汇总（全局 Bridge）：{rows.Length} 条遭遇行；" +
-            $"疑似字段粘连 {gluedRows} 条，原始槽位含疑似后续字段 {fieldSlotRows} 条，" +
-            $"其他未找到活动怪物定义 {rows.Length - gluedRows - fieldSlotRows} 条；" +
-            $"未解析字符串 {unresolvedTokenCount} 个（去重，不等于缺失怪物数量）。" +
-            "每行只计一类；当前副本不可直写的同一行不重复计数。仅排除这些组合，未禁用整个 Mod。");
+            EditorText.Format("BattleEncounterCatalog_Diagnostics_001", rows.Length) +
+            EditorText.Format("BattleEncounterCatalog_Diagnostics_002", gluedRows, fieldSlotRows) +
+            EditorText.Format("BattleEncounterCatalog_Diagnostics_003", rows.Length - gluedRows - fieldSlotRows) +
+            EditorText.Format("BattleEncounterCatalog_Diagnostics_004", unresolvedTokenCount) +
+            EditorText.Get("BattleEncounterCatalog_Diagnostics_005"));
         foreach (var row in rows)
         {
-            issues.Add("遭遇排除明细（全局 Bridge）：" + FormatUnresolvedEncounter(row));
+            issues.Add(EditorText.Get("BattleEncounterCatalog_Diagnostics_006") + FormatUnresolvedEncounter(row));
         }
     }
 
@@ -75,23 +75,23 @@ public static partial class BattleEncounterCatalog
         var encounter = row.Encounter;
         var location = encounter.MashType switch
         {
-            0 => "走廊 hall",
-            1 => "房间 room",
-            _ => "首领房间 boss"
+            0 => EditorText.Get("BattleEncounterCatalog_Diagnostics_007"),
+            1 => EditorText.Get("BattleEncounterCatalog_Diagnostics_008"),
+            _ => EditorText.Get("BattleEncounterCatalog_Diagnostics_009")
         };
         var reason = row.GluedFieldTokens.Length > 0
-            ? "疑似字段粘连；粘连线索=" + string.Join(", ", row.GluedFieldTokens) +
-              "（去掉字段后缀的 ID 存在，但完整字符串不存在）；" +
-              "后续字段值可能混入 .types，不应全算作缺失怪物；编辑器不自动拆分，请核对原始行的字段分隔"
+            ? EditorText.Get("BattleEncounterCatalog_Diagnostics_010") + string.Join(", ", row.GluedFieldTokens) +
+              EditorText.Get("BattleEncounterCatalog_Diagnostics_011") +
+              EditorText.Get("BattleEncounterCatalog_Diagnostics_012")
             : row.FieldSlotTokens.Length > 0
-            ? "原始槽位含疑似后续字段；字段线索=" + string.Join(", ", row.FieldSlotTokens) +
-              "；这些字符串进入前四个原始槽位，当前组合无法完整确认；" +
-              "不等于相同数量的怪物文件缺失；编辑器不自动删除字段或重排槽位"
-            : "未找到活动怪物定义；仅凭此项无法区分拼写错误、依赖未启用或缺少对应难度版本；不猜测替代 ID";
-        return $"{reason}；来源={encounter.SourceLabel}；" +
-            $"文件={encounter.SourcePath}:{encounter.SourceLine}；记录={encounter.SourceRecordIndex}；" +
-            $"地区={encounter.OriginDungeonId}；难度={encounter.OriginDifficulty}；位置={location}；" +
-            $"原始 .types 解析结果=[{string.Join(", ", encounter.MonsterIds)}]；" +
-            $"未解析字符串=[{string.Join(", ", row.UnresolvedTokens)}]";
+            ? EditorText.Get("BattleEncounterCatalog_Diagnostics_013") + string.Join(", ", row.FieldSlotTokens) +
+              EditorText.Get("BattleEncounterCatalog_Diagnostics_014") +
+              EditorText.Get("BattleEncounterCatalog_Diagnostics_015")
+            : EditorText.Get("BattleEncounterCatalog_Diagnostics_016");
+        return EditorText.Format("BattleEncounterCatalog_Diagnostics_017", reason, encounter.SourceLabel) +
+            EditorText.Format("BattleEncounterCatalog_Diagnostics_018", encounter.SourcePath, encounter.SourceLine, encounter.SourceRecordIndex) +
+            EditorText.Format("BattleEncounterCatalog_Diagnostics_019", encounter.OriginDungeonId, encounter.OriginDifficulty, location) +
+            EditorText.Format("BattleEncounterCatalog_Diagnostics_020", string.Join(", ", encounter.MonsterIds)) +
+            EditorText.Format("BattleEncounterCatalog_Diagnostics_021", string.Join(", ", row.UnresolvedTokens));
     }
 }

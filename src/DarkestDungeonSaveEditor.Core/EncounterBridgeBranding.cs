@@ -8,7 +8,7 @@ internal static class EncounterBridgeBranding
     {
         using var icon = typeof(EncounterBridgeBranding).Assembly
             .GetManifestResourceStream("DarkestDungeonSaveEditor.BridgePreview.png")
-            ?? throw new InvalidOperationException("程序包缺少存档编辑器图标，无法生成 Bridge 封面。");
+            ?? throw new InvalidOperationException(EditorText.Get("EncounterBridgeBranding_001"));
         using var output = new FileStream(Path.Combine(packageDirectory, PreviewFileName),
             FileMode.Create, FileAccess.Write, FileShare.None);
         icon.CopyTo(output);

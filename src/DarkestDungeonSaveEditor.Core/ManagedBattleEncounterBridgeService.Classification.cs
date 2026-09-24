@@ -30,7 +30,7 @@ public sealed partial class ManagedBattleEncounterBridgeService
                     }
                     if (rows.Any(row => !row.SourceSha256.Equals(table.GeneratedMashSha256, StringComparison.OrdinalIgnoreCase)))
                     {
-                        throw new InvalidDataException("遭遇表哈希与清单不一致");
+                        throw new InvalidDataException(EditorText.Get("ManagedBattleEncounterBridgeService_Classification_001"));
                     }
                     foreach (var entry in table.Entries)
                     {
@@ -41,12 +41,12 @@ public sealed partial class ManagedBattleEncounterBridgeService
                             (row.MashIndex is { } runtimeIndex && runtimeIndex != entry.MashIndex) ||
                             !row.MonsterIds.SequenceEqual(entry.MonsterIds, StringComparer.Ordinal))
                         {
-                            throw new InvalidDataException("追加索引或敌方组成与清单不一致");
+                            throw new InvalidDataException(EditorText.Get("ManagedBattleEncounterBridgeService_Classification_002"));
                         }
                         var key = ClassificationKey(row);
                         if (!result.TryAdd(key, null))
                         {
-                            throw new InvalidDataException("清单含重复追加索引");
+                            throw new InvalidDataException(EditorText.Get("ManagedBattleEncounterBridgeService_Classification_003"));
                         }
                         origins.Add((row, entry));
                     }
@@ -54,7 +54,7 @@ public sealed partial class ManagedBattleEncounterBridgeService
             }
             catch (Exception error) when (error is InvalidDataException or IOException or UnauthorizedAccessException or ArgumentException)
             {
-                issues.Add($"托管 Bridge 分类读取失败：{source.DisplayName}；{error.Message}。未确认的零权重条目不进入生成目录。");
+                issues.Add(EditorText.Format("ManagedBattleEncounterBridgeService_Classification_004", source.DisplayName, error.Message));
                 var sourcePrefix = Path.GetFullPath(source.Directory).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
                 var sourceRows = classifiedRows.Where(row => Path.GetFullPath(row.SourcePath)
                     .StartsWith(sourcePrefix, StringComparison.OrdinalIgnoreCase)).ToArray();
@@ -115,7 +115,7 @@ public sealed partial class ManagedBattleEncounterBridgeService
             result[ClassificationKey(row)] = classification;
             if (classification is null)
             {
-                issues.Add($"托管 Bridge 条目无法确认原始分类，已从生成目录排除：{row.DisplayName}。既有地图和索引保持不变。");
+                issues.Add(EditorText.Format("ManagedBattleEncounterBridgeService_Classification_005", row.DisplayName));
             }
         }
         return result;

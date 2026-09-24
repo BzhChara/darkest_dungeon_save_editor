@@ -56,7 +56,7 @@ public static partial class QuantityItemCatalog
         _ = QuantityItemSaveScene.Read(activeContent);
         var catalog = Load(activeContent, JsonSupport.ReadObject(decodedPath), originalSha256);
         return scene.HasRaidResidue
-            ? catalog with { Issues = catalog.Issues.Append("当前为小镇状态；残留副本文件已忽略，物品修改只作用于小镇库存。").ToArray() }
+            ? catalog with { Issues = catalog.Issues.Append(CatalogIssueCode.TownRaidResidue + EditorText.Get("QuantityItemCatalog_001")).ToArray() }
             : catalog;
     }
 
@@ -156,13 +156,13 @@ public static partial class QuantityItemCatalog
                 readFailures.Count > 0,
                 [])
             {
-                SourceLabel = "仅存档（当前内容未找到定义）",
+                SourceLabel = EditorText.Get("QuantityItemCatalog_Refresh_002"),
                 IsPresentInSave = true,
                 SavedEntryCount = savedEntryCounts[entry.CatalogKey],
                 ReferenceStatus = QuantityItemReferenceStatus.SaveOnly,
                 ReferenceEvidence = readFailures.Count > 0
-                    ? ["活动物品定义读取不完整，无法确认该条目仅存在于存档，暂不可修改"]
-                    : ["当前存档包含该条目"]
+                    ? [EditorText.Get("QuantityItemCatalog_Refresh_003")]
+                    : [EditorText.Get("QuantityItemCatalog_Refresh_005")]
             });
         }
 
@@ -257,13 +257,13 @@ public static partial class QuantityItemCatalog
                 readFailures.Count > 0,
                 [])
             {
-                SourceLabel = "仅当前副本（活动内容未找到定义）",
+                SourceLabel = EditorText.Get("QuantityItemCatalog_Refresh_001"),
                 IsPresentInSave = true,
                 SavedEntryCount = savedEntryCounts[entry.CatalogKey],
                 ReferenceStatus = QuantityItemReferenceStatus.SaveOnly,
                 ReferenceEvidence = readFailures.Count > 0
-                    ? ["活动物品定义读取不完整，无法确认该条目仅存在于副本存档，暂不可修改"]
-                    : ["当前副本背包包含该条目"]
+                    ? [EditorText.Get("QuantityItemCatalog_002")]
+                    : [EditorText.Get("QuantityItemCatalog_Refresh_004")]
             });
         }
 

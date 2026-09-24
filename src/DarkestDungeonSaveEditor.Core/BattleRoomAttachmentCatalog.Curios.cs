@@ -33,7 +33,7 @@ public static partial class BattleRoomAttachmentCatalog
                 var first = block.FirstOrDefault();
                 if (first is null || first.Count < 3 || !IsPropIdentity(first.Fields[2]))
                 {
-                    issues.Add($"奇物互动类型缺少有效 ID 行，已跳过该块：{file.Path}:{first?.Line}");
+                    issues.Add(EditorText.Format("BattleRoomAttachmentCatalog_Curios_001", file.Path, first?.Line));
                     continue;
                 }
                 var id = first.Fields[2];
@@ -51,7 +51,7 @@ public static partial class BattleRoomAttachmentCatalog
             var fields = row.Fields;
             if (row.Count < 2 || fields[2].Length == 0) continue;
             if (!IsPropIdentity(fields[0]))
-                throw new InvalidDataException($"奇物道具名称无效或超过原生缓冲区：{file.Path}:{row.Line}");
+                throw new InvalidDataException(EditorText.Format("BattleRoomAttachmentCatalog_Curios_002", file.Path, row.Line));
             var resource = resources.GetOrCreate(fields[0]);
             var name = fields[3].Length > 0 ? fields[3] :
                 resource.Data.NameId.Length > 0 ? resource.Data.NameId : fields[1];
@@ -63,7 +63,7 @@ public static partial class BattleRoomAttachmentCatalog
         var collidingProps = NativeResourceIdentity.FindCollisions(resources.Ids);
         var collidingTypes = NativeResourceIdentity.FindCollisions(types);
         foreach (var id in collidingProps.Concat(collidingTypes).Distinct(StringComparer.Ordinal))
-            issues.Add($"地图资源原生 hash collision：{id}");
+            issues.Add(EditorText.Format("BattleRoomAttachmentCatalog_Curios_003", id));
         return new CurioResources(types, collidingProps, collidingTypes);
     }
 

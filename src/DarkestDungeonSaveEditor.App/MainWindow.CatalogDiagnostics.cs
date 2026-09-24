@@ -22,7 +22,7 @@ public partial class MainWindow
     {
         if (inventory is null)
         {
-            AppendStatus("文件清点未完成，原因已记录到完整日志；业务目录仍按现有规则加载。", level: DiagnosticLogLevel.Warning);
+            AppendStatus(EditorText.Get("MainWindow_CatalogDiagnostics_001"), level: DiagnosticLogLevel.Warning);
             return;
         }
 

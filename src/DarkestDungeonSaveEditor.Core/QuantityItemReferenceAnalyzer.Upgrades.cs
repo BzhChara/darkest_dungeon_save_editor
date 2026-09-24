@@ -17,7 +17,7 @@ internal static partial class QuantityItemReferenceAnalyzer
             if (!TryParseJson(file.Text, out var document) || document is null)
             {
                 identitiesComplete = false;
-                MarkExactIdentities(file.Text, index, incompleteEvidence, $"活动升级 JSON 无法完整解析：{file.File.RelativePath}");
+                MarkExactIdentities(file.Text, index, incompleteEvidence, EditorText.Format("QuantityItemReferenceAnalyzer_Upgrades_001", file.File.RelativePath));
                 issues.Add($"Quantity-item reference scan could not parse active upgrade JSON file: {file.File.Path}");
                 continue;
             }
@@ -68,7 +68,7 @@ internal static partial class QuantityItemReferenceAnalyzer
             {
                 complete = false;
                 MarkExactIdentities(tree.Node.GetRawText(), index, incompleteEvidence,
-                    $"最终升级树无法完整分析：{tree.Path}");
+                    EditorText.Format("QuantityItemReferenceAnalyzer_Upgrades_002", tree.Path));
                 issues.Add($"Quantity-item upgrade references are incomplete for '{tree.Id}' ({tree.Path}): {error.Message}");
             }
         }

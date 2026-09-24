@@ -49,7 +49,7 @@ internal static partial class QuantityItemReferenceAnalyzer
                 file.Text,
                 index,
                 incompleteEvidence,
-                $"活动 JSON 无法完整解析：{file.File.RelativePath}");
+                EditorText.Format("QuantityItemReferenceAnalyzer_RootParsing_001", file.File.RelativePath));
             _ = MarkQuotedLootCodes(
                 file.Text,
                 knownLootTables,
@@ -99,7 +99,7 @@ internal static partial class QuantityItemReferenceAnalyzer
         var hero = file.MountedPath.StartsWith("heroes/", StringComparison.OrdinalIgnoreCase);
         var monster = file.MountedPath.StartsWith("monsters/", StringComparison.OrdinalIgnoreCase);
         var unverified = false;
-        var message = $"文本结构尚未确认物品消费规则：{file.File.RelativePath}";
+        var message = EditorText.Format("QuantityItemReferenceAnalyzer_RootParsing_002", file.File.RelativePath);
         void UncertainItems(IEnumerable<string> keys)
         {
             foreach (var key in keys)
@@ -151,7 +151,7 @@ internal static partial class QuantityItemReferenceAnalyzer
         foreach (var block in NativeCurioCsvReader.TypeBlocks(rows))
         {
             if (block.Count == 0 || block[0].Count < 3 || block[0].Fields[2].Length == 0)
-                throw new InvalidDataException("奇物互动类型缺少有效 ID 行。");
+                throw new InvalidDataException(EditorText.Get("QuantityItemReferenceAnalyzer_RootParsing_003"));
             var itemSection = false;
             foreach (var row in block)
             {
@@ -163,7 +163,7 @@ internal static partial class QuantityItemReferenceAnalyzer
                     if (fields[4] == "Loot")
                     {
                         var weight = NativeDarkestReader.ReadIntPrefix(fields[5])
-                            ?? throw new InvalidDataException("奇物默认掉落权重超出可确认范围。");
+                            ?? throw new InvalidDataException(EditorText.Get("QuantityItemReferenceAnalyzer_RootParsing_004"));
                         if (weight != 0) AddCurioLootReferences(row, file.File.RelativePath, rootLootEvidence);
                     }
                     continue;
@@ -193,20 +193,20 @@ internal static partial class QuantityItemReferenceAnalyzer
         // Native Loot consumes columns 8/11/14. Notes and localization text
         // are not references. The first code is copied even when its count is 0.
         var firstCount = NativeDarkestReader.ReadIntPrefix(row.Fields[8])
-            ?? throw new InvalidDataException("奇物掉落次数超出可确认范围。");
+            ?? throw new InvalidDataException(EditorText.Get("QuantityItemReferenceAnalyzer_RootParsing_005"));
         var codes = new List<(string Code, int Count)> { (row.Fields[7], Math.Max(1, firstCount)) };
         foreach (var column in new[] { 10, 13 })
         {
             if (column + 2 >= row.Count || row.Fields[column].Length == 0) continue;
             var count = NativeDarkestReader.ReadIntPrefix(row.Fields[column + 1])
-                ?? throw new InvalidDataException("奇物掉落次数超出可确认范围。");
+                ?? throw new InvalidDataException(EditorText.Get("QuantityItemReferenceAnalyzer_RootParsing_005"));
             if (count > 0) codes.Add((row.Fields[column], count));
         }
         // ReadPropLootResultTypePossibleResults packs all repeated codes into
         // ONE 64-byte buffer. Do not confirm untruncated column IDs if that
         // combined value would overflow; leave this file's analysis incomplete.
         var bytes = codes.Sum(entry => ((long)Encoding.UTF8.GetByteCount(entry.Code) + 1) * entry.Count) - 1;
-        if (bytes > 63) throw new InvalidDataException("奇物掉落代码合并后超过原生缓冲区，无法确认引用。");
+        if (bytes > 63) throw new InvalidDataException(EditorText.Get("QuantityItemReferenceAnalyzer_RootParsing_006"));
         // CurioInteractionLootResult construction (0x1404A835F) tokenizes the
         // packed string on '&', skips empty tokens, then copies each to 32 bytes.
         var consumed = codes.SelectMany(entry => entry.Code.Split('&', StringSplitOptions.RemoveEmptyEntries))

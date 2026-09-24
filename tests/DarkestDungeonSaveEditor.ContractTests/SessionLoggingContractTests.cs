@@ -30,12 +30,14 @@ internal static partial class ContractSuite
     {
         const string path = @"E:\fixture\localization\failed.xml";
         const string failure = $"Failed to read localization '{path}': Invalid XML at line 2.";
-        const string partial = "本地化部分读取：'E:\\fixture\\localization\\english.loc'；跳过 1 个无效项，其余有效条目继续读取。";
+        const string partialPath = @"E:\fixture\localization\english.loc";
+        const string partial = CatalogIssueCode.PartialLocalization + partialPath + "';" +
+            "本地化部分读取：跳过 1 个无效项，其余有效条目继续读取。";
         var batch = new CatalogDiagnosticBatch();
         var original = new[] { failure, partial };
         batch.Add("人物/怪癖/姓名", original);
         batch.Add("物品", [failure]);
-        batch.Add("战斗遭遇", [failure.Replace(path, path.ToLowerInvariant(), StringComparison.Ordinal), partial.ToLowerInvariant(), "An unrelated encounter warning."]);
+        batch.Add("战斗遭遇", [failure.Replace(path, path.ToLowerInvariant(), StringComparison.Ordinal), partial.Replace(partialPath, partialPath.ToLowerInvariant(), StringComparison.Ordinal), "An unrelated encounter warning."]);
         batch.Add("战斗附加内容", [failure, partial]);
         var summary = batch.Summarize();
         var written = batch.Drain();

@@ -22,17 +22,17 @@ public partial class MainWindow : Window
         public string Location => FormatItemStorage(Definition.StorageKind);
         public string InventoryType => Definition.InventoryType;
         public string StackSummary => Definition.StorageKind != QuantityItemStorageKind.RaidInventory
-            ? "不适用"
+            ? EditorText.Get("MainWindow_RowModels_001")
             : Definition.BaseStackLimit is > 0
-                ? "每格 " + Definition.BaseStackLimit.Value.ToString(CultureInfo.InvariantCulture)
-                : "未知";
+                ? EditorText.Get("MainWindow_RowModels_002") + Definition.BaseStackLimit.Value.ToString(CultureInfo.InvariantCulture)
+                : EditorText.Get("BattleEncounterSelectionDialog_017");
         public string ProvisionSummary => Definition.StorageKind != QuantityItemStorageKind.EstateItems
             ? string.Empty
             : Definition.EstateCanBeProvision switch
             {
-                true => "配给：可手动配给",
-                false => "配给：不可手动配给",
-                null => "配给：未声明"
+                true => EditorText.Get("MainWindow_RowModels_003"),
+                false => EditorText.Get("MainWindow_RowModels_004"),
+                null => EditorText.Get("MainWindow_RowModels_005")
             };
         public int CurrentAmount => Definition.CurrentAmount;
         public string Source
@@ -44,15 +44,11 @@ public partial class MainWindow : Window
                     : Definition.SourceLabel;
                 return Definition.IsPresentInSave &&
                        Definition.ReferenceStatus == QuantityItemReferenceStatus.SuspectedUnused
-                    ? $"{source}（存档残留）"
+                    ? EditorText.Format("MainWindow_RowModels_006", source)
                     : source;
             }
         }
-        public string DisplayName => !string.IsNullOrWhiteSpace(Definition.LocalizedName.Chinese)
-            ? Definition.LocalizedName.Chinese
-            : !string.IsNullOrWhiteSpace(Definition.LocalizedName.English)
-                ? Definition.LocalizedName.English
-                : Definition.DisplayId;
+        public string DisplayName => EditorText.ContentName(Definition.LocalizedName, Definition.DisplayId);
     }
 
     private sealed record TrinketRow(TrinketDefinition Definition)
@@ -72,7 +68,7 @@ public partial class MainWindow : Window
 
     private sealed record HeroLevelChoice(int ResolveLevel, int ResolveXp)
     {
-        public string DisplayName => $"{ResolveLevel}级 / XP {ResolveXp}";
+        public string DisplayName => EditorText.Format("MainWindow_RowModels_007", ResolveLevel, ResolveXp);
     }
 
     private sealed record HeroRow(HeroClassDefinition Definition)
@@ -84,13 +80,13 @@ public partial class MainWindow : Window
             ? Definition.Source
             : Definition.SourceLabel;
         public string GenerationMode => !Definition.GenerationAvailability.Any(level => level.CanGenerate)
-            ? "暂不可生成"
+            ? EditorText.Get("MainWindow_RowModels_008")
             : Definition.Generation switch
             {
-                null => "生成模板缺失",
-                { IsEnabled: true } => "普通招募开启 / 编辑器手动",
-                { IsEnabled: false } => "普通招募关闭 / 编辑器手动",
-                _ => "自然状态未知 / 编辑器手动"
+                null => EditorText.Get("MainWindow_RowModels_009"),
+                { IsEnabled: true } => EditorText.Get("MainWindow_RowModels_010"),
+                { IsEnabled: false } => EditorText.Get("MainWindow_RowModels_011"),
+                _ => EditorText.Get("MainWindow_RowModels_012")
             };
         public bool HasProviderConflict => Definition.HasProviderConflict;
         public double? BaseHp => Definition.BaseHp;
@@ -101,24 +97,24 @@ public partial class MainWindow : Window
                 var levels = Definition.GenerationAvailability.Where(level => level.CanGenerate)
                     .Select(level => level.ResolveLevel).ToArray();
                 return levels.Length == 0
-                    ? "不可生成"
+                    ? EditorText.Get("MainWindow_RowModels_013")
                     : levels.Length == Definition.GenerationAvailability.Count
-                        ? $"0-{levels[^1]}级可生成"
-                        : $"可生成 {string.Join(",", levels)} 级";
+                        ? EditorText.Format("MainWindow_RowModels_014", levels[^1])
+                        : EditorText.Format("MainWindow_RowModels_015", string.Join(",", levels));
             }
         }
         public int ColourVariationCount => Definition.ColourVariationCount;
         public string QuirkRange => Definition.Generation is not { } generation
-            ? "未知"
-            : $"正面 {FormatRange(generation.PositiveQuirksMin, generation.PositiveQuirksMax)} / " +
-              $"负面 {FormatRange(generation.NegativeQuirksMin, generation.NegativeQuirksMax)}";
+            ? EditorText.Get("BattleEncounterSelectionDialog_017")
+            : EditorText.Format("MainWindow_RowModels_016", FormatRange(generation.PositiveQuirksMin, generation.PositiveQuirksMax)) +
+              EditorText.Format("MainWindow_RowModels_017", FormatRange(generation.NegativeQuirksMin, generation.NegativeQuirksMax));
         public string CombatSkillSummary =>
-            $"定义 {Definition.CombatSkillIds.Count} / 标记 {Definition.GuaranteedCombatSkillIds.Count}" +
-            (Definition.GuaranteedCombatSkillIds.Count > 0 ? "（至少选一项） / " : " / ") +
-            $"选择上限 {Definition.SelectedCombatSkillsMax?.ToString(CultureInfo.InvariantCulture) ?? "未知"}";
+            EditorText.Format("MainWindow_RowModels_018", Definition.CombatSkillIds.Count, Definition.GuaranteedCombatSkillIds.Count) +
+            (Definition.GuaranteedCombatSkillIds.Count > 0 ? EditorText.Get("MainWindow_RowModels_019") : " / ") +
+            EditorText.Format("MainWindow_RowModels_020", Definition.SelectedCombatSkillsMax?.ToString(CultureInfo.InvariantCulture) ?? EditorText.Get("BattleEncounterSelectionDialog_017"));
         public string CampingSkillSummary => Definition.CampingSkillsComplete
-            ? $"职业 {Definition.ClassCampingSkillIds.Count} / 共享 {Definition.SharedCampingSkillIds.Count}"
-            : "露营技能读取不完整";
+            ? EditorText.Format("MainWindow_RowModels_021", Definition.ClassCampingSkillIds.Count, Definition.SharedCampingSkillIds.Count)
+            : EditorText.Get("MainWindow_RowModels_022");
         public string RecruitEventSummary => string.Join(", ", Definition.RecruitEvents.Select(item => item.Id));
         public string RuntimeQuirkSummary => string.Join(
             ", ",

@@ -1,6 +1,7 @@
 <UserControl x:Class="DarkestDungeonSaveEditor.App.BattleMapView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:DarkestDungeonSaveEditor.App"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Name="Root"
              MinWidth="600"
              MinHeight="360"
@@ -30,7 +31,7 @@
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="Padding" Value="3" />
             <Setter Property="HasDropShadow" Value="False" />
-            <Setter Property="FontFamily" Value="SimHei, Microsoft YaHei UI" />
+            <Setter Property="FontFamily" Value="{x:Static local:EditorTypography.Body}" />
             <Setter Property="FontSize" Value="13.5" />
             <Setter Property="Template">
                 <Setter.Value>
@@ -54,6 +55,7 @@
             <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
             <Setter Property="Padding" Value="10,7" />
             <Setter Property="MinWidth" Value="190" />
+            <Setter Property="MinHeight" Value="36" />
             <Setter Property="HorizontalContentAlignment" Value="Stretch" />
             <Setter Property="VerticalContentAlignment" Value="Center" />
             <Setter Property="FocusVisualStyle" Value="{x:Null}" />
@@ -66,13 +68,15 @@
                                     Padding="{TemplateBinding Padding}">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="22" />
+                                        <ColumnDefinition Width="30" />
                                         <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="18" />
                                     </Grid.ColumnDefinitions>
                                     <ContentPresenter Grid.Column="0"
-                                                      Margin="0,0,7,0"
+                                                      Width="22" Height="22"
+                                                      Margin="0,0,8,0"
                                                       ContentSource="Icon"
+                                                      HorizontalAlignment="Left"
                                                       VerticalAlignment="Center" />
                                     <ContentPresenter Grid.Column="1"
                                                       ContentSource="Header"
@@ -167,11 +171,11 @@
                   ClipToBounds="True"
                   VerticalAlignment="Center">
                 <TextBlock x:Name="MapTitleTextBlock"
-                           FontFamily="SimSun, Microsoft YaHei UI"
+                           FontFamily="{x:Static local:EditorTypography.Heading}"
                            FontSize="18"
                            FontWeight="Bold"
                            Foreground="{StaticResource GoldBrush}"
-                           Text="当前副本地图" />
+                           Text="{local:Text BattleMapView_ProfileLifecycle_025}" />
             </Grid>
             <StackPanel Grid.Column="1"
                         Margin="8,0,12,0"
@@ -184,14 +188,14 @@
                         Margin="3,0,11,0"
                         Padding="12,4"
                         FontSize="13"
-                        Content="强制返回城镇"
-                        ToolTip="修改当前档案的读档入口；完整备份后将下次载入强制切回城镇"
+                        Content="{local:Text BattleMapView_001}"
+                        ToolTip="{local:Text BattleMapView_002}"
                         IsEnabled="False"
                         Click="ForceTownButton_Click" />
                 <Button x:Name="ZoomOutButton"
                         Style="{StaticResource MapToolbarButtonStyle}"
                         Content="－"
-                        ToolTip="缩小地图"
+                        ToolTip="{local:Text BattleMapView_003}"
                         Click="ZoomOutButton_Click" />
                 <TextBlock x:Name="ZoomTextBlock"
                            Width="58"
@@ -204,19 +208,19 @@
                 <Button x:Name="ZoomInButton"
                         Style="{StaticResource MapToolbarButtonStyle}"
                         Content="＋"
-                        ToolTip="放大地图"
+                        ToolTip="{local:Text BattleMapView_004}"
                         Click="ZoomInButton_Click" />
                 <Button x:Name="ResetZoomButton"
                         Style="{StaticResource MapToolbarButtonStyle}"
                         MinWidth="62"
                         Content="100%"
-                        ToolTip="恢复 100% 并居中"
+                        ToolTip="{local:Text BattleMapView_005}"
                         Click="ResetZoomButton_Click" />
                 <Button x:Name="FitMapButton"
                         Style="{StaticResource MapToolbarButtonStyle}"
                         MinWidth="82"
-                        Content="适应窗口"
-                        ToolTip="显示完整地图"
+                        Content="{local:Text BattleMapView_006}"
+                        ToolTip="{local:Text BattleMapView_007}"
                         Click="FitMapButton_Click" />
             </StackPanel>
         </Grid>
@@ -250,18 +254,18 @@
                                 HorizontalAlignment="Center"
                                 VerticalAlignment="Center">
                         <TextBlock HorizontalAlignment="Center"
-                                   FontFamily="SimSun, Microsoft YaHei UI"
+                                   FontFamily="{x:Static local:EditorTypography.Heading}"
                                    FontSize="28"
                                    FontWeight="Bold"
                                    Foreground="{StaticResource GoldBrush}"
-                                   Text="当前没有可显示的副本地图" />
+                                   Text="{local:Text BattleMapView_008}" />
                         <TextBlock x:Name="EmptyStateTextBlock"
                                    Margin="0,13,0,0"
                                    TextAlignment="Center"
                                    TextWrapping="Wrap"
                                    Foreground="{StaticResource TextSecondaryBrush}"
                                    LineHeight="22"
-                                   Text="载入 Profile 后，这里会在副本期间读取真实地图；小镇状态不会显示地图。" />
+                                   Text="{local:Text BattleMapView_009}" />
                     </StackPanel>
                 </Grid>
 
@@ -277,7 +281,7 @@
                     <TextBlock x:Name="PrototypeBadgeTextBlock"
                                Foreground="{StaticResource GoldBrush}"
                                FontWeight="Bold"
-                               Text="全局视野" />
+                               Text="{local:Text BattleMapView_Assets_001}" />
                 </Border>
 
             </Grid>
@@ -293,14 +297,14 @@
                        Margin="14,0"
                        VerticalAlignment="Center"
                        Foreground="{StaticResource TextPrimaryBrush}"
-                       Text="请选择一个地图格。" />
+                       Text="{local:Text BattleMapView_010}" />
             <TextBlock x:Name="LiveStatusTextBlock"
                        Grid.Column="1"
                        Margin="12,0,14,0"
                        VerticalAlignment="Center"
                        Foreground="{StaticResource TextSecondaryBrush}"
                        FontSize="12"
-                       Text="尚未绑定存档" />
+                       Text="{local:Text BattleMapView_ProfileLifecycle_005}" />
         </Grid>
     </Grid>
 </UserControl>

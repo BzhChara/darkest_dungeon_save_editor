@@ -74,7 +74,7 @@ public partial class MainWindow : Window
         token.ThrowIfCancellationRequested();
         if (generation != _catalogGeneration) throw new OperationCanceledException();
         if (!_syncReady)
-            throw new IOException("首次同步未完成，请等待自动重试或重新载入。" + _lastSyncError);
+            throw new IOException(EditorText.Get("MainWindow_ProfileSync_001") + _lastSyncError);
     }
 
     private void StopProfileSync(bool cancelCatalogLoad = true)
@@ -111,7 +111,7 @@ public partial class MainWindow : Window
         _maintenanceRetryPending = false;
         if (ProfileSyncStatusTextBlock is not null)
         {
-            ProfileSyncStatusTextBlock.Text = "尚未加载档案";
+            ProfileSyncStatusTextBlock.Text = EditorText.Get("MainWindow_ProfileSync_002");
             ProfileSyncStatusTextBlock.ToolTip = null;
         }
     }
@@ -153,8 +153,8 @@ public partial class MainWindow : Window
                 InvalidatePreparedEdit();
                 BattleMapPanel.DismissProfileMenu();
             }
-            ProfileSyncStatusTextBlock.Text = _catalogLoading ? "正在完成首次同步…" :
-                IsBusy ? "操作结束后同步" : "正在同步存档…";
+            ProfileSyncStatusTextBlock.Text = _catalogLoading ? EditorText.Get("MainWindow_ProfileSync_003") :
+                IsBusy ? EditorText.Get("MainWindow_ProfileSync_004") : EditorText.Get("MainWindow_ProfileSync_005");
             UpdateEnabledState();
         }
         _ = DrainProfileSyncAsync();
@@ -238,7 +238,7 @@ public partial class MainWindow : Window
                 _syncReady = false;
                 InvalidatePreparedEdit();
                 BattleMapPanel.DismissProfileMenu();
-                ProfileSyncStatusTextBlock.Text = _catalogLoading ? "正在完成首次同步…" : "正在同步存档…";
+                ProfileSyncStatusTextBlock.Text = _catalogLoading ? EditorText.Get("MainWindow_ProfileSync_003") : EditorText.Get("MainWindow_ProfileSync_005");
                 UpdateEnabledState();
                 try
                 {
@@ -303,10 +303,10 @@ public partial class MainWindow : Window
                     var currentHashes = await Task.Run(() => ProfileCatalogSnapshotReader.CaptureHashes(
                         snapshot.Content.Profile), token);
                     if (!ProfileCatalogSnapshotReader.HashesEqual(snapshot.FileHashes, currentHashes))
-                        throw new IOException("游戏仍在保存，等待完整存档后自动重试。");
+                        throw new IOException(EditorText.Get("MainWindow_ProfileSync_006"));
                     if (contentChanged && snapshot.ContentFingerprint != await Task.Run(() =>
                             ProfileCatalogContentFingerprint.Capture(snapshot.Content.Sources, token), token))
-                        throw new IOException("资源文件仍在更新，等待完整内容后自动重试。");
+                        throw new IOException(EditorText.Get("MainWindow_ProfileSync_007"));
                     if (generation != _catalogGeneration || token.IsCancellationRequested) return;
                     if (_busyDepth > 0) { _syncRequested = true; return; }
 
@@ -327,15 +327,15 @@ public partial class MainWindow : Window
                         _allHeroes = heroes.HeroClasses;
                         _heroCatalog = heroes;
                         var diagnostics = new CatalogDiagnosticBatch();
-                        diagnostics.Add("活动来源", snapshot.Content.Issues);
-                        diagnostics.Add("物品", snapshot.QuantityItems.Issues);
-                        diagnostics.Add("饰品", trinkets.Issues);
-                        diagnostics.Add("人物/怪癖/姓名", heroes.Issues);
+                        diagnostics.Add(EditorText.Get("MainWindow_CatalogLoading_005"), snapshot.Content.Issues);
+                        diagnostics.Add(EditorText.Get("MainWindow_CatalogLoading_010"), snapshot.QuantityItems.Issues);
+                        diagnostics.Add(EditorText.Get("MainWindow_CatalogLoading_008"), trinkets.Issues);
+                        diagnostics.Add(EditorText.Get("MainWindow_CatalogLoading_009"), heroes.Issues);
                         CrashDiagnostics.RecordCatalogDiagnostics(diagnostics);
-                        AppendStatus("活动 Mod/DLC、资源定义或模式配置已变化，内容目录已自动更新。");
+                        AppendStatus(EditorText.Get("MainWindow_ProfileSync_008"));
                     }
                     ItemTab.Header = _quantitySaveContext == QuantityItemSaveContext.Raid
-                        ? "副本背包  /  RAID ITEMS" : "小镇物品  /  ESTATE ITEMS";
+                        ? EditorText.Get("MainWindow_CatalogLoading_011") : EditorText.Get("MainWindow_CatalogLoading_012");
                     if (itemsChanged || contentChanged)
                         RefreshCatalogRowsPreservingInput(sceneChanged, contentChanged);
                     _catalogFileHashes = snapshot.FileHashes;
@@ -345,17 +345,17 @@ public partial class MainWindow : Window
                     _catalogSyncRetry?.Stop();
                     if (changedFiles.Length > 0)
                     {
-                        CrashDiagnostics.RecordStatus($"档案自动同步：档案={snapshot.Content.Profile.ProfileId}；" +
-                            $"场景={FormatQuantitySaveContext(_quantitySaveContext)}；变化文件={string.Join("、", changedFiles)}；" +
-                            $"默认物品={_allItems.Count(item => !item.IsHiddenByDefault)}；隐藏物品={_allItems.Count(item => item.IsHiddenByDefault)}；" +
-                            $"副本占格={snapshot.QuantityItems.RaidOccupiedSlots}；内容目录重建={contentChanged}；旧预览已失效。");
+                        CrashDiagnostics.RecordStatus(EditorText.Format("MainWindow_ProfileSync_009", snapshot.Content.Profile.ProfileId) +
+                            EditorText.Format("MainWindow_ProfileSync_010", FormatQuantitySaveContext(_quantitySaveContext), string.Join("、", changedFiles)) +
+                            EditorText.Format("MainWindow_ProfileSync_011", _allItems.Count(item => !item.IsHiddenByDefault), _allItems.Count(item => item.IsHiddenByDefault)) +
+                            EditorText.Format("MainWindow_ProfileSync_012", snapshot.QuantityItems.RaidOccupiedSlots, contentChanged));
                     }
                     if (sceneChanged)
-                        AppendStatus($"已自动切换为{FormatQuantitySaveContext(_quantitySaveContext)}物品，请重新选择修改目标。");
-                    if (_lastSyncError is not null) AppendStatus("档案自动同步已恢复。");
+                        AppendStatus(EditorText.Format("MainWindow_ProfileSync_013", FormatQuantitySaveContext(_quantitySaveContext)));
+                    if (_lastSyncError is not null) AppendStatus(EditorText.Get("MainWindow_ProfileSync_014"));
                     _lastSyncError = null;
-                    ProfileSyncStatusTextBlock.Text = $"已同步 {snapshot.ReadAtUtc.ToLocalTime():HH:mm:ss}";
-                    ProfileSyncStatusTextBlock.ToolTip = "自动检测当前档案及资源定义变化；失效的编辑器战斗记录将在关闭游戏后自动清理。";
+                    ProfileSyncStatusTextBlock.Text = EditorText.Format("BattleMapView_LiveRefresh_008", snapshot.ReadAtUtc.ToLocalTime());
+                    ProfileSyncStatusTextBlock.ToolTip = EditorText.Get("MainWindow_ProfileSync_015");
                     UpdateCatalogMode();
                 }
                 finally
@@ -378,10 +378,10 @@ public partial class MainWindow : Window
             }
             _syncReady = false;
             _syncRequested = true;
-            ProfileSyncStatusTextBlock.Text = "等待完整存档 · 自动重试";
+            ProfileSyncStatusTextBlock.Text = EditorText.Get("MainWindow_ProfileSync_016");
             ProfileSyncStatusTextBlock.ToolTip = ex.Message;
             if (_lastSyncError != ex.Message)
-                CrashDiagnostics.RecordStatus($"档案自动同步暂缓，保留上一完整快照并暂停写入：{ex.Message}", DiagnosticLogLevel.Warning);
+                CrashDiagnostics.RecordStatus(EditorText.Format("MainWindow_ProfileSync_017", ex.Message), DiagnosticLogLevel.Warning);
             _lastSyncError = ex.Message;
             ScheduleProfileSyncRetry(generation);
         }
@@ -408,7 +408,7 @@ public partial class MainWindow : Window
 
     private void ReportMaintenanceError(Exception error, ManagedBattleEncounterBridgeService maintenance)
     {
-        var message = "战斗记录自动维护暂缓：" + error.Message;
+        var message = EditorText.Get("MainWindow_ProfileSync_018") + error.Message;
         if (_lastMaintenanceMessage != message) AppendStatus(message);
         _lastMaintenanceMessage = message;
         _maintenanceRetryPending = true;
@@ -418,14 +418,14 @@ public partial class MainWindow : Window
     private void CompleteUnchangedSync(ProfileCatalogSnapshot snapshot)
     {
         _catalogSyncRetry?.Stop();
-        if (_lastSyncError is not null) AppendStatus("档案自动同步已恢复。");
+        if (_lastSyncError is not null) AppendStatus(EditorText.Get("MainWindow_ProfileSync_014"));
         _lastSyncError = null;
         var wasReady = _syncReady;
         _syncReady = !_syncInvalidated;
         if (!wasReady && _syncReady)
         {
-            ProfileSyncStatusTextBlock.Text = $"已同步 {snapshot.ReadAtUtc.ToLocalTime():HH:mm:ss}";
-            ProfileSyncStatusTextBlock.ToolTip = "自动检测当前档案及资源定义变化；失效的编辑器战斗记录将在关闭游戏后自动清理。";
+            ProfileSyncStatusTextBlock.Text = EditorText.Format("BattleMapView_LiveRefresh_008", snapshot.ReadAtUtc.ToLocalTime());
+            ProfileSyncStatusTextBlock.ToolTip = EditorText.Get("MainWindow_ProfileSync_015");
         }
     }
 

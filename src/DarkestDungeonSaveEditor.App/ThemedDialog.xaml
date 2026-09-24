@@ -1,5 +1,6 @@
 <Window x:Class="DarkestDungeonSaveEditor.App.ThemedDialog"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:local="clr-namespace:DarkestDungeonSaveEditor.App"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Width="680"
         MinWidth="560"
@@ -9,7 +10,7 @@
         Icon="Assets/save-editor.ico"
         Background="{StaticResource AppTextureBrush}"
         Foreground="{StaticResource TextPrimaryBrush}"
-        FontFamily="SimHei, Microsoft YaHei UI"
+        FontFamily="{x:Static local:EditorTypography.Body}"
         FontSize="14"
         UseLayoutRounding="True"
         SnapsToDevicePixels="True"
@@ -55,7 +56,7 @@
                                        HorizontalAlignment="Left"
                                        VerticalAlignment="Center"
                                        TextAlignment="Center"
-                                       FontFamily="SimSun, Microsoft YaHei UI"
+                                       FontFamily="{x:Static local:EditorTypography.Heading}"
                                        FontSize="29"
                                        FontWeight="Bold"
                                        Foreground="{StaticResource WarningBrush}"
@@ -65,7 +66,7 @@
                                         Margin="10,0,0,0"
                                         VerticalAlignment="Center">
                                 <TextBlock x:Name="HeaderTitleTextBlock"
-                                           FontFamily="SimSun, Microsoft YaHei UI"
+                                           FontFamily="{x:Static local:EditorTypography.Heading}"
                                            FontSize="23"
                                            FontWeight="Bold"
                                            Foreground="{StaticResource GoldBrush}"
@@ -74,7 +75,7 @@
                                            Margin="1,2,0,0"
                                            FontSize="11.5"
                                            Foreground="{StaticResource TextSecondaryBrush}"
-                                           Text="警示  /  WARNING" />
+                                           Text="{local:Text ThemedDialog_003}" />
                             </StackPanel>
                         </Grid>
                     </Grid>
@@ -92,9 +93,9 @@
                                           VerticalScrollBarVisibility="Auto"
                                           Focusable="False">
                                 <TextBlock x:Name="MessageTextBlock"
-                                           AutomationProperties.Name="弹窗信息"
+                                           AutomationProperties.Name="{local:Text ThemedDialog_005}"
                                            Foreground="#24170E"
-                                           FontFamily="SimHei, Microsoft YaHei UI"
+                                           FontFamily="{x:Static local:EditorTypography.Body}"
                                            FontSize="15"
                                            FontWeight="SemiBold"
                                            LineHeight="24"
@@ -111,12 +112,12 @@
                         <Button x:Name="CancelButton"
                                 Width="112"
                                 Style="{StaticResource GhostButtonStyle}"
-                                Content="返回"
+                                Content="{local:Text ThemedDialog_006}"
                                 Click="Cancel_Click" />
                         <Button x:Name="ConfirmButton"
                                 Width="112"
                                 Style="{StaticResource PrimaryButtonStyle}"
-                                Content="确认"
+                                Content="{local:Text ThemedDialog_007}"
                                 Click="Confirm_Click" />
                     </StackPanel>
                 </Grid>

@@ -39,13 +39,13 @@ public static class BattleEncounterBridgeBuilder
                 catalog.TableGuard.Fingerprint,
                 StringComparison.OrdinalIgnoreCase))
         {
-            throw new InvalidOperationException("所选遭遇不属于当前遭遇目录快照。");
+            throw new InvalidOperationException(EditorText.Get("BattleEncounterBridgeProbeBuilder_001"));
         }
         if (catalog.TableGuard.ActiveSources.Any(IsGeneratedBridgeSource))
         {
             throw new InvalidOperationException(
-                "当前档案已经启用另一个 DDSE Encounter Bridge。请先完成或删除其遭遇，" +
-                "确认地图与战斗不再引用新增索引，再禁用旧 Bridge 并重新加载内容目录。");
+                EditorText.Get("BattleEncounterBridgeProbeBuilder_002") +
+                EditorText.Get("BattleEncounterBridgeProbeBuilder_003"));
         }
 
         BattleEncounterCatalog.ValidateBridgeEncounter(encounter);
@@ -66,7 +66,7 @@ public static class BattleEncounterBridgeBuilder
         var packageDirectory = Path.Combine(outputRoot, sessionId, packageName);
         if (Directory.Exists(packageDirectory))
         {
-            throw new IOException($"Bridge 输出目录已经存在：{packageDirectory}");
+            throw new IOException(EditorText.Format("BattleEncounterBridgeProbeBuilder_004", packageDirectory));
         }
 
         var relativeMashPath = target.RelativeMashPath;

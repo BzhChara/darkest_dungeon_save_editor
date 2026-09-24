@@ -16,11 +16,11 @@ public static partial class StagecoachHeroCandidateFactory
             var id = rawId;
             if (string.IsNullOrWhiteSpace(id))
             {
-                throw new InvalidOperationException("初始怪癖 ID 不能为空。");
+                throw new InvalidOperationException(EditorText.Get("StagecoachHeroCandidateFactory_Quirks_001"));
             }
             if (!uniqueIds.Add(id))
             {
-                throw new InvalidOperationException($"初始怪癖 '{id}' 被重复选择。");
+                throw new InvalidOperationException(EditorText.Format("StagecoachHeroCandidateFactory_Quirks_002", id));
             }
 
             var matches = catalog.InitialQuirks
@@ -30,14 +30,14 @@ public static partial class StagecoachHeroCandidateFactory
             {
                 throw new InvalidOperationException(
                     matches.Length == 0
-                        ? $"初始怪癖 '{id}' 不在当前活动内容目录中。"
-                        : $"初始怪癖 '{id}' 有多个未解析定义，不能安全创建。");
+                        ? EditorText.Format("StagecoachHeroCandidateFactory_Quirks_003", id)
+                        : EditorText.Format("StagecoachHeroCandidateFactory_Quirks_004", id));
             }
 
             var quirk = matches[0];
             if (quirk.IsPositive is null)
             {
-                throw new InvalidOperationException($"初始怪癖 '{quirk.Id}' 没有明确的正负类型。");
+                throw new InvalidOperationException(EditorText.Format("StagecoachHeroCandidateFactory_Quirks_005", quirk.Id));
             }
             var canWriteWithPreviewLimitCheck =
                 quirk.WriteStatus == HeroInitialQuirkWriteStatus.RequiresSaveContext &&
@@ -46,7 +46,7 @@ public static partial class StagecoachHeroCandidateFactory
                 !canWriteWithPreviewLimitCheck)
             {
                 throw new InvalidOperationException(
-                    $"初始怪癖 '{quirk.Id}' 当前不能显式写入：{quirk.WriteStatusReason}");
+                    EditorText.Format("StagecoachHeroCandidateFactory_Quirks_006", quirk.Id, quirk.WriteStatusReason));
             }
             selected.Add(quirk);
         }
@@ -59,14 +59,14 @@ public static partial class StagecoachHeroCandidateFactory
         if ((positiveCount > 0 && limits.Positive is null) ||
             (negativeCount > 0 && limits.Negative is null) ||
             (diseaseCount > 0 && limits.Diseases is null))
-            throw new InvalidOperationException("活动 shared 规则中的怪癖上限无法确定，不能添加对应类别的初始怪癖。");
+            throw new InvalidOperationException(EditorText.Get("StagecoachHeroCandidateFactory_Quirks_007"));
         if (positiveCount > limits.Positive || negativeCount > limits.Negative || diseaseCount > limits.Diseases)
         {
             throw new InvalidOperationException(
-                $"初始怪癖最多正面 {limits.Positive?.ToString(CultureInfo.InvariantCulture) ?? "未知"} 个、" +
-                $"负面 {limits.Negative?.ToString(CultureInfo.InvariantCulture) ?? "未知"} 个、" +
-                $"疾病 {limits.Diseases?.ToString(CultureInfo.InvariantCulture) ?? "未知"} 个；" +
-                $"当前选择为 +{positiveCount}/-{negativeCount}/疾病 {diseaseCount}。");
+                EditorText.Format("StagecoachHeroCandidateFactory_Quirks_008", limits.Positive?.ToString(CultureInfo.InvariantCulture) ?? EditorText.Get("BattleEncounterSelectionDialog_017")) +
+                EditorText.Format("StagecoachHeroCandidateFactory_Quirks_009", limits.Negative?.ToString(CultureInfo.InvariantCulture) ?? EditorText.Get("BattleEncounterSelectionDialog_017")) +
+                EditorText.Format("StagecoachHeroCandidateFactory_Quirks_010", limits.Diseases?.ToString(CultureInfo.InvariantCulture) ?? EditorText.Get("BattleEncounterSelectionDialog_017")) +
+                EditorText.Format("StagecoachHeroCandidateFactory_Quirks_011", positiveCount, negativeCount, diseaseCount));
         }
 
         for (var leftIndex = 0; leftIndex < selected.Count; leftIndex++)
@@ -79,7 +79,7 @@ public static partial class StagecoachHeroCandidateFactory
                     right.IncompatibleQuirkIds.Any(id => NativeResourceIdentity.HashCString(id) == NativeResourceIdentity.HashCString(left.Id)))
                 {
                     throw new InvalidOperationException(
-                        $"初始怪癖 '{left.Id}' 与 '{right.Id}' 互斥，不能同时选择。");
+                        EditorText.Format("StagecoachHeroCandidateFactory_Quirks_012", left.Id, right.Id));
                 }
             }
         }

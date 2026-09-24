@@ -118,7 +118,7 @@ internal static partial class QuantityItemReferenceAnalyzer
             file.Text,
             index,
             incompleteEvidence,
-            $"掉落文件无法完整解析：{file.File.RelativePath}");
+            EditorText.Format("QuantityItemReferenceAnalyzer_LootParsing_001", file.File.RelativePath));
         issues.Add($"Quantity-item reference scan could not parse active loot file: {file.File.Path}");
     }
 

@@ -27,14 +27,14 @@ public partial class BattleMapView : UserControl
         if (!isProtectedContent)
         {
             var changeRoot = CreateMenuItem(
-                hasPersistedContent ? "替换" : "新建",
-                hasPersistedContent ? "↻" : "＋");
+                hasPersistedContent ? EditorText.Get("BattleMapView_Commands_001") : EditorText.Get("BattleMapView_Commands_002"),
+                hasPersistedContent ? BattleMenuIcon.Replace : BattleMenuIcon.Add);
             PopulateContentChoices(changeRoot, cell);
             contextMenu.Items.Add(changeRoot);
 
             if (CanEditBattleAttachment(cell))
             {
-                var attachmentRoot = CreateMenuItem("战斗附加内容", "✦");
+                var attachmentRoot = CreateMenuItem(EditorText.Get("BattleMapView_Commands_003"), BattleMenuIcon.Attachment);
                 PopulateBattleAttachmentChoices(attachmentRoot, cell);
                 contextMenu.Items.Add(attachmentRoot);
             }
@@ -42,8 +42,8 @@ public partial class BattleMapView : UserControl
             if (hasDeletableContent)
             {
                 contextMenu.Items.Add(CreateAsyncActionMenuItem(
-                    "删除",
-                    "×",
+                    EditorText.Get("BattleMapView_Commands_004"),
+                    BattleMenuIcon.Remove,
                     () => DeleteContentAsync(cell)));
             }
 
@@ -53,8 +53,8 @@ public partial class BattleMapView : UserControl
             });
         }
         var moveItem = CreateAsyncActionMenuItem(
-            "移动队伍到此",
-            "◆",
+            EditorText.Get("BattleMapView_Commands_005"),
+            BattleMenuIcon.MoveParty,
             () => MovePartyAsync(cell));
         moveItem.IsEnabled = !cell.HasParty && !_isApplyingEdit;
         contextMenu.Items.Add(moveItem);
@@ -105,7 +105,7 @@ public partial class BattleMapView : UserControl
 
     private void PopulateContentChoices(MenuItem root, PrototypeMapCell cell)
     {
-        var battleMenu = CreateMenuItem("战斗", "⚔");
+        var battleMenu = CreateMenuItem(EditorText.Get("BattleMapView_CellVisuals_013"), BattleMenuIcon.Battle);
         var isFinalRoom = _currentSnapshot is not null &&
                           string.Equals(
                               cell.SourceAreaId,
@@ -115,13 +115,13 @@ public partial class BattleMapView : UserControl
         {
             battleMenu.Items.Add(CreateEncounterPickerItem(
                 cell,
-                "普通战斗",
-                "⚔",
+                EditorText.Get("BattleEncounterSelectionDialog_014"),
+                BattleMenuIcon.Battle,
                 BattleEncounterClassification.Ordinary));
             battleMenu.Items.Add(CreateEncounterPickerItem(
                 cell,
-                "游荡首领 / 特殊遭遇",
-                "☠",
+                EditorText.Get("BattleMapView_Commands_006"),
+                BattleMenuIcon.Boss,
                 BattleEncounterClassification.RoamingBoss,
                 BattleEncounterClassification.RoamingEncounter,
                 BattleEncounterClassification.ConditionalOrAdditional));
@@ -131,8 +131,8 @@ public partial class BattleMapView : UserControl
         {
             battleMenu.Items.Add(CreateEncounterPickerItem(
                 cell,
-                "固定首领",
-                "☠",
+                EditorText.Get("BattleEncounterSelectionDialog_005"),
+                BattleMenuIcon.Boss,
                 BattleEncounterClassification.FixedBoss));
         }
         root.Items.Add(battleMenu);
@@ -143,17 +143,17 @@ public partial class BattleMapView : UserControl
         }
 
         var propCatalog = GetCurrentRoomAttachmentCatalog();
-        root.Items.Insert(0, CreateContentPickerItem(cell, "奇物", "?",
+        root.Items.Insert(0, CreateContentPickerItem(cell, EditorText.Get("BattleMapView_CellVisuals_012"), BattleMenuIcon.Curio,
             cell.Kind == PrototypeCellKind.Room ? propCatalog?.Curios ?? [] : propCatalog?.HallCurios ?? []));
         if (cell.Kind == PrototypeCellKind.Room)
         {
-            root.Items.Add(CreateContentPickerItem(cell, "宝箱", "✦", propCatalog?.Treasures ?? []));
+            root.Items.Add(CreateContentPickerItem(cell, EditorText.Get("BattleMapView_Commands_007"), BattleMenuIcon.Treasure, propCatalog?.Treasures ?? []));
         }
         else
         {
-            root.Items.Add(CreateRegionalContentItem(cell, "陷阱", "!",
+            root.Items.Add(CreateRegionalContentItem(cell, EditorText.Get("BattleMapView_CellVisuals_014"), BattleMenuIcon.Trap,
                 BattleRoomAttachmentKind.Trap));
-            root.Items.Add(CreateRegionalContentItem(cell, "障碍", "▰",
+            root.Items.Add(CreateRegionalContentItem(cell, EditorText.Get("BattleMapView_CellVisuals_017"), BattleMenuIcon.Obstacle,
                 BattleRoomAttachmentKind.Obstacle));
         }
     }
@@ -182,8 +182,8 @@ public partial class BattleMapView : UserControl
         var catalog = GetCurrentRoomAttachmentCatalog();
         var curios = catalog?.Curios ?? [];
         var treasures = catalog?.Treasures ?? [];
-        root.Items.Add(CreateBattleAttachmentPickerItem(cell, "奇物", "?", curios));
-        root.Items.Add(CreateBattleAttachmentPickerItem(cell, "宝箱", "✦", treasures));
+        root.Items.Add(CreateBattleAttachmentPickerItem(cell, EditorText.Get("BattleMapView_CellVisuals_012"), BattleMenuIcon.Curio, curios));
+        root.Items.Add(CreateBattleAttachmentPickerItem(cell, EditorText.Get("BattleMapView_Commands_007"), BattleMenuIcon.Treasure, treasures));
         if (cell.RawContent is
             (int)BattleMapTileContent.GuardedCurio or
             (int)BattleMapTileContent.GuardedTreasure)
@@ -193,8 +193,8 @@ public partial class BattleMapView : UserControl
                 Style = (Style)FindResource("BattleMapSeparatorStyle")
             });
             root.Items.Add(CreateAsyncActionMenuItem(
-                "移除附加内容",
-                "×",
+                EditorText.Get("BattleMapView_Commands_008"),
+                BattleMenuIcon.Remove,
                 () => RemoveBattleAttachmentAsync(cell)));
         }
     }
@@ -202,7 +202,7 @@ public partial class BattleMapView : UserControl
     private MenuItem CreateBattleAttachmentPickerItem(
         PrototypeMapCell cell,
         string label,
-        string icon,
+        BattleMenuIcon icon,
         IReadOnlyCollection<BattleRoomAttachmentDefinition> candidates)
     {
         if (candidates.Count == 0)
@@ -243,7 +243,7 @@ public partial class BattleMapView : UserControl
     {
         if (GetCurrentRoomAttachmentCatalog() is null || Window.GetWindow(this) is not { } owner)
         {
-            MapSelectionTextBlock.Text = "当前奇物/宝箱目录已经失效，请重新加载内容目录。";
+            MapSelectionTextBlock.Text = EditorText.Get("BattleMapView_Commands_009");
             return;
         }
 
@@ -261,7 +261,7 @@ public partial class BattleMapView : UserControl
     private MenuItem CreateEncounterPickerItem(
         PrototypeMapCell cell,
         string label,
-        string icon,
+        BattleMenuIcon icon,
         params BattleEncounterClassification[] classifications)
     {
         var candidates = GetEncounterPickerCandidates(cell, classifications);
@@ -274,12 +274,12 @@ public partial class BattleMapView : UserControl
 
         var targetLabel = classifications.Length == 1 &&
                           classifications[0] == BattleEncounterClassification.FixedBoss
-            ? "房间"
-            : cell.Kind == PrototypeCellKind.Room ? "房间" : "走廊";
+            ? EditorText.Get("BattleEncounterSelectionDialog_016")
+            : cell.Kind == PrototypeCellKind.Room ? EditorText.Get("BattleEncounterSelectionDialog_016") : EditorText.Get("BattleEncounterSelectionDialog_015");
         return CreateAsyncActionMenuItem(
             $"{label}（{candidates.Count}）",
             icon,
-            () => SelectAndPlaceEncounterAsync(cell, candidates, $"选择{targetLabel}{label}"));
+            () => SelectAndPlaceEncounterAsync(cell, candidates, EditorText.Format("BattleMapView_Commands_010", targetLabel, label)));
     }
 
     private IReadOnlyList<BattleEncounterDefinition> GetEncounterPickerCandidates(
@@ -333,7 +333,7 @@ public partial class BattleMapView : UserControl
         var catalog = GetCurrentEncounterCatalog();
         if (catalog is null || Window.GetWindow(this) is not { } owner)
         {
-            MapSelectionTextBlock.Text = "当前遭遇目录已经失效，请重新加载内容目录。";
+            MapSelectionTextBlock.Text = EditorText.Get("BattleMapView_Commands_011");
             return;
         }
 
@@ -372,28 +372,28 @@ public partial class BattleMapView : UserControl
             _managedEncounterBridgeService is null ||
             string.IsNullOrWhiteSpace(_gameDirectory))
         {
-            MapSelectionTextBlock.Text = "当前遭遇目录或写入环境已经失效，请重新加载内容目录。";
+            MapSelectionTextBlock.Text = EditorText.Get("BattleMapView_Commands_012");
             return;
         }
 
         var replacementText = target.RawContent == 0
-            ? "新建"
-            : $"替换“{target.ContentLabel ?? "当前内容"}”";
+            ? EditorText.Get("BattleMapView_Commands_002")
+            : EditorText.Format("BattleMapView_Commands_014", target.ContentLabel ?? EditorText.Get("BattleMapView_Commands_013"));
         var difficultyWarning = encounter.OriginDifficulty == catalog.Difficulty
             ? string.Empty
             : Environment.NewLine +
-              $"所选组合来自难度 {encounter.OriginDifficulty}，敌人数值不会自动缩放为当前难度 {catalog.Difficulty}。";
+              EditorText.Format("BattleMapView_Commands_015", encounter.OriginDifficulty, catalog.Difficulty);
         var classificationLabel = FormatEncounterClassification(encounter);
         if (!ThemedDialog.Confirm(
                 owner,
-                $"将在 {target.DisplayName} {replacementText}为战斗：{encounter.DisplayName}" +
+                EditorText.Format("BattleMapView_Commands_016", target.DisplayName, replacementText, encounter.DisplayName) +
                 Environment.NewLine +
-                $"来源：{encounter.SourceLabel} · {encounter.OriginDungeonId}" +
+                EditorText.Format("BattleMapView_Commands_017", encounter.SourceLabel, encounter.OriginDungeonId) +
                 difficultyWarning + Environment.NewLine +
-                "编辑器会在后台追加或复用稳定遭遇索引，并自动保持托管 Bridge 启用。" +
+                EditorText.Get("BattleMapView_Commands_018") +
                 Environment.NewLine +
-                "旧奇物、陷阱或障碍绑定会被清除，程序会先完整备份当前档案。",
-                $"确认写入{classificationLabel}"))
+                EditorText.Get("BattleMapView_Commands_019"),
+                EditorText.Format("BattleMapView_Commands_020", classificationLabel)))
         {
             return;
         }
@@ -409,7 +409,7 @@ public partial class BattleMapView : UserControl
             encounterResolver: async () =>
             {
                 MapSelectionTextBlock.Text =
-                    $"正在为 {encounter.DisplayName} 更新托管遭遇表并验证索引……";
+                    EditorText.Format("BattleMapView_Commands_021", encounter.DisplayName);
                 var result = await managedService.EnsureEncounterAsync(
                     profile,
                     snapshot,
@@ -425,15 +425,15 @@ public partial class BattleMapView : UserControl
                 await ReloadRoomAttachmentCatalogAsync(result.ActiveContent);
                 ActiveContentChanged?.Invoke(result.ActiveContent);
                 CrashDiagnostics.RecordStatus(
-                    $"托管 Encounter Bridge：目录={result.PackageDirectory}；" +
-                    $"地区={catalog.DungeonId}；难度={catalog.Difficulty}；" +
-                    $"来源地区={encounter.OriginDungeonId}；来源难度={encounter.OriginDifficulty}；" +
-                    $"分类={encounter.Classification}；来源类型={encounter.SourceKind}；" +
+                    EditorText.Format("BattleMapView_Commands_022", result.PackageDirectory) +
+                    EditorText.Format("BattleMapView_Commands_023", catalog.DungeonId, catalog.Difficulty) +
+                    EditorText.Format("BattleMapView_Commands_024", encounter.OriginDungeonId, encounter.OriginDifficulty) +
+                    EditorText.Format("BattleMapView_Commands_025", encounter.Classification, encounter.SourceKind) +
                     $"mash_type={result.MashType}；" +
-                    $"mash_index={result.MashIndex}；新增={result.EncounterWasAdded}；" +
-                    $"自动启用或置顶={result.ProfileConfigurationChanged}；" +
-                    $"组合={string.Join(',', result.MonsterIds)}；" +
-                    $"配置备份={result.ProfileBackupDirectory ?? "无需改动"}");
+                    EditorText.Format("BattleMapView_Commands_026", result.MashIndex, result.EncounterWasAdded) +
+                    EditorText.Format("BattleMapView_Commands_027", result.ProfileConfigurationChanged) +
+                    EditorText.Format("BattleMapView_Commands_028", string.Join(',', result.MonsterIds)) +
+                    EditorText.Format("BattleMapView_Commands_030", result.ProfileBackupDirectory ?? EditorText.Get("BattleMapView_Commands_029")));
                 return result.DirectEncounter;
             });
     }
@@ -441,19 +441,19 @@ public partial class BattleMapView : UserControl
     private static string FormatEncounterClassification(BattleEncounterDefinition encounter) =>
         encounter.Classification switch
         {
-            BattleEncounterClassification.FixedBoss => "固定首领",
-            BattleEncounterClassification.RoamingBoss => "游荡首领",
-            BattleEncounterClassification.RoamingEncounter => "游荡遭遇",
+            BattleEncounterClassification.FixedBoss => EditorText.Get("BattleEncounterSelectionDialog_005"),
+            BattleEncounterClassification.RoamingBoss => EditorText.Get("BattleEncounterSelectionDialog_006"),
+            BattleEncounterClassification.RoamingEncounter => EditorText.Get("BattleEncounterSelectionDialog_007"),
             BattleEncounterClassification.ConditionalOrAdditional when
                 encounter.ContainsBossMonster &&
-                encounter.SourceKind == BattleEncounterSourceKind.Conditional => "条件首领",
+                encounter.SourceKind == BattleEncounterSourceKind.Conditional => EditorText.Get("BattleEncounterSelectionDialog_008"),
             BattleEncounterClassification.ConditionalOrAdditional when
                 encounter.ContainsBossMonster &&
-                encounter.SourceKind == BattleEncounterSourceKind.Additional => "额外首领",
+                encounter.SourceKind == BattleEncounterSourceKind.Additional => EditorText.Get("BattleEncounterSelectionDialog_009"),
             BattleEncounterClassification.ConditionalOrAdditional when
-                encounter.ContainsBossMonster => "特殊首领",
-            BattleEncounterClassification.ConditionalOrAdditional => "条件 / 额外战斗",
-            _ => "战斗遭遇"
+                encounter.ContainsBossMonster => EditorText.Get("BattleEncounterSelectionDialog_010"),
+            BattleEncounterClassification.ConditionalOrAdditional => EditorText.Get("BattleMapView_Commands_031"),
+            _ => EditorText.Get("BattleMapView_Commands_032")
         };
 
     private async Task ReloadRoomAttachmentCatalogAsync(ActiveContentSnapshot activeContent)
@@ -470,27 +470,21 @@ public partial class BattleMapView : UserControl
             CrashDiagnostics.RecordException(
                 "BattleMap: reload room attachment catalog",
                 ex,
-                $"档案={activeContent.Profile.ProfileId}");
+                EditorText.Format("BattleMapView_Commands_033", activeContent.Profile.ProfileId));
         }
     }
 
-    private MenuItem CreateMenuItem(string header, string icon)
+    private MenuItem CreateMenuItem(string header, BattleMenuIcon icon)
     {
         return new MenuItem
         {
             Header = header,
-            Icon = new TextBlock
-            {
-                Text = icon,
-                Foreground = new SolidColorBrush(Color.FromRgb(212, 190, 115)),
-                HorizontalAlignment = HorizontalAlignment.Center,
-                FontWeight = FontWeights.Bold
-            },
+            Icon = CreateMenuIcon(icon),
             Style = (Style)FindResource("BattleMapMenuItemStyle")
         };
     }
 
-    private MenuItem CreateAsyncActionMenuItem(string header, string icon, Func<Task> action)
+    private MenuItem CreateAsyncActionMenuItem(string header, BattleMenuIcon icon, Func<Task> action)
     {
         var menuItem = CreateMenuItem(header, icon);
         menuItem.Click += async (_, _) => await action();
@@ -505,12 +499,12 @@ public partial class BattleMapView : UserControl
             target.ContentLabel = null;
             RefreshCellVisual(target);
             MapSelectionTextBlock.Text =
-                $"已在界面预览中清空 {target.DisplayName}；存档未发生变化。";
+                EditorText.Format("BattleMapView_Commands_034", target.DisplayName);
             return;
         }
         if (!TryGetWritableContext(target, out var owner, out var profile, out var snapshot, out var service))
         {
-            MapSelectionTextBlock.Text = "当前地图正在刷新或处理其他操作，请重新选择目标。";
+            MapSelectionTextBlock.Text = EditorText.Get("BattleMapView_Commands_035");
             return;
         }
 
@@ -518,18 +512,18 @@ public partial class BattleMapView : UserControl
             target.SourceAreaId,
             snapshot.FinalRoomId,
             StringComparison.Ordinal)
-            ? Environment.NewLine + "这是当前最终房间；删除其内容可能使任务无法完成。"
+            ? Environment.NewLine + EditorText.Get("BattleMapView_Commands_036")
             : string.Empty;
         var contentDescription = target.RawContent == 0
-            ? "已完成后留下的资源模型"
-            : $"“{target.ContentLabel ?? "当前内容"}”";
+            ? EditorText.Get("BattleMapView_Commands_037")
+            : $"“{target.ContentLabel ?? EditorText.Get("BattleMapView_Commands_013")}”";
         if (!ThemedDialog.Confirm(
                 owner,
-                $"将彻底删除 {target.DisplayName} 的{contentDescription}。" +
+                EditorText.Format("BattleMapView_Commands_038", target.DisplayName, contentDescription) +
                 specialWarning + Environment.NewLine +
-                "事件、奇物、陷阱、障碍和战斗绑定会一并清空；探索状态会保留。" +
-                Environment.NewLine + "程序会先完整备份当前档案。",
-                "确认删除地图内容"))
+                EditorText.Get("BattleMapView_Commands_039") +
+                Environment.NewLine + EditorText.Get("BattleMapView_Commands_040"),
+                EditorText.Get("BattleMapView_Commands_041")))
         {
             return;
         }
@@ -546,21 +540,21 @@ public partial class BattleMapView : UserControl
         }
         if (!TryGetWritableContext(target, out var owner, out var profile, out var snapshot, out var service))
         {
-            MapSelectionTextBlock.Text = "当前地图正在刷新或处理其他操作，请重新选择目标。";
+            MapSelectionTextBlock.Text = EditorText.Get("BattleMapView_Commands_035");
             return;
         }
 
         var contentWarning = target.RawContent == 0 || IsHungerContent(target)
             ? string.Empty
             : Environment.NewLine +
-              $"目标仍保留“{target.ContentLabel ?? "地图事件"}”；移动只修改队伍落点，" +
-              "不会模拟走入该格，因此目标事件不保证立即触发。";
+              EditorText.Format("BattleMapView_Commands_043", target.ContentLabel ?? EditorText.Get("BattleMapView_Commands_042")) +
+              EditorText.Get("BattleMapView_Commands_044");
         if (!ThemedDialog.Confirm(
                 owner,
-                $"将当前队伍移动到 {target.DisplayName}。" +
+                EditorText.Format("BattleMapView_Commands_045", target.DisplayName) +
                 contentWarning + Environment.NewLine +
-                "程序会先完整备份当前档案。",
-                "确认移动队伍"))
+                EditorText.Get("BattleMapView_Commands_040"),
+                EditorText.Get("BattleMapView_Commands_046")))
         {
             return;
         }
@@ -574,31 +568,31 @@ public partial class BattleMapView : UserControl
     {
         if (!TryGetWritableContext(target, out var owner, out var profile, out var snapshot, out var service))
         {
-            MapSelectionTextBlock.Text = "当前地图正在刷新或处理其他操作，请重新选择目标。";
+            MapSelectionTextBlock.Text = EditorText.Get("BattleMapView_Commands_035");
             return;
         }
         if (!encounter.CanPlaceDirectly || encounter.MashIndex is null)
         {
-            MapSelectionTextBlock.Text = "所选遭遇没有可证明的当前副本索引。";
+            MapSelectionTextBlock.Text = EditorText.Get("BattleMapView_Commands_047");
             return;
         }
 
         var replacementText = target.RawContent == 0
-            ? "新建"
-            : $"替换“{target.ContentLabel ?? "当前内容"}”";
+            ? EditorText.Get("BattleMapView_Commands_002")
+            : EditorText.Format("BattleMapView_Commands_014", target.ContentLabel ?? EditorText.Get("BattleMapView_Commands_013"));
         var naturalQuotaWarning = encounter.Weight is <= 0
             ? Environment.NewLine +
-              "这是零权重桥接/测试条目；本次写入不会修改条件或额外遭遇的自然生成计数。"
+              EditorText.Get("BattleMapView_Commands_048")
             : string.Empty;
         if (!ThemedDialog.Confirm(
                 owner,
-                $"将在 {target.DisplayName} {replacementText}为战斗：{encounter.DisplayName}" +
-                Environment.NewLine + $"来源：{encounter.SourceLabel}" +
+                EditorText.Format("BattleMapView_Commands_016", target.DisplayName, replacementText, encounter.DisplayName) +
+                Environment.NewLine + EditorText.Format("BattleMapView_Commands_049", encounter.SourceLabel) +
                 Environment.NewLine +
-                $"当前表索引：mash_type={encounter.MashType}，mash_index={encounter.MashIndex}" +
+                EditorText.Format("BattleMapView_Commands_050", encounter.MashType, encounter.MashIndex) +
                 naturalQuotaWarning + Environment.NewLine +
-                "旧奇物、陷阱或障碍绑定会被清除，程序会先完整备份当前档案。",
-                "确认写入战斗遭遇"))
+                EditorText.Get("BattleMapView_Commands_019"),
+                EditorText.Get("BattleMapView_Commands_051")))
         {
             return;
         }
@@ -618,24 +612,25 @@ public partial class BattleMapView : UserControl
     {
         if (!TryGetWritableContext(target, out var owner, out var profile, out var snapshot, out var service))
         {
-            MapSelectionTextBlock.Text = "当前地图正在刷新或处理其他操作，请重新选择目标。";
+            MapSelectionTextBlock.Text = EditorText.Get("BattleMapView_Commands_035");
             return;
         }
 
-        var kindLabel = attachment.Kind == BattleRoomAttachmentKind.Curio ? "奇物" : "宝箱";
+        var kindLabel = attachment.Kind == BattleRoomAttachmentKind.Curio ? EditorText.Get("BattleMapView_CellVisuals_012") : EditorText.Get("BattleMapView_Commands_007");
         var actionLabel = target.RawContent is
             (int)BattleMapTileContent.GuardedCurio or
             (int)BattleMapTileContent.GuardedTreasure
-            ? "替换当前附加内容"
-            : "添加到当前战斗";
+            ? EditorText.Get("BattleMapView_Commands_052")
+            : EditorText.Get("BattleMapView_Commands_053");
         if (!ThemedDialog.Confirm(
                 owner,
-                $"将在 {target.DisplayName} {actionLabel}：{attachment.ChineseName} / {attachment.EnglishName}" +
+                EditorText.Format("BattleMapView_Commands_054", target.DisplayName, actionLabel,
+                    EditorText.ContentName(attachment.LocalizedName, attachment.Id), attachment.Id) +
                 Environment.NewLine + $"ID：{attachment.Id}" +
-                Environment.NewLine + $"来源：{attachment.SourceLabel}" +
+                Environment.NewLine + EditorText.Format("BattleMapView_Commands_049", attachment.SourceLabel) +
                 Environment.NewLine +
-                "现有战斗及敌方组合保持不变，程序会先完整备份当前档案。",
-                $"确认应用{kindLabel}"))
+                EditorText.Get("BattleMapView_Commands_055"),
+                EditorText.Format("BattleMapView_Commands_056", kindLabel)))
         {
             return;
         }
@@ -653,15 +648,15 @@ public partial class BattleMapView : UserControl
     {
         if (!TryGetWritableContext(target, out var owner, out var profile, out var snapshot, out var service))
         {
-            MapSelectionTextBlock.Text = "当前地图正在刷新或处理其他操作，请重新选择目标。";
+            MapSelectionTextBlock.Text = EditorText.Get("BattleMapView_Commands_035");
             return;
         }
 
         if (!ThemedDialog.Confirm(
                 owner,
-                $"将移除 {target.DisplayName} 的“{target.ContentLabel ?? "附加内容"}”，保留原有战斗及敌方组合。" +
-                Environment.NewLine + "程序会先完整备份当前档案。",
-                "确认移除战斗附加内容"))
+                EditorText.Format("BattleMapView_Commands_058", target.DisplayName, target.ContentLabel ?? EditorText.Get("BattleMapView_Commands_057")) +
+                Environment.NewLine + EditorText.Get("BattleMapView_Commands_040"),
+                EditorText.Get("BattleMapView_Commands_059")))
         {
             return;
         }
@@ -720,13 +715,13 @@ public partial class BattleMapView : UserControl
         MapCanvas.IsHitTestVisible = false;
         MapSelectionTextBlock.Text = kind switch
         {
-            BattleMapEditKind.DeleteContent => $"正在删除 {target.DisplayName} 的内容并验证存档……",
-            BattleMapEditKind.MoveParty => $"正在把队伍移动到 {target.DisplayName} 并验证存档……",
-            BattleMapEditKind.PlaceBattle => $"正在向 {target.DisplayName} 写入战斗并验证存档……",
-            BattleMapEditKind.PlaceContent => $"正在向 {target.DisplayName} 写入{attachment?.KindLabel}并验证存档……",
-            BattleMapEditKind.SetBattleAttachment => $"正在修改 {target.DisplayName} 的战斗附加内容并验证存档……",
-            BattleMapEditKind.RemoveBattleAttachment => $"正在移除 {target.DisplayName} 的战斗附加内容并验证存档……",
-            _ => "正在验证战斗地图操作……"
+            BattleMapEditKind.DeleteContent => EditorText.Format("BattleMapView_Commands_060", target.DisplayName),
+            BattleMapEditKind.MoveParty => EditorText.Format("BattleMapView_Commands_061", target.DisplayName),
+            BattleMapEditKind.PlaceBattle => EditorText.Format("BattleMapView_Commands_062", target.DisplayName),
+            BattleMapEditKind.PlaceContent => EditorText.Format("BattleMapView_Commands_063", target.DisplayName, attachment?.KindLabel),
+            BattleMapEditKind.SetBattleAttachment => EditorText.Format("BattleMapView_Commands_064", target.DisplayName),
+            BattleMapEditKind.RemoveBattleAttachment => EditorText.Format("BattleMapView_Commands_065", target.DisplayName),
+            _ => EditorText.Get("BattleMapView_Commands_066")
         };
 
         try
@@ -740,7 +735,7 @@ public partial class BattleMapView : UserControl
                 target.SourceTileId is null)
             {
                 throw new InvalidOperationException(
-                    "地图已刷新；请在最新地图上重新选择目标。");
+                    EditorText.Get("BattleMapView_Commands_067"));
             }
 
             if (_managedEncounterBridgeService is not null && _codec is not null && !string.IsNullOrWhiteSpace(_gameDirectory))
@@ -759,7 +754,7 @@ public partial class BattleMapView : UserControl
                         _activeContentSnapshot = currentContent;
                         RenderSnapshot(updated, fitToView: false);
                     }
-                    MapSelectionTextBlock.Text = "已清理失效的旧战斗记录，请在更新后的地图上重新选择操作。";
+                    MapSelectionTextBlock.Text = EditorText.Get("BattleMapView_Commands_068");
                     return;
                 }
                 if (maintenance.Deferred) throw new InvalidOperationException(maintenance.Message);
@@ -769,7 +764,7 @@ public partial class BattleMapView : UserControl
             {
                 if (kind != BattleMapEditKind.PlaceBattle || encounter is not null)
                 {
-                    throw new InvalidOperationException("托管遭遇解析器只能用于尚未解析索引的战斗写入。");
+                    throw new InvalidOperationException(EditorText.Get("BattleMapView_Commands_069"));
                 }
                 encounter = await encounterResolver();
                 managedEncounterResolved = true;
@@ -810,34 +805,34 @@ public partial class BattleMapView : UserControl
                         snapshot,
                         target.SourceAreaId,
                         target.SourceTileId),
-                _ => throw new InvalidOperationException("战斗地图操作缺少有效参数。")
+                _ => throw new InvalidOperationException(EditorText.Get("BattleMapView_Commands_070"))
             };
             var result = await service.CommitAsync(prepared);
             backupDirectory = result.BackupDirectory;
             committed = true;
             var operationLabel = kind switch
             {
-                BattleMapEditKind.DeleteContent => "删除",
-                BattleMapEditKind.MoveParty => "移动",
-                BattleMapEditKind.PlaceBattle => "遭遇写入",
-                BattleMapEditKind.PlaceContent => "内容写入",
-                BattleMapEditKind.SetBattleAttachment => "战斗附加内容写入",
-                BattleMapEditKind.RemoveBattleAttachment => "战斗附加内容移除",
+                BattleMapEditKind.DeleteContent => EditorText.Get("BattleMapView_Commands_004"),
+                BattleMapEditKind.MoveParty => EditorText.Get("BattleMapView_Commands_071"),
+                BattleMapEditKind.PlaceBattle => EditorText.Get("BattleMapView_Commands_072"),
+                BattleMapEditKind.PlaceContent => EditorText.Get("BattleMapView_Commands_073"),
+                BattleMapEditKind.SetBattleAttachment => EditorText.Get("BattleMapView_Commands_074"),
+                BattleMapEditKind.RemoveBattleAttachment => EditorText.Get("BattleMapView_Commands_075"),
                 _ => kind.ToString()
             };
             SaveEditApplied?.Invoke(
-                $"战斗地图{operationLabel}已应用：" +
-                $"操作编号={prepared.SessionId}；档案={profile.ProfileId}；目录={profile.ProfileDirectory}；" +
-                $"目标={target.SourceAreaId}.{target.SourceTileId}；" +
-                (kind == BattleMapEditKind.MoveParty ? $"原位置={snapshot.PartyAreaId}/tile{snapshot.PartyTileIndex}；" : string.Empty) +
-                (prepared.Encounter is { } appliedEncounter ? $"敌方=[{appliedEncounter.DisplayName}]；难度={appliedEncounter.OriginDifficulty}；" : string.Empty) +
+                EditorText.Format("BattleMapView_Commands_076", operationLabel) +
+                EditorText.Format("BattleMapView_Commands_077", prepared.SessionId, profile.ProfileId, profile.ProfileDirectory) +
+                EditorText.Format("BattleMapView_Commands_078", target.SourceAreaId, target.SourceTileId) +
+                (kind == BattleMapEditKind.MoveParty ? EditorText.Format("BattleMapView_Commands_079", snapshot.PartyAreaId, snapshot.PartyTileIndex) : string.Empty) +
+                (prepared.Encounter is { } appliedEncounter ? EditorText.Format("BattleMapView_Commands_080", appliedEncounter.DisplayName, appliedEncounter.OriginDifficulty) : string.Empty) +
                 (prepared.Attachment is { } appliedAttachment
                     ? kind == BattleMapEditKind.PlaceContent
-                        ? $"内容={appliedAttachment.KindLabel}/{appliedAttachment.Id}；原内容={prepared.Preview.PreviousRawContent}；" +
-                          $"新内容={(int)appliedAttachment.StandaloneContent}；来源={appliedAttachment.SourceLabel}；"
-                        : $"附加内容={appliedAttachment.Id}；"
+                        ? EditorText.Format("BattleMapView_Commands_081", appliedAttachment.KindLabel, appliedAttachment.Id, prepared.Preview.PreviousRawContent) +
+                          EditorText.Format("BattleMapView_Commands_082", (int)appliedAttachment.StandaloneContent, appliedAttachment.SourceLabel)
+                        : EditorText.Format("BattleMapView_Commands_083", appliedAttachment.Id)
                     : string.Empty) +
-                $"备份={result.BackupDirectory}");
+                EditorText.Format("BattleMapView_Commands_084", result.BackupDirectory));
             if (generation != _profileGeneration || _snapshotReader is null)
             {
                 return;
@@ -856,34 +851,34 @@ public partial class BattleMapView : UserControl
             refreshedSuccessfully = true;
             MapSelectionTextBlock.Text = kind switch
             {
-                BattleMapEditKind.DeleteContent => $"已删除 {target.DisplayName} 的内容。",
-                BattleMapEditKind.MoveParty => $"已将队伍移动到 {target.DisplayName}。",
-                BattleMapEditKind.PlaceBattle => $"已在 {target.DisplayName} 写入战斗遭遇。",
-                BattleMapEditKind.PlaceContent => $"已在 {target.DisplayName} 写入{attachment?.KindLabel}。",
-                BattleMapEditKind.SetBattleAttachment => $"已更新 {target.DisplayName} 的战斗附加内容。",
-                BattleMapEditKind.RemoveBattleAttachment => $"已移除 {target.DisplayName} 的战斗附加内容。",
-                _ => "战斗地图操作已完成。"
+                BattleMapEditKind.DeleteContent => EditorText.Format("BattleMapView_Commands_085", target.DisplayName),
+                BattleMapEditKind.MoveParty => EditorText.Format("BattleMapView_Commands_086", target.DisplayName),
+                BattleMapEditKind.PlaceBattle => EditorText.Format("BattleMapView_Commands_087", target.DisplayName),
+                BattleMapEditKind.PlaceContent => EditorText.Format("BattleMapView_Commands_088", target.DisplayName, attachment?.KindLabel),
+                BattleMapEditKind.SetBattleAttachment => EditorText.Format("BattleMapView_Commands_089", target.DisplayName),
+                BattleMapEditKind.RemoveBattleAttachment => EditorText.Format("BattleMapView_Commands_090", target.DisplayName),
+                _ => EditorText.Get("BattleMapView_Commands_091")
             };
         }
         catch (Exception ex)
         {
             CrashDiagnostics.RecordException("Battle map: " + (committed ? "post-commit UI" : "edit"), ex,
-                $"操作={kind}；操作编号={prepared?.SessionId ?? "尚未完成准备"}；档案={profile.ProfileId}；" +
-                $"目录={profile.ProfileDirectory}；目标={target.SourceAreaId}.{target.SourceTileId}；" +
-                $"已写入={committed}；Bridge已就绪={managedEncounterResolved}；备份={backupDirectory ?? "见异常详情"}");
+                EditorText.Format("BattleMapView_Commands_093", kind, prepared?.SessionId ?? EditorText.Get("BattleMapView_Commands_092"), profile.ProfileId) +
+                EditorText.Format("BattleMapView_Commands_094", profile.ProfileDirectory, target.SourceAreaId, target.SourceTileId) +
+                EditorText.Format("BattleMapView_Commands_096", committed, managedEncounterResolved, backupDirectory ?? EditorText.Get("BattleMapView_Commands_095")));
             MapSelectionTextBlock.Text = committed
-                ? "操作已写入，但地图刷新失败；请重新加载内容目录。"
+                ? EditorText.Get("BattleMapView_Commands_097")
                 : ex is AggregateException
-                    ? "操作失败，恢复未能完整完成；请查看错误详情及备份。"
+                    ? EditorText.Get("BattleMapView_Commands_098")
                     : managedEncounterResolved
-                        ? "托管遭遇表已就绪，但地图操作失败；请查看详情确认存档状态。"
-                        : "操作失败，错误已记录；请查看详情确认存档状态。";
+                        ? EditorText.Get("BattleMapView_Commands_099")
+                        : EditorText.Get("BattleMapView_Commands_100");
             if (Window.GetWindow(this) is { } owner)
             {
                 ThemedDialog.ShowMessage(
                     owner,
                     ex.Message,
-                    committed ? "地图刷新失败" : "战斗地图操作失败",
+                    committed ? EditorText.Get("BattleMapView_Commands_101") : EditorText.Get("BattleMapView_Commands_102"),
                     ThemedDialogKind.Error);
             }
         }
@@ -917,7 +912,7 @@ public partial class BattleMapView : UserControl
         }
 
         MapSelectionTextBlock.Text =
-            $"界面预览：队伍移动至 {target.DisplayName}。存档未发生变化。";
+            EditorText.Format("BattleMapView_Commands_103", target.DisplayName);
     }
 
 }

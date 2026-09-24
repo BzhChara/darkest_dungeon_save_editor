@@ -48,9 +48,14 @@ public partial class MainWindow : Window
     private CroppedBitmap[]? _titleLogoFrames;
     private int _titleLogoFrameIndex;
 
-    public MainWindow()
+    public MainWindow() : this(EditorLanguageSettings.DefaultPath) { }
+
+    internal MainWindow(string languageSettingsPath)
     {
+        _languageSettingsPath = languageSettingsPath;
         InitializeComponent();
+        InitializeLanguageSelection();
+        foreach (var grid in new[] { ItemGrid, TrinketGrid, HeroGrid }) EditorNameColumns.Apply(grid);
         BattleMapPanel.UsesSharedProfileMonitor = true;
         ItemGrid.ItemsSource = _visibleItems;
         TrinketGrid.ItemsSource = _visibleTrinkets;

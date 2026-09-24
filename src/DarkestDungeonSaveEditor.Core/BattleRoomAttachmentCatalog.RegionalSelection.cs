@@ -93,7 +93,7 @@ public static partial class BattleRoomAttachmentCatalog
         {
             return value;
         }
-        issues.Add($"地图区域资源未参与自动选择：.chance 权重缺失或无效；文件={path}:{line}");
+        issues.Add(EditorText.Format("BattleRoomAttachmentCatalog_RegionalSelection_001", path, line));
         return 0;
     }
 }

@@ -125,7 +125,7 @@ internal sealed class ContentLocalizationCatalog
                     }
                     catch (RegexMatchTimeoutException)
                     {
-                        diagnostics.Skip(entry.Key, "名称格式化超时");
+                        diagnostics.Skip(entry.Key, EditorText.Get("ContentLocalizationCatalog_001"));
                         continue;
                     }
 
@@ -176,9 +176,9 @@ internal sealed class ContentLocalizationCatalog
         foreach (var (file, reason) in readFailures)
         {
             var evidence = compiledEvidence.TryGetValue(file.Source.Id, out var paths)
-                ? $"名称读取器已从同一来源的其他编译表取得有效条目（LOC={paths.Count(path => path.EndsWith(".loc", StringComparison.OrdinalIgnoreCase))}，" +
-                  $"LOC2={paths.Count(path => path.EndsWith(".loc2", StringComparison.OrdinalIgnoreCase))}）；不保证覆盖失败文件的所有名称"
-                : "本次所请求的名称中，未从同一来源的其他编译表取得有效条目；这不是其他来源或语言全部缺失的结论";
+                ? EditorText.Format("ContentLocalizationCatalog_002", paths.Count(path => path.EndsWith(".loc", StringComparison.OrdinalIgnoreCase))) +
+                  EditorText.Format("ContentLocalizationCatalog_003", paths.Count(path => path.EndsWith(".loc2", StringComparison.OrdinalIgnoreCase)))
+                : EditorText.Get("ContentLocalizationCatalog_004");
             issues.Add($"Failed to read localization '{file.Path}': {reason}" +
                 CatalogLogDiagnostics.LocalizationEvidenceMarker + evidence);
         }
@@ -252,14 +252,14 @@ internal sealed class ContentLocalizationCatalog
                 var key = (string?)entry.Attribute("id") ?? string.Empty;
                 if (string.IsNullOrWhiteSpace(key) || string.IsNullOrWhiteSpace(languageId))
                 {
-                    diagnostics.Skip($"XML 条目 {entryIndex}", string.IsNullOrWhiteSpace(key) ? "缺少 ID" : "缺少语言 ID");
+                    diagnostics.Skip(EditorText.Format("ContentLocalizationCatalog_005", entryIndex), string.IsNullOrWhiteSpace(key) ? EditorText.Get("ContentLocalizationCatalog_006") : EditorText.Get("ContentLocalizationCatalog_007"));
                     continue;
                 }
 
                 if (entry.Ancestors("entry").Any() || entry.Descendants("entry").Any() ||
                     entry.Descendants("language").Any() || entry.Ancestors("language").FirstOrDefault() != language)
                 {
-                    diagnostics.Skip(key, "条目或语言嵌套导致归属不明确");
+                    diagnostics.Skip(key, EditorText.Get("ContentLocalizationCatalog_008"));
                     continue;
                 }
 

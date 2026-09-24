@@ -43,21 +43,21 @@ public partial class MainWindow : Window
             // before any path validation, scan failure or close can finish this load.
             if (_catalogSyncTask is { } previousSync) await previousSync;
             if (generation != _catalogGeneration) return;
-            var gameDirectory = RequireDirectory(GameDirectoryTextBox.Text, "游戏目录");
+            var gameDirectory = RequireDirectory(GameDirectoryTextBox.Text, EditorText.Get("MainWindow_CatalogLoading_001"));
             var workshopDirectory = string.IsNullOrWhiteSpace(WorkshopDirectoryTextBox.Text)
                 ? null
                 : Path.GetFullPath(WorkshopDirectoryTextBox.Text.Trim());
             var additionalLocalModDirectory = string.IsNullOrWhiteSpace(LocalModDirectoryTextBox.Text)
                 ? null
-                : RequireDirectory(LocalModDirectoryTextBox.Text, "本地 Mod 目录");
+                : RequireDirectory(LocalModDirectoryTextBox.Text, EditorText.Get("MainWindow_CatalogLoading_002"));
             var profile = SteamDiscovery.OpenProfile(ProfileDirectoryTextBox.Text.Trim());
             var jarPath = Path.Combine(AppContext.BaseDirectory, "tools", "DDSaveEditor", "DDSaveEditor.jar");
             var codec = new DsonSaveCodec(jarPath);
             AppendStatus(
-                "正在读取当前档案启用的 DLC、Workshop 与本地 Mod，再扫描可计数物品、饰品和人物定义……" +
+                EditorText.Get("MainWindow_CatalogLoading_003") +
                 (additionalLocalModDirectory is null
                     ? string.Empty
-                    : $" 本地 Mod 目录：{additionalLocalModDirectory}"));
+                    : EditorText.Format("MainWindow_CatalogLoading_004", additionalLocalModDirectory)));
             CrashDiagnostics.SetStage("LoadCatalog: resolving active content");
             var activeContent = await ActiveContentResolver.ResolveAsync(
                 profile,
@@ -74,10 +74,10 @@ public partial class MainWindow : Window
             await Task.Run(() => new ModManifestPreparationService().EnsureAsync(activeContent,
                 gameDirectory, manifestProgress, loadCancellation.Token), loadCancellation.Token);
             if (generation != _catalogGeneration) return;
-            diagnosticBatch.Add("活动来源", activeContent.Issues);
+            diagnosticBatch.Add(EditorText.Get("MainWindow_CatalogLoading_005"), activeContent.Issues);
             CrashDiagnostics.RecordStatus(
-                $"内容目录档案：ID={activeContent.Profile.ProfileId}；" +
-                $"档案目录={activeContent.Profile.ProfileDirectory}；" +
+                EditorText.Format("MainWindow_CatalogLoading_006", activeContent.Profile.ProfileId) +
+                EditorText.Format("MainWindow_CatalogLoading_007", activeContent.Profile.ProfileDirectory) +
                 $"persist.game.json SHA-256={activeContent.SourceGameSha256}");
             CrashDiagnostics.SetStage("LoadCatalog: inventorying active Mod files");
             var inventory = await Task.Run(() => ScanContentFilesForDiagnostics(activeContent));
@@ -86,10 +86,10 @@ public partial class MainWindow : Window
             var contentFingerprint = await Task.Run(() => ProfileCatalogContentFingerprint.Capture(activeContent.Sources));
             var staticCatalogTask = Task.Run(() => new
             {
-                Trinkets = diagnosticBatch.Capture("饰品", () => TrinketCatalog.Load(activeContent), catalog => catalog.Issues),
-                Heroes = diagnosticBatch.Capture("人物/怪癖/姓名", () => HeroClassCatalog.Load(activeContent), catalog => catalog.Issues)
+                Trinkets = diagnosticBatch.Capture(EditorText.Get("MainWindow_CatalogLoading_008"), () => TrinketCatalog.Load(activeContent), catalog => catalog.Issues),
+                Heroes = diagnosticBatch.Capture(EditorText.Get("MainWindow_CatalogLoading_009"), () => HeroClassCatalog.Load(activeContent), catalog => catalog.Issues)
             });
-            var quantityItemCatalogTask = diagnosticBatch.CaptureAsync("物品",
+            var quantityItemCatalogTask = diagnosticBatch.CaptureAsync(EditorText.Get("MainWindow_CatalogLoading_010"),
                 () => QuantityItemCatalog.LoadAsync(activeContent, codec), catalog => catalog.Issues);
             await Task.WhenAll(staticCatalogTask, quantityItemCatalogTask);
             var catalogs = await staticCatalogTask;
@@ -111,8 +111,8 @@ public partial class MainWindow : Window
             _catalogQuantitySaveSha256 = quantityItems.SourceSaveSha256;
             _quantitySaveContext = quantityItems.SaveContext;
             ItemTab.Header = _quantitySaveContext == QuantityItemSaveContext.Raid
-                ? "副本背包  /  RAID ITEMS"
-                : "小镇物品  /  ESTATE ITEMS";
+                ? EditorText.Get("MainWindow_CatalogLoading_011")
+                : EditorText.Get("MainWindow_CatalogLoading_012");
             try
             {
                 _ = await BattleMapPanel.LoadProfileAsync(
@@ -129,9 +129,9 @@ public partial class MainWindow : Window
                 CrashDiagnostics.RecordException(
                     "LoadCatalog: battle map snapshot",
                     mapException,
-                    $"档案={profile.ProfileId}；目录={profile.ProfileDirectory}");
+                    EditorText.Format("MainWindow_CatalogLoading_013", profile.ProfileId, profile.ProfileDirectory));
                 AppendStatus(
-                    $"战斗地图暂时无法读取，其他目录仍已正常加载：{mapException.Message}", level: DiagnosticLogLevel.Warning);
+                    EditorText.Format("MainWindow_CatalogLoading_014", mapException.Message), level: DiagnosticLogLevel.Warning);
             }
             CrashDiagnostics.SetStage("LoadCatalog: populating visible rows");
             UpdateCatalogMode();
@@ -144,31 +144,31 @@ public partial class MainWindow : Window
                 ? activeContent.Profile.RaidSavePath
                 : profile.EstateSavePath;
             CrashDiagnostics.RecordStatus(
-                $"内容目录数量快照：场景={FormatQuantitySaveContext(_quantitySaveContext)}；" +
-                $"数量来源文件={Path.GetFullPath(quantitySourcePath)}；" +
+                EditorText.Format("MainWindow_CatalogLoading_015", FormatQuantitySaveContext(_quantitySaveContext)) +
+                EditorText.Format("MainWindow_CatalogLoading_016", Path.GetFullPath(quantitySourcePath)) +
                 $"SHA-256={quantityItems.SourceSaveSha256}" +
                 (_quantitySaveContext == QuantityItemSaveContext.Raid
                     ? $"；persist.estate.json SHA-256={estateSaveSha256}"
                     : string.Empty));
             AppendStatus(
-                $"目录扫描完成：档案 {profile.ProfileId}；模式 {catalogs.Heroes.GameMode}；" +
+                EditorText.Format("MainWindow_CatalogLoading_017", profile.ProfileId, catalogs.Heroes.GameMode) +
                 CatalogLogDiagnostics.FormatSourceCounts(activeContent) + "；" +
-                $"本轮目录日志说明 {diagnostics.Count(entry => entry.Level == DiagnosticLogLevel.Information)} 条，" +
-                $"警告 {diagnostics.Count(entry => entry.Level == DiagnosticLogLevel.Warning)} 条（含战斗目录，跨模块按文件/原因合并，不等于不可用内容数量）。");
+                EditorText.Format("MainWindow_CatalogLoading_018", diagnostics.Count(entry => entry.Level == DiagnosticLogLevel.Information)) +
+                EditorText.Format("MainWindow_CatalogLoading_019", diagnostics.Count(entry => entry.Level == DiagnosticLogLevel.Warning)));
             AppendStatus(
-                $"目录统计：{FormatQuantitySaveContext(_quantitySaveContext)}物品 {defaultVisibleItemCount} 个" +
-                $"（当前场景隐藏项 {hiddenItemCount} 个）" +
+                EditorText.Format("MainWindow_CatalogLoading_020", FormatQuantitySaveContext(_quantitySaveContext), defaultVisibleItemCount) +
+                EditorText.Format("MainWindow_CatalogLoading_021", hiddenItemCount) +
                 (_quantitySaveContext == QuantityItemSaveContext.Raid
-                    ? $"；副本格位 {quantityItems.RaidOccupiedSlots}/" +
+                    ? EditorText.Format("MainWindow_CatalogLoading_022", quantityItems.RaidOccupiedSlots) +
                       $"{FormatRaidInventoryCapacity(_raidInventoryStorage)}"
                     : string.Empty) +
-                $"；饰品 {_allTrinkets.Count} 个；仓库槽位 {FormatStorageCapacity(_trinketStorage)}；" +
-                $"人物 {_allHeroes.Count} 个；怪癖定义 {catalogs.Heroes.InitialQuirks.Count} 个；" +
-                $"姓名 {catalogs.Heroes.HeroNames.Count} 个；" +
-                $"等级 0-{Math.Max(0, catalogs.Heroes.ResolveLevelThresholds.Count - 1)}。" +
-                $" 人物线索：有招募事件的人物 {_allHeroes.Count(item => item.RecruitEvents.Count > 0)} 个；" +
-                $"有后续玩法怪癖线索的人物 {_allHeroes.Count(item => item.RuntimeQuirkSignals.Count > 0)} 个" +
-                "（不作为初始怪癖）。");
+                EditorText.Format("MainWindow_CatalogLoading_023", _allTrinkets.Count, FormatStorageCapacity(_trinketStorage)) +
+                EditorText.Format("MainWindow_CatalogLoading_024", _allHeroes.Count, catalogs.Heroes.InitialQuirks.Count) +
+                EditorText.Format("MainWindow_CatalogLoading_025", catalogs.Heroes.HeroNames.Count) +
+                EditorText.Format("MainWindow_CatalogLoading_026", Math.Max(0, catalogs.Heroes.ResolveLevelThresholds.Count - 1)) +
+                EditorText.Format("MainWindow_CatalogLoading_027", _allHeroes.Count(item => item.RecruitEvents.Count > 0)) +
+                EditorText.Format("MainWindow_CatalogLoading_028", _allHeroes.Count(item => item.RuntimeQuirkSignals.Count > 0)) +
+                EditorText.Get("MainWindow_CatalogLoading_029"));
             CrashDiagnostics.RecordCatalogDiagnostics(diagnosticBatch);
 
             foreach (var entry in diagnostics.Take(30))
@@ -179,20 +179,20 @@ public partial class MainWindow : Window
 
             if (diagnostics.Count > 30)
             {
-                AppendStatus($"另有 {diagnostics.Count - 30} 条目录说明/警告仅写入完整日志。", persist: false);
+                AppendStatus(EditorText.Format("MainWindow_CatalogLoading_030", diagnostics.Count - 30), persist: false);
             }
 
             CrashDiagnostics.SetStage("LoadCatalog: waiting for initial profile sync");
             await StartProfileSyncAsync(activeContent, quantityItems, codec, gameDirectory,
                 workshopDirectory, additionalLocalModDirectory, contentFingerprint, locations);
             CrashDiagnostics.SetStage("LoadCatalog: initial profile sync completed");
-            AppendStatus("当前存档载入完成，首次同步已完成。");
+            AppendStatus(EditorText.Get("MainWindow_CatalogLoading_031"));
         }
         catch (OperationCanceledException) when (loadCancellation.IsCancellationRequested) { }
         catch (Exception ex)
         {
             CrashDiagnostics.RecordException("LoadCatalog handled exception", ex);
-            AppendStatusSafely($"载入当前存档未完成：{ex.Message}", "LoadCatalog failure status", DiagnosticLogLevel.Error);
+            AppendStatusSafely(EditorText.Format("MainWindow_CatalogLoading_032", ex.Message), "LoadCatalog failure status", DiagnosticLogLevel.Error);
         }
         finally
         {
@@ -210,7 +210,7 @@ public partial class MainWindow : Window
             catch (Exception ex)
             {
                 CrashDiagnostics.RecordException("LoadCatalog cleanup exception", ex);
-                AppendStatusSafely($"恢复界面状态失败：{ex.Message}", "LoadCatalog cleanup status", DiagnosticLogLevel.Error);
+                AppendStatusSafely(EditorText.Format("MainWindow_CatalogLoading_033", ex.Message), "LoadCatalog cleanup status", DiagnosticLogLevel.Error);
             }
         }
     }

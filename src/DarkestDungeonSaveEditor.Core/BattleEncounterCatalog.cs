@@ -52,7 +52,7 @@ public sealed record BattleEncounterDefinition(
     string UnavailableReason,
     BattleEncounterTableGuard TableGuard)
 {
-    public string DisplayName => MonsterIds.Count == 0 ? "（空遭遇位置）" : string.Join(" + ", MonsterIds);
+    public string DisplayName => MonsterIds.Count == 0 ? EditorText.Get("BattleEncounterCatalog_001") : string.Join(" + ", MonsterIds);
 
     public string ChineseDisplayName =>
         MonsterNames.Count == MonsterIds.Count
@@ -118,7 +118,7 @@ public static partial class BattleEncounterCatalog
                 Path.GetFullPath(snapshot.ProfileDirectory),
                 StringComparison.OrdinalIgnoreCase))
         {
-            throw new InvalidOperationException("活动内容目录与当前战斗地图不属于同一个档案。");
+            throw new InvalidOperationException(EditorText.Get("BattleEncounterCatalog_002"));
         }
 
         var issues = new List<string>();
@@ -130,14 +130,14 @@ public static partial class BattleEncounterCatalog
         var gameSavePath = Path.Combine(snapshot.ProfileDirectory, "persist.game.json");
         if (!File.Exists(gameSavePath))
         {
-            throw new FileNotFoundException("当前档案缺少 persist.game.json。", gameSavePath);
+            throw new FileNotFoundException(EditorText.Get("BattleEncounterCatalog_003"), gameSavePath);
         }
         if (!ComputeSha256(gameSavePath).Equals(
                 activeContent.SourceGameSha256,
                 StringComparison.OrdinalIgnoreCase))
         {
             throw new InvalidOperationException(
-                "活动 Mod 配置在目录加载后已经变化，请重新加载内容目录。");
+                EditorText.Get("BattleEncounterCatalog_004"));
         }
 
         var fingerprints = effectiveFiles
@@ -165,14 +165,14 @@ public static partial class BattleEncounterCatalog
             .ToDictionary(
                 group => group.Key,
                 group => fileOrderIssue is not null
-                    ? $"有效遭遇文件的顺序无法确认：{fileOrderIssue}"
+                    ? EditorText.Format("BattleEncounterCatalog_005", fileOrderIssue)
                     : unparsedTypes.Contains(group.Key)
-                    ? "该类型含无法解析的遭遇行，不能证明运行时索引"
+                    ? EditorText.Get("BattleEncounterCatalog_006")
                     : HasProvenFileOrder(group.ToArray(), out var reason) &&
                       HasProvenRowCounts(RuntimeRows(group, availableMonsters), availableMonsters, out reason) ? string.Empty : reason);
         var indexesByType = new Dictionary<int, int>();
         issues.AddRange(unavailableTypeReasons.Where(pair => !string.IsNullOrEmpty(pair.Value))
-            .Select(pair => $"当前战斗类型 {pair.Key} 暂不可直写：{pair.Value}"));
+            .Select(pair => EditorText.Format("BattleEncounterCatalog_007", pair.Key, pair.Value)));
         var encounters = new List<BattleEncounterDefinition>(parsed.Length);
         foreach (var entry in parsed)
         {
@@ -182,7 +182,7 @@ public static partial class BattleEncounterCatalog
                 {
                     MashIndex = null,
                     CanPlaceDirectly = false,
-                    UnavailableReason = "条件/额外遭遇需要先桥接到当前普通遭遇表"
+                    UnavailableReason = EditorText.Get("BattleEncounterCatalog_008")
                 });
                 continue;
             }
@@ -190,8 +190,8 @@ public static partial class BattleEncounterCatalog
             if (IsNativeSkippedRow(entry, availableMonsters))
             {
                 encounters.Add(entry with { MashIndex = null, CanPlaceDirectly = false,
-                    UnavailableReason = "该组合体型超过四格，游戏会跳过此行，不占用运行时编号" });
-                issues.Add($"标准遭遇按原生规则跳过，不影响后续编号：{entry.SourcePath}:{entry.SourceLine}");
+                    UnavailableReason = EditorText.Get("BattleEncounterCatalog_009") });
+                issues.Add(EditorText.Format("BattleEncounterCatalog_010", entry.SourcePath, entry.SourceLine));
                 continue;
             }
             var nextIndex = indexesByType.GetValueOrDefault(entry.MashType);
@@ -211,7 +211,7 @@ public static partial class BattleEncounterCatalog
             {
                 MashIndex = nextIndex,
                 CanPlaceDirectly = entry.MonsterIds.Count > 0,
-                UnavailableReason = entry.MonsterIds.Count == 0 ? "空遭遇占用运行时编号，但不能放置" : string.Empty
+                UnavailableReason = entry.MonsterIds.Count == 0 ? EditorText.Get("BattleEncounterCatalog_Maintenance_004") : string.Empty
             });
         }
 
@@ -253,10 +253,10 @@ public static partial class BattleEncounterCatalog
                 encounters[index] = encounters[index] with
                 {
                     CanPlaceDirectly = false,
-                    UnavailableReason = "缺少当前活动敌方定义：" + string.Join(", ", missingIds)
+                    UnavailableReason = EditorText.Get("BattleEncounterCatalog_011") + string.Join(", ", missingIds)
                 };
                 issues.Add(
-                    $"当前副本遭遇不可直写（索引 {encounters[index].MashIndex} 保留，不重排后续索引）：" +
+                    EditorText.Format("BattleEncounterCatalog_012", encounters[index].MashIndex) +
                     FormatUnresolvedEncounter(CreateUnresolvedEncounterDiagnostic(
                         encounters[index], missingIds, availableMonsters.Ids)));
             }
@@ -266,7 +266,7 @@ public static partial class BattleEncounterCatalog
         foreach (var row in bridgeCandidateRows)
         {
             if (!HasProvenRowCounts([row], availableMonsters, out var reason))
-                globalIssues.Add($"遭遇未加入 Bridge 选择列表：{reason}");
+                globalIssues.Add(EditorText.Format("BattleEncounterCatalog_013", reason));
         }
 
         var bridgeEncounters = bridgeCandidateRows
@@ -277,7 +277,7 @@ public static partial class BattleEncounterCatalog
                 {
                     MashIndex = null,
                     CanPlaceDirectly = false,
-                    UnavailableReason = "需要 Encounter Bridge 才能写入当前副本遭遇表"
+                    UnavailableReason = EditorText.Get("BattleEncounterCatalog_014")
                 },
                 localization))
             .Where(encounter => encounter.HasKnownClassification)
@@ -319,7 +319,7 @@ public static partial class BattleEncounterCatalog
                 StringComparison.OrdinalIgnoreCase))
         {
             throw new InvalidOperationException(
-                "活动 Mod 配置在遭遇选择后已经变化，请重新加载内容目录。");
+                EditorText.Get("BattleEncounterCatalog_015"));
         }
 
         var issues = new List<string>();
@@ -337,7 +337,7 @@ public static partial class BattleEncounterCatalog
                 StringComparison.OrdinalIgnoreCase))
         {
             throw new InvalidOperationException(
-                "当前副本的有效遭遇文件或索引输入已经变化，请重新加载内容目录。");
+                EditorText.Get("BattleEncounterCatalog_016"));
         }
     }
 
@@ -348,7 +348,7 @@ public static partial class BattleEncounterCatalog
             encounter.MashIndex is null or < 0 ||
             encounter.SourceKind != BattleEncounterSourceKind.Standard)
         {
-            throw new InvalidOperationException("所选遭遇不是可直接写入的标准表条目。");
+            throw new InvalidOperationException(EditorText.Get("BattleEncounterCatalog_017"));
         }
 
         ValidateGuard(encounter.TableGuard);
@@ -362,14 +362,14 @@ public static partial class BattleEncounterCatalog
             encounter.MashIndex.Value >= rows.Length)
         {
             throw new InvalidOperationException(
-                "当前遭遇类型不再具有可证明的运行时索引。");
+                EditorText.Get("BattleEncounterCatalog_018"));
         }
 
         var expected = rows[encounter.MashIndex.Value];
         if (!SameEncounterIdentity(encounter, expected))
         {
             throw new InvalidOperationException(
-                "所选遭遇的索引、组成或来源与当前有效表不一致，请重新加载内容目录。");
+                EditorText.Get("BattleEncounterCatalog_019"));
         }
         ValidateMonsterDefinitions(encounter);
     }
@@ -382,7 +382,7 @@ public static partial class BattleEncounterCatalog
             encounter.SourceKind is not (
                 BattleEncounterSourceKind.Conditional or BattleEncounterSourceKind.Additional))
         {
-            throw new InvalidOperationException("所选遭遇不是可桥接的条件或额外遭遇。");
+            throw new InvalidOperationException(EditorText.Get("BattleEncounterCatalog_020"));
         }
 
         ValidateGuard(encounter.TableGuard);
@@ -394,7 +394,7 @@ public static partial class BattleEncounterCatalog
         if (!matches)
         {
             throw new InvalidOperationException(
-                "所选特殊遭遇已变化、消失或存在歧义，请重新加载内容目录。");
+                EditorText.Get("BattleEncounterCatalog_021"));
         }
     }
 
@@ -406,7 +406,7 @@ public static partial class BattleEncounterCatalog
             encounter.MashIndex is not null)
         {
             throw new InvalidOperationException(
-                "所选遭遇不是可桥接的普通战斗、游荡首领、特殊遭遇或固定首领。");
+                EditorText.Get("BattleEncounterCatalog_022"));
         }
 
         ValidateGuard(encounter.TableGuard);
@@ -428,7 +428,7 @@ public static partial class BattleEncounterCatalog
         if (matchingFiles.Length == 0)
         {
             throw new InvalidOperationException(
-                "所选遭遇的有效来源文件已经消失或被其他内容覆盖，请重新加载内容目录。");
+                EditorText.Get("BattleEncounterCatalog_023"));
         }
 
         // Reopened files may occupy more than one native result slot. The full
@@ -442,7 +442,7 @@ public static partial class BattleEncounterCatalog
         if (!matches)
         {
             throw new InvalidOperationException(
-                "所选遭遇已变化、消失或存在歧义，请重新加载内容目录。");
+                EditorText.Get("BattleEncounterCatalog_024"));
         }
     }
 
@@ -456,13 +456,13 @@ public static partial class BattleEncounterCatalog
     private static void ValidateMonsterDefinitions(BattleEncounterDefinition encounter)
     {
         if (encounter.MonsterIds.Count == 0)
-            throw new InvalidOperationException("空遭遇占用运行时编号，但不能放置。");
+            throw new InvalidOperationException(EditorText.Get("BattleEncounterCatalog_025"));
         var availableMonsters = ResolveAvailableMonsterDefinitions(encounter.TableGuard.ActiveSources, []);
         var missingIds = GetMissingMonsterIds(encounter, availableMonsters.Ids);
         if (missingIds.Length > 0)
         {
             throw new InvalidOperationException(
-                "所选遭遇引用了当前启用内容中不存在的敌方定义：" + string.Join(", ", missingIds));
+                EditorText.Get("BattleEncounterCatalog_026") + string.Join(", ", missingIds));
         }
         if (!HasProvenRowCounts([encounter], availableMonsters, out var reason))
             throw new InvalidOperationException(reason);
@@ -517,7 +517,7 @@ public static partial class BattleEncounterCatalog
         if (issues.Count > 0)
         {
             throw new InvalidOperationException(
-                "当前遭遇表无法完整复核，请重新加载内容目录。");
+                EditorText.Get("BattleEncounterCatalog_027"));
         }
 
         return parsed;
@@ -643,20 +643,20 @@ public static partial class BattleEncounterCatalog
             catch (DecoderFallbackException)
             {
                 if (sourceKind == BattleEncounterSourceKind.Standard) unparsedTypes?.Add(mashType);
-                issues.Add($"遭遇字符串截断后不是完整 UTF-8，无法确认编号：{file.Path}:{record.SourceLine}");
+                issues.Add(EditorText.Format("BattleEncounterCatalog_028", file.Path, record.SourceLine));
                 continue;
             }
             // MashGuide zero-initializes all four actors before the optional
             // .types read. Missing, bare and quoted-empty lists all retain a
             // native slot for index/append/maintenance, but cannot be placed.
             if (monsters.Length == 0 && reportNativeAdjustments)
-                issues.Add($"空遭遇保留编号，不影响后续索引，不能放置：{file.Path}:{record.SourceLine}");
+                issues.Add(EditorText.Format("BattleEncounterCatalog_029", file.Path, record.SourceLine));
             // MashGuide's .types parser copies exactly four 32-byte slots;
             // fifth and later IDs never reach AddMashEntry.
             if (actorSlots.Length > 4)
             {
                 if (reportNativeAdjustments)
-                    issues.Add($"遭遇槽位截取：{file.Path}:{record.SourceLine}；记录={record.RecordIndex}");
+                    issues.Add(CatalogIssueCode.FormatEncounterSlots(file.Path, record.SourceLine, record.RecordIndex));
             }
 
             double? weight = ReadNativeChance(record.Body);

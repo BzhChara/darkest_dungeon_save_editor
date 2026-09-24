@@ -13,7 +13,7 @@ internal sealed record QuantityItemSaveScene(QuantityItemSaveContext Context, bo
             if (!Convert.ToHexString(SHA256.HashData(stream)).Equals(
                     content.SourceGameSha256, StringComparison.OrdinalIgnoreCase))
             {
-                throw new InvalidOperationException("档案状态或活动内容已变化，请重新加载内容目录。");
+                throw new InvalidOperationException(EditorText.Get("QuantityItemSaveScene_001"));
             }
         }
 
@@ -23,7 +23,7 @@ internal sealed record QuantityItemSaveScene(QuantityItemSaveContext Context, bo
             root["raiddungeon"] is not JsonValue dungeonNode || !dungeonNode.TryGetValue<string>(out var dungeon) ||
             string.IsNullOrWhiteSpace(dungeon))
         {
-            throw new InvalidDataException("无法确定当前档案的小镇／副本状态，请在游戏中正常保存后重新加载。");
+            throw new InvalidDataException(EditorText.Get("QuantityItemSaveScene_002"));
         }
 
         var location = RaidSaveLocation.FromGame(content.Profile.ProfileDirectory, game);
@@ -31,12 +31,12 @@ internal sealed record QuantityItemSaveScene(QuantityItemSaveContext Context, bo
         var hasDungeon = !dungeon.Equals("none", StringComparison.Ordinal);
         if (inRaid != hasDungeon)
         {
-            throw new InvalidDataException("当前档案的小镇／副本状态不一致，请在游戏中完成过渡并保存后重新加载。");
+            throw new InvalidDataException(EditorText.Get("QuantityItemSaveScene_003"));
         }
 
         if (inRaid && !hasRaid)
         {
-            throw new InvalidOperationException("档案仍标记为副本中，但副本背包数据缺失；请重新加载，不能改写小镇库存。");
+            throw new InvalidOperationException(EditorText.Get("QuantityItemSaveScene_004"));
         }
 
         return new QuantityItemSaveScene(
