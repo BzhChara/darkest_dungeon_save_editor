@@ -39,6 +39,7 @@ public sealed class DsonSaveCodec
 
     public async Task DecodeAsync(string inputPath, string outputPath, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         ValidateAvailability();
         inputPath = Path.GetFullPath(inputPath);
         outputPath = Path.GetFullPath(outputPath);
@@ -47,6 +48,7 @@ public sealed class DsonSaveCodec
         if (!IsDson(inputPath))
         {
             _ = JsonSupport.ReadObject(inputPath);
+            cancellationToken.ThrowIfCancellationRequested();
             File.Copy(inputPath, outputPath, overwrite: false);
             return;
         }
@@ -61,6 +63,7 @@ public sealed class DsonSaveCodec
         string? originalBinaryPath,
         CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         ValidateAvailability();
         decodedJsonPath = Path.GetFullPath(decodedJsonPath);
         outputPath = Path.GetFullPath(outputPath);
@@ -69,6 +72,7 @@ public sealed class DsonSaveCodec
 
         if (!string.IsNullOrWhiteSpace(originalBinaryPath) && !IsDson(originalBinaryPath))
         {
+            cancellationToken.ThrowIfCancellationRequested();
             File.Copy(decodedJsonPath, outputPath, overwrite: false);
             return;
         }
@@ -106,11 +110,28 @@ public sealed class DsonSaveCodec
         startInfo.ArgumentList.Add(outputPath);
         startInfo.ArgumentList.Add(inputPath);
 
+        cancellationToken.ThrowIfCancellationRequested();
         using var process = Process.Start(startInfo)
             ?? throw new InvalidOperationException("Failed to start Java for DDSaveEditor.");
-        var stdoutTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
-        var stderrTask = process.StandardError.ReadToEndAsync(cancellationToken);
-        await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
+        // Keep draining both pipes until the child has actually exited. Cancelling
+        // only WaitForExitAsync would leave Java writing into an abandoned workspace.
+        var stdoutTask = process.StandardOutput.ReadToEndAsync();
+        var stderrTask = process.StandardError.ReadToEndAsync();
+        try
+        {
+            await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            try
+            {
+                if (!process.HasExited) process.Kill(entireProcessTree: true);
+            }
+            catch (InvalidOperationException) when (process.HasExited) { }
+            await process.WaitForExitAsync(CancellationToken.None).ConfigureAwait(false);
+            await Task.WhenAll(stdoutTask, stderrTask).ConfigureAwait(false);
+        }
+        cancellationToken.ThrowIfCancellationRequested();
         var stdout = await stdoutTask.ConfigureAwait(false);
         var stderr = await stderrTask.ConfigureAwait(false);
 

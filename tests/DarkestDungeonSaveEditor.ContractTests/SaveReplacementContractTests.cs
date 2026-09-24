@@ -1,9 +1,33 @@
 internal static partial class ContractSuite
 {
+    public static void RunSaveReplacementOnly(string repositoryRoot)
+    {
+        var root = Path.Combine(repositoryRoot, "workspaces", "replacement_contracts", Guid.NewGuid().ToString("N"));
+        RunSaveReplacementContracts(root);
+        Console.WriteLine($"Artifacts: {root}");
+    }
+
     private static void RunSaveReplacementContracts(string runRoot)
     {
         var root = Path.Combine(runRoot, "guarded-replacement");
         Directory.CreateDirectory(root);
+        var longTarget = Path.Combine(root, new string('a', 96), new string('b', 96), "save.json");
+        Directory.CreateDirectory(Path.GetDirectoryName(longTarget)!);
+        File.WriteAllText(longTarget, "long-path-original");
+        Assert(longTarget.Length > 260, "The replacement-access contract must exceed the legacy Windows path limit.");
+        GuardedSaveReplacement.ValidateReplaceAccess(longTarget);
+        GuardedSaveReplacement.ValidateReplaceAccess(@"\\?\" + Path.GetFullPath(longTarget));
+        using (var locked = new FileStream(longTarget, FileMode.Open, FileAccess.Read, FileShare.Read))
+        {
+            var error = CaptureSaveFailure(() => GuardedSaveReplacement.ValidateReplaceAccess(longTarget));
+            Assert(error is IOException { InnerException: System.ComponentModel.Win32Exception { NativeErrorCode: 32 } },
+                "A long-path probe must report the real replacement lock, not a path lookup error.");
+        }
+        GuardedSaveReplacement.ValidateReplaceAccess(longTarget);
+        Assert(File.ReadAllText(longTarget) == "long-path-original" &&
+            CaptureSaveFailure(() => GuardedSaveReplacement.ValidateReplaceAccess(longTarget + ".missing")) is IOException,
+            "Replacement-access probing must preserve file bytes and reject absent long-path targets.");
+        Console.WriteLine("PASS: long and extended Windows paths preserve read-only replacement-access checks and reject real locks/missing targets.");
         foreach (var scenario in new[] { "success", "rollback", "before", "after", "both", "recovery-race", "locked-recovery", "corrupt-displaced" })
         {
             var target = Path.Combine(root, scenario + ".json");

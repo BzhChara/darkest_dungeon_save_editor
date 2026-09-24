@@ -5,7 +5,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <LangVersion>latest</LangVersion>
-    <UseAppHost>false</UseAppHost>
+    <!-- The cancellation contracts launch this host as an isolated codec process. -->
+    <UseAppHost>true</UseAppHost>
     <UseWPF>true</UseWPF>
   </PropertyGroup>
 

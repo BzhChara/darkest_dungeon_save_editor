@@ -140,7 +140,7 @@ public partial class MainWindow : Window
         if (busy) unchecked { _catalogOperationGeneration++; }
         _busyDepth = busy ? _busyDepth + 1 : Math.Max(0, _busyDepth - 1);
         UpdateEnabledState();
-        if (!IsBusy && _syncRequested) _ = DrainProfileSyncAsync();
+        if (!IsProfileOperationBusy && _syncRequested) _ = DrainProfileSyncAsync();
     }
 
     private void UpdateEnabledState()

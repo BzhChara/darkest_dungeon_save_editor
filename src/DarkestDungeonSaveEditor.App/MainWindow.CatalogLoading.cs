@@ -26,7 +26,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private async Task LoadCatalogAsync()
+    private async Task LoadCatalogAsync(SaveEditorLocations? locations = null)
     {
         var diagnosticBatch = new CatalogDiagnosticBatch();
         using var loadCancellation = new CancellationTokenSource();
@@ -37,7 +37,12 @@ public partial class MainWindow : Window
             _catalogLoadCancellation = loadCancellation;
             var generation = _catalogGeneration;
             CrashDiagnostics.SetStage("LoadCatalog: entering busy state");
-            SetBusy(true);
+            _catalogLoading = true;
+            UpdateEnabledState();
+            // Cancellation is asynchronous. Include the previous reader's cleanup
+            // before any path validation, scan failure or close can finish this load.
+            if (_catalogSyncTask is { } previousSync) await previousSync;
+            if (generation != _catalogGeneration) return;
             var gameDirectory = RequireDirectory(GameDirectoryTextBox.Text, "游戏目录");
             var workshopDirectory = string.IsNullOrWhiteSpace(WorkshopDirectoryTextBox.Text)
                 ? null
@@ -59,7 +64,7 @@ public partial class MainWindow : Window
                 gameDirectory,
                 workshopDirectory,
                 additionalLocalModDirectory,
-                codec, cancellationToken: loadCancellation.Token);
+                codec, workspaceRoot: locations?.WorkspaceDirectory, cancellationToken: loadCancellation.Token);
             if (generation != _catalogGeneration) return;
             CrashDiagnostics.SetStage("LoadCatalog: preparing missing Mod manifests");
             var manifestProgress = new Progress<string>(message =>
@@ -146,7 +151,7 @@ public partial class MainWindow : Window
                     ? $"；persist.estate.json SHA-256={estateSaveSha256}"
                     : string.Empty));
             AppendStatus(
-                $"目录加载完成：档案 {profile.ProfileId}；模式 {catalogs.Heroes.GameMode}；" +
+                $"目录扫描完成：档案 {profile.ProfileId}；模式 {catalogs.Heroes.GameMode}；" +
                 CatalogLogDiagnostics.FormatSourceCounts(activeContent) + "；" +
                 $"本轮目录日志说明 {diagnostics.Count(entry => entry.Level == DiagnosticLogLevel.Information)} 条，" +
                 $"警告 {diagnostics.Count(entry => entry.Level == DiagnosticLogLevel.Warning)} 条（含战斗目录，跨模块按文件/原因合并，不等于不可用内容数量）。");
@@ -177,15 +182,17 @@ public partial class MainWindow : Window
                 AppendStatus($"另有 {diagnostics.Count - 30} 条目录说明/警告仅写入完整日志。", persist: false);
             }
 
-            CrashDiagnostics.SetStage("LoadCatalog: synchronous UI update completed");
-            StartProfileSync(activeContent, quantityItems, codec, gameDirectory,
-                workshopDirectory, additionalLocalModDirectory, contentFingerprint);
+            CrashDiagnostics.SetStage("LoadCatalog: waiting for initial profile sync");
+            await StartProfileSyncAsync(activeContent, quantityItems, codec, gameDirectory,
+                workshopDirectory, additionalLocalModDirectory, contentFingerprint, locations);
+            CrashDiagnostics.SetStage("LoadCatalog: initial profile sync completed");
+            AppendStatus("当前存档载入完成，首次同步已完成。");
         }
         catch (OperationCanceledException) when (loadCancellation.IsCancellationRequested) { }
         catch (Exception ex)
         {
             CrashDiagnostics.RecordException("LoadCatalog handled exception", ex);
-            AppendStatusSafely($"加载内容目录失败：{ex.Message}", "LoadCatalog failure status", DiagnosticLogLevel.Error);
+            AppendStatusSafely($"载入当前存档未完成：{ex.Message}", "LoadCatalog failure status", DiagnosticLogLevel.Error);
         }
         finally
         {
@@ -195,7 +202,8 @@ public partial class MainWindow : Window
             try
             {
                 CrashDiagnostics.SetStage("LoadCatalog: leaving busy state");
-                SetBusy(false);
+                _catalogLoading = false;
+                UpdateEnabledState();
                 CrashDiagnostics.SetStage("LoadCatalog: handler returned; waiting for Dispatcher");
                 ScheduleLoadCatalogDispatcherProbes();
             }

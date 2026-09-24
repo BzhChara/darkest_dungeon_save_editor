@@ -102,7 +102,7 @@ public partial class MainWindow : Window
     protected override void OnActivated(EventArgs e)
     {
         base.OnActivated(e);
-        RequestProfileSync(invalidatePreview: false);
+        CheckProfileSync(windowActive: true);
     }
 
 }

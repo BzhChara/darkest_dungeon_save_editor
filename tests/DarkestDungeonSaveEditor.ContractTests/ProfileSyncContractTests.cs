@@ -68,7 +68,10 @@ internal static partial class ContractSuite
             "Nonbattle definition edits must invalidate the shared page refresh signal.");
         File.Delete(itemUpdatePath);
         File.Delete(quirkUpdatePath);
+        var resourceProbe = WriteMultiMash(fixture.GameRoot, "dungeons/cove/save_only_sync.1.mash.darkest",
+            "hall: .chance 1 .types save_only_monster\n");
         first = await reader.ReadAsync(refreshContent: true);
+        using var lockedResource = File.Open(resourceProbe, FileMode.Open, FileAccess.Read, FileShare.None);
 
         var game = (JsonObject)JsonNode.Parse(File.ReadAllText(fixture.DecodedGameSeedPath))!;
         var gameBase = (JsonObject)game["base_root"]!;
@@ -90,6 +93,15 @@ internal static partial class ContractSuite
         Assert(newGold.CurrentAmount == 5432 && newGold.LocalizedName == gold.LocalizedName &&
             newGold.SourceLabel == gold.SourceLabel,
             "Quantity refresh must adopt live amounts without changing bilingual names or provenance.");
+        Assert(quantities.ContentFingerprint == first.ContentFingerprint && progress.ContentFingerprint == first.ContentFingerprint,
+            "Progress and quantity-only sync must reuse cached resource definitions even while an unrelated resource is locked.");
+        var resourceReadRejected = false;
+        try { await reader.ReadAsync(refreshContent: true); } catch (IOException) { resourceReadRejected = true; }
+        Assert(resourceReadRejected, "An explicit content refresh must still validate the unreadable resource.");
+        lockedResource.Dispose();
+        File.Delete(resourceProbe);
+        quantities = await reader.ReadAsync(refreshContent: true);
+        Console.WriteLine("PASS: save-only progress/quantity refresh avoids global resource reads; explicit resource validation remains enforced.");
         var validGame = File.ReadAllBytes(gamePath);
         var cachedGame = quantities.Content.DecodedGamePath;
         var cachedBytes = File.ReadAllBytes(cachedGame);

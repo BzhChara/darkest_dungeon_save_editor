@@ -7,14 +7,19 @@ namespace DarkestDungeonSaveEditor.App;
 
 public partial class MainWindow : Window
 {
+    private static readonly TimeSpan ContentCheckInterval = TimeSpan.FromSeconds(60);
     private ProfileSaveMonitor? _catalogMonitor;
     private ProfileCatalogSnapshotReader? _catalogSnapshotReader;
     private CancellationTokenSource? _catalogSyncCancellation;
     private CancellationTokenSource? _catalogLoadCancellation;
     private Task? _catalogLoadTask;
+    private Task? _catalogSyncTask;
+    private bool _catalogLoading;
     private bool _catalogCloseRequested;
     private DispatcherTimer? _catalogSyncRetry;
-    private DispatcherTimer? _contentPoll;
+    private DispatcherTimer? _profilePoll;
+    private DateTime _nextContentCheckUtc;
+    private bool _contentRefreshRequested;
     private ManagedBattleEncounterBridgeService? _battleMaintenance;
     private string? _catalogContentFingerprint;
     private string? _lastMaintenanceMessage;
@@ -34,13 +39,20 @@ public partial class MainWindow : Window
     private bool _maintenanceRetryPending;
     private bool _syncReady;
     private bool _restoringCatalogSelection;
-    private bool IsBusy => _busyDepth > 0 || _syncApplying;
+    // Loading locks the UI while still allowing its own initial sync to run.
+    private bool IsProfileOperationBusy => _busyDepth > 0 || _syncApplying;
+    private bool IsBusy => _catalogLoading || IsProfileOperationBusy;
 
-    private void StartProfileSync(ActiveContentSnapshot content, QuantityItemCatalogResult items,
+    private async Task StartProfileSyncAsync(ActiveContentSnapshot content, QuantityItemCatalogResult items,
         DsonSaveCodec codec, string gameDirectory, string? workshopDirectory, string? localModDirectory,
         string contentFingerprint, SaveEditorLocations? locations = null)
     {
-        StopProfileSync();
+        StopProfileSync(cancelCatalogLoad: false);
+        var generation = _catalogGeneration;
+        // A previous reader must finish cancellation/codec cleanup before the new
+        // load can publish a snapshot or finish closing the window.
+        if (_catalogSyncTask is { } previousSync) await previousSync;
+        if (generation != _catalogGeneration) throw new OperationCanceledException();
         _catalogConfigurationKey = ProfileContentConfiguration.GetKey(content.DecodedGamePath);
         _catalogContentFingerprint = contentFingerprint;
         _catalogSnapshotReader = new(content, items, codec, gameDirectory, workshopDirectory, localModDirectory,
@@ -52,18 +64,22 @@ public partial class MainWindow : Window
         _catalogMonitor = new ProfileSaveMonitor(content.Profile.ProfileDirectory, ProfileCatalogSnapshotReader.WatchedFileNames);
         _catalogMonitor.Changed += CatalogMonitor_Changed;
         _catalogMonitor.Start();
-        _contentPoll = new DispatcherTimer { Interval = TimeSpan.FromSeconds(10) };
-        _contentPoll.Tick += (_, _) =>
-        {
-            if (!IsBusy && !_syncInProgress) RequestProfileSync(invalidatePreview: false);
-        };
-        _contentPoll.Start();
-        RequestProfileSync(); // Catch writes between the initial load and monitor baseline.
+        // Keep the inexpensive save/game-exit check independent of resource scans.
+        _profilePoll = new DispatcherTimer { Interval = TimeSpan.FromSeconds(10) };
+        _profilePoll.Tick += (_, _) => CheckProfileSync(IsActive);
+        _profilePoll.Start();
+        var token = _catalogSyncCancellation.Token;
+        RequestProfileSync(refreshContent: true); // Catch writes since the initial load.
+        await DrainProfileSyncAsync();
+        token.ThrowIfCancellationRequested();
+        if (generation != _catalogGeneration) throw new OperationCanceledException();
+        if (!_syncReady)
+            throw new IOException("首次同步未完成，请等待自动重试或重新载入。" + _lastSyncError);
     }
 
-    private void StopProfileSync()
+    private void StopProfileSync(bool cancelCatalogLoad = true)
     {
-        _catalogLoadCancellation?.Cancel();
+        if (cancelCatalogLoad) _catalogLoadCancellation?.Cancel();
         unchecked { _catalogGeneration++; }
         _catalogSyncCancellation?.Cancel();
         _catalogSyncCancellation?.Dispose();
@@ -75,8 +91,10 @@ public partial class MainWindow : Window
             _catalogMonitor = null;
         }
         _catalogSyncRetry?.Stop();
-        _contentPoll?.Stop();
-        _contentPoll = null;
+        _profilePoll?.Stop();
+        _profilePoll = null;
+        _nextContentCheckUtc = DateTime.MinValue;
+        _contentRefreshRequested = false;
         _battleMaintenance = null;
         _catalogContentFingerprint = null;
         _lastMaintenanceMessage = null;
@@ -112,10 +130,18 @@ public partial class MainWindow : Window
         catch (InvalidOperationException) { /* The owning window is closing. */ }
     }
 
-    private void RequestProfileSync(bool invalidatePreview = true)
+    private void CheckProfileSync(bool windowActive)
+    {
+        if (IsBusy || _syncInProgress) return;
+        RequestProfileSync(invalidatePreview: false,
+            refreshContent: windowActive && DateTime.UtcNow >= _nextContentCheckUtc);
+    }
+
+    private void RequestProfileSync(bool invalidatePreview = true, bool refreshContent = false)
     {
         if (_catalogSnapshotReader is null || _catalogSyncCancellation is null) return;
         _syncRequested = true;
+        _contentRefreshRequested |= refreshContent;
         // A timer/focus check is read-only until it actually detects a change.
         if (invalidatePreview)
         {
@@ -127,36 +153,52 @@ public partial class MainWindow : Window
                 InvalidatePreparedEdit();
                 BattleMapPanel.DismissProfileMenu();
             }
-            ProfileSyncStatusTextBlock.Text = IsBusy ? "操作结束后同步" : "正在同步存档…";
+            ProfileSyncStatusTextBlock.Text = _catalogLoading ? "正在完成首次同步…" :
+                IsBusy ? "操作结束后同步" : "正在同步存档…";
             UpdateEnabledState();
         }
         _ = DrainProfileSyncAsync();
     }
 
-    private async Task DrainProfileSyncAsync()
+    private Task DrainProfileSyncAsync()
     {
-        if (_syncInProgress || IsBusy || !_syncRequested || _catalogSnapshotReader is null ||
-            _catalogSyncCancellation is null) return;
+        if (_syncInProgress) return _catalogSyncTask ?? Task.CompletedTask;
+        if (IsProfileOperationBusy || !_syncRequested || _catalogSnapshotReader is null ||
+            _catalogSyncCancellation is null) return Task.CompletedTask;
+        return _catalogSyncTask = RunProfileSyncAsync();
+    }
+
+    private async Task RunProfileSyncAsync()
+    {
         _syncInProgress = true;
         var generation = _catalogGeneration;
-        var reader = _catalogSnapshotReader;
+        var reader = _catalogSnapshotReader!;
         var maintenance = _battleMaintenance;
         var maintenanceGameDirectory = _maintenanceGameDirectory;
         var maintenanceLocalModDirectory = _maintenanceLocalModDirectory;
-        var token = _catalogSyncCancellation.Token;
+        var token = _catalogSyncCancellation!.Token;
         var operationGeneration = _catalogOperationGeneration;
+        var refreshContent = false;
         try
         {
-            while (_syncRequested && !IsBusy && generation == _catalogGeneration)
+            while (_syncRequested && !IsProfileOperationBusy && generation == _catalogGeneration)
             {
                 _syncRequested = false;
                 _syncInvalidated = false;
                 operationGeneration = _catalogOperationGeneration;
-                var snapshot = await Task.Run(() => reader.ReadAsync(token, refreshContent: true), token);
+                refreshContent = _contentRefreshRequested;
+                _contentRefreshRequested = false;
+                var snapshot = await Task.Run(() => reader.ReadAsync(token, refreshContent), token);
                 if (generation != _catalogGeneration || token.IsCancellationRequested) return;
-                if (IsBusy) { _syncRequested = true; return; }
+                if (refreshContent) _nextContentCheckUtc = DateTime.UtcNow + ContentCheckInterval;
+                // Retain resource-check intent until publication has also passed
+                // its guards, including checks triggered by configuration changes.
+                refreshContent |= snapshot.ConfigurationKey != _catalogConfigurationKey ||
+                    snapshot.ContentFingerprint != _catalogContentFingerprint;
+                if (IsProfileOperationBusy) { _syncRequested = true; return; }
                 if (operationGeneration != _catalogOperationGeneration) { _syncRequested = true; continue; }
                 var unchanged = IsPublishedSnapshot(snapshot);
+                var needsMaintenance = NeedsBattleMaintenance(snapshot);
                 if (unchanged)
                 {
                     if (!((_battleMaintenanceDeferred || _maintenanceRetryPending) &&
@@ -176,7 +218,7 @@ public partial class MainWindow : Window
                     }
                     catch (Exception error) when (error is not OperationCanceledException) { inspectionError = error; }
                     if (generation != _catalogGeneration || token.IsCancellationRequested) return;
-                    if (IsBusy) { _syncRequested = true; return; }
+                    if (IsProfileOperationBusy) { _syncRequested = true; return; }
                     if (operationGeneration != _catalogOperationGeneration) { _syncRequested = true; continue; }
                     if (inspectionError is not null) ReportMaintenanceError(inspectionError, maintenance);
                     else
@@ -196,11 +238,11 @@ public partial class MainWindow : Window
                 _syncReady = false;
                 InvalidatePreparedEdit();
                 BattleMapPanel.DismissProfileMenu();
-                ProfileSyncStatusTextBlock.Text = "正在同步存档…";
+                ProfileSyncStatusTextBlock.Text = _catalogLoading ? "正在完成首次同步…" : "正在同步存档…";
                 UpdateEnabledState();
                 try
                 {
-                    if (maintenance is not null && maintenanceGameDirectory is not null)
+                    if (maintenance is not null && maintenanceGameDirectory is not null && needsMaintenance)
                     {
                         EditorBattleMaintenanceResult? result = null;
                         try
@@ -214,6 +256,7 @@ public partial class MainWindow : Window
                             ReportMaintenanceError(error, maintenance);
                             // Unproven encounter indexes must not disable inventory/hero
                             // workflows. Map writes repeat maintenance before committing.
+                            refreshContent = true;
                             snapshot = await Task.Run(() => reader.ReadAsync(token, refreshContent: true), token);
                         }
                         if (generation != _catalogGeneration || token.IsCancellationRequested) return;
@@ -231,6 +274,7 @@ public partial class MainWindow : Window
                         {
                             InvalidatePreparedEdit();
                             BattleMapPanel.DismissProfileMenu();
+                            refreshContent = true;
                             snapshot = await Task.Run(() => reader.ReadAsync(token, refreshContent: true), token);
                         }
                         if (result is { Deferred: false }) _lastMaintenanceMessage = null;
@@ -325,7 +369,8 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             if (generation != _catalogGeneration) return;
-            if (IsBusy || operationGeneration != _catalogOperationGeneration)
+            _contentRefreshRequested |= refreshContent;
+            if (IsProfileOperationBusy || operationGeneration != _catalogOperationGeneration)
             {
                 _syncRequested = true;
                 ScheduleProfileSyncRetry(generation);
@@ -354,6 +399,12 @@ public partial class MainWindow : Window
         _catalogFileHashes is not null && _catalogConfigurationKey == snapshot.ConfigurationKey &&
         _catalogContentFingerprint == snapshot.ContentFingerprint &&
         ProfileCatalogSnapshotReader.HashesEqual(_catalogFileHashes, snapshot.FileHashes);
+
+    private bool NeedsBattleMaintenance(ProfileCatalogSnapshot snapshot) =>
+        _catalogFileHashes is null || _battleMaintenanceDeferred || _maintenanceRetryPending ||
+        _catalogConfigurationKey != snapshot.ConfigurationKey || _catalogContentFingerprint != snapshot.ContentFingerprint ||
+        new[] { "persist.game.json", "persist.map.json", "persist.raid.json", "raid_save" }
+            .Any(name => _catalogFileHashes.GetValueOrDefault(name) != snapshot.FileHashes.GetValueOrDefault(name));
 
     private void ReportMaintenanceError(Exception error, ManagedBattleEncounterBridgeService maintenance)
     {

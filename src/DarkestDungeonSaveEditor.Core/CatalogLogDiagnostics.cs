@@ -1,19 +1,23 @@
 namespace DarkestDungeonSaveEditor.Core;
 
 /// <summary>Presentation-only grouping; the catalogs' original Issues remain authoritative.</summary>
-public static class CatalogLogDiagnostics
+public static partial class CatalogLogDiagnostics
 {
     internal const string LocalizationEvidenceMarker = "\n本地化读取补充：";
 
     public static IReadOnlyList<DiagnosticLogEntry> Summarize(
         IEnumerable<(string Module, IReadOnlyList<string> Issues)> inputs)
     {
+        var batches = inputs.Select(input => (input.Module, Issues: input.Issues.ToArray())).ToArray();
+        var missingPaths = batches.SelectMany(input => input.Issues).Select(ReadMissingFilePath)
+            .OfType<string>().ToHashSet(StringComparer.OrdinalIgnoreCase);
         var groups = new Dictionary<string, LogGroup>(StringComparer.Ordinal);
-        foreach (var (module, issues) in inputs)
+        foreach (var (module, issues) in batches)
         {
             foreach (var raw in issues.Distinct(StringComparer.Ordinal))
             {
-                var parsed = Describe(raw);
+                if (AddEncounterSlotNotice(raw, module, groups)) continue;
+                var parsed = DescribeFileAccess(raw, missingPaths) ?? Describe(raw);
                 if (!groups.TryGetValue(parsed.Key, out var group))
                 {
                     group = new LogGroup(parsed.Level, parsed.Message);
@@ -34,7 +38,7 @@ public static class CatalogLogDiagnostics
 
         return groups.Values.Select(group => new DiagnosticLogEntry(group.Level,
                 (group.Level == DiagnosticLogLevel.Information ? "目录说明：" : "目录警告：") +
-                group.Message + "；报告模块=" + string.Join("、", group.Modules.Order(StringComparer.Ordinal)) +
+                group.Message + FormatLocations(group) + "；报告模块=" + string.Join("、", group.Modules.Order(StringComparer.Ordinal)) +
                 (group.Evidence.Count == 0 ? string.Empty : "；" + string.Join("；", group.Evidence.OrderBy(pair => pair.Key, StringComparer.Ordinal)
                     .Select(pair => $"读取范围[{string.Join("、", pair.Value.Order(StringComparer.Ordinal))}]：{pair.Key}")))))
             .OrderByDescending(entry => entry.Level)
@@ -119,5 +123,6 @@ public static class CatalogLogDiagnostics
         public string Message { get; } = message;
         public HashSet<string> Modules { get; } = new(StringComparer.Ordinal);
         public Dictionary<string, HashSet<string>> Evidence { get; } = new(StringComparer.Ordinal);
+        public SortedSet<(int Line, int Record)> Locations { get; } = [];
     }
 }
