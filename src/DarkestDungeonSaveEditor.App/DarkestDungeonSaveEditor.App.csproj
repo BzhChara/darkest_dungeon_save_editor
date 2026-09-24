@@ -33,7 +33,8 @@
              CopyToPublishDirectory="PreserveNewest" />
     <Content Include="..\..\tools\DDSaveEditor\DDSaveEditor.jar"
              Link="tools\DDSaveEditor\DDSaveEditor.jar"
-             CopyToOutputDirectory="PreserveNewest" />
+             CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="PreserveNewest" />
     <Content Include="..\..\tools\DDSaveEditor\LICENSE"
              Link="tools\DDSaveEditor\LICENSE"
              CopyToOutputDirectory="PreserveNewest"
