@@ -36,7 +36,7 @@ public partial class MainWindow : Window
     private void BattleMapPanel_ActiveContentChanged(ActiveContentSnapshot activeContent)
     {
         // A managed Bridge changes active sources. Publish all catalogs together after the write.
-        RequestProfileSync();
+        RequestProfileSync(refreshContent: true);
         CrashDiagnostics.RecordStatus(
             $"托管遭遇 Bridge 已同步活动内容：档案={activeContent.Profile.ProfileId}；" +
             CatalogLogDiagnostics.FormatSourceCounts(activeContent) + "；" +

@@ -1,5 +1,20 @@
 internal static partial class ContractSuite
 {
+    public static async Task RunCatalogDiagnosticsOnlyAsync(string repositoryRoot)
+    {
+        var fixture = BuildContractFixture(repositoryRoot);
+        var profile = WriteBattleSafetyProfile(Path.Combine(fixture.RunRoot, "diagnostic-profile"));
+        var gamePath = Path.Combine(profile.ProfileDirectory, "persist.game.json");
+        var content = ActiveContentResolver.ResolveDecoded(profile, fixture.GameRoot, null, null,
+            fixture.RunRoot, gamePath, ComputeSha256(gamePath));
+        RunLoggingUiContracts(repositoryRoot);
+        RunLoggingContracts(content, fixture.RunRoot);
+        var snapshot = await new BattleMapSnapshotReader(fixture.Codec).LoadAsync(profile.ProfileDirectory);
+        VerifyEncounterDiagnosticContracts(content, snapshot, fixture.RunRoot);
+        await RunEncounterRecordContractsAsync(fixture.RunRoot, fixture.Codec);
+        Console.WriteLine($"Artifacts: {fixture.RunRoot}");
+    }
+
     private static void RunLoggingUiContracts(string repositoryRoot)
     {
         var appRoot = Path.Combine(repositoryRoot, "src", "DarkestDungeonSaveEditor.App");
@@ -130,6 +145,48 @@ internal static partial class ContractSuite
         VerifyAppliedEditLogContracts(content.Profile);
         VerifySessionLogContracts(runRoot);
         VerifyCatalogDiagnosticBatchContracts();
+        VerifyFileIssueLogGrouping();
+    }
+
+    private static void VerifyFileIssueLogGrouping()
+    {
+        const string path = @"E:\fixture\monsters\missing (variant).art.darkest";
+        const string unreadable = @"E:\fixture\monsters\locked.art.darkest";
+        const string mash = @"E:\fixture\dungeons\cove\cove.2.mash.darkest";
+        var missing = $"Actor discovery file listed by Mod is missing: {path}";
+        var quantity = $"Failed to read quantity-item reference file '{path.ToLowerInvariant()}': not found";
+        var boss = $"Monster definition could not be read for boss classification: {path} (not found)";
+        var slot = $"遭遇槽位截取：{mash}:7；记录=3";
+        var raw = new[] { missing, quantity, boss, slot };
+        var before = raw.ToArray();
+        var logs = CatalogLogDiagnostics.Summarize([
+            ("物品", raw),
+            ("战斗遭遇", new[] { boss, slot, $"遭遇槽位截取：{mash.ToLowerInvariant()}:7；记录=4",
+                $"Failed to read quantity-item reference file '{unreadable}': permission denied",
+                $"Failed to read quantity-item reference file '{unreadable}': sharing violation",
+                "遭遇槽位截取：malformed" })
+        ]);
+        var access = logs.Single(entry => entry.Message.Contains("文件访问问题", StringComparison.Ordinal));
+        var slots = logs.Single(entry => entry.Level == DiagnosticLogLevel.Information);
+        Assert(logs.Count == 5 && access.Level == DiagnosticLogLevel.Warning &&
+               access.Message.Contains(missing, StringComparison.Ordinal) &&
+               access.Message.Contains(quantity, StringComparison.Ordinal) &&
+               access.Message.Contains(boss, StringComparison.Ordinal) &&
+               access.Message.Contains("物品", StringComparison.Ordinal) &&
+               access.Message.Contains("战斗遭遇", StringComparison.Ordinal) && raw.SequenceEqual(before),
+            "A missing file and dependent failures must be grouped across modules/case variants while retaining every reason and original issue.");
+        Assert(slots.Message.Contains("涉及记录 2 条", StringComparison.Ordinal) &&
+               slots.Message.Contains("7/3, 7/4", StringComparison.Ordinal) &&
+               slots.Message.Contains("不据此判断超过四只怪物", StringComparison.Ordinal) &&
+               logs.Count(entry => entry.Message.Contains(unreadable, StringComparison.Ordinal)) == 2 &&
+               logs.Any(entry => entry.Level == DiagnosticLogLevel.Warning &&
+                   entry.Message.Contains("遭遇槽位截取：malformed", StringComparison.Ordinal)),
+            "Slot notices must retain distinct logical records, and unconfirmed read failures or malformed diagnostics must not disappear into a missing-file group.");
+        var fresh = CatalogLogDiagnostics.Summarize([("战斗遭遇", new[] { boss })]);
+        Assert(fresh.Count == 1 && fresh[0].Message.Contains(boss, StringComparison.Ordinal) &&
+               !fresh[0].Message.Contains("文件访问问题", StringComparison.Ordinal),
+            "Missing-file evidence from a prior summary must not leak into a later load.");
+        Console.WriteLine("PASS: file-scoped diagnostic grouping, preserved reasons and informational slot notices.");
     }
 
     private static void VerifyLocalizationLogEvidence(ActiveContentSnapshot content, string runRoot)

@@ -93,17 +93,25 @@ public sealed class ProfileCatalogSnapshotReader
             if (routedHashes["persist.game.json"] != before["persist.game.json"])
                 throw new IOException("副本入口在同步期间发生变化，稍后自动重试。");
             before = routedHashes;
-            var content = key != _configurationKey || refreshContent
+            var content = _content with
+            {
+                Profile = profile,
+                WorkspaceDirectory = workspace,
+                DecodedGamePath = gamePath,
+                SourceGameSha256 = before["persist.game.json"]!
+            };
+            var scene = QuantityItemSaveScene.Read(content).Context;
+            // Save notifications normally need only the cached definitions and new
+            // amounts. A new scene needs fresh definitions before its cache is built.
+            var checkContent = refreshContent || _lastSnapshot is null ||
+                key != _configurationKey || !_quantityCache.ContainsKey(scene);
+            content = checkContent
                 ? ActiveContentResolver.ResolveDecoded(profile, _gameDirectory, _workshopDirectory,
                     _localModDirectory, workspace, gamePath, before["persist.game.json"]!, cancellationToken)
-                : _content with
-                {
-                    Profile = profile,
-                    WorkspaceDirectory = workspace,
-                    DecodedGamePath = gamePath,
-                    SourceGameSha256 = before["persist.game.json"]!
-                };
-            var contentFingerprint = ProfileCatalogContentFingerprint.Capture(content.Sources, cancellationToken);
+                : content;
+            var contentFingerprint = checkContent
+                ? ProfileCatalogContentFingerprint.Capture(content.Sources, cancellationToken)
+                : _contentFingerprint;
             var contentChanged = _lastSnapshot is null || key != _configurationKey || contentFingerprint != _contentFingerprint;
             if (!contentChanged && _lastSnapshot is not null && HashesEqual(before, _lastSnapshot.FileHashes))
             {
@@ -111,7 +119,6 @@ public sealed class ProfileCatalogSnapshotReader
                     throw new IOException("游戏仍在保存，等待完整存档后自动重试。");
                 return _lastSnapshot with { ReadAtUtc = DateTime.UtcNow };
             }
-            var scene = QuantityItemSaveScene.Read(content).Context;
             if (scene == QuantityItemSaveContext.Raid)
             {
                 RequireHash(before, "persist.raid.json");
@@ -151,7 +158,8 @@ public sealed class ProfileCatalogSnapshotReader
             }
             if (contentChanged && contentFingerprint != ProfileCatalogContentFingerprint.Capture(content.Sources, cancellationToken))
                 throw new IOException("资源文件仍在更新，等待完整内容后自动重试。");
-            ActiveContentResolver.ValidateSourceBindings(content.Resolution, content.Sources, cancellationToken);
+            if (checkContent)
+                ActiveContentResolver.ValidateSourceBindings(content.Resolution, content.Sources, cancellationToken);
             cache[scene] = quantities;
             _quantityCache = cache;
             _content = content;

@@ -61,7 +61,14 @@ internal sealed class GuardedSaveReplacement : IDisposable
     {
         const uint deleteAccess = 0x00010000;
         const uint openExisting = 3;
-        using var handle = CreateFileW(Path.GetFullPath(path), deleteAccess,
+        // Unlike the managed file APIs, this native call still depends on the
+        // host's long-path manifest unless given an extended absolute path.
+        var nativePath = Path.GetFullPath(path);
+        if (!nativePath.StartsWith(@"\\?\", StringComparison.Ordinal) &&
+            !nativePath.StartsWith(@"\\.\", StringComparison.Ordinal))
+            nativePath = nativePath.StartsWith(@"\\", StringComparison.Ordinal)
+                ? @"\\?\UNC\" + nativePath[2..] : @"\\?\" + nativePath;
+        using var handle = CreateFileW(nativePath, deleteAccess,
             FileShare.ReadWrite | FileShare.Delete, IntPtr.Zero, openExisting, 0, IntPtr.Zero);
         if (handle.IsInvalid)
         {

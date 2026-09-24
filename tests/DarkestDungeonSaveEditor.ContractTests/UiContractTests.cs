@@ -18,14 +18,14 @@ internal static partial class ContractSuite
                     SearchOption.TopDirectoryOnly)
                 .OrderBy(path => path, StringComparer.Ordinal)
                 .Select(File.ReadAllText));
-        Assert(mainWindowCode.Contains("StartProfileSync(activeContent, quantityItems", StringComparison.Ordinal) &&
+        Assert(mainWindowCode.Contains("await StartProfileSyncAsync(activeContent, quantityItems", StringComparison.Ordinal) &&
             mainWindowCode.Contains("confirmationRevision != _editRevision", StringComparison.Ordinal) &&
             mainWindowCode.Contains("RefreshCatalogRowsPreservingInput", StringComparison.Ordinal) &&
             mainWindowCode.Contains("if (_restoringCatalogSelection) return;", StringComparison.Ordinal) &&
             mainWindowCode.Contains("sceneChanged ? null", StringComparison.Ordinal) &&
             mainWindowCode.Contains("generation != _catalogGeneration", StringComparison.Ordinal) &&
             mainWindowCode.Contains("BattleMapPanel.UsesSharedProfileMonitor = true", StringComparison.Ordinal) &&
-            mainWindowCode.Contains("!IsBusy && _syncRequested", StringComparison.Ordinal),
+            mainWindowCode.Contains("!IsProfileOperationBusy && _syncRequested", StringComparison.Ordinal),
             "Profile sync must preserve input, clear cross-scene targets, reject stale dialogs/profiles, and defer until writers finish.");
         Assert(System.Text.RegularExpressions.Regex.IsMatch(mainWindowCode,
                 @"UpdateInitialQuirkSelectionSummary\(\);\s+UpdateEnabledState\(\);"),
@@ -172,7 +172,7 @@ internal static partial class ContractSuite
                 .Any(element => element.Attribute(xamlName)?.Value == "CatalogSummaryTextBlock") &&
             !mainWindowCode.Contains("CatalogSummaryTextBlock", StringComparison.Ordinal) &&
             !mainWindowCode.Contains("UpdateCatalogSummary", StringComparison.Ordinal) &&
-            mainWindowCode.Contains("目录加载完成：档案 {profile.ProfileId}；模式 {catalogs.Heroes.GameMode}", StringComparison.Ordinal) &&
+            mainWindowCode.Contains("目录扫描完成：档案 {profile.ProfileId}；模式 {catalogs.Heroes.GameMode}", StringComparison.Ordinal) &&
             mainWindowCode.Contains("目录统计：{FormatQuantitySaveContext(_quantitySaveContext)}物品", StringComparison.Ordinal) &&
             mainWindowCode.Contains("当前场景隐藏项 {hiddenItemCount} 个", StringComparison.Ordinal) &&
             mainWindowCode.Contains("副本格位 {quantityItems.RaidOccupiedSlots}/", StringComparison.Ordinal) &&

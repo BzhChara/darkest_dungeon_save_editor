@@ -656,7 +656,7 @@ public static partial class BattleEncounterCatalog
             if (actorSlots.Length > 4)
             {
                 if (reportNativeAdjustments)
-                    issues.Add($"遭遇行超过四个怪物，按游戏规则只读取前四个：{file.Path}:{record.SourceLine}");
+                    issues.Add($"遭遇槽位截取：{file.Path}:{record.SourceLine}；记录={record.RecordIndex}");
             }
 
             double? weight = ReadNativeChance(record.Body);
