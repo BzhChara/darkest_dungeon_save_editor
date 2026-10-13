@@ -46,6 +46,7 @@ $packageDirectory = Join-Path $runDirectory $packageName
 $publishArguments = @(
     'publish', $appProject, '-c', 'Release', '-r', 'win-x64', '--self-contained', 'true',
     '-p:PublishSingleFile=false', '-p:PublishTrimmed=false', '-p:DebugType=None', '-p:DebugSymbols=false',
+    '-p:NativeCodecTestBuild=false',
     '-m:1', '-o', $packageDirectory
 )
 & dotnet @publishArguments | Out-Host
@@ -125,6 +126,10 @@ foreach ($framework in $runtimeOptions.includedFrameworks) {
 
 Copy-Item -LiteralPath $installationNotes -Destination (Join-Path $packageDirectory 'START-HERE.md')
 Copy-Item -LiteralPath $releaseNotes -Destination (Join-Path $packageDirectory 'RELEASE-NOTES.md')
+[System.IO.File]::WriteAllText(
+    (Join-Path $packageDirectory 'Start-JarReference.cmd'),
+    "@echo off`r`n`"%~dp0DarkestDungeonSaveEditor.App.exe`" --codec=java`r`n",
+    [System.Text.UTF8Encoding]::new($false))
 $archivePath = Join-Path $runDirectory "$packageName.zip"
 [System.IO.Compression.ZipFile]::CreateFromDirectory(
     $packageDirectory, $archivePath, [System.IO.Compression.CompressionLevel]::Optimal, $true)

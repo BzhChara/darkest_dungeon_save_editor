@@ -7,6 +7,18 @@ public sealed class DsonSaveCodec
     private static readonly byte[] Magic = [0x01, 0xB1, 0x00, 0x00];
     private readonly string _jarPath;
     private readonly string _javaExecutable;
+    private readonly bool _native;
+
+    private DsonSaveCodec()
+    {
+        _jarPath = string.Empty;
+        _javaExecutable = string.Empty;
+        _native = true;
+    }
+
+    // The desktop default. The JAR constructor remains available for explicit
+    // reference comparisons; native failures never switch backends implicitly.
+    public static DsonSaveCodec CreateNative() => new();
 
     public DsonSaveCodec(string jarPath, string javaExecutable = "java")
     {
@@ -24,6 +36,7 @@ public sealed class DsonSaveCodec
 
     public void ValidateAvailability()
     {
+        if (_native) return;
         if (!File.Exists(_jarPath))
         {
             throw new FileNotFoundException("DDSaveEditor.jar was not found.", _jarPath);
@@ -43,16 +56,22 @@ public sealed class DsonSaveCodec
         ValidateAvailability();
         inputPath = Path.GetFullPath(inputPath);
         outputPath = Path.GetFullPath(outputPath);
-        Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
 
         if (!IsDson(inputPath))
         {
             _ = JsonSupport.ReadObject(inputPath);
             cancellationToken.ThrowIfCancellationRequested();
+            Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
             File.Copy(inputPath, outputPath, overwrite: false);
             return;
         }
 
+        if (_native)
+        {
+            await Dson.NativeDsonCodec.DecodeAsync(inputPath, outputPath, cancellationToken).ConfigureAwait(false);
+            return;
+        }
+        Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
         await RunAsync("decode", inputPath, outputPath, cancellationToken).ConfigureAwait(false);
         _ = JsonSupport.ReadObject(outputPath);
     }
@@ -67,16 +86,24 @@ public sealed class DsonSaveCodec
         ValidateAvailability();
         decodedJsonPath = Path.GetFullPath(decodedJsonPath);
         outputPath = Path.GetFullPath(outputPath);
-        _ = JsonSupport.ReadObject(decodedJsonPath);
-        Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
 
         if (!string.IsNullOrWhiteSpace(originalBinaryPath) && !IsDson(originalBinaryPath))
         {
+            _ = JsonSupport.ReadObject(decodedJsonPath);
             cancellationToken.ThrowIfCancellationRequested();
+            Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
             File.Copy(decodedJsonPath, outputPath, overwrite: false);
             return;
         }
 
+        if (_native)
+        {
+            await Dson.NativeDsonCodec.EncodeAsync(decodedJsonPath, outputPath, originalBinaryPath, cancellationToken)
+                .ConfigureAwait(false);
+            return;
+        }
+        _ = JsonSupport.ReadObject(decodedJsonPath);
+        Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
         await RunAsync("encode", decodedJsonPath, outputPath, cancellationToken).ConfigureAwait(false);
         if (!IsDson(outputPath))
         {

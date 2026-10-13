@@ -31,8 +31,7 @@ public partial class MainWindow : Window
                 profile,
                 requireCurrentQuantitySnapshot: CatalogTabs.SelectedIndex == 0,
                 requireCurrentEstateSnapshot: CatalogTabs.SelectedIndex == 1);
-            var jarPath = Path.Combine(AppContext.BaseDirectory, "tools", "DDSaveEditor", "DDSaveEditor.jar");
-            var editService = new SaveEditService(new DsonSaveCodec(jarPath));
+            var editService = new SaveEditService(_codecSession.Codec, _saveLocations);
             AppendStatus(EditorText.Format("MainWindow_EditWorkflow_001", profile.ProfileId));
 
             if (CatalogTabs.SelectedIndex == 0)

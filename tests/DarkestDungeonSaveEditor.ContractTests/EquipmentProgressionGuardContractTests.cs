@@ -127,9 +127,11 @@ internal static partial class ContractSuite
             JsonException? codecFailure = null;
             try { decoded = await RoundtripDirectoryQueryAsync(codeRoot, "upgrades", raw, codec); }
             catch (JsonException error) { codecFailure = error; }
-            Assert(supported ? codecFailure is null && JsonNode.DeepEquals(raw, decoded) :
+            // The native backend fixes character escaping/typing. Keep checking
+            // the application's conservative purchase policy below for both backends.
+            Assert((UseNativeCodec || supported) ? codecFailure is null && JsonNode.DeepEquals(raw, decoded) :
                     codecFailure is JsonException || (codecFailure is null && !JsonNode.DeepEquals(raw, decoded)),
-                "The purchase-code support boundary must match the bundled codec's actual output, not just an ASCII assumption.");
+                "The native codec must preserve all tested single-byte characters; the retained Java codec must match its documented boundary.");
             if (supported) continue;
             var unsafeTree = EquipmentContent(Path.Combine(codeRoot, "catalog"), "base",
                 ordinary with { Requirements = [("a", 1), (code, 0)] });

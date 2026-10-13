@@ -25,6 +25,11 @@ tools/DDSaveEditor/DDSaveEditor.jar is Darkest Dungeon Save Editor v0.0.70
 by robojumper, distributed under the MIT License. See
 tools/DDSaveEditor/LICENSE and tools/DDSaveEditor/THIRD-PARTY-NOTICES.md.
 
+The native C# DSON codec also incorporates format knowledge and type paths
+from robojumper's MIT-licensed implementation. Its original notice is retained
+in src/DarkestDungeonSaveEditor.Core/Dson/LICENSE in the source tree and in
+tools/DDSaveEditor/LICENSE in binary distributions.
+
 Self-contained release packages include .NET runtime components with
 their original licenses and notices under licenses/Microsoft.NETCore.App
 and licenses/Microsoft.WindowsDesktop.App.

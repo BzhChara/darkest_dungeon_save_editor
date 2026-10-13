@@ -4,19 +4,50 @@ try
     // The localization group switches both cultures explicitly and restores this baseline.
     DarkestDungeonSaveEditor.Core.EditorText.Initialize("zh-CN", System.Globalization.CultureInfo.CurrentUICulture);
     if (await ContractSuite.TryRunCodecProcessProbeAsync(args)) return;
+    if (args.Length == 2 && args[1] == "--native-desktop")
+    {
+        await ContractSuite.RunDesktopCodecOnlyAsync(Path.GetFullPath(args[0]));
+        return;
+    }
+    if (args.Length == 3 && args[1] == "--native-save-regression")
+    {
+        await ContractSuite.RunNativeSaveRegressionAsync(Path.GetFullPath(args[0]), Path.GetFullPath(args[2]));
+        return;
+    }
+    if (args.Length == 2 && args[1] == "--native-codec")
+    {
+        await ContractSuite.RunNativeCodecOnlyAsync(Path.GetFullPath(args[0]));
+        return;
+    }
+    if (args.Length == 2 && args[1] == "--native-all")
+    {
+        await ContractSuite.RunNativeAllAsync(Path.GetFullPath(args[0]));
+        return;
+    }
+    if (args.Length == 2 && args[1] == "--native-equipment")
+    {
+        await ContractSuite.RunNativeEquipmentOnlyAsync(Path.GetFullPath(args[0]));
+        return;
+    }
+    if (args.Length == 3 && args[1] == "--native-upload-regression")
+    {
+        await ContractSuite.RunNativeUploadRegressionAsync(Path.GetFullPath(args[0]), Path.GetFullPath(args[2]));
+        return;
+    }
     if (args.Length == 2 && args[1] == "--ui-localization")
     {
         await ContractSuite.RunEditorLocalizationOnlyAsync(Path.GetFullPath(args[0]));
         return;
     }
-    if (args.Length is < 1 or > 2 || (args.Length == 2 && args[1] is not ("--maintenance" or "--manifests" or "--catalogs" or "--semantics" or "--capacities" or "--map-content" or "--raid-paths" or "--queries" or "--quirk-rules" or "--hero-selection" or "--overlay-slots" or "--canonical-resources" or "--encounter-queries" or "--case-identities" or "--inventory-persistence" or "--loot-references" or "--upgrade-references" or "--reference-consumers" or "--content-sync" or "--quirk-selection" or "--trinket-dependencies" or "--codec-cancellation" or "--save-replacement" or "--catalog-diagnostics")))
+    if (args.Length is < 1 or > 2 || (args.Length == 2 && args[1] is not ("--maintenance" or "--manifests" or "--catalogs" or "--semantics" or "--capacities" or "--map-content" or "--raid-paths" or "--queries" or "--quirk-rules" or "--hero-selection" or "--overlay-slots" or "--canonical-resources" or "--encounter-queries" or "--case-identities" or "--inventory-persistence" or "--loot-references" or "--upgrade-references" or "--reference-consumers" or "--content-sync" or "--quirk-selection" or "--trinket-dependencies" or "--codec-cancellation" or "--codec-json-escaping" or "--save-replacement" or "--catalog-diagnostics")))
     {
-        throw new InvalidOperationException("Usage: DarkestDungeonSaveEditor.ContractTests <repository-root> [--maintenance|--manifests|--catalogs|--semantics|--capacities|--map-content|--raid-paths|--queries|--quirk-rules|--hero-selection|--overlay-slots|--canonical-resources|--encounter-queries|--case-identities|--inventory-persistence|--loot-references|--upgrade-references|--reference-consumers|--content-sync|--quirk-selection|--trinket-dependencies|--codec-cancellation|--save-replacement|--catalog-diagnostics]");
+        throw new InvalidOperationException("Usage: DarkestDungeonSaveEditor.ContractTests <repository-root> [--maintenance|--manifests|--catalogs|--semantics|--capacities|--map-content|--raid-paths|--queries|--quirk-rules|--hero-selection|--overlay-slots|--canonical-resources|--encounter-queries|--case-identities|--inventory-persistence|--loot-references|--upgrade-references|--reference-consumers|--content-sync|--quirk-selection|--trinket-dependencies|--codec-cancellation|--codec-json-escaping|--save-replacement|--catalog-diagnostics]");
     }
 
     if (args.Length == 2 && args[1] == "--catalog-diagnostics") await ContractSuite.RunCatalogDiagnosticsOnlyAsync(Path.GetFullPath(args[0]));
     else if (args.Length == 2 && args[1] == "--save-replacement") ContractSuite.RunSaveReplacementOnly(Path.GetFullPath(args[0]));
     else if (args.Length == 2 && args[1] == "--codec-cancellation") await ContractSuite.RunCodecCancellationOnlyAsync(Path.GetFullPath(args[0]));
+    else if (args.Length == 2 && args[1] == "--codec-json-escaping") await ContractSuite.RunCodecJsonEscapingOnlyAsync(Path.GetFullPath(args[0]));
     else if (args.Length == 2 && args[1] == "--trinket-dependencies") await ContractSuite.RunTrinketDependenciesOnlyAsync(Path.GetFullPath(args[0]));
     else if (args.Length == 2 && args[1] == "--quirk-selection") await ContractSuite.RunQuirkSelectionOnlyAsync(Path.GetFullPath(args[0]));
     else if (args.Length == 2 && args[1] == "--content-sync") await ContractSuite.RunContentSyncOnlyAsync(Path.GetFullPath(args[0]));

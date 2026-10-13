@@ -1906,7 +1906,7 @@ internal static partial class ContractSuite
     """,
             new UTF8Encoding(false));
 
-        var codec = new DsonSaveCodec(jarPath);
+        var codec = UseNativeCodec ? DsonSaveCodec.CreateNative() : new DsonSaveCodec(jarPath);
 
         WriteFixtureManifest(localModRoot);
         WriteFixtureManifest(externalLocalModRoot);

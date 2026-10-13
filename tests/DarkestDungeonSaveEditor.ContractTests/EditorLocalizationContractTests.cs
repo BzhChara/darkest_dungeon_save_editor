@@ -151,7 +151,9 @@ internal static partial class ContractSuite
                 try
                 {
                     ((Image)window.FindName("TitleLogoImage")).RaiseEvent(new RoutedEventArgs(FrameworkElement.LoadedEvent));
-                    Assert(window.Title == (language == "en" ? "Darkest Dungeon Save Editor" : "Darkest Dungeon 存档修改器") &&
+                    var expectedTitle = (language == "en" ? "Darkest Dungeon Save Editor" : "Darkest Dungeon 存档修改器") +
+                        (DesktopCodecSession.IsNativeTestBuild ? " — " + EditorText.Get("Codec_NativeTestTitle") : string.Empty);
+                    Assert(window.Title == expectedTitle &&
                            ((Button)window.FindName("LoadCatalogButton")).Content as string == EditorText.Get("MainWindow_021"),
                         "The actual compiled main window must resolve its title and load action in both languages.");
                     var languageButton = (Button)window.FindName("LanguageButton");

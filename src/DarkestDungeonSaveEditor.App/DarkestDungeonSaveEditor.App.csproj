@@ -9,6 +9,10 @@
     <LangVersion>latest</LangVersion>
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(NativeCodecTestBuild)' == 'true'">
+    <DefineConstants>$(DefineConstants);NATIVE_DSON_TEST_BUILD</DefineConstants>
+  </PropertyGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\DarkestDungeonSaveEditor.Core\DarkestDungeonSaveEditor.Core.csproj" />
   </ItemGroup>

@@ -25,8 +25,10 @@ local-analysis/
 
 # Local review, experiment and change-history records
 /docs/change-history/
+/.research/
 
 # Local-only configuration and transient files
+mo2-compat.json
 .env
 .env.*
 !.env.example

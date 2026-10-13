@@ -4,7 +4,8 @@
 
 - Windows 10/11, x64.
 - A local Darkest Dungeon installation and save profile.
-- Java 8 or newer, with `java` available on `PATH`. Java is not included. Open a new terminal and run `java -version` to check it after installation.
+
+Starting with `v0.1.0-beta.3`, normal use does not require Java. The default C# backend handles both reading and writing. Java 8 or newer on `PATH` is required only for the optional JAR reference mode, or for older `beta.1`/`beta.2` packages. Java is not included.
 
 The Windows x64 release includes the .NET 8 runtime. You do not need to install the .NET SDK or Desktop Runtime separately. Keep all extracted files together, including the `tools` folder.
 
@@ -15,6 +16,8 @@ The Windows x64 release includes the .NET 8 runtime. You do not need to install 
 3. Optionally verify the ZIP in PowerShell with `Get-FileHash -Algorithm SHA256 .\DarkestDungeonSaveEditor-v<version>-win-x64.zip`. Replace `<version>` with the downloaded version and compare the complete hash with `SHA256SUMS.txt`.
 4. Extract the entire ZIP to a writable folder. Do not run the EXE inside the archive or copy it out alone.
 5. Run `DarkestDungeonSaveEditor.App.exe` from the extracted folder. Starting with `v0.1.0-beta.2`, the compact **Language** menu offers English, Simplified Chinese, or the system default; changes apply on the next startup. Keep the included `zh-CN` resource directory. The original `v0.1.0-beta.1` ZIP uses Simplified Chinese only.
+
+For a diagnostic comparison in `beta.3` or later, close the editor and run `Start-JarReference.cmd`. The title identifies the **JAR reference** session. You can also pass `--codec=java` to the executable; `--codec=native` explicitly selects C#. Selection applies only to that process and does not change a saved preference. Unsupported native saves report an error instead of silently switching to Java. Check the startup log for `DSON codec: native-csharp` or `DSON codec: java-reference` when reporting a problem.
 
 ## First use
 
@@ -36,4 +39,4 @@ Automatic synchronization reads save changes while the game runs. Applying chang
 
 This is an independent offline editor, not an official Darkest Dungeon tool. Scripted encounters, special ambush/teleport behavior and hidden/story maps are not fully supported. Compatibility with every Mod is not guaranteed. See the [project README](https://github.com/BzhChara/darkest_dungeon_save_editor#readme) for the supported operations and write safeguards.
 
-The editor is licensed under `GPL-3.0-or-later`; see `LICENSE` and `NOTICE`. The bundled DDSaveEditor codec retains its MIT license under `tools/DDSaveEditor`. Included .NET runtime components retain their own licenses and notices under `licenses/Microsoft.NETCore.App` and `licenses/Microsoft.WindowsDesktop.App`. Darkest Dungeon and third-party Mod content retain their respective owners' rights. Game installations, Java, and user saves are not included in this download.
+The editor is licensed under `GPL-3.0-or-later`; see `LICENSE` and `NOTICE`. Both the native C# codec derived from robojumper's work and the retained DDSaveEditor JAR preserve the original MIT notice under `tools/DDSaveEditor`. Included .NET runtime components retain their own licenses and notices under `licenses/Microsoft.NETCore.App` and `licenses/Microsoft.WindowsDesktop.App`. Darkest Dungeon and third-party Mod content retain their respective owners' rights. Game installations, Java, and user saves are not included in this download.

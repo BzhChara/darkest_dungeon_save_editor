@@ -4,6 +4,8 @@
 
 The suite is split by responsibility:
 
+- `DesktopCodecContractTests.cs`: `--native-desktop` verifies the regular C# default without a JAR, explicit backend arguments and JAR reference title, shared catalog/map/preview/commit codec, isolated guarded writes and backups, saved-value refresh, and initial-load failure/cancellation handling. `--native-all` runs the full business suite with C# fixtures; `--native-codec` covers binary preservation and format edge cases. These native groups do not require Java. The default suite without a mode still uses Java reference fixtures and requires Java.
+
 - `EditorLocalizationContractTests.cs`: `--ui-localization` validates compiled English/Chinese resources, matching keys/placeholders, culture and name fallback, invariant diagnostic classification, atomic language preferences, next-start selection behavior, and WPF rendering at normal/minimum sizes. The legacy groups explicitly use Chinese for existing message assertions. See [UI localization](../../docs/ui-localization.md).
 
 - `LoggingContractTests.cs`, `EncounterDiagnosticContractTests.cs`: `--catalog-diagnostics` covers file-scoped issue grouping, informational fifth-slot notices, field-slot clues, unchanged direct/Bridge eligibility and preflight checks. It also runs the encounter record, Bridge lifecycle and map persistence contracts; all fixtures are isolated.
@@ -92,6 +94,8 @@ Close Darkest Dungeon before the suite: save transaction contracts exercise the 
 Non-actor references: `dotnet run --project tests/DarkestDungeonSaveEditor.ContractTests -c Release -- . --reference-consumers`. This covers 228 content samples, 876 town/raid catalog checks, and 12 DSON save round trips. `--queries` and the full suite also include this group. Samples write only isolated resources and saves, verifying that unrelated text and missing manifest entries neither falsely confirm references nor contaminate other items, while retaining uncertainty for unverified sources and legitimate companion loot.
 
 This targeted run also executes 136 additional item-reference provider and wallet-identity scenarios, including 4 actual isolated commits with DSON readback; the full suite includes these additions. `--queries` retains the original non-actor reference coverage. Per-case results are written to `results.json` in that run's artifact directory. These are editor contract tests, not new live-game experiments.
+
+`BuildingItemReferenceContractTests` runs with `--reference-consumers` and the full suite (including `--native-all`). It covers abbey/tavern activity costs, all four sanitarium cost lists, activity currency side effects, six source kinds, town/raid boundaries, native currency identities, first JSON members, wrong shapes, unmodeled extensions, provider overlays, byte-driven refresh, bilingual warnings and two isolated DSON commits preserving town balances. Existing upgrade and district reference contracts remain part of the full suite. These checks identify declared resource consumers; they do not simulate activity availability, current upgrades or random side-effect outcomes.
 
 Case identities: `dotnet run --project tests/DarkestDungeonSaveEditor.ContractTests -c Release -- . --case-identities`. This also runs the existing capacity matrix. The full suite additionally runs `CanonicalResourceContractTests` for native exact `arena` exclusion, physical `ARENA` aliases, and Mod-manifest controls; that group can run separately with `--canonical-resources`. Targeted runs do not replace the full suite.
 

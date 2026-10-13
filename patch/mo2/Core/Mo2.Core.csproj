@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <NeutralLanguage>en</NeutralLanguage>
+    <AssemblyName>DarkestDungeonSaveEditor.Core</AssemblyName>
+    <RootNamespace>DarkestDungeonSaveEditor.Core</RootNamespace>
+    <OriginalCore>$(MSBuildThisFileDirectory)..\..\..\src\DarkestDungeonSaveEditor.Core</OriginalCore>
+    <GeneratedResolver>$(MSBuildThisFileDirectory)obj\generated\ActiveContentResolver.cs</GeneratedResolver>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="$(OriginalCore)\**\*.cs"
+             Exclude="$(OriginalCore)\obj\**;$(OriginalCore)\bin\**;$(OriginalCore)\ActiveContentResolver.cs" />
+    <Compile Include="$(GeneratedResolver)" />
+    <EmbeddedResource Include="$(OriginalCore)\Localization\Strings*.resx" Link="Localization\%(Filename)%(Extension)" />
+    <EmbeddedResource Include="$(OriginalCore)\..\DarkestDungeonSaveEditor.App\Assets\save-editor-icon.png"
+                      LogicalName="DarkestDungeonSaveEditor.BridgePreview.png" />
+    <InternalsVisibleTo Include="Mo2.Compatibility.Tests" />
+  </ItemGroup>
+  <Target Name="GenerateCompatibilityResolver" BeforeTargets="CoreCompile">
+    <Exec Command="powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File &quot;$(MSBuildThisFileDirectory)..\Generate-Core.ps1&quot; -Source &quot;$(OriginalCore)\ActiveContentResolver.cs&quot; -Destination &quot;$(GeneratedResolver)&quot;" />
+  </Target>
+</Project>

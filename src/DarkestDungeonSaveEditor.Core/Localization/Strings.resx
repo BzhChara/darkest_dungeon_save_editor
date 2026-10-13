@@ -3939,6 +3939,10 @@ Backup directory:
     <value>The event's first result could not be verified: {0}</value>
     <comment>src/DarkestDungeonSaveEditor.Core/QuantityItemReferenceAnalyzer.JsonRoots.cs</comment>
   </data>
+  <data xml:space="preserve" name="QuantityItemReferenceAnalyzer_JsonRoots_004">
+    <value>Item references in this structure are unverified: {0}; JSON={1}; possible item IDs={2}; possible loot table IDs={3}. These matches do not confirm use or an invalid save; items without other confirmed references retain incomplete analysis.</value>
+    <comment>src/DarkestDungeonSaveEditor.Core/QuantityItemReferenceAnalyzer.JsonRoots.cs</comment>
+  </data>
   <data xml:space="preserve" name="QuantityItemReferenceAnalyzer_LootParsing_001">
     <value>The loot file could not be fully parsed: {0}</value>
     <comment>src/DarkestDungeonSaveEditor.Core/QuantityItemReferenceAnalyzer.LootParsing.cs</comment>
@@ -4839,5 +4843,11 @@ Backup directory:
   </data>
   <data name="CatalogLogDiagnostics_PartialFile" xml:space="preserve">
     <value>File={0}; {1}</value>
+  </data>
+  <data name="Codec_NativeTestTitle" xml:space="preserve">
+    <value>C# test build</value>
+  </data>
+  <data name="Codec_JavaReferenceTitle" xml:space="preserve">
+    <value>JAR reference build</value>
   </data>
 </root>

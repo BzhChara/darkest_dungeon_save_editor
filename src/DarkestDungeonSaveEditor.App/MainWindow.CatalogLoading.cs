@@ -28,6 +28,7 @@ public partial class MainWindow : Window
 
     private async Task LoadCatalogAsync(SaveEditorLocations? locations = null)
     {
+        locations ??= _saveLocations;
         var diagnosticBatch = new CatalogDiagnosticBatch();
         using var loadCancellation = new CancellationTokenSource();
         try
@@ -51,8 +52,7 @@ public partial class MainWindow : Window
                 ? null
                 : RequireDirectory(LocalModDirectoryTextBox.Text, EditorText.Get("MainWindow_CatalogLoading_002"));
             var profile = SteamDiscovery.OpenProfile(ProfileDirectoryTextBox.Text.Trim());
-            var jarPath = Path.Combine(AppContext.BaseDirectory, "tools", "DDSaveEditor", "DDSaveEditor.jar");
-            var codec = new DsonSaveCodec(jarPath);
+            var codec = _codecSession.Codec;
             AppendStatus(
                 EditorText.Get("MainWindow_CatalogLoading_003") +
                 (additionalLocalModDirectory is null

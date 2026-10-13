@@ -43,14 +43,15 @@ internal static partial class QuantityItemReferenceAnalyzer
             Inventory(Child(node, "items_definition"));
             Inventory(Child(node, "threshold_loot"));
         }
-        void Uncertain(JsonElement node)
+        void Uncertain(JsonElement node, string jsonPath = "$", string? memberName = null)
         {
-            if (node.ValueKind is JsonValueKind.Undefined or JsonValueKind.Null ||
+            if ((memberName is null && node.ValueKind is JsonValueKind.Undefined or JsonValueKind.Null) ||
                 !ReferencePathCanAffectContext(file.MountedPath, context)) return;
             // This is valid parsed JSON: equivalent escaped spellings must
             // provide the same uncertainty. Raw-text recovery is only for
             // malformed files whose JSON strings cannot be decoded reliably.
             var tokens = new HashSet<string>(StringComparer.Ordinal);
+            if (memberName is not null) tokens.Add(memberName);
             void Collect(JsonElement value)
             {
                 if (value.ValueKind == JsonValueKind.String) tokens.Add(value.GetString()!);
@@ -64,18 +65,22 @@ internal static partial class QuantityItemReferenceAnalyzer
                 }
             }
             Collect(node);
-            var matched = false;
-            foreach (var identity in index.Identities.Where(identity => tokens.Contains(identity.Identity)))
+            var identities = index.Identities.Where(identity => tokens.Contains(identity.Identity))
+                .OrderBy(identity => identity.Identity, StringComparer.Ordinal).ToArray();
+            var tables = knownLootTables.Where(tokens.Contains).Distinct(StringComparer.Ordinal)
+                .Order(StringComparer.Ordinal).ToArray();
+            var location = $"{path} ({jsonPath})";
+            foreach (var identity in identities)
             {
-                MarkResolved(identity.CatalogKeys, incompleteEvidence, EditorText.Format("QuantityItemReferenceAnalyzer_JsonRoots_001", path));
-                matched = true;
+                MarkResolved(identity.CatalogKeys, incompleteEvidence, EditorText.Format("QuantityItemReferenceAnalyzer_JsonRoots_001", location));
             }
-            foreach (var table in knownLootTables.Where(tokens.Contains))
+            foreach (var table in tables)
             {
-                AddEvidence(uncertainLootEvidence, table, EditorText.Format("QuantityItemReferenceAnalyzer_JsonRoots_002", path));
-                matched = true;
+                AddEvidence(uncertainLootEvidence, table, EditorText.Format("QuantityItemReferenceAnalyzer_JsonRoots_002", location));
             }
-            if (matched) issues.Add($"Quantity-item references remain unverified in a consumed JSON structure: {path}");
+            if (identities.Length > 0 || tables.Length > 0)
+                issues.Add(EditorText.Format("QuantityItemReferenceAnalyzer_JsonRoots_004", file.File.Path, jsonPath,
+                    JsonSerializer.Serialize(identities.Select(identity => identity.Identity)), JsonSerializer.Serialize(tables)));
         }
 
         switch (file.JsonKind)
@@ -165,7 +170,7 @@ internal static partial class QuantityItemReferenceAnalyzer
                         Items(List(goal, "starting_items"));
                         // Goal-specific data uses separate virtual consumers. It
                         // cannot certify an item merely because data contains an ID.
-                        Uncertain(Child(goal, "data"));
+                        Uncertain(Child(goal, "data"), "$.goals[].data");
                     }
                 break;
 
@@ -181,7 +186,7 @@ internal static partial class QuantityItemReferenceAnalyzer
                             var target = String(buff, "target_inventory");
                             if (town && target == "estate" || !town && target == "provision")
                                 MarkResolved(index.Resolve(String(buff, "item_type"), String(buff, "item_name")), evidence, path);
-                            else if (target is not ("estate" or "provision")) Uncertain(buff);
+                            else if (target is not ("estate" or "provision")) Uncertain(buff, "$.buildings[].buff_list[]");
                         }
                         else if (type == "DistrictReplacementInventoryEffectBuffData" && !town)
                             MarkResolved(index.Resolve(String(buff, "item_type"), String(buff, "item_id")), evidence, path);
@@ -190,11 +195,11 @@ internal static partial class QuantityItemReferenceAnalyzer
                 break;
 
             case NativeReferenceJsonKind.Building:
-                // Per-building data is interpreted by different LoadInternal
-                // implementations. Preserve uncertainty rather than invent a
-                // universal item/currency consumer from arbitrary nested fields.
-                Uncertain(Child(root, "data"));
-                Uncertain(Child(root, "requirements"));
+                if (!town) break;
+                VisitBuildingReferences(Child(root, "data"), file.MountedPath.Split('/')[3],
+                    (currency, jsonPath) => MarkResolved(index.ResolveCurrencyHash(String(currency, "type")),
+                        evidence, $"{path} ({jsonPath})"), Uncertain);
+                Uncertain(Child(root, "requirements"), "$.requirements");
                 break;
             case NativeReferenceJsonKind.Unverified:
                 Uncertain(root);

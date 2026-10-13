@@ -3939,6 +3939,10 @@
     <value>事件首条结果无法确认：{0}</value>
     <comment>src/DarkestDungeonSaveEditor.Core/QuantityItemReferenceAnalyzer.JsonRoots.cs</comment>
   </data>
+  <data xml:space="preserve" name="QuantityItemReferenceAnalyzer_JsonRoots_004">
+    <value>此结构的物品引用规则尚未确认：{0}；JSON={1}；疑似引用物品 ID={2}；疑似引用掉落表 ID={3}。这些匹配不代表已确认使用或存档损坏；没有其他已确认引用的物品保留“分析不完整”状态。</value>
+    <comment>src/DarkestDungeonSaveEditor.Core/QuantityItemReferenceAnalyzer.JsonRoots.cs</comment>
+  </data>
   <data xml:space="preserve" name="QuantityItemReferenceAnalyzer_LootParsing_001">
     <value>掉落文件无法完整解析：{0}</value>
     <comment>src/DarkestDungeonSaveEditor.Core/QuantityItemReferenceAnalyzer.LootParsing.cs</comment>
@@ -4839,5 +4843,11 @@
   </data>
   <data name="CatalogLogDiagnostics_PartialFile" xml:space="preserve">
     <value>文件={0}；{1}</value>
+  </data>
+  <data name="Codec_NativeTestTitle" xml:space="preserve">
+    <value>C# 测试版</value>
+  </data>
+  <data name="Codec_JavaReferenceTitle" xml:space="preserve">
+    <value>JAR 对照版</value>
   </data>
 </root>

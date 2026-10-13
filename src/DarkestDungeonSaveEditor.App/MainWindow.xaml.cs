@@ -47,13 +47,24 @@ public partial class MainWindow : Window
     private DispatcherTimer? _titleLogoTimer;
     private CroppedBitmap[]? _titleLogoFrames;
     private int _titleLogoFrameIndex;
+    private readonly DesktopCodecSession _codecSession;
+    private readonly SaveEditorLocations? _saveLocations;
 
     public MainWindow() : this(EditorLanguageSettings.DefaultPath) { }
 
-    internal MainWindow(string languageSettingsPath)
+    internal MainWindow(string languageSettingsPath, DesktopCodecSession? codecSession = null,
+        SaveEditorLocations? saveLocations = null)
     {
+        _saveLocations = saveLocations;
+        _codecSession = codecSession ?? (Application.Current as App)?.CodecSession
+            ?? DesktopCodecSession.Create([], AppContext.BaseDirectory);
         _languageSettingsPath = languageSettingsPath;
         InitializeComponent();
+        if (!_codecSession.IsNative)
+            Title += " — " + EditorText.Get("Codec_JavaReferenceTitle");
+        else if (DesktopCodecSession.IsNativeTestBuild)
+            Title += " — " + EditorText.Get("Codec_NativeTestTitle");
+        CrashDiagnostics.RecordStatus($"Window DSON codec: {_codecSession.Identity}");
         InitializeLanguageSelection();
         foreach (var grid in new[] { ItemGrid, TrinketGrid, HeroGrid }) EditorNameColumns.Apply(grid);
         BattleMapPanel.UsesSharedProfileMonitor = true;

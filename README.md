@@ -10,7 +10,7 @@ The editor supports English and Simplified Chinese. Use the compact **Language**
 
 ## Download and run
 
-The current prerelease is [v0.1.0-beta.2](https://github.com/BzhChara/darkest_dungeon_save_editor/releases/tag/v0.1.0-beta.2), with English and Simplified Chinese UI support and refined battle-menu icons. Download the **Windows x64 ZIP** from its assets, extract all files, and run `DarkestDungeonSaveEditor.App.exe`. Keep the included `zh-CN` resource directory. The .NET 8 runtime is included; **Java 8 or newer must be installed separately and available on `PATH`**.
+Download a **Windows x64 ZIP** from [GitHub Releases](https://github.com/BzhChara/darkest_dungeon_save_editor/releases), extract all files, and run `DarkestDungeonSaveEditor.App.exe`. Keep the included `zh-CN` resource directory. The .NET 8 runtime is included. Starting with the `v0.1.0-beta.3` source and packages, the editor defaults to the native C# codec and **does not require Java for normal use**. Older `beta.1`/`beta.2` packages require Java 8 or newer on `PATH`.
 
 See [Installation and first use](docs/release-installation.md) for requirements, checksum verification, backups and updates. This is a prerelease: keep a separate save backup and check the selected profile before editing. The **Source code** archives on GitHub require building the project.
 
@@ -21,6 +21,8 @@ Copyright (C) 2026 BzhChara and contributors.
 Darkest Dungeon Save Editor is free software licensed under the GNU General Public License, version 3 or (at your option) any later version (`GPL-3.0-or-later`). See [LICENSE](LICENSE) for the full terms and [NOTICE](NOTICE) for the project notice and source-code location. The program is provided without warranty, including the implied warranties of merchantability or fitness for a particular purpose.
 
 Third-party components retain their own licenses. The bundled `DDSaveEditor.jar` by robojumper remains MIT-licensed; its [license](tools/DDSaveEditor/LICENSE) and [third-party notices](tools/DDSaveEditor/THIRD-PARTY-NOTICES.md) are preserved and included in application builds and publish output. Darkest Dungeon game files and assets, and third-party Mod content, retain their respective owners' rights and are not covered by this project's GPL license grant.
+
+The [native C# codec](docs/dson-codec-migration.md) is the default throughout desktop reading and writing, and retains robojumper's MIT notice for the derived format implementation. The JAR remains available for explicit comparison: run `Start-JarReference.cmd` in a release package, or pass `--codec=java`. This reference mode requires Java 8 or newer on `PATH`; native failures do not automatically fall back to Java.
 
 ## Current capabilities
 
@@ -76,11 +78,13 @@ Requirements:
 
 - Windows
 - .NET 8 Desktop Runtime / SDK
-- Java 8 or newer
+- Java 8 or newer only for JAR reference mode and the legacy Java test suite
 
 ```powershell
 dotnet build .\DarkestDungeonSaveEditor.sln -c Release -m:1
-.\tests\TestTrinketEditRoundTrip.ps1
+dotnet run --project .\tests\DarkestDungeonSaveEditor.ContractTests -c Release --no-build -- . --native-all
+dotnet run --project .\tests\DarkestDungeonSaveEditor.ContractTests -c Release --no-build -- . --native-codec
+dotnet run --project .\tests\DarkestDungeonSaveEditor.ContractTests -c Release --no-build -- . --native-desktop
 ```
 
 On the development machine, parallel solution restore with .NET 10 SDK/MSBuild can exit with code 1 without diagnostics. `-m:1` disables project-level parallelism without changing build output. Individual restore of all three projects has been verified. See the [contract-test README](tests/DarkestDungeonSaveEditor.ContractTests/README.md) for complete and targeted suites.
@@ -99,7 +103,7 @@ On Windows with PowerShell 7.1 or newer and a .NET SDK that supports targeting .
 .\tools\Publish-Release.ps1
 ```
 
-The script reads the shared version from `Directory.Build.props`, publishes a self-contained `win-x64` folder, includes installation instructions and licenses, and creates a ZIP plus `SHA256SUMS.txt` under a new directory in `artifacts/releases`. It does not create Git tags or publish to GitHub. Java remains an external requirement. Publishing may download the matching .NET runtime packs during restore.
+The script reads the shared version from `Directory.Build.props`, publishes a self-contained `win-x64` folder with the default C# backend, includes installation instructions, licenses and `Start-JarReference.cmd`, and creates a ZIP plus `SHA256SUMS.txt` under a new directory in `artifacts/releases`. It does not create Git tags or publish to GitHub. Only the optional JAR reference mode needs a separate Java installation. Publishing may download the matching .NET runtime packs during restore.
 
 Before publishing a release, commit the intended source, run the contract suite, and build the package from that clean commit. Verify startup and codec operation from an extracted copy. Tag that same commit, then attach the ZIP and checksum file to a GitHub Release using the matching notes under `docs/releases/`. A prerelease version must be marked **Pre-release** on GitHub.
 

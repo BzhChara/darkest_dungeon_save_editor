@@ -9,6 +9,8 @@ namespace DarkestDungeonSaveEditor.App;
 public partial class App : Application
 {
     private readonly string? _languageLoadError;
+    internal DesktopCodecSession CodecSession { get; private set; } =
+        DesktopCodecSession.Create([], AppContext.BaseDirectory);
 
     public App()
     {
@@ -19,6 +21,18 @@ public partial class App : Application
     protected override void OnStartup(StartupEventArgs e)
     {
         CrashDiagnostics.SetStage("Application: startup");
+        try
+        {
+            CodecSession = DesktopCodecSession.Create(e.Args, AppContext.BaseDirectory);
+            CrashDiagnostics.RecordStatus($"DSON codec: {CodecSession.Identity}; native test build: {DesktopCodecSession.IsNativeTestBuild}");
+        }
+        catch (ArgumentException ex)
+        {
+            CrashDiagnostics.RecordException("Application: codec selection", ex);
+            MessageBox.Show(ex.Message, EditorText.Get("MainWindow_001"), MessageBoxButton.OK, MessageBoxImage.Error);
+            Shutdown(2);
+            return;
+        }
         if (_languageLoadError is not null)
             CrashDiagnostics.RecordStatus(EditorText.Format("Language_LoadFailed", _languageLoadError), DiagnosticLogLevel.Warning);
         try
