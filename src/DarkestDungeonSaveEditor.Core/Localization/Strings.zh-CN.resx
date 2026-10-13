@@ -3007,6 +3007,22 @@
     <value>清单无法读取：{0}</value>
     <comment>src/DarkestDungeonSaveEditor.Core/ContentFileInventory.cs</comment>
   </data>
+  <data xml:space="preserve" name="ContentFileInventory_017">
+    <value>目录记录必须以路径分隔符结尾并标记大小为 0</value>
+    <comment>src/DarkestDungeonSaveEditor.Core/ContentFileInventory.cs</comment>
+  </data>
+  <data xml:space="preserve" name="ContentFileInventory_018">
+    <value>清单目录不存在（第 {0} 行）：{1}</value>
+    <comment>src/DarkestDungeonSaveEditor.Core/ContentFileInventory.cs</comment>
+  </data>
+  <data xml:space="preserve" name="ContentFileInventory_019">
+    <value>清单要求目录，但实际是文件（第 {0} 行）：{1}</value>
+    <comment>src/DarkestDungeonSaveEditor.Core/ContentFileInventory.cs</comment>
+  </data>
+  <data xml:space="preserve" name="ContentFileInventory_020">
+    <value>目录相对路径无效</value>
+    <comment>src/DarkestDungeonSaveEditor.Core/ContentFileInventory.cs</comment>
+  </data>
   <data xml:space="preserve" name="ContentLocalizationCatalog_001">
     <value>名称格式化超时</value>
     <comment>src/DarkestDungeonSaveEditor.Core/ContentLocalizationCatalog.cs</comment>
@@ -3820,11 +3836,47 @@
     <comment>src/DarkestDungeonSaveEditor.Core/ModManifestPreparationService.cs</comment>
   </data>
   <data xml:space="preserve" name="ModManifestPreparationService_013">
-    <value>官方清单路径或文件大小与原 Mod 不一致：{0}</value>
+    <value>官方清单第 {0} 行（{1}）：{2}</value>
     <comment>src/DarkestDungeonSaveEditor.Core/ModManifestPreparationService.cs</comment>
   </data>
   <data xml:space="preserve" name="ModManifestPreparationService_014">
     <value>官方工具未生成有效文件记录，停止加载；不会改用无清单扫描。</value>
+    <comment>src/DarkestDungeonSaveEditor.Core/ModManifestPreparationService.cs</comment>
+  </data>
+  <data xml:space="preserve" name="ModManifestPreparationService_015">
+    <value>无法为 Mod“{0}”（{1}）准备清单：{2}</value>
+    <comment>src/DarkestDungeonSaveEditor.Core/ModManifestPreparationService.cs</comment>
+  </data>
+  <data xml:space="preserve" name="ModManifestPreparationService_016">
+    <value>相对路径无效。</value>
+    <comment>src/DarkestDungeonSaveEditor.Core/ModManifestPreparationService.cs</comment>
+  </data>
+  <data xml:space="preserve" name="ModManifestPreparationService_017">
+    <value>路径重复。</value>
+    <comment>src/DarkestDungeonSaveEditor.Core/ModManifestPreparationService.cs</comment>
+  </data>
+  <data xml:space="preserve" name="ModManifestPreparationService_018">
+    <value>目录记录的大小必须为 0。</value>
+    <comment>src/DarkestDungeonSaveEditor.Core/ModManifestPreparationService.cs</comment>
+  </data>
+  <data xml:space="preserve" name="ModManifestPreparationService_019">
+    <value>原 Mod 中不存在此目录。</value>
+    <comment>src/DarkestDungeonSaveEditor.Core/ModManifestPreparationService.cs</comment>
+  </data>
+  <data xml:space="preserve" name="ModManifestPreparationService_020">
+    <value>原 Mod 中不存在此文件。</value>
+    <comment>src/DarkestDungeonSaveEditor.Core/ModManifestPreparationService.cs</comment>
+  </data>
+  <data xml:space="preserve" name="ModManifestPreparationService_021">
+    <value>文件大小不符：清单为 {0} 字节，原文件为 {1} 字节。</value>
+    <comment>src/DarkestDungeonSaveEditor.Core/ModManifestPreparationService.cs</comment>
+  </data>
+  <data xml:space="preserve" name="ModManifestPreparationService_022">
+    <value>清单要求目录，但原 Mod 中是文件。</value>
+    <comment>src/DarkestDungeonSaveEditor.Core/ModManifestPreparationService.cs</comment>
+  </data>
+  <data xml:space="preserve" name="ModManifestPreparationService_023">
+    <value>清单要求文件，但原 Mod 中是目录。</value>
     <comment>src/DarkestDungeonSaveEditor.Core/ModManifestPreparationService.cs</comment>
   </data>
   <data xml:space="preserve" name="NativeCurioCsvReader_001">
@@ -4849,5 +4901,20 @@
   </data>
   <data name="Codec_JavaReferenceTitle" xml:space="preserve">
     <value>JAR 对照版</value>
+  </data>
+  <data name="CatalogLogDiagnostics_MissingLocalMod" xml:space="preserve">
+    <value>存档仍启用了本地 Mod「{0}」，但按项目标题找不到它。请检查 Mod 目录及 project.xml 中的 Title，然后重新载入存档。移动或删除 Mod 文件不会清除存档中的启用记录。</value>
+  </data>
+  <data name="CatalogLogDiagnostics_AmbiguousLocalMod" xml:space="preserve">
+    <value>已启用的本地 Mod 对应多个目录，无法确定来源：{0}。请检查同名项目，然后重新载入存档。</value>
+  </data>
+  <data name="CatalogLogDiagnostics_UnavailableWorkshopDirectory" xml:space="preserve">
+    <value>存档启用了创意工坊 Mod「{0}」，但创意工坊目录未设置或不可用。请检查该目录，然后重新载入存档。</value>
+  </data>
+  <data name="SaveEditService_Trinkets_UnresolvedMods" xml:space="preserve">
+    <value>饰品「{0}」暂时只读。当前有已启用的 Mod 来源无法识别，请先处理以下来源问题，然后重新载入存档。{1}</value>
+  </data>
+  <data name="SaveEditService_Trinkets_Unverified" xml:space="preserve">
+    <value>饰品「{0}」暂时只读：无法确认其实际生效的定义或依赖。请查看载入日志中的目录警告，处理具体原因后重新载入存档。</value>
   </data>
 </root>

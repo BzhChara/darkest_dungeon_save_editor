@@ -3007,6 +3007,22 @@ Backup directory:
     <value>Cannot read manifest: {0}</value>
     <comment>src/DarkestDungeonSaveEditor.Core/ContentFileInventory.cs</comment>
   </data>
+  <data xml:space="preserve" name="ContentFileInventory_017">
+    <value>A directory record must end with a separator and size 0</value>
+    <comment>src/DarkestDungeonSaveEditor.Core/ContentFileInventory.cs</comment>
+  </data>
+  <data xml:space="preserve" name="ContentFileInventory_018">
+    <value>Manifest directory not found (line {0}): {1}</value>
+    <comment>src/DarkestDungeonSaveEditor.Core/ContentFileInventory.cs</comment>
+  </data>
+  <data xml:space="preserve" name="ContentFileInventory_019">
+    <value>Manifest expects a directory but found a file (line {0}): {1}</value>
+    <comment>src/DarkestDungeonSaveEditor.Core/ContentFileInventory.cs</comment>
+  </data>
+  <data xml:space="preserve" name="ContentFileInventory_020">
+    <value>Invalid relative directory path</value>
+    <comment>src/DarkestDungeonSaveEditor.Core/ContentFileInventory.cs</comment>
+  </data>
   <data xml:space="preserve" name="ContentLocalizationCatalog_001">
     <value>Name formatting timed out</value>
     <comment>src/DarkestDungeonSaveEditor.Core/ContentLocalizationCatalog.cs</comment>
@@ -3820,11 +3836,47 @@ Backup directory:
     <comment>src/DarkestDungeonSaveEditor.Core/ModManifestPreparationService.cs</comment>
   </data>
   <data xml:space="preserve" name="ModManifestPreparationService_013">
-    <value>Official manifest path or file size differs from the original Mod: {0}</value>
+    <value>Official manifest line {0} ({1}): {2}</value>
     <comment>src/DarkestDungeonSaveEditor.Core/ModManifestPreparationService.cs</comment>
   </data>
   <data xml:space="preserve" name="ModManifestPreparationService_014">
     <value>The official tool produced no valid file records. Loading stopped; manifest-free scanning will not be used.</value>
+    <comment>src/DarkestDungeonSaveEditor.Core/ModManifestPreparationService.cs</comment>
+  </data>
+  <data xml:space="preserve" name="ModManifestPreparationService_015">
+    <value>Cannot prepare manifest for Mod '{0}' ({1}): {2}</value>
+    <comment>src/DarkestDungeonSaveEditor.Core/ModManifestPreparationService.cs</comment>
+  </data>
+  <data xml:space="preserve" name="ModManifestPreparationService_016">
+    <value>Invalid relative path.</value>
+    <comment>src/DarkestDungeonSaveEditor.Core/ModManifestPreparationService.cs</comment>
+  </data>
+  <data xml:space="preserve" name="ModManifestPreparationService_017">
+    <value>Duplicate path.</value>
+    <comment>src/DarkestDungeonSaveEditor.Core/ModManifestPreparationService.cs</comment>
+  </data>
+  <data xml:space="preserve" name="ModManifestPreparationService_018">
+    <value>A directory record must have size 0.</value>
+    <comment>src/DarkestDungeonSaveEditor.Core/ModManifestPreparationService.cs</comment>
+  </data>
+  <data xml:space="preserve" name="ModManifestPreparationService_019">
+    <value>Directory not found in the original Mod.</value>
+    <comment>src/DarkestDungeonSaveEditor.Core/ModManifestPreparationService.cs</comment>
+  </data>
+  <data xml:space="preserve" name="ModManifestPreparationService_020">
+    <value>File not found in the original Mod.</value>
+    <comment>src/DarkestDungeonSaveEditor.Core/ModManifestPreparationService.cs</comment>
+  </data>
+  <data xml:space="preserve" name="ModManifestPreparationService_021">
+    <value>File size mismatch: manifest {0} bytes, original {1} bytes.</value>
+    <comment>src/DarkestDungeonSaveEditor.Core/ModManifestPreparationService.cs</comment>
+  </data>
+  <data xml:space="preserve" name="ModManifestPreparationService_022">
+    <value>Expected a directory, but the original Mod contains a file.</value>
+    <comment>src/DarkestDungeonSaveEditor.Core/ModManifestPreparationService.cs</comment>
+  </data>
+  <data xml:space="preserve" name="ModManifestPreparationService_023">
+    <value>Expected a file, but the original Mod contains a directory.</value>
     <comment>src/DarkestDungeonSaveEditor.Core/ModManifestPreparationService.cs</comment>
   </data>
   <data xml:space="preserve" name="NativeCurioCsvReader_001">
@@ -4849,5 +4901,20 @@ Backup directory:
   </data>
   <data name="Codec_JavaReferenceTitle" xml:space="preserve">
     <value>JAR reference build</value>
+  </data>
+  <data name="CatalogLogDiagnostics_MissingLocalMod" xml:space="preserve">
+    <value>The save still enables local Mod '{0}', but it could not be found by its project title. Check the Mod directory and the Title in project.xml, then reload the profile. Moving or deleting Mod files does not clear the save's enabled-Mod record.</value>
+  </data>
+  <data name="CatalogLogDiagnostics_AmbiguousLocalMod" xml:space="preserve">
+    <value>An enabled local Mod matches multiple directories, so its source cannot be determined: {0}. Check the duplicate project titles, then reload the profile.</value>
+  </data>
+  <data name="CatalogLogDiagnostics_UnavailableWorkshopDirectory" xml:space="preserve">
+    <value>The save enables Workshop Mod '{0}', but the Workshop directory is not configured or is unavailable. Check that directory, then reload the profile.</value>
+  </data>
+  <data name="SaveEditService_Trinkets_UnresolvedMods" xml:space="preserve">
+    <value>Trinket '{0}' is read-only. Some enabled Mod sources could not be resolved; address the following source issues and reload the profile before retrying. {1}</value>
+  </data>
+  <data name="SaveEditService_Trinkets_Unverified" xml:space="preserve">
+    <value>Trinket '{0}' is read-only because its effective definition or dependencies could not be verified. See the catalog warnings in the load log for the specific cause, resolve it, then reload the profile.</value>
   </data>
 </root>

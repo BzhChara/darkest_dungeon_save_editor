@@ -69,7 +69,7 @@ internal static partial class ContractSuite
         await Reject(() => new ModManifestPreparationService(running.Locations, () => true).EnsureAsync(running.Content, "unused"), "关闭游戏");
         Assert(!File.Exists(Path.Combine(running.Mod, "modfiles.txt")), "A running game must prevent manifest installation.");
 
-        foreach (var scenario in new[] { "generation-failure", "invalid", "source-change", "profile-change", "cancel", "other-writer" })
+        foreach (var scenario in new[] { "generation-failure", "invalid", "source-change", "directory-change", "profile-change", "cancel", "other-writer" })
         {
             var fixture = Setup(scenario);
             var second = fixture.Mod + "-second";
@@ -85,6 +85,7 @@ internal static partial class ContractSuite
                         case "generation-failure": throw new IOException("fixture generator failed");
                         case "invalid": return Task.FromResult(Encoding.UTF8.GetBytes("../escape.json 1\n"));
                         case "source-change": File.AppendAllText(Path.Combine(fixture.Mod, "inventory/probe.inventory.items.darkest"), "changed"); break;
+                        case "directory-change": Directory.CreateDirectory(Path.Combine(fixture.Mod, "empty.sprite")); break;
                         case "profile-change": File.AppendAllText(Path.Combine(fixture.Content.Profile.ProfileDirectory, "persist.game.json"), " "); break;
                         case "cancel": cancellation.Cancel(); break;
                         case "other-writer": File.WriteAllText(Path.Combine(fixture.Mod, "modfiles.txt"), "external\n"); break;
@@ -112,6 +113,7 @@ internal static partial class ContractSuite
         Assert(QuantityItemCatalog.LoadDefinitions(missing.Content, QuantityItemSaveContext.Raid).Count == 0,
             "An existing empty manifest remains authoritative; readers must not fall back to disk discovery.");
         Console.WriteLine("PASS: manifest preparation selection, idempotence, game/config/source/cancellation guards, failure isolation and strict readers.");
+        await RunModManifestDirectoryContractsAsync(runRoot);
     }
 
     private static async Task RunOfficialManifestContractAsync(string runRoot, string game)
@@ -126,6 +128,10 @@ internal static partial class ContractSuite
         WriteMultiMash(source, "localization/probe.loc2", "preserve existing binary payload");
         WriteMultiMash(source, "localization/probe.string_table.xml", "leave authored localization untouched");
         WriteMultiMash(source, "inventory/.backup/unused.inventory.items.darkest", "unused");
+        WriteMultiMash(source, "fx/town_event_idle_first_fleshgolem.sprite/frame.png", "sprite frame");
+        WriteMultiMash(source, "fx/dotted.folder/child/empty.png", "");
+        WriteMultiMash(source, "fx/ordinary.sprite", "ordinary file");
+        Directory.CreateDirectory(Path.Combine(source, "fx/empty.sprite"));
         var vanilla = Directory.EnumerateFiles(Path.Combine(game, "inventory"), "*.darkest").First();
         var relative = Path.GetRelativePath(game, vanilla);
         File.Copy(vanilla, Path.Combine(source, relative));
@@ -138,6 +144,26 @@ internal static partial class ContractSuite
             !manifest.Contains(relative.Replace('\\', '/'), StringComparison.Ordinal) && !manifest.Contains(".backup", StringComparison.Ordinal),
             "The actual official dont_submit tool must include changed files, omit vanilla-identical/hidden files, and leave compiled/authored originals untouched.");
         Assert(!File.Exists(Path.Combine(source, "modfiles.txt")), "The official generator prepares bytes; only the preparation service installs them.");
-        Console.WriteLine("PASS: actual official uploader in an isolated wrapper, vanilla comparison, filtered entries and original resource preservation.");
+        var rows = manifest.Split('\n');
+        Assert(rows.Contains("fx/town_event_idle_first_fleshgolem.sprite/ 0") &&
+            rows.Contains("fx/dotted.folder/ 0") && rows.Contains("fx/dotted.folder/child/ 0") &&
+            rows.Contains("fx/empty.sprite/ 0") && rows.Contains("fx/dotted.folder/child/empty.png 0") &&
+            rows.Contains("fx/ordinary.sprite 13"),
+            "The actual uploader's directory rows, including empty and nested directories, must survive alongside ordinary and zero-byte files.");
+        var rawRows = File.ReadAllLines(Path.Combine(evidence, "official-modfiles.txt"))
+            .Where(row => row.StartsWith("content/", StringComparison.Ordinal)).Select(row => row["content/".Length..]);
+        Assert(rows.Where(row => row.Length != 0).SequenceEqual(rawRows),
+            "Preparation must preserve official content rows byte-for-byte apart from the private wrapper prefix and line endings.");
+        var profile = WriteBattleSafetyProfile(Path.Combine(root, "profile"));
+        var locations = new SaveEditorLocations(root, Path.Combine(root, "workspaces"), Path.Combine(root, "backups"));
+        var content = new ActiveContentSnapshot(profile, "base", [new("local:official", "Official Probe", "local", source, 1000)], [],
+            locations.WorkspaceDirectory, "", 1, ModManifestFiles.Hash(Path.Combine(profile.ProfileDirectory, "persist.game.json")));
+        var result = await new ModManifestPreparationService(locations, () => false, (_, _, _, _) => Task.FromResult(bytes)).EnsureAsync(content, game);
+        Assert(result.CreatedCount == 1 && File.ReadAllBytes(Path.Combine(source, "modfiles.txt")).SequenceEqual(bytes) &&
+            QuantityItemCatalog.LoadDefinitions(content, QuantityItemSaveContext.Raid).Single().ItemId == "ddse_probe" &&
+            ContentFileInventory.Scan(content).Mods.Single() is { IsComplete: true, Issues.Count: 0 },
+            "Actual official directory-bearing output must install and load through the real catalog and inventory.");
+        ModManifestFiles.RequireSnapshot(source, original, default, ignoreManifest: true);
+        Console.WriteLine("PASS: actual official uploader, vanilla filtering, preserved directory rows, installation, catalog loading and unchanged source payloads.");
     }
 }

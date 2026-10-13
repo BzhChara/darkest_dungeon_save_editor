@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 
 internal static partial class ContractSuite
@@ -113,6 +114,24 @@ internal static partial class ContractSuite
                 "Confirmed absence skips the first entry; failed reads preserve its unresolved slot.");
             Assert(fingerprint != ProfileCatalogContentFingerprint.Capture(f.Content.Sources), "Buff edits must invalidate automatic catalog fingerprints.");
             await RejectProviderEditAsync(() => f.Service.PrepareTrinketEditAsync(f.Content.Profile, valid, 1, catalog.Storage, f.Content));
+            if (current.HasProviderConflict)
+            {
+                var originalCulture = CultureInfo.CurrentUICulture;
+                try
+                {
+                    foreach (var language in new[] { "en", "zh-CN" })
+                    {
+                        CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo(language);
+                        var message = await ReadRejectedTrinketMessageAsync(() =>
+                            f.Service.PrepareTrinketEditAsync(f.Content.Profile, current, 1, catalog.Storage, f.Content));
+                        Assert(message.Contains(language == "en" ? "definition or dependencies" : "定义或依赖", StringComparison.Ordinal) &&
+                            !message.Contains("different content paths", StringComparison.Ordinal) &&
+                            !message.Contains("project.xml", StringComparison.Ordinal),
+                            "An unreadable Buff must report unverified content without inventing a cross-path conflict or a missing Mod.");
+                    }
+                }
+                finally { CultureInfo.CurrentUICulture = originalCulture; }
+            }
             await RejectProviderEditAsync(() => f.Service.CommitAsync(prepared));
             Assert(ComputeSha256(f.Content.Profile.EstateSavePath) == originalHash, "Rejected dependency changes must leave the save unchanged.");
             WriteMultiMash(resources, DependencyBuffPath, DependencyBuffJson);
@@ -172,7 +191,7 @@ internal static partial class ContractSuite
     private static async Task VerifyUnmappedTrinketSourcesAsync(string runRoot, DsonSaveCodec codec)
     {
         foreach (var field in new[] { "buffs", "hero_class_requirements" })
-        foreach (var scenario in new[] { "unmapped-title", "ambiguous-title", "missing-workshop", "resolved" })
+        foreach (var scenario in new[] { "unmapped-title", "ambiguous-title", "missing-workshop", "unavailable-workshop", "multiple-missing", "resolved" })
         {
             var root = Path.Combine(runRoot, field, scenario);
             var game = Path.Combine(root, "game");
@@ -189,28 +208,60 @@ internal static partial class ContractSuite
                     WriteFixtureManifest(mod);
                 }
             var f = await BuildInventoryProviderProfileAsync(root, [new("base", "Base", "base", game, 0)], false, codec);
+            var workshopSource = scenario is "missing-workshop" or "unavailable-workshop";
+            var workshop = scenario == "missing-workshop" ? Path.Combine(root, "workshop") : null;
+            if (workshop is not null) Directory.CreateDirectory(workshop);
             var gameDoc = new JsonObject { ["base_root"] = new JsonObject
             {
                 ["inraid"] = false, ["game_mode"] = "base", ["applied_ugcs_1_0"] = new JsonObject
                 {
-                    ["0"] = new JsonObject { ["name"] = scenario == "missing-workshop" ? "123" : "Buff Provider",
-                        ["source"] = scenario == "missing-workshop" ? "Steam" : "mod_local_source" }
+                    ["0"] = new JsonObject { ["name"] = workshopSource ? "123" : "Buff Provider",
+                        ["source"] = workshopSource ? "Steam" : "mod_local_source" }
                 }
             } };
+            if (scenario == "multiple-missing")
+            {
+                gameDoc["base_root"]!["applied_ugcs_1_0"]!["1"] = new JsonObject
+                    { ["name"] = "Second Missing Mod", ["source"] = "mod_local_source" };
+                gameDoc["base_root"]!["applied_ugcs_1_0"]!["2"] = new JsonObject
+                    { ["name"] = "456", ["source"] = "Steam" };
+            }
             WriteMultiMash(f.Content.Profile.ProfileDirectory, "persist.game.json", gameDoc.ToJsonString());
-            var content = await ActiveContentResolver.ResolveAsync(f.Content.Profile, game, null, codec, Path.Combine(root, "resolve"));
+            var content = await ActiveContentResolver.ResolveAsync(f.Content.Profile, game, workshop, codec, Path.Combine(root, "resolve"));
             var catalog = TrinketCatalog.Load(content);
             var item = catalog.Trinkets.Single();
             var resolved = scenario == "resolved";
-            Assert(content.AppliedModCount == 1 && item.QuestUses == 2 && item.HasProviderConflict != resolved,
+            Assert(content.AppliedModCount == (scenario == "multiple-missing" ? 3 : 1) && item.QuestUses == 2 && item.HasProviderConflict != resolved,
                 $"{field}/{scenario}: omitted enabled providers must leave the earlier dependent entry unresolved.");
             if (resolved)
             {
-                await f.Service.CommitAsync(await f.Service.PrepareTrinketEditAsync(content.Profile, item, 1, catalog.Storage, content));
+                var preparedBeforeRemoval = await f.Service.PrepareTrinketEditAsync(content.Profile, item, 1, catalog.Storage, content);
+                var project = Path.Combine(game, "mods", "a", "project.xml");
+                var projectBytes = File.ReadAllBytes(project);
+                var beforeRemoval = ComputeSha256(content.Profile.EstateSavePath);
+                // Keep the directory but remove its saved-title binding, as happens when
+                // project metadata is changed outside the game after a successful load.
+                File.WriteAllText(project, "<project><Title>Different Provider</Title></project>");
+                try
+                {
+                    await AssertNamedModFailureAsync(() => f.Service.PrepareTrinketEditAsync(content.Profile, item, 1, catalog.Storage, content),
+                        ["Buff Provider"], "unmapped-title");
+                    await AssertNamedModFailureAsync(() => f.Service.CommitAsync(preparedBeforeRemoval), ["Buff Provider"], "unmapped-title");
+                }
+                finally { File.WriteAllBytes(project, projectBytes); }
+                Assert(ComputeSha256(content.Profile.EstateSavePath) == beforeRemoval,
+                    "A Mod disappearing after load must be named at preview and commit without changing the save.");
+                var restored = await ActiveContentResolver.ResolveAsync(f.Content.Profile, game, workshop, codec, Path.Combine(root, "restored"));
+                var restoredCatalog = TrinketCatalog.Load(restored);
+                Assert(!restoredCatalog.Trinkets.Single().HasProviderConflict, "Restoring the source and reloading must remove the read-only restriction.");
+                await f.Service.CommitAsync(await f.Service.PrepareTrinketEditAsync(restored.Profile, restoredCatalog.Trinkets.Single(), 1, restoredCatalog.Storage, restored));
                 continue;
             }
             var before = ComputeSha256(content.Profile.EstateSavePath);
-            await RejectProviderEditAsync(() => f.Service.PrepareTrinketEditAsync(content.Profile, item, 1, catalog.Storage, content));
+            var expectedNames = scenario == "multiple-missing" ? new[] { "Buff Provider", "Second Missing Mod", "456" }
+                : new[] { workshopSource ? "123" : "Buff Provider" };
+            await AssertNamedModFailureAsync(() => f.Service.PrepareTrinketEditAsync(content.Profile, item, 1, catalog.Storage, content),
+                expectedNames, scenario, content.Issues);
             // Exercise the commit boundary independently: a hypothetical source-only
             // preview is rebound to the real incomplete configuration. Commit must
             // retain that context when rebuilding its validation catalog.
@@ -218,10 +269,66 @@ internal static partial class ContractSuite
             var fallback = TrinketCatalog.Load(hypothetical);
             var prepared = await f.Service.PrepareTrinketEditAsync(content.Profile, fallback.Trinkets.Single(), 1, fallback.Storage, hypothetical);
             prepared = prepared with { ContentGuard = prepared.ContentGuard with { Resolution = content.Resolution } };
-            await RejectProviderEditAsync(() => f.Service.CommitAsync(prepared));
+            await AssertNamedModFailureAsync(() => f.Service.CommitAsync(prepared), expectedNames, scenario);
             Assert(ComputeSha256(content.Profile.EstateSavePath) == before, "Incomplete-source preflight and commit rejection must not modify the estate.");
         }
-        Console.WriteLine("PASS: actual source resolution, unmapped/ambiguous local Mods, absent Workshop provider, preflight/commit context and resolved control.");
+        Console.WriteLine("PASS: named bilingual Mod-source failures in logs/preview/commit, missing/ambiguous/multiple sources, removal after preview, restoration and unchanged-save guards.");
+    }
+
+    private static async Task<string> ReadRejectedTrinketMessageAsync(Func<Task> action)
+    {
+        try { await action(); }
+        catch (Exception error) when (error is InvalidOperationException or IOException) { return error.Message; }
+        throw new InvalidOperationException("An unverified trinket was accepted.");
+    }
+
+    private static async Task AssertNamedModFailureAsync(Func<Task> action, string[] names, string scenario,
+        IReadOnlyList<string>? sourceIssues = null)
+    {
+        var originalCulture = CultureInfo.CurrentUICulture;
+        try
+        {
+            foreach (var language in new[] { "en", "zh-CN" })
+            {
+                CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo(language);
+                var message = await ReadRejectedTrinketMessageAsync(action);
+                Assert(names.All(name => message.Contains(name, StringComparison.Ordinal)) &&
+                    !message.Contains("different content paths", StringComparison.Ordinal) &&
+                    !message.Contains("conflict", StringComparison.OrdinalIgnoreCase) && !message.Contains("冲突", StringComparison.Ordinal),
+                    "Source failures must name every unresolved enabled Mod without describing a trinket conflict.");
+                var expectedReason = (scenario, language) switch
+                {
+                    ("ambiguous-title", "en") => "multiple directories",
+                    ("ambiguous-title", _) => "多个目录",
+                    ("missing-workshop", "en") => "Workshop",
+                    ("missing-workshop", _) => "工坊",
+                    ("unavailable-workshop", "en") => "Workshop directory",
+                    ("unavailable-workshop", _) => "创意工坊目录",
+                    (_, "en") => "project.xml",
+                    _ => "启用记录"
+                };
+                Assert(message.Contains(expectedReason, StringComparison.Ordinal), $"{scenario}/{language}: report the actual source problem.");
+                if (scenario == "ambiguous-title")
+                    Assert(!message.Contains("could not be found", StringComparison.Ordinal) && !message.Contains("找不到", StringComparison.Ordinal),
+                        "Ambiguous titles must not be reported as missing files.");
+                if (sourceIssues is not null)
+                {
+                    var logs = CatalogLogDiagnostics.Summarize([("sources", sourceIssues), ("second", sourceIssues)]);
+                    Assert(logs.Count == sourceIssues.Count && logs.All(entry => entry.Level == DiagnosticLogLevel.Warning) &&
+                        names.All(name => logs.Any(entry => entry.Message.Contains(name, StringComparison.Ordinal))) &&
+                        logs.Any(entry => entry.Message.Contains(expectedReason, StringComparison.Ordinal)),
+                        "Localized source diagnostics must preserve warning severity and cross-module grouping while naming the missing sources.");
+                    var noisyLogs = CatalogLogDiagnostics.Summarize([
+                        ("sources", sourceIssues),
+                        ("trinkets", Enumerable.Range(0, 40).Select(index =>
+                            $"Trinket 'item_{index}' Buff dependencies could not be verified and are read-only: file.json").ToArray())
+                    ]);
+                    Assert(names.All(name => noisyLogs.Take(30).Any(entry => entry.Message.Contains(name, StringComparison.Ordinal))),
+                        "Missing-source names must remain in the UI's first 30 diagnostics ahead of cascading dependency warnings in both languages.");
+                }
+            }
+        }
+        finally { CultureInfo.CurrentUICulture = originalCulture; }
     }
 
     private static void VerifyTrinketHeroProviders(string root, string kind)

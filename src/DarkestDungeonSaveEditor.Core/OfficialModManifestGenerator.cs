@@ -48,7 +48,12 @@ internal static class OfficialModManifestGenerator
             File.WriteAllText(Path.Combine(runtime, "project_paths.txt"), "../base/", new UTF8Encoding(false));
             var original = ModManifestFiles.Snapshot(source, token);
             var expected = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var (relative, stamp) in original)
+            foreach (var relative in original.Directories)
+            {
+                token.ThrowIfCancellationRequested();
+                Directory.CreateDirectory(Path.Combine(payload, relative));
+            }
+            foreach (var (relative, stamp) in original.Files)
             {
                 Copy(Path.Combine(source, relative), Path.Combine(payload, relative));
                 var vanilla = Path.Combine(game, relative);
@@ -118,8 +123,8 @@ internal static class OfficialModManifestGenerator
                 .Select(line => line.TrimEnd('\r')).Where(line => line.StartsWith("content/", StringComparison.Ordinal))
                 .Select(line => line["content/".Length..]).ToArray();
             var bytes = Encoding.UTF8.GetBytes(string.Join('\n', rows) + "\n");
-            ModManifestFiles.Validate(bytes, original);
-            if (!expected.SetEquals(rows.Select(line => line[..line.LastIndexOf(' ')])))
+            var records = ModManifestFiles.Validate(bytes, original);
+            if (!expected.SetEquals(records.Where(record => !record.IsDirectory).Select(record => record.RelativePath)))
                 throw new InvalidDataException(EditorText.Get("OfficialModManifestGenerator_010"));
             return bytes;
         }

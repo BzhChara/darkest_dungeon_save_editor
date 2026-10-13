@@ -188,7 +188,7 @@ internal static partial class ContractSuite
         try { await service.PrepareQuantityItemEditAsync(content.Profile, items.Single(item => item.ItemId == "BE"), 3, snapshot); }
         catch (InvalidOperationException error) when (error.Message.Contains("unresolved definitions", StringComparison.Ordinal)) { itemRejected = true; }
         try { await service.PrepareTrinketEditAsync(content.Profile, trinkets.Single(item => item.Id == "BE"), 1, null, snapshot); }
-        catch (InvalidOperationException error) when (error.Message.Contains("unresolved definitions", StringComparison.Ordinal)) { trinketRejected = true; }
+        catch (InvalidOperationException error) when (error.Message == EditorText.Format("SaveEditService_Trinkets_Unverified", "BE")) { trinketRejected = true; }
         Assert(itemRejected && trinketRejected && !Directory.Exists(locations.BackupDirectory),
             "Native hash collisions must be rejected by the real preview services before any save mutation or backup.");
     }

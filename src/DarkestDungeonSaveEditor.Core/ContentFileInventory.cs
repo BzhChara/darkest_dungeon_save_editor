@@ -58,6 +58,8 @@ public static partial class ContentFileInventory
         var issues = new List<string>();
         var actual = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
         var declared = new Dictionary<string, long?>(StringComparer.OrdinalIgnoreCase);
+        var actualDirectories = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var declaredDirectories = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var manifestPath = Path.Combine(root, "modfiles.txt");
         var hasManifest = false;
         var manifestReadable = true;
@@ -103,6 +105,7 @@ public static partial class ContentFileInventory
 
                         if ((attributes & FileAttributes.Directory) != 0)
                         {
+                            actualDirectories.Add(Normalize(Path.GetRelativePath(root, path)));
                             pending.Push(path);
                         }
                         else
@@ -168,6 +171,14 @@ public static partial class ContentFileInventory
                         }
 
                         relative = relative.Replace('\\', '/');
+                        var isDirectory = relative.EndsWith('/');
+                        if (isDirectory)
+                        {
+                            if (length != 0) throw new InvalidDataException(EditorText.Get("ContentFileInventory_017"));
+                            relative = relative[..^1];
+                            if (relative.Split('/').Any(segment => segment is "" or "." or ".."))
+                                throw new InvalidDataException(EditorText.Get("ContentFileInventory_020"));
+                        }
                         if (Path.IsPathRooted(relative) || relative.Contains(':'))
                         {
                             throw new InvalidDataException(EditorText.Get("ContentFileInventory_010"));
@@ -185,7 +196,16 @@ public static partial class ContentFileInventory
                             throw new InvalidDataException(EditorText.Get("ContentFileInventory_012"));
                         }
 
-                        if (!declared.TryAdd(relative, length))
+                        if (isDirectory)
+                        {
+                            if (!declaredDirectories.Add(relative))
+                                issues.Add(EditorText.Format("ContentFileInventory_013", lineNumber, relative + "/"));
+                            else if (actual.ContainsKey(relative))
+                                issues.Add(EditorText.Format("ContentFileInventory_019", lineNumber, relative + "/"));
+                            else if (treeComplete && !actualDirectories.Contains(relative))
+                                issues.Add(EditorText.Format("ContentFileInventory_018", lineNumber, relative + "/"));
+                        }
+                        else if (!declared.TryAdd(relative, length))
                         {
                             issues.Add(EditorText.Format("ContentFileInventory_013", lineNumber, relative));
                         }

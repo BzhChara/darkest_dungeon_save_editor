@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -62,10 +63,20 @@ public sealed class ModManifestPreparationService
                 var before = ModManifestFiles.Snapshot(source.Directory, cancellationToken);
                 var evidence = Path.Combine(workspace, index.ToString());
                 Directory.CreateDirectory(evidence);
-                var bytes = await _generate(gameDirectory, source.Directory, evidence, cancellationToken).ConfigureAwait(false);
-                Guard();
-                ModManifestFiles.RequireSnapshot(source.Directory, before, cancellationToken);
-                var count = ModManifestFiles.Validate(bytes, before);
+                byte[] bytes;
+                int count;
+                try
+                {
+                    bytes = await _generate(gameDirectory, source.Directory, evidence, cancellationToken).ConfigureAwait(false);
+                    Guard();
+                    ModManifestFiles.RequireSnapshot(source.Directory, before, cancellationToken);
+                    count = ModManifestFiles.Validate(bytes, before).Count;
+                }
+                catch (InvalidDataException error)
+                {
+                    throw new InvalidDataException(EditorText.Format("ModManifestPreparationService_015",
+                        source.DisplayName, source.Directory, error.Message), error);
+                }
                 var output = Path.Combine(evidence, "modfiles.txt");
                 await File.WriteAllBytesAsync(output, bytes, cancellationToken).ConfigureAwait(false);
                 prepared.Add(new(source.Directory, source.DisplayName, output, ModManifestFiles.Hash(output), count, before));
@@ -129,10 +140,13 @@ public sealed class ModManifestPreparationService
     }
 
     private sealed record Prepared(string Directory, string Name, string Output, string Hash, int Rows,
-        IReadOnlyDictionary<string, ModManifestFileStamp> Before);
+        ModManifestSnapshot Before);
 }
 
 internal sealed record ModManifestFileStamp(long Length, string Hash);
+internal sealed record ModManifestSnapshot(IReadOnlyDictionary<string, ModManifestFileStamp> Files,
+    IReadOnlySet<string> Directories);
+internal sealed record ModManifestRecord(string RelativePath, long Size, bool IsDirectory);
 
 internal static class ModManifestFiles
 {
@@ -153,10 +167,11 @@ internal static class ModManifestFiles
         }
     }
 
-    internal static Dictionary<string, ModManifestFileStamp> Snapshot(string root, CancellationToken token, bool ignoreManifest = false)
+    internal static ModManifestSnapshot Snapshot(string root, CancellationToken token, bool ignoreManifest = false)
     {
         RequireRegularPath(root);
         var result = new Dictionary<string, ModManifestFileStamp>(StringComparer.OrdinalIgnoreCase);
+        var directoryPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var directories = new Stack<string>(); directories.Push(root);
         while (directories.TryPop(out var directory))
         foreach (var path in Directory.EnumerateFileSystemEntries(directory))
@@ -164,36 +179,69 @@ internal static class ModManifestFiles
             token.ThrowIfCancellationRequested();
             var attributes = File.GetAttributes(path);
             if ((attributes & FileAttributes.ReparsePoint) != 0) throw new IOException(EditorText.Format("ModManifestPreparationService_010", path));
-            if ((attributes & FileAttributes.Directory) != 0) { directories.Push(path); continue; }
             var relative = Path.GetRelativePath(root, path).Replace('\\', '/');
+            if ((attributes & FileAttributes.Directory) != 0)
+            {
+                directoryPaths.Add(relative);
+                directories.Push(path);
+                continue;
+            }
             if (ignoreManifest && relative.Equals("modfiles.txt", StringComparison.OrdinalIgnoreCase)) continue;
             result.Add(relative, new(new FileInfo(path).Length, Hash(path)));
         }
-        return result;
+        return new(result, directoryPaths);
     }
 
-    internal static void RequireSnapshot(string root, IReadOnlyDictionary<string, ModManifestFileStamp> before,
+    internal static void RequireSnapshot(string root, ModManifestSnapshot before,
         CancellationToken token, bool ignoreManifest = false)
     {
         var after = Snapshot(root, token, ignoreManifest);
-        if (before.Count != after.Count || before.Any(pair => after.GetValueOrDefault(pair.Key) != pair.Value))
+        if (before.Files.Count != after.Files.Count || before.Files.Any(pair => after.Files.GetValueOrDefault(pair.Key) != pair.Value) ||
+            !before.Directories.SetEquals(after.Directories))
             throw new IOException(EditorText.Format("ModManifestPreparationService_011", root));
     }
 
-    internal static int Validate(byte[] bytes, IReadOnlyDictionary<string, ModManifestFileStamp> files)
+    internal static IReadOnlyList<ModManifestRecord> Validate(byte[] bytes, ModManifestSnapshot snapshot)
     {
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var line in new UTF8Encoding(false, true).GetString(bytes).Split('\n', StringSplitOptions.RemoveEmptyEntries))
+        var records = new List<ModManifestRecord>();
+        var lines = new UTF8Encoding(false, true).GetString(bytes).Split('\n');
+        for (var index = 0; index < lines.Length; index++)
         {
-            var row = line.TrimEnd('\r'); var separator = row.LastIndexOf(' ');
-            if (separator < 1 || !long.TryParse(row[(separator + 1)..], out var size)) throw new InvalidDataException(EditorText.Get("ModManifestPreparationService_012"));
+            var row = lines[index].TrimEnd('\r');
+            if (row.Length == 0) continue;
+            InvalidDataException Invalid(string path, string reason) =>
+                new(EditorText.Format("ModManifestPreparationService_013", index + 1, path, reason));
+            var separator = row.LastIndexOf(' ');
+            if (separator < 1 || !long.TryParse(row[(separator + 1)..], NumberStyles.None, CultureInfo.InvariantCulture, out var size))
+                throw Invalid(row, EditorText.Get("ModManifestPreparationService_012"));
             var relative = row[..separator];
-            if (Path.IsPathRooted(relative) || relative.Contains('\\') || relative.Split('/').Any(part => part is ".." or "." or "") ||
-                relative.Equals("modfiles.txt", StringComparison.OrdinalIgnoreCase) || !seen.Add(relative) ||
-                !files.TryGetValue(relative, out var file) || file.Length != size)
-                throw new InvalidDataException(EditorText.Format("ModManifestPreparationService_013", relative));
+            var isDirectory = relative.EndsWith('/');
+            // Strip only the directory marker for lookup. Preserve the original row in the output.
+            var path = isDirectory ? relative[..^1] : relative;
+            if (Path.IsPathRooted(path) || path.Contains('\\') ||
+                path.Split('/').Any(part => part is ".." or "." or "" || part.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0) ||
+                path.Equals("modfiles.txt", StringComparison.OrdinalIgnoreCase))
+                throw Invalid(relative, EditorText.Get("ModManifestPreparationService_016"));
+            if (!seen.Add(path)) throw Invalid(relative, EditorText.Get("ModManifestPreparationService_017"));
+            if (isDirectory)
+            {
+                if (size != 0) throw Invalid(relative, EditorText.Get("ModManifestPreparationService_018"));
+                if (!snapshot.Directories.Contains(path))
+                    throw Invalid(relative, EditorText.Get(snapshot.Files.ContainsKey(path)
+                        ? "ModManifestPreparationService_022" : "ModManifestPreparationService_019"));
+            }
+            else
+            {
+                if (!snapshot.Files.TryGetValue(path, out var file))
+                    throw Invalid(relative, EditorText.Get(snapshot.Directories.Contains(path)
+                        ? "ModManifestPreparationService_023" : "ModManifestPreparationService_020"));
+                if (file.Length != size)
+                    throw Invalid(relative, EditorText.Format("ModManifestPreparationService_021", size, file.Length));
+            }
+            records.Add(new(relative, size, isDirectory));
         }
-        if (seen.Count == 0) throw new InvalidDataException(EditorText.Get("ModManifestPreparationService_014"));
-        return seen.Count;
+        if (!records.Any(record => !record.IsDirectory)) throw new InvalidDataException(EditorText.Get("ModManifestPreparationService_014"));
+        return records;
     }
 }

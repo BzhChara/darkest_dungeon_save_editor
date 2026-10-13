@@ -27,8 +27,11 @@ internal static class HeroSkinDirectoryDiscovery
                 var relative = entry.RelativePath.Replace('\\', '/');
                 if (Path.IsPathRooted(relative) || relative.Split('/').Any(part => part is "." or "..")) continue;
                 var mounted = NativeResourceFileRules.MountedPath(relative, prefixes, manifestDirectory: true);
-                var parts = mounted.Split('/');
-                if (parts.Length < 4 || parts[0] != "heroes" || parts.Take(4).Any(string.IsNullOrEmpty)) continue;
+                var isDirectory = mounted.EndsWith('/');
+                var parts = (isDirectory ? mounted[..^1] : mounted).Split('/');
+                var requiredParts = isDirectory ? 3 : 4;
+                if (parts.Length < requiredParts || parts[0] != "heroes" ||
+                    parts.Take(isDirectory ? parts.Length : requiredParts).Any(string.IsNullOrEmpty)) continue;
                 var directory = relative[..(relative.Length - mounted.Length)] + string.Join('/', parts.Take(3));
                 paths.Add(Path.Combine(source.Directory, directory.Replace('/', Path.DirectorySeparatorChar)));
             }

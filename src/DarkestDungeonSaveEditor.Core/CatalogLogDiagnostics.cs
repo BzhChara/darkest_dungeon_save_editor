@@ -20,7 +20,10 @@ public static partial class CatalogLogDiagnostics
                 var parsed = DescribeFileAccess(raw, missingPaths) ?? Describe(raw);
                 if (!groups.TryGetValue(parsed.Key, out var group))
                 {
-                    group = new LogGroup(parsed.Level, parsed.Message);
+                    group = new LogGroup(parsed.Level, parsed.Message)
+                    {
+                        IsModSourceIssue = DescribeModSourceIssue(raw) is not null
+                    };
                     groups.Add(parsed.Key, group);
                 }
                 group.Modules.Add(module);
@@ -36,13 +39,17 @@ public static partial class CatalogLogDiagnostics
             }
         }
 
-        return groups.Values.Select(group => new DiagnosticLogEntry(group.Level,
+        return groups.Values.Select(group => (group.IsModSourceIssue, Entry: new DiagnosticLogEntry(group.Level,
                 (group.Level == DiagnosticLogLevel.Information ? EditorText.Get("CatalogLogDiagnostics_001") : EditorText.Get("CatalogLogDiagnostics_002")) +
                 group.Message + FormatLocations(group) + EditorText.Get("CatalogLogDiagnostics_003") + string.Join("、", group.Modules.Order(StringComparer.Ordinal)) +
                 (group.Evidence.Count == 0 ? string.Empty : "；" + string.Join("；", group.Evidence.OrderBy(pair => pair.Key, StringComparer.Ordinal)
-                    .Select(pair => EditorText.Format("CatalogLogDiagnostics_004", string.Join("、", pair.Value.Order(StringComparer.Ordinal)), pair.Key))))))
-            .OrderByDescending(entry => entry.Level)
-            .ThenBy(entry => entry.Message, StringComparer.Ordinal)
+                    .Select(pair => EditorText.Format("CatalogLogDiagnostics_004", string.Join("、", pair.Value.Order(StringComparer.Ordinal)), pair.Key)))))))
+            .OrderByDescending(item => item.Entry.Level)
+            // The UI shows only the first 30 entries. Keep source failures ahead
+            // of the per-item dependency warnings they can cause in either language.
+            .ThenByDescending(item => item.IsModSourceIssue)
+            .ThenBy(item => item.Entry.Message, StringComparer.Ordinal)
+            .Select(item => item.Entry)
             .ToArray();
     }
 
@@ -110,13 +117,37 @@ public static partial class CatalogLogDiagnostics
         {
             return (raw, DiagnosticLogLevel.Information, Clean(raw), null);
         }
-        if (raw.StartsWith("Enabled Workshop item is not installed: ", StringComparison.Ordinal))
-        {
-            return (raw, DiagnosticLogLevel.Warning,
-                EditorText.Get("CatalogLogDiagnostics_011") + raw["Enabled Workshop item is not installed: ".Length..] +
-                EditorText.Get("CatalogLogDiagnostics_012"), null);
-        }
+        if (DescribeModSourceIssue(raw) is { } sourceIssue)
+            return (raw, DiagnosticLogLevel.Warning, sourceIssue, null);
         return (raw, DiagnosticLogLevel.Warning, Clean(raw), null);
+    }
+
+    internal static string FormatUnresolvedModSources(IEnumerable<string> issues) =>
+        string.Join(" ", issues.Distinct(StringComparer.Ordinal).Select(DescribeModSourceIssue).OfType<string>());
+
+    private static string? DescribeModSourceIssue(string raw)
+    {
+        const string missingLocal = "Enabled local Mod could not be mapped by project title: ";
+        const string ambiguousLocal = "Enabled local Mod title is ambiguous and was not scanned: ";
+        const string missingWorkshop = "Enabled Workshop item is not installed: ";
+        const string workshopPrefix = "Enabled Workshop item '";
+        const string unavailableWorkshop = "' cannot be resolved because the Workshop directory is unavailable.";
+        if (raw.StartsWith(missingLocal, StringComparison.Ordinal))
+            return EditorText.Format("CatalogLogDiagnostics_MissingLocalMod", Clean(raw[missingLocal.Length..]));
+        if (raw.StartsWith(ambiguousLocal, StringComparison.Ordinal))
+            return EditorText.Format("CatalogLogDiagnostics_AmbiguousLocalMod", Clean(raw[ambiguousLocal.Length..]));
+        if (raw.StartsWith(missingWorkshop, StringComparison.Ordinal))
+            return EditorText.Get("CatalogLogDiagnostics_011") + Clean(raw[missingWorkshop.Length..]) +
+                EditorText.Get("CatalogLogDiagnostics_012");
+        if (raw.StartsWith(workshopPrefix, StringComparison.Ordinal) && raw.EndsWith(unavailableWorkshop, StringComparison.Ordinal))
+            return EditorText.Format("CatalogLogDiagnostics_UnavailableWorkshopDirectory",
+                Clean(raw[workshopPrefix.Length..^unavailableWorkshop.Length]));
+        // Keep other source-resolution failures visible without calling them missing files.
+        if (raw.StartsWith("Enabled Workshop item", StringComparison.Ordinal) ||
+            raw.StartsWith("Enabled local Mod", StringComparison.Ordinal) ||
+            raw.StartsWith("Unsupported enabled Mod source", StringComparison.Ordinal))
+            return Clean(raw);
+        return null;
     }
 
     private static string Clean(string value) => value.Replace('\r', ' ').Replace('\n', ' ').Replace('\t', ' ');
@@ -125,6 +156,7 @@ public static partial class CatalogLogDiagnostics
     {
         public DiagnosticLogLevel Level { get; } = level;
         public string Message { get; } = message;
+        public bool IsModSourceIssue { get; init; }
         public HashSet<string> Modules { get; } = new(StringComparer.Ordinal);
         public Dictionary<string, HashSet<string>> Evidence { get; } = new(StringComparer.Ordinal);
         public SortedSet<(int Line, int Record)> Locations { get; } = [];

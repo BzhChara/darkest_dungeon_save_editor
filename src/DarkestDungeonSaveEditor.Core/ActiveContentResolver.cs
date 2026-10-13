@@ -112,18 +112,29 @@ public static class ActiveContentResolver
     }
 
     public static void ValidateSourceBindings(ActiveContentResolution? resolution,
-        IReadOnlyList<ActiveContentSource> expectedSources, CancellationToken cancellationToken = default)
+        IReadOnlyList<ActiveContentSource> expectedSources, CancellationToken cancellationToken = default) =>
+        ValidateSourceBindings(resolution, expectedSources, out _, cancellationToken);
+
+    internal static void ValidateSourceBindings(ActiveContentResolution? resolution,
+        IReadOnlyList<ActiveContentSource> expectedSources, out IReadOnlyList<string> issues,
+        CancellationToken cancellationToken = default)
     {
         // Explicit source lists are also used by standalone catalog consumers. They do not
         // claim a saved Mod-title mapping. Every ResolveAsync/ResolveDecoded snapshot does.
+        issues = [];
         if (resolution is null) return;
         var configuration = JsonNode.Parse(resolution.ConfigurationJson)!.AsObject();
         var current = ResolveSources(configuration, resolution.GameDirectory, resolution.WorkshopDirectory,
             resolution.AdditionalLocalModDirectory, cancellationToken);
+        issues = current.Issues;
         if (current.Sources.Count != expectedSources.Count ||
             current.Sources.Where((source, index) => !SameBinding(source, expectedSources[index])).Any() ||
             current.Sources.Any(source => !Directory.Exists(source.Directory)))
-            throw new InvalidOperationException(EditorText.Get("ActiveContentResolver_001"));
+        {
+            var sourceIssues = CatalogLogDiagnostics.FormatUnresolvedModSources(current.Issues);
+            throw new InvalidOperationException(EditorText.Get("ActiveContentResolver_001") +
+                (sourceIssues.Length == 0 ? string.Empty : " " + sourceIssues));
+        }
     }
 
     private static bool SameBinding(ActiveContentSource left, ActiveContentSource right) =>

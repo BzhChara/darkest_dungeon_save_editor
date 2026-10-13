@@ -21,11 +21,7 @@ public sealed partial class SaveEditService
         NativeInventoryIdentity.RequireWritable(trinket.SaveIdentityIssue);
         _codec.ValidateAvailability();
         ValidateProfile(profile);
-        if (trinket.HasProviderConflict)
-        {
-            throw new InvalidOperationException(
-                $"Trinket '{trinket.Id}' has unresolved definitions from different content paths and is read-only.");
-        }
+        RequireVerifiedTrinket(trinket, activeContent);
 
         if (expectedStorage is null)
         {
@@ -54,9 +50,9 @@ public sealed partial class SaveEditService
 
         var currentTrinket = currentCatalog.Trinkets.SingleOrDefault(item =>
             item.Id.Equals(trinket.Id, StringComparison.Ordinal));
+        if (currentTrinket is not null) RequireVerifiedTrinket(currentTrinket, activeContent);
         if (currentTrinket is null ||
             currentTrinket.SaveIdentityIssue.Length > 0 ||
-            currentTrinket.HasProviderConflict ||
             !TrinketDefinitionMatches(currentTrinket, trinket))
         {
             throw new InvalidOperationException(
@@ -298,7 +294,8 @@ public sealed partial class SaveEditService
 
     private static void ValidateTrinketContentGuard(PreparedTrinketEdit prepared)
     {
-        ActiveContentResolver.ValidateSourceBindings(prepared.ContentGuard.Resolution, prepared.ContentGuard.Sources);
+        ActiveContentResolver.ValidateSourceBindings(prepared.ContentGuard.Resolution, prepared.ContentGuard.Sources,
+            out var sourceIssues);
         var gameSavePath = Path.Combine(prepared.Profile.ProfileDirectory, "persist.game.json");
         if (!File.Exists(gameSavePath) ||
             !ComputeSha256(gameSavePath).Equals(
@@ -317,7 +314,7 @@ public sealed partial class SaveEditService
             prepared.Profile,
             string.Empty,
             prepared.ContentGuard.Sources,
-            [],
+            sourceIssues,
             string.Empty,
             string.Empty,
             0,
@@ -341,9 +338,9 @@ public sealed partial class SaveEditService
 
         var currentTrinket = currentCatalog.Trinkets.SingleOrDefault(item =>
             item.Id.Equals(prepared.Trinket.Id, StringComparison.Ordinal));
+        if (currentTrinket is not null) RequireVerifiedTrinket(currentTrinket, currentSnapshot);
         if (currentTrinket is null ||
             currentTrinket.SaveIdentityIssue.Length > 0 ||
-            currentTrinket.HasProviderConflict ||
             !TrinketDefinitionMatches(currentTrinket, prepared.Trinket) ||
             !Path.GetFullPath(currentTrinket.SourcePath).Equals(
                 Path.GetFullPath(prepared.ContentGuard.TrinketSourcePath),
@@ -356,6 +353,15 @@ public sealed partial class SaveEditService
             throw new InvalidOperationException(
                 "The selected trinket definition changed after preview; prepare a new preview.");
         }
+    }
+
+    private static void RequireVerifiedTrinket(TrinketDefinition trinket, ActiveContentSnapshot? content)
+    {
+        if (!trinket.HasProviderConflict) return;
+        var sourceIssues = CatalogLogDiagnostics.FormatUnresolvedModSources(content?.Resolution is not null ? content.Issues : []);
+        throw new InvalidOperationException(sourceIssues.Length > 0
+            ? EditorText.Format("SaveEditService_Trinkets_UnresolvedMods", trinket.Id, sourceIssues)
+            : EditorText.Format("SaveEditService_Trinkets_Unverified", trinket.Id));
     }
 
     private static bool StorageDefinitionMatches(

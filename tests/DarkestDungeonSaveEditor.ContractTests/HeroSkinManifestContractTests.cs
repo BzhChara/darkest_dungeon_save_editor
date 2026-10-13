@@ -17,6 +17,10 @@ internal static partial class ContractSuite
             Assert(StagecoachHeroCandidateFactory.Generate(unlisted, hero, 1729, 0, []).Preview.ColourVariation == 0,
                 "Candidate generation must not pick an unlisted skin.");
 
+            File.AppendAllText(manifest, "heroes/local_hero/local_hero_B/ 0\n");
+            Assert(HeroClassCatalog.Load(content).HeroClasses.Single(item => item.Id == "local_hero").ColourVariationCount == 2,
+                "An explicit skin directory record must restore its slot without authorizing an unlisted texture.");
+
             File.WriteAllBytes(manifest, original);
             var before = ProfileCatalogContentFingerprint.Capture(content.Sources);
             File.Delete(skin);

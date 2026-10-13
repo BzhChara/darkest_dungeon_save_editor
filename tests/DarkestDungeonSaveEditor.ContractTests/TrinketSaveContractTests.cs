@@ -35,7 +35,8 @@ internal static partial class ContractSuite
                 activeCatalog.Storage,
                 activeContent);
         }
-        catch (InvalidOperationException ex) when (ex.Message.Contains("unresolved definitions", StringComparison.Ordinal))
+        catch (InvalidOperationException ex) when (ex.Message.Contains(ambiguousTrinket.Id, StringComparison.Ordinal) &&
+            ex.Message.Contains(EditorText.IsChinese ? "暂时只读" : "read-only", StringComparison.Ordinal))
         {
             ambiguousTrinketBlocked = true;
         }
