@@ -134,13 +134,19 @@ internal static partial class ContractSuite
         await RunSourceBindingInventoryContractsAsync(Path.Combine(runRoot, "source-bindings"), codec);
         await RunSourceBindingBattleContractsAsync(Path.Combine(runRoot, "battle-bindings"), codec);
         await RunSourceBindingHeroContractsAsync(fixture);
-        await RunProfileSyncContractsAsync(fixture);
+        var syncFixture = BuildContractFixture(repositoryRoot);
+        await SeedSyncFixtureAsync(syncFixture);
+        await RunProfileSyncContractsAsync(syncFixture);
+        var modLoadFixture = BuildContractFixture(repositoryRoot);
+        await SeedSyncFixtureAsync(modLoadFixture);
+        VerifyMissingModSourceGuard(modLoadFixture);
         await RunWpfContractsAsync(async () =>
         {
+            await VerifyMissingModLoadUiAsync(modLoadFixture);
             await VerifyEditorLocalizationUiAsync(repositoryRoot, runRoot);
             await VerifySelectionAndMenuAsync(runRoot);
             await VerifyQuirkSelectionInteractionAsync(repositoryRoot);
-            await VerifyProfileSyncInteractionAsync(fixture);
+            await VerifyProfileSyncInteractionAsync(syncFixture);
         });
         RunContentDiscoveryContracts(activeContent, fixture);
         RunManifestDiscoveryContracts(activeContent, fixture);

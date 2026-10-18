@@ -4918,6 +4918,15 @@
   <data name="Codec_JavaReferenceTitle" xml:space="preserve">
     <value>JAR 对照版</value>
   </data>
+  <data name="ActiveContentResolver_UnresolvedMods" xml:space="preserve">
+    <value>已停止载入：以下已启用的 Mod 找不到或无法唯一识别。请检查安装状态和 Mod 目录设置，然后重新载入。移动或删除 Mod 不会清除存档中的启用记录。</value>
+  </data>
+  <data name="ActiveContentResolver_MissingWorkshopMod" xml:space="preserve">
+    <value>创意工坊 Mod ID {0}：未找到安装目录。请检查订阅、安装状态及创意工坊目录。</value>
+  </data>
+  <data name="ActiveContentResolver_InvalidModRecord" xml:space="preserve">
+    <value>已启用 Mod 记录 {0} 格式无效或信息不完整，无法识别对应的 Mod。请检查存档中的 Mod 列表。</value>
+  </data>
   <data name="CatalogLogDiagnostics_MissingLocalMod" xml:space="preserve">
     <value>存档仍启用了本地 Mod「{0}」，但按项目标题找不到它。请检查 Mod 目录及 project.xml 中的 Title，然后重新载入存档。移动或删除 Mod 文件不会清除存档中的启用记录。</value>
   </data>

@@ -19,11 +19,19 @@ internal static partial class ContractSuite
         Console.WriteLine($"Artifacts: {fixture.RunRoot}");
     }
 
-    private static async Task SeedSyncFixtureAsync(ContractFixture f)
+    private static async Task SeedSyncFixtureAsync(ContractFixture f, bool includeMissingWorkshop = false)
     {
         foreach (var (input, output) in new[] { (f.DecodedSeedPath, f.EstatePath), (f.DecodedGameSeedPath, f.GameSavePath),
             (f.DecodedTownSeedPath, f.TownSavePath), (f.DecodedRosterSeedPath, f.RosterSavePath), (f.DecodedUpgradesSeedPath, f.UpgradesSavePath) })
             await f.Codec.EncodeAsync(input, output, null);
+        // The discovery fixture deliberately references an absent Workshop item.
+        // Interactive loading now requires all enabled sources to resolve.
+        if (!includeMissingWorkshop)
+        {
+            var game = JsonNode.Parse(File.ReadAllText(f.DecodedGameSeedPath))!.AsObject();
+            game["base_root"]!["applied_ugcs_1_0"]!.AsObject().Remove("11");
+            await WriteModLoadGameAsync(f, game);
+        }
     }
 
     private static Task RunProfileSyncInteractionContractsAsync(ContractFixture f) =>

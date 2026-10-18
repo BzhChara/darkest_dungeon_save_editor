@@ -15,28 +15,32 @@ internal static class Mo2Compatibility
     internal const string MergeTitle = "merge mod";
     private static readonly object Gate = new();
 
-    internal static void Apply(JsonObject configuration, string gameDirectory, string? workshopDirectory,
+    internal static Func<string>? RegisterSource(JsonObject configuration, string gameDirectory, string? workshopDirectory,
         Dictionary<string, IReadOnlyList<string>> localSources, CancellationToken token, bool validateBindingsOnly = false)
     {
         if (configuration["applied_ugcs_1_0"] is not JsonObject applied ||
             !applied.Any(pair => pair.Value is JsonObject entry &&
                 string.Equals(JsonSupport.ReadString(entry, "name"), MergeTitle, StringComparison.OrdinalIgnoreCase) &&
                 string.Equals(JsonSupport.ReadString(entry, "source"), "mod_local_source", StringComparison.OrdinalIgnoreCase)))
-            return;
+            return null;
 
         var configPath = Path.Combine(AppContext.BaseDirectory, "mo2-compat.json");
         var settings = Mo2Settings.Read(configPath);
+        var virtualSlot = Path.GetFullPath(Path.Combine(gameDirectory, "mods", "!!MOD"));
         if (localSources.TryGetValue(MergeTitle, out var physicalCandidates))
         {
-            var virtualSlot = Path.Combine(gameDirectory, "mods", "!!MOD");
             foreach (var candidate in physicalCandidates)
                 if (!Path.GetFullPath(candidate).Equals(Path.GetFullPath(virtualSlot), StringComparison.OrdinalIgnoreCase) &&
                     !Path.GetFullPath(candidate).Equals(settings.OverwriteDirectory, StringComparison.OrdinalIgnoreCase))
                     throw Error($"An unrelated local project also uses the title 'merge mod': {candidate}. Resolve the title ambiguity before loading.");
         }
-        localSources[MergeTitle] = [validateBindingsOnly
+        // This path is only an identity token; it is never created or returned.
+        // A real slot such as game/mods/!!MOD could belong to another enabled
+        // project and cause directory deduplication to discard one of the sources.
+        localSources[MergeTitle] = [Path.Combine(settings.CacheDirectory!, "pending-source-" + Guid.NewGuid().ToString("N"))];
+        return () => validateBindingsOnly
             ? ResolveForValidation(configPath, gameDirectory, workshopDirectory, token)
-            : Prepare(configPath, gameDirectory, workshopDirectory, token)];
+            : Prepare(configPath, gameDirectory, workshopDirectory, token);
     }
 
     internal static string ResolveForValidation(string configPath, string gameDirectory, string? workshopDirectory,

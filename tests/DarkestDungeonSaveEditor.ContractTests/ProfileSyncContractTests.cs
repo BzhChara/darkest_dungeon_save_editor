@@ -73,7 +73,7 @@ internal static partial class ContractSuite
         first = await reader.ReadAsync(refreshContent: true);
         using var lockedResource = File.Open(resourceProbe, FileMode.Open, FileAccess.Read, FileShare.None);
 
-        var game = (JsonObject)JsonNode.Parse(File.ReadAllText(fixture.DecodedGameSeedPath))!;
+        var game = (JsonObject)JsonNode.Parse(File.ReadAllText(first.Content.DecodedGamePath))!;
         var gameBase = (JsonObject)game["base_root"]!;
         gameBase["week"] = 88;
         var gamePath = Path.Combine(profileRoot, "persist.game.json");

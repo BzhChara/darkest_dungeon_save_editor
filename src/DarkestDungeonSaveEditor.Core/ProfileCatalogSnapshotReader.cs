@@ -46,6 +46,7 @@ public sealed class ProfileCatalogSnapshotReader
         string? workspaceRoot = null,
         string? initialContentFingerprint = null)
     {
+        ActiveContentResolver.RequireResolvedModSources(initialContent);
         _content = initialContent;
         _profile = initialContent.Profile;
         _codec = codec;
@@ -109,6 +110,7 @@ public sealed class ProfileCatalogSnapshotReader
                 ? ActiveContentResolver.ResolveDecoded(profile, _gameDirectory, _workshopDirectory,
                     _localModDirectory, workspace, gamePath, before["persist.game.json"]!, cancellationToken)
                 : content;
+            ActiveContentResolver.RequireResolvedModSources(content);
             var contentFingerprint = checkContent
                 ? ProfileCatalogContentFingerprint.Capture(content.Sources, cancellationToken)
                 : _contentFingerprint;

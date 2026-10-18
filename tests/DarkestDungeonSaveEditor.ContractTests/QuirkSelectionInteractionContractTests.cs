@@ -25,7 +25,7 @@ internal static partial class ContractSuite
     private static async Task VerifyQuirkSelectionInteractionAsync(string repositoryRoot)
     {
         var f = BuildContractFixture(repositoryRoot);
-        await SeedSyncFixtureAsync(f);
+        await SeedSyncFixtureAsync(f, includeMissingWorkshop: true);
         var root = Path.Combine(f.RunRoot, "quirk-selection");
         Directory.CreateDirectory(root);
         var buffs = new JsonArray();

@@ -142,6 +142,18 @@ public static class ActiveContentResolver
         Path.GetFullPath(left.Directory).Equals(Path.GetFullPath(right.Directory), StringComparison.OrdinalIgnoreCase) &&
         left.VirtualPathPrefix.Equals(right.VirtualPathPrefix, StringComparison.OrdinalIgnoreCase);
 
+    /// <summary>Reject incomplete saved Mod bindings before preparing manifests or reading resource catalogs.</summary>
+    public static void RequireResolvedModSources(ActiveContentSnapshot content) =>
+        RequireResolvedModSources(content.Issues);
+
+    internal static void RequireResolvedModSources(IEnumerable<string> issues)
+    {
+        var details = CatalogLogDiagnostics.FormatUnresolvedModSources(issues, forLoading: true);
+        if (details.Length > 0)
+            throw new InvalidOperationException(EditorText.Get("ActiveContentResolver_UnresolvedMods") +
+                Environment.NewLine + details);
+    }
+
     internal static bool HasUnresolvedModSources(ActiveContentSnapshot content)
     {
         // Explicit/hypothetical source lists do not claim a saved Mod mapping.

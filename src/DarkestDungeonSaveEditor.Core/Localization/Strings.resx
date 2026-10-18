@@ -4918,6 +4918,15 @@ Backup directory:
   <data name="Codec_JavaReferenceTitle" xml:space="preserve">
     <value>JAR reference build</value>
   </data>
+  <data name="ActiveContentResolver_UnresolvedMods" xml:space="preserve">
+    <value>Loading stopped: the following enabled Mods could not be found or uniquely identified. Check their installation and the configured Mod directories, then reload. Moving or deleting a Mod does not disable it in the save.</value>
+  </data>
+  <data name="ActiveContentResolver_MissingWorkshopMod" xml:space="preserve">
+    <value>Workshop Mod ID {0}: its installation directory was not found. Check its subscription, installation and the Workshop directory.</value>
+  </data>
+  <data name="ActiveContentResolver_InvalidModRecord" xml:space="preserve">
+    <value>Enabled-Mod record {0} is invalid or incomplete; its Mod cannot be identified. Check the save's Mod list.</value>
+  </data>
   <data name="CatalogLogDiagnostics_MissingLocalMod" xml:space="preserve">
     <value>The save still enables local Mod '{0}', but it could not be found by its project title. Check the Mod directory and the Title in project.xml, then reload the profile. Moving or deleting Mod files does not clear the save's enabled-Mod record.</value>
   </data>

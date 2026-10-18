@@ -30,7 +30,7 @@ if ($LASTEXITCODE -ne 0) { throw 'Replacement Core API/identity verification fai
 $revision = & git -C $repo rev-parse HEAD
 if ($LASTEXITCODE -ne 0) { throw 'Cannot read source revision.' }
 $run = Join-Path $PSScriptRoot ('artifacts\package-' + (Get-Date -Format 'yyyyMMdd-HHmmss') + '-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
-$name = "DarkestDungeonSaveEditor-$version-MO2-patch-20261018-r4"
+$name = "DarkestDungeonSaveEditor-$version-MO2-patch"
 $package = Join-Path $run $name
 $payload = Join-Path $package 'payload'
 New-Item -ItemType Directory -Path (Join-Path $payload 'zh-CN') | Out-Null
@@ -81,7 +81,7 @@ $buildInfo = [ordered]@{
     builtAtUtc = [DateTime]::UtcNow.ToString('O')
     ordinaryCoreSha256 = (Get-FileHash -LiteralPath $ordinaryDll -Algorithm SHA256).Hash
     replacementCoreSha256 = (Get-FileHash -LiteralPath (Join-Path $payload 'DarkestDungeonSaveEditor.Core.dll') -Algorithm SHA256).Hash
-    compatibilityRevision = 'mapper-20261016-guards-20261018-r4'
+    compatibilityRevision = 'mapper-20261016-guards-20261018-beta4'
     supportedMapper = 'game_support_DarkestDungeon_20261016_004446 (merge mod mapper)'
 }
 $buildInfo | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $package 'build-info.json') -Encoding utf8NoBOM

@@ -12,12 +12,30 @@ if (($text.Split([string[]]@($anchor), [StringSplitOptions]::None)).Length -ne 2
     throw 'The upstream resolver changed. Review the MO2 insertion point before rebuilding.'
 }
 $insertion = @'
-        // Present the MO2 virtual merge as one saved Mod; retain native ordering and guards.
-        Mo2Compatibility.Apply(baseRoot, gameDirectory, normalizedWorkshopDirectory,
+        // Identify the virtual merge now; only materialize it after saved Mod bindings pass.
+        var resolveMergeSource = Mo2Compatibility.RegisterSource(baseRoot, gameDirectory, normalizedWorkshopDirectory,
             localSources, cancellationToken, validateBindingsOnly);
 
 '@
 $text = $text.Replace($anchor, $insertion + "`n" + $anchor)
+$returnAnchor = @'
+        return (gameMode, sources.OrderBy(source => source.LoadOrder).ToArray(), issues, appliedEntries.Count);
+'@
+if (($text.Split([string[]]@($returnAnchor), [StringSplitOptions]::None)).Length -ne 2) {
+    throw 'The upstream resolver return changed. Review deferred MO2 source preparation before rebuilding.'
+}
+$prepareMerge = @'
+        if (resolveMergeSource is not null)
+        {
+            RequireResolvedModSources(issues);
+            var mergeDirectory = resolveMergeSource();
+            for (var index = 0; index < sources.Count; index++)
+                if (sources[index].Id.Equals("local:" + Mo2Compatibility.MergeTitle, StringComparison.OrdinalIgnoreCase))
+                    sources[index] = sources[index] with { Directory = mergeDirectory };
+        }
+
+'@
+$text = $text.Replace($returnAnchor, $prepareMerge + "`n" + $returnAnchor)
 $signature = @'
         string gameDirectory, string? workshopDirectory, string? normalizedAdditionalLocalModDirectory,
         CancellationToken cancellationToken)

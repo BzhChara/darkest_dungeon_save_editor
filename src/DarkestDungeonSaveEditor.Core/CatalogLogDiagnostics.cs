@@ -122,10 +122,11 @@ public static partial class CatalogLogDiagnostics
         return (raw, DiagnosticLogLevel.Warning, Clean(raw), null);
     }
 
-    internal static string FormatUnresolvedModSources(IEnumerable<string> issues) =>
-        string.Join(" ", issues.Distinct(StringComparer.Ordinal).Select(DescribeModSourceIssue).OfType<string>());
+    internal static string FormatUnresolvedModSources(IEnumerable<string> issues, bool forLoading = false) =>
+        string.Join(forLoading ? Environment.NewLine : " ", issues.Distinct(StringComparer.Ordinal)
+            .Select(issue => DescribeModSourceIssue(issue, forLoading)).OfType<string>());
 
-    private static string? DescribeModSourceIssue(string raw)
+    private static string? DescribeModSourceIssue(string raw, bool forLoading = false)
     {
         const string missingLocal = "Enabled local Mod could not be mapped by project title: ";
         const string ambiguousLocal = "Enabled local Mod title is ambiguous and was not scanned: ";
@@ -137,11 +138,16 @@ public static partial class CatalogLogDiagnostics
         if (raw.StartsWith(ambiguousLocal, StringComparison.Ordinal))
             return EditorText.Format("CatalogLogDiagnostics_AmbiguousLocalMod", Clean(raw[ambiguousLocal.Length..]));
         if (raw.StartsWith(missingWorkshop, StringComparison.Ordinal))
-            return EditorText.Get("CatalogLogDiagnostics_011") + Clean(raw[missingWorkshop.Length..]) +
-                EditorText.Get("CatalogLogDiagnostics_012");
+            return forLoading
+                ? EditorText.Format("ActiveContentResolver_MissingWorkshopMod", Clean(raw[missingWorkshop.Length..]))
+                : EditorText.Get("CatalogLogDiagnostics_011") + Clean(raw[missingWorkshop.Length..]) +
+                    EditorText.Get("CatalogLogDiagnostics_012");
         if (raw.StartsWith(workshopPrefix, StringComparison.Ordinal) && raw.EndsWith(unavailableWorkshop, StringComparison.Ordinal))
             return EditorText.Format("CatalogLogDiagnostics_UnavailableWorkshopDirectory",
                 Clean(raw[workshopPrefix.Length..^unavailableWorkshop.Length]));
+        if (forLoading && (raw.StartsWith("Ignored malformed applied_ugcs_1_0 entry: ", StringComparison.Ordinal) ||
+            raw.StartsWith("Ignored incomplete applied_ugcs_1_0 entry: ", StringComparison.Ordinal)))
+            return EditorText.Format("ActiveContentResolver_InvalidModRecord", Clean(raw[(raw.IndexOf(": ", StringComparison.Ordinal) + 2)..]));
         // Keep other source-resolution failures visible without calling them missing files.
         if (raw.StartsWith("Enabled Workshop item", StringComparison.Ordinal) ||
             raw.StartsWith("Enabled local Mod", StringComparison.Ordinal) ||

@@ -369,6 +369,8 @@ try
                 var content = f.Resolve("{\"0\":{\"name\":\"Other\",\"source\":\"mod_local_source\"},\"3\":{\"name\":\"merge mod\",\"source\":\"mod_local_source\"}}");
                 Assert(content.Sources.Count == 3 && content.Sources[2].Id == "local:merge mod" && content.Sources[2].LoadOrder == 1003, "saved slot preserved");
                 Assert(content.Sources[1].Directory == Path.Combine(f.Game, "mods", "Other"), "other local source unchanged");
+                ActiveContentResolver.RequireResolvedModSources(content);
+                Throws<InvalidOperationException>(() => f.Resolve("{\"0\":{\"name\":\"Missing Local Mod\",\"source\":\"mod_local_source\"},\"3\":{\"name\":\"merge mod\",\"source\":\"mod_local_source\"}}"), "Missing Local Mod");
                 ActiveContentResolver.ValidateSourceBindings(content.Resolution, content.Sources);
                 Fixture.Write(Path.Combine(f.Game, "mods/!!MOD/project.xml"), "<project><Title>merge mod</Title></project>");
                 ActiveContentResolver.ValidateSourceBindings(content.Resolution, content.Sources);
@@ -378,6 +380,54 @@ try
                 Fixture.Write(Path.Combine(f.Game, "mods/Collision/project.xml"), "<project><Title>Different</Title></project>");
                 Fixture.Write(Path.Combine(f.ModDirectory("A"), "inventory/test.darkest"), "two");
                 Throws<InvalidOperationException>(() => ActiveContentResolver.ValidateSourceBindings(content.Resolution, content.Sources));
+            }
+            finally { System.IO.File.Delete(appConfig); }
+        }),
+        ("deferred merge identity never hides a physical source", f =>
+        {
+            f.Mod("A"); f.List("+A"); f.File("A", "inventory/test.darkest", "one"); f.Manifest(("inventory/test.darkest", "one"));
+            var nativeDirectory = Path.Combine(f.Game, "mods", "!!MOD");
+            Fixture.Write(Path.Combine(nativeDirectory, "project.xml"), "<project><Title>Other</Title></project>");
+            Fixture.Write(Path.Combine(nativeDirectory, "modfiles.txt"), "");
+            var appConfig = Path.Combine(AppContext.BaseDirectory, "mo2-compat.json");
+            Assert(!System.IO.File.Exists(appConfig), "test directory has no user config");
+            System.IO.File.Copy(f.Config, appConfig);
+            try
+            {
+                foreach (var names in new[] { new[] { "Other", "merge mod" }, new[] { "merge mod", "Other" } })
+                {
+                    var applied = JsonSerializer.Serialize(names.Select((name, index) => (name, index))
+                        .ToDictionary(entry => entry.index.ToString(), entry => new { entry.name, source = "mod_local_source" }));
+                    var content = f.Resolve(applied);
+                    ActiveContentResolver.RequireResolvedModSources(content);
+                    Assert(content.Sources.Count == 3 &&
+                        content.Sources.Single(source => source.Id == "local:Other").Directory == nativeDirectory &&
+                        content.Sources.Single(source => source.Id == "local:merge mod").Directory.StartsWith(f.Cache, StringComparison.OrdinalIgnoreCase) &&
+                        content.Sources.Skip(1).Select(source => source.DisplayName).SequenceEqual(names),
+                        "both saved source identities and priorities must survive either list order");
+                    ActiveContentResolver.ValidateSourceBindings(content.Resolution, content.Sources);
+                }
+            }
+            finally { System.IO.File.Delete(appConfig); }
+        }),
+        ("missing saved Mods stop before MO2 resource reads and cache generation", f =>
+        {
+            f.Mod("A"); f.List("+A"); f.File("A", "inventory/test.darkest", "one"); f.Manifest(("inventory/test.darkest", "one"));
+            var appConfig = Path.Combine(AppContext.BaseDirectory, "mo2-compat.json");
+            Assert(!System.IO.File.Exists(appConfig), "test directory has no user config");
+            System.IO.File.Copy(f.Config, appConfig);
+            var unresolved = "{\"0\":{\"name\":\"Missing Local Mod\",\"source\":\"mod_local_source\"},\"1\":{\"name\":\"999999\",\"source\":\"Steam\"},\"3\":{\"name\":\"merge mod\",\"source\":\"mod_local_source\"}}";
+            try
+            {
+                using (System.IO.File.Open(Path.Combine(f.ModDirectory("A"), "inventory/test.darkest"),
+                    FileMode.Open, FileAccess.Read, FileShare.None))
+                    Throws<InvalidOperationException>(() => f.Resolve(unresolved), "Missing Local Mod");
+                Throws<InvalidOperationException>(() => f.Resolve(unresolved), "999999");
+                Assert(!Directory.Exists(f.Cache), "preflight must not create a merged cache for incomplete saved bindings");
+                var content = f.Resolve("{\"3\":{\"name\":\"merge mod\",\"source\":\"mod_local_source\"}}");
+                ActiveContentResolver.RequireResolvedModSources(content);
+                Assert(Directory.Exists(f.Cache) && content.Sources[1].Directory.StartsWith(f.Cache, StringComparison.OrdinalIgnoreCase),
+                    "corrected saved bindings must resolve to the real prepared cache, not the temporary virtual slot");
             }
             finally { System.IO.File.Delete(appConfig); }
         }),

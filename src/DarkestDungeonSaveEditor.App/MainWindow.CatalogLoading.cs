@@ -67,6 +67,7 @@ public partial class MainWindow : Window
                 additionalLocalModDirectory,
                 codec, workspaceRoot: locations?.WorkspaceDirectory, cancellationToken: loadCancellation.Token);
             if (generation != _catalogGeneration) return;
+            ActiveContentResolver.RequireResolvedModSources(activeContent);
             CrashDiagnostics.SetStage("LoadCatalog: preparing missing Mod manifests");
             RequireGameStopped();
             var manifestProgress = new Progress<string>(message =>
