@@ -32,6 +32,8 @@ internal static partial class ContractSuite
     // Exercise the shipped WPF handlers on a Dispatcher. No visible window or real profile is opened.
     private static async Task VerifyProfileSyncInteractionAsync(ContractFixture f)
     {
+        await VerifyOperationSyncPolicyAsync(f);
+        await VerifyRaidStateMaintenanceSyncAsync(f);
         await VerifyInitialProfileLoadAsync(Path.GetFullPath(Path.Combine(f.RunRoot, "..", "..", "..")));
         var window = new MainWindow();
         const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic;
@@ -69,12 +71,7 @@ internal static partial class ContractSuite
         {
             await (Task)Call("StartProfileSyncAsync", content, items, f.Codec, f.GameRoot, f.WorkshopRoot, f.AdditionalLocalModDirectory, fingerprint, locations)!;
             await Settled();
-            // Poll explicitly to avoid wall-clock timer races in the contract.
-            ((DispatcherTimer)Get("_profilePoll")!).Stop();
-            ((ProfileSaveMonitor)Get("_catalogMonitor")!).Stop();
-            Assert((DateTime)Get("_nextContentCheckUtc")! > DateTime.UtcNow &&
-                (DateTime)Get("_nextContentCheckUtc")! <= DateTime.UtcNow.AddSeconds(60),
-                "The initial content check must establish the resource-check deadline.");
+            ((DispatcherTimer)Get("_gameProcessPoll")!).Stop();
             var service = new SaveEditService(f.Codec, new(f.RunRoot, Path.Combine(f.RunRoot, "ui-work"), Path.Combine(f.RunRoot, "ui-backups")));
             var prepared = await service.PrepareQuantityItemEditAsync(content.Profile,
                 items.Items.Single(item => item.DisplayId == "gold"), 17, content);
@@ -90,18 +87,53 @@ internal static partial class ContractSuite
                 gate = ReaderGate();
                 await gate.WaitAsync();
                 Call("RequestProfileSync", false);
-                Call("RequestProfileSync", false); // Coalesced focus + timer checks must also remain nonblocking.
+                Call("RequestProfileSync", false); // Coalesced explicit requests must preserve the same snapshot.
                 Assert(Flag("_syncInProgress") && Flag("_syncReady") && ((Control)Get("BattleMapPanel")!).IsEnabled &&
                     ((Button)Get("ApplyButton")!).IsEnabled && ReferenceEquals(Get("_preparedQuantityItemEdit"), prepared),
-                    "An unchanged background check must not disable map/apply or invalidate a prepared edit.");
+                    "An unchanged explicit reader check must not invalidate a prepared edit.");
                 if (i == 1) { Call("SetBusy", true); Call("SetBusy", false); } // An operation finished while the check was waiting.
                 gate.Release(); gate = null;
                 await Settled();
                 Assert(Equals(Get("_editRevision"), revision) && ReferenceEquals(Get("_preparedQuantityItemEdit"), prepared) &&
                     ((TextBlock)Get("ProfileSyncStatusTextBlock")!).Text == status && ((TextBox)Get("StatusTextBox")!).Text == logs,
-                    "Quiet polls must preserve preview, status and log, including a completed concurrent operation.");
+                    "Unchanged explicit checks must preserve preview, status and log, including a completed concurrent operation.");
             }
-            Console.WriteLine("PASS: WPF idle/focus polling stays interactive, preserves previews and emits no repeated sync status.");
+            Console.WriteLine("PASS: WPF coalesced explicit reads preserve previews and emit no repeated sync status.");
+
+            foreach (var mapOperation in new[] { false, true })
+            {
+                // Block the reader after the write has ended, including an already
+                // running reader check. Controls must not briefly become live.
+                gate = ReaderGate();
+                await gate.WaitAsync();
+                Call("RequestProfileSync", false);
+                if (mapOperation) await (Task)Call("BattleMapPanel_SaveEditBusyChanged", true)!;
+                else Call("SetBusy", true);
+                var completion = (Task)(mapOperation
+                    ? Call("BattleMapPanel_SaveEditBusyChanged", false) : Call("CompleteProfileEditAsync"))!;
+                Assert(!completion.IsCompleted && Flag("_completingProfileEdit") && !Flag("_syncReady") &&
+                    !((Control)Get("BattleMapPanel")!).IsEnabled && !((TabControl)Get("CatalogTabs")!).IsEnabled &&
+                    !((Button)Get("ApplyButton")!).IsEnabled && !((Button)Get("PreviewButton")!).IsEnabled,
+                    "Inventory and map completion must await full sync under an uninterrupted UI lock.");
+                gate.Release(); gate = null;
+                await completion;
+                await Settled();
+                Assert(!Flag("_completingProfileEdit") && Flag("_syncReady") && ((TabControl)Get("CatalogTabs")!).IsEnabled &&
+                    Get("_preparedQuantityItemEdit") is null,
+                    "Successful completion must publish sync before restoring controls and consume the old preview.");
+            }
+            using (var lockedSave = new FileStream(f.EstatePath, FileMode.Open, FileAccess.Read, FileShare.None))
+            {
+                Call("SetBusy", true);
+                await (Task)Call("CompleteProfileEditAsync")!;
+                Assert(!Flag("_completingProfileEdit") && !Flag("_syncReady") &&
+                    !((Control)Get("BattleMapPanel")!).IsEnabled && !((Button)Get("PreviewButton")!).IsEnabled &&
+                    !((Button)Get("ApplyButton")!).IsEnabled && ((FrameworkElement)Get("PathInputsBorder")!).IsEnabled,
+                    "A failed post-write sync must keep editing disabled while allowing reload/recovery.");
+            }
+            Call("RequestProfileSync", false); await Settled();
+            Set("_preparedQuantityItemEdit", prepared); Call("UpdateEnabledState");
+            Console.WriteLine("PASS: WPF inventory/map completion awaits sync, consumes previews and recovers after sync failure.");
 
             Set("_battleMaintenanceDeferred", false);
             Set("_maintenanceRetryPending", false);
@@ -128,17 +160,6 @@ internal static partial class ContractSuite
             Set("_preparedQuantityItemEdit", prepared);
             Call("UpdateEnabledState");
             Console.WriteLine("PASS: WPF quantity-only saves refresh amounts without repeated battle maintenance.");
-
-            var running = true;
-            Set("_battleMaintenance", new ManagedBattleEncounterBridgeService(f.Codec, locations, () => running));
-            Set("_battleMaintenanceDeferred", true);
-            Call("CheckProfileSync", false); await Settled();
-            Assert(Flag("_battleMaintenanceDeferred") && ReferenceEquals(Get("_preparedQuantityItemEdit"), prepared),
-                "A cleanup deferred by the running game must not keep disrupting otherwise unchanged polls.");
-            running = false;
-            Call("CheckProfileSync", false); await Settled();
-            Assert(!Flag("_battleMaintenanceDeferred") && Flag("_syncReady"), "Closing the game must retry pending maintenance even without save changes.");
-            Console.WriteLine("PASS: WPF game-exit maintenance retry does not repeatedly block quiet polling.");
 
             var pending = Path.Combine(locations.BackupDirectory, profile.SteamUserId, profile.ProfileId, "pending-recovery");
             Directory.CreateDirectory(pending);
@@ -226,22 +247,13 @@ internal static partial class ContractSuite
             var hot = WriteMultiMash(f.GameRoot, "inventory/sync-ui.inventory.items.darkest",
                 "inventory_item: .type estate .id sync_ui_probe .base_stack_limit 7\n");
             Set("_preparedQuantityItemEdit", prepared);
-            Set("_nextContentCheckUtc", DateTime.UtcNow.AddSeconds(60));
-            Call("CheckProfileSync", true); await Settled();
+            Call("CheckGameProcess"); await Settled();
             Assert(!disabledDuringChange && ReferenceEquals(Get("_preparedQuantityItemEdit"), prepared) &&
                 !((IReadOnlyList<QuantityItemDefinition>)Get("_allItems")!).Any(item => item.ItemId == "sync_ui_probe"),
-                "Returning to the window before the content deadline must preserve previews and defer the resource scan.");
-            Set("_nextContentCheckUtc", DateTime.MinValue);
-            Call("CheckProfileSync", false); await Settled();
-            Assert(!disabledDuringChange && ReferenceEquals(Get("_preparedQuantityItemEdit"), prepared) &&
-                !((IReadOnlyList<QuantityItemDefinition>)Get("_allItems")!).Any(item => item.ItemId == "sync_ui_probe"),
-                "Inactive polling must not perform a scheduled resource scan even after its deadline.");
-            Call("CheckProfileSync", true); await Settled();
+                "Idle process/focus checks must preserve previews without scanning changed resource files.");
+            Call("RequestProfileSync", false, true); await Settled();
             Assert(disabledDuringChange && Flag("_syncReady") && ((IReadOnlyList<QuantityItemDefinition>)Get("_allItems")!).Any(item => item.ItemId == "sync_ui_probe") &&
                 ((TextBox)Get("CopiesTextBox")!).Text == "17", "Actual resource updates publish exclusively and preserve user input.");
-            Assert((DateTime)Get("_nextContentCheckUtc")! > DateTime.UtcNow.AddSeconds(45) &&
-                (DateTime)Get("_nextContentCheckUtc")! <= DateTime.UtcNow.AddSeconds(60),
-                "A completed scheduled resource check must defer the next scan by one minute.");
             File.Delete(hot);
             gate = ReaderGate(); await gate.WaitAsync();
             Call("RequestProfileSync", false);
@@ -249,8 +261,8 @@ internal static partial class ContractSuite
             gate.Release(); gate = null; await Settled();
             Assert(!((IReadOnlyList<QuantityItemDefinition>)Get("_allItems")!).Any(item => item.ItemId == "sync_ui_probe") &&
                 !Flag("_contentRefreshRequested"),
-                "An explicit resource refresh queued during a save check must survive coalescing and bypass the deadline.");
-            Console.WriteLine("PASS: WPF resource checks respect the minute deadline and inactive window; queued explicit refreshes publish without losing user input.");
+                "An explicit resource refresh queued during a save check must survive coalescing.");
+            Console.WriteLine("PASS: WPF resources refresh only on explicit checks; queued refreshes preserve user input.");
 
             hot = WriteMultiMash(f.GameRoot, "inventory/sync-ui.inventory.items.darkest",
                 "inventory_item: .type estate .id sync_ui_retry .base_stack_limit 8\n");
@@ -258,23 +270,22 @@ internal static partial class ContractSuite
             {
                 Call("RequestProfileSync", false, true);
                 while (Flag("_syncInProgress")) await Task.Delay(15);
-                ((DispatcherTimer)Get("_catalogSyncRetry")!).Stop();
-                Assert(!Flag("_syncReady") && Flag("_contentRefreshRequested"),
-                    "A failed resource check must retain its full-refresh intent for recovery.");
+                Assert(!Flag("_syncReady") && Flag("_contentRefreshRequested") && !Flag("_syncRequested"),
+                    "A failed resource check must retain refresh intent without scheduling a background retry.");
             }
             Call("RequestProfileSync", false); await Settled();
             Assert(Flag("_syncReady") && ((IReadOnlyList<QuantityItemDefinition>)Get("_allItems")!).Any(item => item.ItemId == "sync_ui_retry"),
-                "The next save poll must finish a previously failed resource refresh even before its normal deadline.");
+                "The next explicit request must finish a previously failed resource refresh.");
             File.Delete(hot);
             Call("RequestProfileSync", false, true); await Settled();
-            Console.WriteLine("PASS: WPF resource failures retain full-refresh intent and recover without waiting for the next minute.");
+            Console.WriteLine("PASS: WPF resource failures retain full-refresh intent and recover on explicit retry.");
 
             var bytes = File.ReadAllBytes(f.GameSavePath);
             File.WriteAllText(f.GameSavePath, "{broken");
             Call("RequestProfileSync", false);
             while (Flag("_syncInProgress")) await Task.Delay(15);
             Assert(!Flag("_syncReady") && !panel.IsEnabled && Get("_lastSyncError") is not null,
-                "Partial saves must pause writes and schedule recovery instead of publishing a partial catalog.");
+                "Partial saves must pause writes until explicit recovery instead of publishing a partial catalog.");
             File.WriteAllBytes(f.GameSavePath, bytes);
             Call("RequestProfileSync", false); await Settled();
             Assert(Flag("_syncReady") && Get("_lastSyncError") is null, "Stable save recovery must restore interaction.");
@@ -294,6 +305,91 @@ internal static partial class ContractSuite
         finally
         {
             gate?.Release();
+            Call("StopProfileSync");
+            window.Close();
+        }
+    }
+    private static async Task VerifyRaidStateMaintenanceSyncAsync(ContractFixture f)
+    {
+        var root = Path.Combine(f.RunRoot, "sync-deferred-raid");
+        var game = Path.Combine(root, "game");
+        var mods = Path.Combine(game, "mods");
+        Directory.CreateDirectory(mods);
+        var profile = WriteBattleSafetyProfile(Path.Combine(root, "profile"));
+        foreach (var name in new[] { "persist.estate.json", "persist.roster.json", "persist.town.json", "persist.upgrades.json" })
+            File.WriteAllText(Path.Combine(profile.ProfileDirectory, name), "{\"base_root\":{}}");
+        var map = JsonNode.Parse(File.ReadAllText(profile.MapSavePath))!;
+        map["base_root"]!["map"]!["final_room_id"] = 250;
+        File.WriteAllText(profile.MapSavePath, map.ToJsonString());
+        var raid = JsonNode.Parse(File.ReadAllText(profile.RaidSavePath))!;
+        raid["base_root"]!["start_elapsed_time"] = 100;
+        raid["base_root"]!["raid_instance"]!["id"] = "sync-deferred-raid";
+        raid["base_root"]!["party"]!["inventory"] = JsonNode.Parse("{\"items\":{\"0\":{\"id\":\"\",\"type\":\"gold\",\"amount\":100}}}");
+        File.WriteAllText(profile.RaidSavePath, raid.ToJsonString());
+        WriteMultiMash(game, "inventory/base.inventory.items.darkest", "inventory_item: .type gold .id \"\" .base_stack_limit 1750\n");
+        CreateBattleMonsterDefinitions(game, ["native", "added"]);
+        var table = WriteMultiMash(game, "dungeons/cove/cove.2.mash.darkest", "room: .chance 1 .types native\n");
+        var locations = new SaveEditorLocations(root, Path.Combine(root, "workspaces"), Path.Combine(root, "backups"));
+        var content = await ActiveContentResolver.ResolveAsync(profile, game, null, mods, f.Codec, locations.WorkspaceDirectory);
+        var snapshot = await new BattleMapSnapshotReader(f.Codec).LoadAsync(profile.ProfileDirectory);
+        var encounter = BattleEncounterCatalog.Load(content, snapshot).DirectEncounters.Single(item => item.MashType == 1);
+        var edits = new BattleMapEditService(f.Codec, locations);
+        await edits.CommitAsync(await edits.PreparePlaceBattleAsync(profile, snapshot, "rooB", "tile0", encounter));
+        File.WriteAllText(table, "room: .chance 1 .types added\nroom: .chance 1 .types native\n");
+        raid["base_root"]!["inbattle"] = true;
+        File.WriteAllText(profile.RaidSavePath, raid.ToJsonString());
+        var originalMapHash = ComputeSha256(profile.MapSavePath);
+        var originalRaidHash = ComputeSha256(profile.RaidSavePath);
+        var items = await QuantityItemCatalog.LoadAsync(content, f.Codec);
+        var window = new MainWindow();
+        const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic;
+        object? Get(string name) => typeof(MainWindow).GetField(name, flags)!.GetValue(window);
+        void Set(string name, object? value) => typeof(MainWindow).GetField(name, flags)!.SetValue(window, value);
+        object? Call(string name, params object?[] args)
+        {
+            var method = typeof(MainWindow).GetMethod(name, flags)!;
+            return method.Invoke(window, method.GetParameters().Select((parameter, index) =>
+                index < args.Length ? args[index] : parameter.DefaultValue).ToArray());
+        }
+        Set("_activeContentSnapshot", content);
+        Set("_allItems", items.Items);
+        Set("_quantitySaveContext", items.SaveContext);
+        try
+        {
+            await (Task)Call("StartProfileSyncAsync", content, items, f.Codec, game, null, mods,
+                ProfileCatalogContentFingerprint.Capture(content.Sources), locations)!;
+            ((DispatcherTimer)Get("_gameProcessPoll")!).Stop();
+            Assert((bool)Get("_syncReady")! && !(bool)Get("_maintenanceRetryPending")! && !(bool)Get("_battleMaintenanceDeferred")!,
+                "Saved combat must defer cleanup without registering an error or game-exit retry.");
+            var revision = Get("_editRevision");
+            var status = ((TextBlock)Get("ProfileSyncStatusTextBlock")!).Text;
+            var logs = ((TextBox)Get("StatusTextBox")!).Text;
+            var disabled = false;
+            var tabs = (TabControl)Get("CatalogTabs")!;
+            tabs.IsEnabledChanged += (_, _) => { if (!tabs.IsEnabled) disabled = true; };
+            for (var attempt = 0; attempt < 3; attempt++)
+            {
+                Call("RequestProfileSync", false, attempt == 2);
+                await (Task)Call("DrainProfileSyncAsync")!;
+                Assert(!disabled && (bool)Get("_syncReady")! && !(bool)Get("_syncRequested")! &&
+                    Equals(revision, Get("_editRevision")) && ((TextBlock)Get("ProfileSyncStatusTextBlock")!).Text == status &&
+                    ((TextBox)Get("StatusTextBox")!).Text == logs && ComputeSha256(profile.MapSavePath) == originalMapHash &&
+                    ComputeSha256(profile.RaidSavePath) == originalRaidHash,
+                    "Repeated explicit checks during saved combat must preserve controls, preview revision, status, logs and saves.");
+            }
+            raid["base_root"]!["inbattle"] = false;
+            File.WriteAllText(profile.RaidSavePath, raid.ToJsonString());
+            Call("RequestProfileSync", false);
+            await (Task)Call("DrainProfileSyncAsync")!;
+            Assert((bool)Get("_syncReady")! && !(bool)Get("_maintenanceRetryPending")! &&
+                ComputeSha256(profile.MapSavePath) != originalMapHash &&
+                (await new BattleMapSnapshotReader(f.Codec).LoadAsync(profile.ProfileDirectory)).Areas
+                    .Single(area => area.AreaId == "rooB").Tiles.Single().MashIndex == -1,
+                "A new stationary raid save must automatically resume and finish the deferred cleanup.");
+            Console.WriteLine("PASS: WPF saved-combat cleanup deferral does not loop or disable controls; a changed raid resumes maintenance.");
+        }
+        finally
+        {
             Call("StopProfileSync");
             window.Close();
         }

@@ -1647,8 +1647,20 @@ Backup directory:
     <value>{0} does not exist: {1}</value>
     <comment>src/DarkestDungeonSaveEditor.App/MainWindow.Presentation.cs</comment>
   </data>
+  <data xml:space="preserve" name="MainWindow_ProfileSync_GameRunning">
+    <value>Game running · Editing disabled · Showing the last loaded data</value>
+    <comment>src/DarkestDungeonSaveEditor.App/MainWindow.OperationSync.cs</comment>
+  </data>
+  <data xml:space="preserve" name="MainWindow_ProfileSync_GameExited">
+    <value>Game closed · Waiting for stable saves and synchronizing</value>
+    <comment>src/DarkestDungeonSaveEditor.App/MainWindow.OperationSync.cs</comment>
+  </data>
+  <data xml:space="preserve" name="MainWindow_ProfileSync_OperationChanged">
+    <value>The save or active content changed and has been refreshed. Create a new preview or select the map action again.</value>
+    <comment>src/DarkestDungeonSaveEditor.App/MainWindow.OperationSync.cs</comment>
+  </data>
   <data xml:space="preserve" name="MainWindow_ProfileSync_001">
-    <value>Initial synchronization is incomplete. Wait for an automatic retry or reload.</value>
+    <value>Synchronization is incomplete. Reload the profile to retry. </value>
     <comment>src/DarkestDungeonSaveEditor.App/MainWindow.ProfileSync.cs</comment>
   </data>
   <data xml:space="preserve" name="MainWindow_ProfileSync_002">
@@ -1704,11 +1716,11 @@ Backup directory:
     <comment>src/DarkestDungeonSaveEditor.App/MainWindow.ProfileSync.cs</comment>
   </data>
   <data xml:space="preserve" name="MainWindow_ProfileSync_015">
-    <value>Automatically detects profile and resource changes. Stale editor battle records will be cleaned up after the game closes.</value>
+    <value>Checks saves and resources before editing. Editing is disabled while the game runs and until synchronization after exit completes.</value>
     <comment>src/DarkestDungeonSaveEditor.App/MainWindow.ProfileSync.cs</comment>
   </data>
   <data xml:space="preserve" name="MainWindow_ProfileSync_016">
-    <value>Waiting for a complete save · Retrying</value>
+    <value>Synchronization failed · Reload the profile to retry</value>
     <comment>src/DarkestDungeonSaveEditor.App/MainWindow.ProfileSync.cs</comment>
   </data>
   <data xml:space="preserve" name="MainWindow_ProfileSync_017">
@@ -3559,6 +3571,10 @@ Backup directory:
     <value>Not written yet</value>
     <comment>src/DarkestDungeonSaveEditor.Core/ManagedBattleEncounterBridgeService.Maintenance.cs</comment>
   </data>
+  <data xml:space="preserve" name="ManagedBattleEncounterBridgeService_Maintenance_028">
+    <value>Automatic encounter cleanup is deferred until the saved raid state changes. {0}</value>
+    <comment>src/DarkestDungeonSaveEditor.Core/ManagedBattleEncounterBridgeService.Maintenance.cs</comment>
+  </data>
   <data xml:space="preserve" name="ManagedBattleEncounterBridgeService_Maintenance_027">
     <value>Automatic battle cleanup failed; files written by this attempt were restored. Backup: {0}. {1}</value>
     <comment>src/DarkestDungeonSaveEditor.Core/ManagedBattleEncounterBridgeService.Maintenance.cs</comment>
@@ -4879,8 +4895,8 @@ Backup directory:
   <data xml:space="preserve" name="Language_English">
     <value>English</value>
   </data>
-  <data xml:space="preserve" name="Language_RestartRequired">
-    <value>Applies on next startup</value>
+  <data xml:space="preserve" name="Language_Immediate">
+    <value>Applies immediately</value>
   </data>
   <data xml:space="preserve" name="Language_SaveFailedTitle">
     <value>Could not save language</value>
@@ -4916,5 +4932,8 @@ Backup directory:
   </data>
   <data name="SaveEditService_Trinkets_Unverified" xml:space="preserve">
     <value>Trinket '{0}' is read-only because its effective definition or dependencies could not be verified. See the catalog warnings in the load log for the specific cause, resolve it, then reload the profile.</value>
+  </data>
+  <data name="ManagedBattleEncounterBridgeService_LegacyTitle" xml:space="preserve">
+    <value>This Bridge uses an old title with fullwidth parentheses and must be cleaned up and recreated before editing battles: {0}. Its files and save references have not been migrated.</value>
   </data>
 </root>

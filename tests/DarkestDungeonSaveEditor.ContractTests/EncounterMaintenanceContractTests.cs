@@ -9,7 +9,7 @@ internal static partial class ContractSuite
 
     private static async Task RunEncounterMaintenanceContractsAsync(string runRoot, DsonSaveCodec codec, bool nested = false)
     {
-        foreach (var scenario in new[] { "shared-interrupted-package", "shared-interrupted-raid", "shared-interrupted", "town-other-raid", "shared-persistent", "town-persistent", "town-reset-route", "cleanup", "binary", "new-raid", "ambiguous-new-raid", "missing-history", "partial-history",
+        foreach (var scenario in new[] { "raid-state-deferred", "shared-interrupted-package", "shared-interrupted-raid", "shared-interrupted", "town-other-raid", "shared-persistent", "town-persistent", "town-reset-route", "cleanup", "binary", "new-raid", "ambiguous-new-raid", "missing-history", "partial-history",
             "unmapped-local", "rollback", "deferred", "direct-only", "unknown", "stats-only", "interrupted", "truncated-marker", "incomplete-marker", "external" })
         {
             var sharedPersistent = scenario.StartsWith("shared-", StringComparison.Ordinal);
@@ -264,6 +264,38 @@ internal static partial class ContractSuite
                 Assert(error is not null && ComputeSha256(mapPath) == beforeMap && bridgeBefore!.All(pair => ComputeSha256(pair.Key) == pair.Value),
                     "Unparseable index tables must defer without turning uncertainty into deletions.");
                 continue;
+            }
+            if (scenario == "raid-state-deferred")
+            {
+                var stationaryRaid = File.ReadAllBytes(raidPath);
+                var backupCount = Directory.EnumerateFiles(locations.BackupDirectory, "backup-manifest.json", SearchOption.AllDirectories).Count();
+                foreach (var state in new[] { "battle", "battle-payload", "wave", "teleport", "camp", "loot", "doorway" })
+                {
+                    var blockedRaid = JsonNode.Parse(stationaryRaid)!;
+                    var blockedRoot = blockedRaid["base_root"]!;
+                    if (state == "battle") blockedRoot["inbattle"] = true;
+                    if (state == "battle-payload") blockedRoot["battle"] = new JsonObject { ["active"] = true };
+                    if (state == "wave") blockedRoot["wave_logic"] = new JsonObject { ["active"] = true };
+                    if (state == "teleport") blockedRoot["teleported"] = true;
+                    if (state == "camp") blockedRoot["camp"]!["phase"] = 1;
+                    if (state == "loot") blockedRoot["loot"]!["queue"]!["pending"] = 1;
+                    if (state == "doorway") blockedRoot["in_doorway"]!["area_to"] = 100;
+                    File.WriteAllText(raidPath, blockedRaid.ToJsonString());
+                    var blockedHash = ComputeSha256(raidPath);
+                    foreach (var inspectOnly in new[] { true, false, true })
+                    {
+                        var blocked = await bridge.ReconcileAsync(content, game, mods, inspectOnly: inspectOnly);
+                        Assert(blocked.Deferred && !blocked.RequiresWrite && !blocked.RetryWhenGameExits && !blocked.Changed &&
+                            !string.IsNullOrWhiteSpace(blocked.DeferredReason) && ComputeSha256(mapPath) == beforeMap &&
+                            ComputeSha256(raidPath) == blockedHash && bridgeBefore!.All(pair => ComputeSha256(pair.Key) == pair.Value) &&
+                            Directory.EnumerateFiles(locations.BackupDirectory, "backup-manifest.json", SearchOption.AllDirectories).Count() == backupCount,
+                            $"Maintenance must defer {state} until the saved raid changes, without requesting writes or creating backups (inspection={inspectOnly}).");
+                    }
+                }
+                File.WriteAllBytes(raidPath, stationaryRaid);
+                var ready = await bridge.ReconcileAsync(content, game, mods, inspectOnly: true);
+                Assert(ready.RequiresWrite && !ready.Deferred, "Maintenance must resume after the saved raid becomes stationary.");
+                Console.WriteLine("PASS: maintenance raid-state deferral is read-only and resumes after battle/camp/loot/transition state changes.");
             }
             if (scenario == "deferred")
             {

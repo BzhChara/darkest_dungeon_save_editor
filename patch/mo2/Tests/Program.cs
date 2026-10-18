@@ -106,31 +106,88 @@ try
             f.Manifest(("shared/quirk/999002base.quirk_library.json", "{\"quirks\":[]}"));
             Assert(File.Exists(Path.Combine(f.Prepare(), "shared/quirk/999002base.quirk_library.json")), "last-only alias");
         }),
-        ("rarity aliases follow dependencies instead of Mod index", f =>
+        ("updated mapper aliases retain every Buff, loc and rules provider", f =>
         {
-            f.Mod("Dependent"); f.Mod("Provider"); f.List("+Provider", "+Dependent");
-            var dependent = "{\"rarities\":[{\"id\":\"child\",\"insert_before\":\"parent\"}]}";
-            var provider = "{\"rarities\":[{\"id\":\"parent\",\"insert_before\":\"common\"}]}";
-            f.File("Dependent", "trinkets/custom.rarities.trinkets.json", dependent);
-            f.File("Provider", "trinkets/custom.rarities.trinkets.json", provider);
-            f.Manifest(("trinkets/999000custom.rarities.trinkets.json", provider), ("trinkets/999001custom.rarities.trinkets.json", dependent));
+            f.Mod("Low"); f.Mod("High"); f.Mod("Disabled"); f.List("+High", "-Disabled", "+Low");
+            var paths = new[] { "shared/buffs/base.buffs.json", "localization/2799235099_schinese.loc",
+                "localization/123_english.loc2", "shared/NL_rules.json", "shared/base.rules.json", "shared/rules.json" };
+            var manifest = new List<(string Path, string Text)>();
+            foreach (var path in paths)
+            {
+                f.File("Low", path, "low"); f.File("High", path, "high"); f.File("Disabled", path, "disabled");
+                // Buffs are no longer merged. Without overwrite there must still be two aliases.
+                var directory = path[..(path.LastIndexOf('/') + 1)]; var name = Path.GetFileName(path);
+                manifest.Add((directory + "999000" + name, "low"));
+                manifest.Add((directory + "999001" + name, "high"));
+            }
+            f.Manifest(manifest.ToArray());
             var snapshot = f.Prepare();
-            Assert(File.ReadAllText(Path.Combine(snapshot, "trinkets/999000custom.rarities.trinkets.json")) == provider, "dependency first");
-            Assert(File.ReadAllText(Path.Combine(snapshot, "trinkets/999001custom.rarities.trinkets.json")) == dependent, "dependent second");
-            // The supplied Windows mapper retains this original because its exclusion key
-            // uses forward slashes while scanner keys use backslashes before normalization.
-            f.Manifest(("trinkets/custom.rarities.trinkets.json", provider),
-                ("trinkets/999000custom.rarities.trinkets.json", provider), ("trinkets/999001custom.rarities.trinkets.json", dependent));
+            foreach (var (path, value) in manifest)
+                Assert(File.ReadAllText(Path.Combine(snapshot, path)) == value, "new alias provider: " + path);
+            Assert(paths.All(path => !File.Exists(Path.Combine(snapshot, path))), "only final alias names are exposed");
+            f.Overwrite("shared/buffs/base.buffs.json", "overwrite");
+            manifest.Add(("shared/buffs/999002base.buffs.json", "overwrite"));
+            f.Manifest(manifest.ToArray());
             snapshot = f.Prepare();
-            Assert(File.ReadAllText(Path.Combine(snapshot, "trinkets/custom.rarities.trinkets.json")) == provider,
-                "original rarity provider retained when listed alongside aliases");
+            Assert(File.ReadAllText(Path.Combine(snapshot, "shared/buffs/999002base.buffs.json")) == "overwrite", "Buff overwrite alias uses the next layer index");
         }),
-        ("rarity cycles fail", f =>
+        ("same-path rarity merge is consumed without rebuilding or renaming", f =>
+        {
+            f.Mod("Low"); f.Mod("High"); f.List("+High", "+Low");
+            const string path = "trinkets/base.rarities.trinkets.json";
+            f.File("Low", path, "{\"rarities\":[{\"id\":\"shared\",\"value\":\"low\"},{\"id\":\"child\"}]}");
+            f.File("High", path, "{\"rarities\":[{\"id\":\"shared\",\"value\":\"high\"}]}");
+            const string merged = "{\"rarities\":[{\"id\":\"shared\",\"value\":\"high\"},{\"id\":\"child\"}]}";
+            f.Manifest((path, merged));
+            Throws<InvalidDataException>(() => f.Prepare(), "Generated merged file is missing");
+            f.Overwrite(path, merged);
+            var snapshot = f.Prepare();
+            Assert(File.ReadAllText(Path.Combine(snapshot, path)) == merged, "MO2 rarity order and ID winners are preserved");
+            Assert(Directory.GetFiles(Path.Combine(snapshot, "trinkets")).Length == 1, "no global rarity aliases generated");
+        }),
+        ("distinct rarity paths are not globally sorted or parsed by the adapter", f =>
         {
             f.Mod("A"); f.List("+A");
-            f.File("A", "trinkets/one.rarities.trinkets.json", "{\"rarities\":[{\"id\":\"a\",\"insert_before\":\"b\"}]}");
-            f.File("A", "trinkets/two.rarities.trinkets.json", "{\"rarities\":[{\"id\":\"b\",\"insert_before\":\"a\"}]}");
-            f.Manifest(); Throws<InvalidDataException>(() => f.Prepare(), "cycle");
+            const string first = "{\"rarities\":[{\"id\":\"a\",\"insert_before\":\"b\"}]}";
+            const string second = "{\"rarities\":[{\"id\":\"b\",\"insert_before\":\"a\"}]}";
+            f.File("A", "trinkets/one.rarities.trinkets.json", first);
+            f.File("A", "trinkets/two.rarities.trinkets.json", second);
+            f.File("A", "trinkets/unlisted.rarities.trinkets.json", "not JSON");
+            f.Manifest(("trinkets/one.rarities.trinkets.json", first), ("trinkets/two.rarities.trinkets.json", second));
+            var snapshot = f.Prepare();
+            Assert(File.ReadAllText(Path.Combine(snapshot, "trinkets/one.rarities.trinkets.json")) == first &&
+                File.ReadAllText(Path.Combine(snapshot, "trinkets/two.rarities.trinkets.json")) == second, "distinct rarity bytes unchanged");
+            Assert(!File.Exists(Path.Combine(snapshot, "trinkets/unlisted.rarities.trinkets.json")), "unlisted malformed rarity ignored");
+        }),
+        ("new inventory merges require overwrite and preserve its bytes", f =>
+        {
+            f.Mod("Low"); f.Mod("High"); f.List("+High", "+Low");
+            foreach (var path in new[] { "inventory/base.gem.inventory.items.darkest", "inventory/base.inventory.extra_stack_limits.darkest" })
+            {
+                f.File("Low", path, "low\n"); f.File("High", path, "high\n");
+                f.Manifest((path, "high\n"));
+                Throws<InvalidDataException>(() => f.Prepare(), "Generated merged file is missing");
+                const string combined = "low\n\nhigh\n\n";
+                f.Overwrite(path, combined); f.Manifest((path, combined));
+                Assert(File.ReadAllText(Path.Combine(f.Prepare(), path)) == combined, "generated inventory bytes retained");
+            }
+        }),
+        ("localization XML keeps its physical name and MO2 priority", f =>
+        {
+            f.Mod("Base"); f.Mod("铸魂者技能闪退bug修复"); f.List("+铸魂者技能闪退bug修复", "+Base");
+            const string path = "localization/soulforged_tt.string_table.xml";
+            f.File("Base", path, "<root>base</root>"); f.File("铸魂者技能闪退bug修复", path, "<root>fixed</root>");
+            f.Manifest((path, "<root>fixed</root>"));
+            Assert(File.ReadAllText(Path.Combine(f.Prepare(), path)) == "<root>fixed</root>", "plain XML provider remains available");
+        }),
+        ("unsupported old rarity aliases report configuration and plugin compatibility", f =>
+        {
+            f.Mod("A"); f.List("+A"); f.File("A", "trinkets/custom.rarities.trinkets.json", "{\"rarities\":[]}");
+            f.Manifest(("trinkets/999000custom.rarities.trinkets.json", "{\"rarities\":[]}"));
+            Throws<InvalidDataException>(() => f.Prepare(), "No enabled provider");
+            Throws<InvalidDataException>(() => f.Prepare(), Path.GetFullPath(f.Profile));
+            Throws<InvalidDataException>(() => f.Prepare(), Path.GetFullPath(f.Mods));
+            Throws<InvalidDataException>(() => f.Prepare(), "matching compatibility package");
         }),
         ("hidden resources stay hidden and metadata need not be restored", f =>
         {
@@ -233,10 +290,65 @@ try
             var snapshot = f.Prepare(); Fixture.Write(Path.Combine(snapshot, "inventory/test.darkest"), "two");
             Throws<InvalidDataException>(() => f.Prepare(), "cache is incomplete or changed");
         }),
+        ("binding validation does not rescan cached catalogs or build new snapshots", f =>
+        {
+            f.Mod("A"); f.List("+A"); f.File("A", "inventory/test.darkest", "one");
+            f.Manifest(("inventory/test.darkest", "one"));
+            var snapshot = f.Prepare();
+            var cachedFile = Path.Combine(snapshot, "inventory/test.darkest");
+            using (var lockedUnrelatedCatalog = new FileStream(cachedFile, FileMode.Open, FileAccess.Read, FileShare.None))
+                for (var i = 0; i < 3; i++)
+                    Assert(Mo2Compatibility.ResolveForValidation(f.Config, f.Game, f.Workshop) == snapshot,
+                        "binding checks reuse published cache identity without reopening catalog bytes");
+            var before = Directory.GetDirectories(f.Cache).Order().ToArray();
+            var source = Path.Combine(f.ModDirectory("A"), "inventory/test.darkest");
+            var stamp = File.GetLastWriteTimeUtc(source);
+            Fixture.Write(source, "two"); File.SetLastWriteTimeUtc(source, stamp);
+            Throws<InvalidOperationException>(() => Mo2Compatibility.ResolveForValidation(f.Config, f.Game, f.Workshop), "changed after loading");
+            Assert(before.SequenceEqual(Directory.GetDirectories(f.Cache).Order()), "validation never creates a new cache for changed inputs");
+            Assert(File.ReadAllText(cachedFile) == "one", "validation never changes the existing cache");
+            f.File("A", "inventory/test.darkest", "one");
+            f.List("-A");
+            Throws<InvalidDataException>(() => Mo2Compatibility.ResolveForValidation(f.Config, f.Game, f.Workshop), "No enabled provider");
+            f.List("+A");
+            Fixture.Write(Path.Combine(snapshot, "modfiles.txt"), "tampered");
+            Throws<InvalidDataException>(() => Mo2Compatibility.ResolveForValidation(f.Config, f.Game, f.Workshop), "metadata changed");
+        }),
         ("cache cannot overlap MO2 or game input", f =>
         {
             f.List(); f.Manifest(); f.WriteConfig(cache: f.OverwriteRoot);
             Throws<InvalidDataException>(() => f.Prepare(), "cacheDirectory must be separate");
+        }),
+        ("ordinary battle guards still reject changed cached encounter bytes", f =>
+        {
+            f.Mod("A"); f.List("+A");
+            const string path = "dungeons/cove/cove.2.mash.darkest";
+            const string row = "hall: .chance 1 .types native_A\n";
+            f.File("A", path, row); f.Manifest((path, row));
+            Fixture.Write(Path.Combine(f.Game, "monsters/native/native_A/native_A.info.darkest"),
+                "display: .size 1\nmonster: .id native_A\n");
+            var appConfig = Path.Combine(AppContext.BaseDirectory, "mo2-compat.json");
+            Assert(!File.Exists(appConfig), "test directory has no user config");
+            File.Copy(f.Config, appConfig);
+            try
+            {
+                var content = f.Resolve("{\"0\":{\"name\":\"merge mod\",\"source\":\"mod_local_source\"}}");
+                var gameSave = Path.Combine(f.Root, "persist.game.json");
+                File.Copy(content.DecodedGamePath, gameSave);
+                content = content with { SourceGameSha256 = Mo2Compatibility.HashFile(gameSave) };
+                var snapshot = new BattleMapSnapshot(f.Root, "", "", "", "", "cove", 2, 1,
+                    null, null, null, null, null, null, null, null, null, false, [], [], [], DateTime.UtcNow);
+                var encounter = BattleEncounterCatalog.Load(content, snapshot).DirectEncounters.Single();
+                BattleEncounterCatalog.ValidateDirectEncounter(encounter);
+                var cached = Path.Combine(content.Sources.Single(s => s.Id == "local:merge mod").Directory, path);
+                var stamp = File.GetLastWriteTimeUtc(cached);
+                File.WriteAllText(cached, row.Replace("chance 1", "chance 2"));
+                File.SetLastWriteTimeUtc(cached, stamp);
+                Throws<InvalidOperationException>(() => BattleEncounterCatalog.ValidateDirectEncounter(encounter));
+                File.WriteAllText(cached, row);
+                BattleEncounterCatalog.ValidateDirectEncounter(encounter);
+            }
+            finally { File.Delete(appConfig); }
         }),
         ("cancellation never returns a partial snapshot", f =>
         {

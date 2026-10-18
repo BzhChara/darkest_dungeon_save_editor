@@ -46,14 +46,20 @@ public partial class MainWindow : Window
     private void BattleMapPanel_SaveEditApplied(string message) =>
         AppendStatusSafely(message, "BattleMap: applied save edit");
 
-    private void BattleMapPanel_SaveEditBusyChanged(bool isBusy)
+    private async Task BattleMapPanel_SaveEditBusyChanged(bool isBusy)
     {
-        if (!isBusy)
-        {
-            RequestProfileSync(invalidatePreview: false);
-        }
-        SetBusy(isBusy);
+        if (isBusy) SetBusy(true);
+        else await CompleteProfileEditAsync();
     }
+
+    private bool BattleMapPanel_ProfileBrowseChecking()
+    {
+        CheckGameProcess();
+        return !_gameRunning && !IsBusy && _syncReady && !_catalogCloseRequested;
+    }
+
+    private Task<bool> BattleMapPanel_ProfileEditChecking() =>
+        CheckProfileBeforeOperationAsync(requireUnchanged: true);
 
     private void AppendStatus(
         string message,

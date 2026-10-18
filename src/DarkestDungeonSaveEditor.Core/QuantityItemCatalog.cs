@@ -173,9 +173,9 @@ public static partial class QuantityItemCatalog
             .Select(definition => definition with
             {
                 LocalizedName = ResolveLocalizedName(localization, definition),
-                SourceLabel = definition.IsSaveOnly
-                    ? definition.SourceLabel
-                    : ContentSourceLabelFormatter.Format(
+                LocalizedSource = definition.IsSaveOnly
+                    ? null
+                    : ContentSourceLabelFormatter.Create(
                         definition.Source,
                         definition.AllSources,
                         activeContent.Sources)
@@ -274,9 +274,9 @@ public static partial class QuantityItemCatalog
             .Select(definition => definition with
             {
                 LocalizedName = ResolveLocalizedName(localization, definition),
-                SourceLabel = definition.IsSaveOnly
-                    ? definition.SourceLabel
-                    : ContentSourceLabelFormatter.Format(
+                LocalizedSource = definition.IsSaveOnly
+                    ? null
+                    : ContentSourceLabelFormatter.Create(
                         definition.Source,
                         definition.AllSources,
                         activeContent.Sources)

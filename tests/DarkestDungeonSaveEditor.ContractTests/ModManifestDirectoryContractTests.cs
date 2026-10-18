@@ -87,7 +87,7 @@ internal static partial class ContractSuite
         {
             foreach (var language in new[] { "en", "zh-CN" })
             {
-                CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo(language);
+                EditorText.Initialize(language, EditorText.SystemCulture);
                 var service = new ModManifestPreparationService(locations, () => false, (_, _, _, _) =>
                     Task.FromResult(Encoding.UTF8.GetBytes(FileRow(item) + "\nfx/missing.sprite/ 0\n")));
                 InvalidDataException? failure = null;
@@ -101,7 +101,7 @@ internal static partial class ContractSuite
                     "Preparation failures must explain the Mod, source, row, directory and cause in the selected language without publishing output.");
             }
         }
-        finally { CultureInfo.CurrentUICulture = originalCulture; }
+        finally { EditorText.Initialize(originalCulture.Name, EditorText.SystemCulture); }
 
         var result = await new ModManifestPreparationService(locations, () => false, (_, _, _, _) => Task.FromResult(bytes))
             .EnsureAsync(content, "unused");

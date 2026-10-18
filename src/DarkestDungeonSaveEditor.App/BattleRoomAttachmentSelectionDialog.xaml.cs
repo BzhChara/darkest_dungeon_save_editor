@@ -120,7 +120,7 @@ public partial class BattleRoomAttachmentSelectionDialog : Window
             Id = definition.Id;
             ChineseName = definition.ChineseName;
             EnglishName = definition.EnglishName;
-            Source = definition.SourceLabel;
+            Source = definition.DisplaySourceLabel;
             SearchText = string.Join(
                 '\n',
                 Id,

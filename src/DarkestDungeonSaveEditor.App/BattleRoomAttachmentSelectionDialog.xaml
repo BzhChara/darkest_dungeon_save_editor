@@ -10,7 +10,7 @@
         Icon="Assets/save-editor.ico"
         Background="{StaticResource AppTextureBrush}"
         Foreground="{StaticResource TextPrimaryBrush}"
-        FontFamily="{x:Static local:EditorTypography.Body}"
+        FontFamily="{local:Font Body}"
         FontSize="14"
         UseLayoutRounding="True"
         SnapsToDevicePixels="True"

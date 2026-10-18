@@ -16,7 +16,7 @@ internal static class Mo2Compatibility
     private static readonly object Gate = new();
 
     internal static void Apply(JsonObject configuration, string gameDirectory, string? workshopDirectory,
-        Dictionary<string, IReadOnlyList<string>> localSources, CancellationToken token)
+        Dictionary<string, IReadOnlyList<string>> localSources, CancellationToken token, bool validateBindingsOnly = false)
     {
         if (configuration["applied_ugcs_1_0"] is not JsonObject applied ||
             !applied.Any(pair => pair.Value is JsonObject entry &&
@@ -34,7 +34,34 @@ internal static class Mo2Compatibility
                     !Path.GetFullPath(candidate).Equals(settings.OverwriteDirectory, StringComparison.OrdinalIgnoreCase))
                     throw Error($"An unrelated local project also uses the title 'merge mod': {candidate}. Resolve the title ambiguity before loading.");
         }
-        localSources[MergeTitle] = [Prepare(configPath, gameDirectory, workshopDirectory, token)];
+        localSources[MergeTitle] = [validateBindingsOnly
+            ? ResolveForValidation(configPath, gameDirectory, workshopDirectory, token)
+            : Prepare(configPath, gameDirectory, workshopDirectory, token)];
+    }
+
+    internal static string ResolveForValidation(string configPath, string gameDirectory, string? workshopDirectory,
+        CancellationToken token = default)
+    {
+        lock (Gate)
+        {
+            token.ThrowIfCancellationRequested();
+            // Always hash current MO2 inputs, even when size/timestamp did not change.
+            // Source-binding guards only need the resulting identity; the caller's
+            // ordinary catalog guards verify the cached resources used by its edit.
+            // Do not copy a new snapshot or re-hash unrelated cached catalogs here.
+            var plan = Mo2ContentPlan.Capture(configPath, gameDirectory, workshopDirectory, token);
+            var snapshot = SafePath.Under(plan.CacheDirectory, plan.Key);
+            var content = Path.Combine(snapshot, "content");
+            SafePath.RejectReparseAncestors(content);
+            var ready = Path.Combine(snapshot, "complete.txt");
+            if (!File.Exists(ready))
+                throw new InvalidOperationException("MO2 compatibility: Content changed after loading. Load the profile again before writing.");
+            SafePath.RequireRegular(ready);
+            if (File.ReadAllText(ready) != plan.Key)
+                throw new InvalidOperationException("MO2 compatibility: Content changed after loading. Load the profile again before writing.");
+            VerifyMetadata(plan, content);
+            return content;
+        }
     }
 
     internal static string Prepare(string configPath, string gameDirectory, string? workshopDirectory,
@@ -97,6 +124,13 @@ internal static class Mo2Compatibility
                 (file.ContentHash is not null && HashFile(path) != file.ContentHash))
                 throw Error($"The MO2 content cache is incomplete or changed: {path}. Close the editor, remove this cache snapshot, and reload.");
         }
+        VerifyMetadata(plan, content);
+    }
+
+    private static void VerifyMetadata(Mo2ContentPlan plan, string content)
+    {
+        SafePath.RequireRegular(Path.Combine(content, "project.xml"));
+        SafePath.RequireRegular(Path.Combine(content, "modfiles.txt"));
         if (!File.ReadAllBytes(Path.Combine(content, "project.xml")).SequenceEqual(plan.ProjectBytes) ||
             !File.ReadAllBytes(Path.Combine(content, "modfiles.txt")).SequenceEqual(plan.ManifestBytes))
             throw Error($"The MO2 content cache metadata changed: {content}. Close the editor and remove this cache snapshot.");
@@ -156,7 +190,7 @@ internal sealed record Mo2ContentPlan(string Key, string CacheDirectory, byte[] 
 
         using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
         void Add(string value) => hash.AppendData(Encoding.UTF8.GetBytes(value + "\n"));
-        Add("ddse-mo2-content-v2-direct");
+        Add("ddse-mo2-content-v3-mapper-20261016");
         Add(Mo2Compatibility.HashFile(configPath));
         Add(Path.GetFullPath(gameDirectory));
         Add(workshopDirectory ?? "");
@@ -229,7 +263,10 @@ internal sealed record Mo2ContentPlan(string Key, string CacheDirectory, byte[] 
             if (relative.Equals("modfiles.txt", StringComparison.OrdinalIgnoreCase))
                 throw Mo2Compatibility.Error("The final manifest must not list itself.");
             if (!mappings.TryGetValue(relative, out var provider))
-                throw Mo2Compatibility.Error($"No enabled provider for '{relative}'. Launch the game through the configured MO2 profile to refresh overwrite, then fully exit it before loading.");
+                throw Mo2Compatibility.Error($"No enabled provider for '{relative}' in the configured MO2 content. " +
+                    $"Profile: '{settings.ProfileDirectory}'; Mods: '{settings.ModsDirectory}'; overwrite: '{settings.OverwriteDirectory}'. " +
+                    "Check the selected profile, enabled Mod files and whether overwrite was refreshed by launching that profile. " +
+                    "If the game plugin was updated, use a matching compatibility package; refreshing overwrite alone cannot resolve unsupported virtual filenames.");
             var physical = provider.SourcePath;
             SafePath.RequireRegular(physical, checkedDirectories);
             var info = new FileInfo(physical);

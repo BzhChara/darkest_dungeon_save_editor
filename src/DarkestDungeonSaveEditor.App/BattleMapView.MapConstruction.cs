@@ -19,13 +19,10 @@ public partial class BattleMapView : UserControl
         _currentSnapshot = snapshot;
         ShowMapSurface();
         UpdateMapBadge();
-        MapTitleTextBlock.Text =
-            EditorText.Format("BattleMapView_MapConstruction_002", _profileId ?? EditorText.Get("BattleMapView_MapConstruction_001"), FormatDungeon(snapshot.DungeonId), snapshot.Difficulty);
-        MapSelectionTextBlock.Text =
-            EditorText.Format("BattleMapView_MapConstruction_003", snapshot.RoomCount, snapshot.CorridorCount) +
-            EditorText.Format("BattleMapView_MapConstruction_004", _cells.Count);
-        LiveStatusTextBlock.Text =
-            EditorText.Format("BattleMapView_LiveRefresh_008", snapshot.ReadAtUtc.ToLocalTime());
+        LocalizedUi.Set(MapTitleTextBlock, TextBlock.TextProperty, () => EditorText.Format("BattleMapView_MapConstruction_002", _profileId ?? EditorText.Get("BattleMapView_MapConstruction_001"), FormatDungeon(snapshot.DungeonId), snapshot.Difficulty));
+        LocalizedUi.Set(MapSelectionTextBlock, TextBlock.TextProperty, () => EditorText.Format("BattleMapView_MapConstruction_003", snapshot.RoomCount, snapshot.CorridorCount) +
+            EditorText.Format("BattleMapView_MapConstruction_004", _cells.Count));
+        LocalizedUi.Set(LiveStatusTextBlock, TextBlock.TextProperty, () => EditorText.Format("BattleMapView_LiveRefresh_008", snapshot.ReadAtUtc.ToLocalTime()));
         SnapshotRefreshed?.Invoke(snapshot);
 
         if (fitToView)
@@ -447,10 +444,15 @@ public partial class BattleMapView : UserControl
             SelectCell(cell);
             e.Handled = true;
         };
-        visual.PreviewMouseRightButtonDown += (_, _) =>
+        visual.PreviewMouseRightButtonDown += (_, _) => SelectCell(cell);
+        visual.MouseRightButtonUp += (_, e) =>
         {
-            SelectCell(cell);
-            visual.ContextMenu = BuildContextMenu(cell);
+            e.Handled = true;
+            // Browsing uses the loaded snapshot. The final confirmation performs
+            // the full content check before any Bridge or save write can begin.
+            if (!CanBrowseProfile() || !_cells.Contains(cell)) return;
+            var menu = BuildContextMenu(cell);
+            menu.IsOpen = true;
         };
 
         RefreshCellVisual(cell);

@@ -10,7 +10,7 @@
         Icon="Assets/save-editor.ico"
         Background="{StaticResource AppTextureBrush}"
         Foreground="{StaticResource TextPrimaryBrush}"
-        FontFamily="{x:Static local:EditorTypography.Body}"
+        FontFamily="{local:Font Body}"
         FontSize="14"
         UseLayoutRounding="True"
         SnapsToDevicePixels="True"
@@ -48,7 +48,7 @@
                         BorderThickness="1" CornerRadius="0">
                     <StackPanel>
                         <TextBlock HorizontalAlignment="Center" Foreground="{StaticResource GoldBrush}"
-                                   FontFamily="{x:Static local:EditorTypography.Heading}" FontSize="15" FontWeight="Bold"
+                                   FontFamily="{local:Font Heading}" FontSize="15" FontWeight="Bold"
                                    Text="{local:Text InitialQuirkSelectionDialog_030}" />
                         <TextBlock Margin="0,2,0,0" HorizontalAlignment="Center"
                                    Foreground="{StaticResource TextSecondaryBrush}" FontSize="11.5"

@@ -3,11 +3,11 @@
         xmlns:local="clr-namespace:DarkestDungeonSaveEditor.App"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="{local:Text MainWindow_003}"
-        Width="580" Height="830"
+        Width="580" Height="720"
         Icon="Assets/save-editor.ico"
         Background="{StaticResource AppTextureBrush}"
         Foreground="{StaticResource TextPrimaryBrush}"
-        FontFamily="{x:Static local:EditorTypography.Body}" FontSize="14"
+        FontFamily="{local:Font Body}" FontSize="14"
         UseLayoutRounding="True" SnapsToDevicePixels="True"
         ResizeMode="NoResize" ShowInTaskbar="False"
         WindowStartupLocation="CenterOwner">
@@ -46,12 +46,21 @@
                                        TextAlignment="Center" TextWrapping="Wrap" LineHeight="23" />
                             <TextBlock Margin="0,7,0,0" Text="{local:Text SupportDialog_003}"
                                        Style="{StaticResource MutedTextStyle}" TextAlignment="Center" TextWrapping="Wrap" />
-                            <Image x:Name="AlipayCodeImage" Margin="0,16,0,12"
-                                   Width="320" MaxWidth="320" Stretch="Uniform"
-                                   HorizontalAlignment="Center"
-                                   Source="Assets/support-alipay.jpg"
-                                   RenderOptions.BitmapScalingMode="HighQuality"
-                                   AutomationProperties.Name="{local:Text SupportDialog_004}" />
+                            <Border Margin="0,16,0,12" Padding="24" Background="White"
+                                    HorizontalAlignment="Center">
+                                <Image x:Name="AlipayCodeImage" Width="320" Height="320" Stretch="Uniform"
+                                       RenderOptions.BitmapScalingMode="HighQuality"
+                                       AutomationProperties.Name="{local:Text SupportDialog_004}">
+                                    <Image.Source>
+                                        <!-- Keep the original QR pixels and omit the surrounding payment poster. -->
+                                        <CroppedBitmap SourceRect="194,590,690,690">
+                                            <CroppedBitmap.Source>
+                                                <BitmapImage UriSource="Assets/support-alipay.jpg" />
+                                            </CroppedBitmap.Source>
+                                        </CroppedBitmap>
+                                    </Image.Source>
+                                </Image>
+                            </Border>
                             <TextBlock Text="{local:Text SupportDialog_005}" FontSize="20" FontWeight="Bold"
                                        Foreground="{StaticResource GoldBrush}" TextAlignment="Center" />
                         </StackPanel>

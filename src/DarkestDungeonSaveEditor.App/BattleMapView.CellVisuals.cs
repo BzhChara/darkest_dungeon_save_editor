@@ -19,9 +19,8 @@ public partial class BattleMapView : UserControl
             RefreshCellVisual(item);
         }
 
-        MapSelectionTextBlock.Text =
-            $"{cell.DisplayName} · {FormatKind(cell.Kind)} · {FormatKnowledge(cell.Knowledge)} · " +
-            EditorText.Format("BattleMapView_CellVisuals_001", FormatContent(cell));
+        LocalizedUi.Set(MapSelectionTextBlock, TextBlock.TextProperty, () => $"{cell.DisplayName} · {FormatKind(cell.Kind)} · {FormatKnowledge(cell.Knowledge)} · " +
+            EditorText.Format("BattleMapView_CellVisuals_001", FormatContent(cell)));
     }
 
     private void RefreshCellVisual(PrototypeMapCell cell)
@@ -234,7 +233,9 @@ public partial class BattleMapView : UserControl
         string? sourceTileId)
     {
         public string Id { get; } = id;
-        public string DisplayName { get; } = displayName;
+        public string DisplayName => SourceAreaId is null ? displayName : Kind == PrototypeCellKind.Room
+            ? EditorText.Format("BattleMapView_MapConstruction_007", SourceAreaId)
+            : EditorText.Format("BattleMapView_MapConstruction_008", SourceAreaId, SourceTileId);
         public PrototypeCellKind Kind { get; } = kind;
         public PrototypeKnowledge Knowledge { get; set; } = knowledge;
         public PrototypeContent Content { get; set; } = content;

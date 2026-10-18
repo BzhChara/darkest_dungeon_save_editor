@@ -52,6 +52,9 @@ public sealed record BattleEncounterDefinition(
     string UnavailableReason,
     BattleEncounterTableGuard TableGuard)
 {
+    internal ContentSourceLabel? LocalizedSource { get; init; }
+    public string DisplaySourceLabel => LocalizedSource?.ToString() ?? SourceLabel;
+
     public string DisplayName => MonsterIds.Count == 0 ? EditorText.Get("BattleEncounterCatalog_001") : string.Join(" + ", MonsterIds);
 
     public string ChineseDisplayName =>
@@ -610,7 +613,7 @@ public static partial class BattleEncounterCatalog
 
         var sourceKind = file.Query.SourceKind;
         var sourceHash = ComputeSha256(file.Path);
-        var sourceLabel = ContentSourceLabelFormatter.Format(
+        var sourceLabel = ContentSourceLabelFormatter.Create(
             file.Source.Id,
             file.ProviderSources,
             activeSources);
@@ -667,7 +670,7 @@ public static partial class BattleEncounterCatalog
                 sourceKind,
                 monsters,
                 weight,
-                sourceLabel,
+                sourceLabel.ToString(),
                 Path.GetFullPath(file.Path),
                 sourceHash,
                 record.SourceLine,
@@ -675,6 +678,7 @@ public static partial class BattleEncounterCatalog
                 string.Empty,
                 guard)
             {
+                LocalizedSource = sourceLabel,
                 OriginDungeonId = file.Query.DungeonId,
                 OriginDifficulty = file.Query.Difficulty,
                 SourceRelativePath = file.RelativePath,

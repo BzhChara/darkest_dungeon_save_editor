@@ -30,13 +30,13 @@ public partial class BattleMapView : UserControl
         if (catalog is null ||
             !TryGetWritableContext(target, out _, out _, out var snapshot, out _))
         {
-            MapSelectionTextBlock.Text = EditorText.Get("BattleMapView_Content_001");
+            LocalizedUi.Set(MapSelectionTextBlock, TextBlock.TextProperty, () => EditorText.Get("BattleMapView_Content_001"));
             return;
         }
         var definition = catalog.SelectRegionalContent(kind, snapshot.DungeonId, Random.Shared.NextDouble());
         if (definition is null)
         {
-            MapSelectionTextBlock.Text = EditorText.Get("BattleMapView_Content_002");
+            LocalizedUi.Set(MapSelectionTextBlock, TextBlock.TextProperty, () => EditorText.Get("BattleMapView_Content_002"));
             return;
         }
         await PlaceContentAsync(target, definition);
@@ -66,7 +66,7 @@ public partial class BattleMapView : UserControl
     {
         if (GetCurrentRoomAttachmentCatalog() is null || Window.GetWindow(this) is not { } dialogOwner)
         {
-            MapSelectionTextBlock.Text = EditorText.Get("BattleMapView_Content_003");
+            LocalizedUi.Set(MapSelectionTextBlock, TextBlock.TextProperty, () => EditorText.Get("BattleMapView_Content_003"));
             return;
         }
 
@@ -89,17 +89,17 @@ public partial class BattleMapView : UserControl
         CloseActiveContextMenu();
         if (GetCurrentRoomAttachmentCatalog() is null)
         {
-            MapSelectionTextBlock.Text = EditorText.Get("BattleMapView_Content_003");
+            LocalizedUi.Set(MapSelectionTextBlock, TextBlock.TextProperty, () => EditorText.Get("BattleMapView_Content_003"));
             return;
         }
         if (!TryGetWritableContext(target, out var owner, out var profile, out var snapshot, out var service))
         {
-            MapSelectionTextBlock.Text = EditorText.Get("BattleMapView_Content_004");
+            LocalizedUi.Set(MapSelectionTextBlock, TextBlock.TextProperty, () => EditorText.Get("BattleMapView_Content_004"));
             return;
         }
         if (!definition.IsAvailableInDungeon(snapshot.DungeonId))
         {
-            MapSelectionTextBlock.Text = EditorText.Get("BattleMapView_Content_005");
+            LocalizedUi.Set(MapSelectionTextBlock, TextBlock.TextProperty, () => EditorText.Get("BattleMapView_Content_005"));
             return;
         }
 
@@ -111,7 +111,7 @@ public partial class BattleMapView : UserControl
         if (!ThemedDialog.Confirm(owner,
                 EditorText.Format("BattleMapView_Content_007", target.DisplayName, action, contentDescription) +
                 Environment.NewLine + $"ID：{definition.Id}" +
-                Environment.NewLine + EditorText.Format("BattleMapView_Commands_049", definition.SourceLabel) +
+                Environment.NewLine + EditorText.Format("BattleMapView_Commands_049", definition.DisplaySourceLabel) +
                 Environment.NewLine + EditorText.Get("BattleMapView_Content_008") +
                 Environment.NewLine + EditorText.Get("BattleMapView_Commands_040"),
                 EditorText.Format("BattleMapView_Commands_020", kindLabel)))

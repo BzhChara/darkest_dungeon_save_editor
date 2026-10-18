@@ -343,7 +343,7 @@ public static partial class HeroClassCatalog
             .Select(heroClass => heroClass with
             {
                 LocalizedName = localization.GetHeroClassName(heroClass.Id),
-                SourceLabel = ContentSourceLabelFormatter.Format(
+                LocalizedSource = ContentSourceLabelFormatter.Create(
                     heroClass.Source,
                     heroClass.AllSources,
                     activeContent.Sources)
@@ -370,7 +370,7 @@ public static partial class HeroClassCatalog
                 return BuildInitialQuirk(mergedQuirk, quirksByHash, buffsByHash, knownBuffHashes) with
                 {
                     LocalizedName = localization.GetQuirkName(mergedQuirk.Id),
-                    SourceLabel = ContentSourceLabelFormatter.Format(
+                    LocalizedSource = ContentSourceLabelFormatter.Create(
                         mergedQuirk.Source,
                         mergedQuirk.AllSources,
                         activeContent.Sources)

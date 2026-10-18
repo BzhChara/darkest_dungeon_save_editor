@@ -41,6 +41,9 @@ public sealed record BattleRoomAttachmentDefinition(
     int SourceLine,
     BattleRoomAttachmentCatalogGuard CatalogGuard)
 {
+    internal ContentSourceLabel? LocalizedSource { get; init; }
+    public string DisplaySourceLabel => LocalizedSource?.ToString() ?? SourceLabel;
+
     public BilingualContentName LocalizedName { get; init; } = BilingualContentName.Empty;
 
     // Several declarations can share a physical line; keep their provenance distinct.
@@ -559,7 +562,7 @@ public static partial class BattleRoomAttachmentCatalog
         }
 
         var sourceSha256 = Convert.ToHexString(SHA256.HashData(bytes));
-        var sourceLabel = ContentSourceLabelFormatter.Format(
+        var sourceLabel = ContentSourceLabelFormatter.Create(
             file.Source.Id,
             file.ProviderSources,
             activeSources);
@@ -623,12 +626,12 @@ public static partial class BattleRoomAttachmentCatalog
                         id,
                         kind.Value,
                         ComputePropHash(id),
-                        sourceLabel,
+                        sourceLabel.ToString(),
                         Path.GetFullPath(file.Path),
                         file.RelativePath,
                         sourceSha256,
                         sourceLine,
-                        guard) { SourceRecordIndex = recordIndex },
+                        guard) { SourceRecordIndex = recordIndex, LocalizedSource = sourceLabel },
                     regionalWeight);
             }
         }

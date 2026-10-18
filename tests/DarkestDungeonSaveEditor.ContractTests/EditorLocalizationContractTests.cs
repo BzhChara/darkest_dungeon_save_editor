@@ -60,6 +60,7 @@ internal static partial class ContractSuite
 
         var originalUi = CultureInfo.CurrentUICulture;
         var originalDefault = CultureInfo.DefaultThreadCurrentUICulture;
+        var originalSystem = EditorText.SystemCulture;
         var originalFormat = CultureInfo.CurrentCulture;
         try
         {
@@ -71,7 +72,7 @@ internal static partial class ContractSuite
                 "Explicit language wins; Chinese system languages use Simplified Chinese; unsupported languages fall back to English.");
             foreach (var (language, values) in new[] { ("en", english), ("zh-CN", chinese) })
             {
-                EditorText.Initialize(language, originalUi);
+                EditorText.Initialize(language, originalSystem);
                 Assert(Equals(CultureInfo.CurrentCulture, originalFormat), "Changing UI language must not change numeric/file culture.");
                 foreach (var (key, value) in values)
                     Assert(EditorText.Get(key).Replace("\r\n", "\n", StringComparison.Ordinal) == value,
@@ -100,7 +101,8 @@ internal static partial class ContractSuite
                        (language != "en" || logs.All(e => !Regex.IsMatch(e.Message, @"\p{IsCJKUnifiedIdeographs}"))),
                     "Diagnostic codes must preserve grouping/severity in both languages without leaking internal markers.");
             }
-            CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo("fr-FR");
+            VerifyLanguageAcrossOldExecutionContext();
+            EditorText.Initialize("system", CultureInfo.GetCultureInfo("fr-FR"));
             Assert(EditorText.Get("MainWindow_001") == "Darkest Dungeon Save Editor", "Unsupported resource cultures must fall back to English.");
 
             var settings = Path.Combine(runRoot, "settings", "language.json");
@@ -128,6 +130,7 @@ internal static partial class ContractSuite
         }
         finally
         {
+            EditorText.Initialize(originalUi.Name, originalSystem);
             CultureInfo.CurrentUICulture = originalUi;
             CultureInfo.DefaultThreadCurrentUICulture = originalDefault;
         }
@@ -138,18 +141,25 @@ internal static partial class ContractSuite
     {
         var originalUi = CultureInfo.CurrentUICulture;
         var originalDefault = CultureInfo.DefaultThreadCurrentUICulture;
+        var originalSystem = EditorText.SystemCulture;
         var originalResources = Application.Current.Resources;
         try
         {
             foreach (var language in new[] { "en", "zh-CN" })
             {
-                EditorText.Initialize(language, originalUi);
+                EditorText.Initialize(language, originalSystem);
                 Application.Current.Resources = LoadContractTheme(repositoryRoot);
                 var settings = Path.Combine(runRoot, "ui-" + language, "language.json");
                 EditorLanguageSettings.Save(settings, language);
-                var window = new MainWindow(settings);
+                var window = new MainWindow(settings)
+                {
+                    WindowStartupLocation = WindowStartupLocation.Manual,
+                    Left = -20000, Top = -20000, ShowActivated = false, ShowInTaskbar = false
+                };
                 try
                 {
+                    window.Show();
+                    FlushLanguageBindings();
                     ((Image)window.FindName("TitleLogoImage")).RaiseEvent(new RoutedEventArgs(FrameworkElement.LoadedEvent));
                     var expectedTitle = (language == "en" ? "Darkest Dungeon Save Editor" : "Darkest Dungeon 存档修改器") +
                         (DesktopCodecSession.IsNativeTestBuild ? " — " + EditorText.Get("Codec_NativeTestTitle") : string.Empty);
@@ -168,18 +178,36 @@ internal static partial class ContractSuite
                         Assert(grid.ColumnFromDisplayIndex(language == "en" ? 1 : 2).Header as string == "English",
                             "English names must precede Chinese names in English mode without removing either column.");
                     }
+                    var checkLoadedState = PrepareLiveLanguageState(window);
                     var previousTitle = window.Title;
                     var selectedPreference = language == "en" ? "zh-CN" : "en";
                     var selectedItem = languageOptions.Single(item => (string)item.Tag == selectedPreference);
                     selectedItem.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent, selectedItem));
+                    FlushLanguageBindings();
                     Assert(EditorLanguageSettings.Load(settings, out _) == selectedPreference &&
                            languageOptions.Count(item => item.IsChecked) == 1 && selectedItem.IsChecked &&
-                           window.Title == previousTitle && CultureInfo.CurrentUICulture.Name == language,
-                        "Language selection must save the next-start preference without changing the running UI or loaded state.");
+                           window.Title != previousTitle && EditorText.Culture.Name == selectedPreference &&
+                           window.FontFamily.Source == EditorTypography.Body.Source &&
+                           ((Button)window.FindName("LoadCatalogButton")).Content as string == EditorText.Get("MainWindow_021"),
+                        "Language selection must persist and immediately update the existing window, controls and fonts.");
                     selectedItem.IsChecked = false;
                     selectedItem.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent, selectedItem));
                     Assert(languageOptions.Count(item => item.IsChecked) == 1 && selectedItem.IsChecked,
                         "Clicking the saved language again must not leave the menu with no selection.");
+                    checkLoadedState();
+                    var systemItem = languageOptions.Single(item => (string)item.Tag == "system");
+                    systemItem.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent, systemItem));
+                    FlushLanguageBindings();
+                    Assert(EditorText.Culture.Equals(EditorText.ResolveCulture("system", originalSystem)) && systemItem.IsChecked,
+                        "Follow system must return to the original Windows language after manual switches.");
+                    checkLoadedState();
+                    var originalItem = languageOptions.Single(item => (string)item.Tag == language);
+                    originalItem.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent, originalItem));
+                    FlushLanguageBindings();
+                    checkLoadedState();
+                    foreach (var gridName in new[] { "ItemGrid", "TrinketGrid", "HeroGrid" })
+                        Assert(((DataGrid)window.FindName(gridName)).ColumnFromDisplayIndex(language == "en" ? 1 : 2).Header as string == "English",
+                            "Name column order must switch back in both directions.");
                     foreach (var size in new[] { new Size(1440, 900), new Size(1120, 720) })
                         RenderContractWindow(window, size, Path.Combine(runRoot, $"main-{language}-{size.Width}.png"));
                     RenderContractElement(languageButton.ContextMenu, new Size(240, 164), Path.Combine(runRoot, $"language-menu-{language}.png"));
@@ -222,11 +250,12 @@ internal static partial class ContractSuite
         }
         finally
         {
+            EditorText.Initialize(originalUi.Name, originalSystem);
             CultureInfo.CurrentUICulture = originalUi;
             CultureInfo.DefaultThreadCurrentUICulture = originalDefault;
             Application.Current.Resources = originalResources;
         }
-        Console.WriteLine("PASS: actual WPF windows in English/Chinese, persisted next-start selection and layout renders at normal/minimum sizes.");
+        Console.WriteLine("PASS: actual WPF windows in English/Chinese, immediate language selection with retained editor state and layout renders at normal/minimum sizes.");
         return Task.CompletedTask;
     }
 
@@ -234,6 +263,14 @@ internal static partial class ContractSuite
     {
         window.ApplyTemplate();
         var content = (FrameworkElement)window.Content;
+        if (window.IsVisible)
+        {
+            window.Width = size.Width;
+            window.Height = size.Height;
+            FlushLanguageBindings();
+            window.UpdateLayout();
+            size = new Size(content.ActualWidth, content.ActualHeight);
+        }
         RenderContractElement(content, size, path);
     }
 
@@ -242,6 +279,7 @@ internal static partial class ContractSuite
         content.Measure(size);
         content.Arrange(new Rect(size));
         content.UpdateLayout();
+        FlushLanguageBindings();
         var bitmap = new RenderTargetBitmap((int)size.Width, (int)size.Height, 96, 96, PixelFormats.Pbgra32);
         bitmap.Render(content);
         var encoder = new PngBitmapEncoder();

@@ -42,17 +42,16 @@ public partial class BattleMapView : UserControl
         {
             BuildPrototypeMap();
             ShowMapSurface();
-            MapTitleTextBlock.Text =
-                EditorText.Format("BattleMapView_ProfileLifecycle_001", (string.IsNullOrWhiteSpace(profileId) ? EditorText.Get("BattleMapView_MapConstruction_001") : profileId));
-            MapSelectionTextBlock.Text = EditorText.Get("BattleMapView_ProfileLifecycle_002");
-            LiveStatusTextBlock.Text = EditorText.Get("BattleMapView_ProfileLifecycle_003");
+            LocalizedUi.Set(MapTitleTextBlock, TextBlock.TextProperty, () => EditorText.Format("BattleMapView_ProfileLifecycle_001", (string.IsNullOrWhiteSpace(profileId) ? EditorText.Get("BattleMapView_MapConstruction_001") : profileId)));
+            LocalizedUi.Set(MapSelectionTextBlock, TextBlock.TextProperty, () => EditorText.Get("BattleMapView_ProfileLifecycle_002"));
+            LocalizedUi.Set(LiveStatusTextBlock, TextBlock.TextProperty, () => EditorText.Get("BattleMapView_ProfileLifecycle_003"));
             UpdateMapBadge();
             _fitToView = true;
             _ = Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(FitMapToViewport));
             return;
         }
 
-        ShowUnavailableState(EditorText.Get("BattleMapView_ProfileLifecycle_004"), EditorText.Get("BattleMapView_ProfileLifecycle_005"));
+        ShowUnavailableState("BattleMapView_ProfileLifecycle_004", "BattleMapView_ProfileLifecycle_005");
     }
 
     public async Task<BattleMapSnapshot?> LoadProfileAsync(
@@ -94,7 +93,7 @@ public partial class BattleMapView : UserControl
         _roomAttachmentCatalog = null;
         _currentSnapshot = null;
         ConfigureOriginalMapAssets(gameDirectory);
-        ShowUnavailableState(EditorText.Get("BattleMapView_ProfileLifecycle_006"), EditorText.Get("BattleMapView_ProfileLifecycle_007"));
+        ShowUnavailableState("BattleMapView_ProfileLifecycle_006", "BattleMapView_ProfileLifecycle_007");
 
         BattleMapSnapshot? snapshot = null;
         try
@@ -189,15 +188,11 @@ public partial class BattleMapView : UserControl
             }
             else if (!mapExists && !raidExists)
             {
-                ShowUnavailableState(
-                    EditorText.Get("BattleMapView_ProfileLifecycle_023"),
-                    EditorText.Get("BattleMapView_LiveRefresh_006"));
+                ShowUnavailableState("BattleMapView_ProfileLifecycle_023", "BattleMapView_LiveRefresh_006");
             }
             else
             {
-                ShowUnavailableState(
-                    EditorText.Get("BattleMapView_LiveRefresh_002"),
-                    EditorText.Get("BattleMapView_LiveRefresh_003"));
+                ShowUnavailableState("BattleMapView_LiveRefresh_002", "BattleMapView_LiveRefresh_003");
                 ScheduleRefreshRetry(generation);
             }
         }
@@ -205,9 +200,7 @@ public partial class BattleMapView : UserControl
         {
             if (generation == _profileGeneration)
             {
-                ShowUnavailableState(
-                    EditorText.Get("BattleMapView_ProfileLifecycle_024"),
-                    EditorText.Get("BattleMapView_LiveRefresh_003"));
+                ShowUnavailableState("BattleMapView_ProfileLifecycle_024", "BattleMapView_LiveRefresh_003");
                 ScheduleRefreshRetry(generation);
             }
             throw;
@@ -250,7 +243,7 @@ public partial class BattleMapView : UserControl
         ForceTownButton.IsEnabled = _currentSnapshot is not null;
     }
 
-    private void ShowUnavailableState(string message, string liveStatus)
+    private void ShowUnavailableState(string messageKey, string liveStatusKey, params object[] messageArguments)
     {
         CloseActiveContextMenu();
         _isRaidAvailable = false;
@@ -260,16 +253,16 @@ public partial class BattleMapView : UserControl
         MapCanvas.Children.Clear();
         MapCanvas.Visibility = Visibility.Collapsed;
         EmptyStatePanel.Visibility = Visibility.Visible;
-        EmptyStateTextBlock.Text = message;
+        LocalizedUi.Set(EmptyStateTextBlock, TextBlock.TextProperty, () => EditorText.Format(messageKey, messageArguments));
         PrototypeBadge.Visibility = Visibility.Collapsed;
         ZoomOutButton.IsEnabled = false;
         ZoomInButton.IsEnabled = false;
         ResetZoomButton.IsEnabled = false;
         FitMapButton.IsEnabled = false;
         ForceTownButton.IsEnabled = false;
-        MapTitleTextBlock.Text = EditorText.Get("BattleMapView_ProfileLifecycle_025");
-        MapSelectionTextBlock.Text = EditorText.Get("BattleMapView_ProfileLifecycle_026");
-        LiveStatusTextBlock.Text = liveStatus;
+        LocalizedUi.Set(MapTitleTextBlock, TextBlock.TextProperty, () => EditorText.Get("BattleMapView_ProfileLifecycle_025"));
+        LocalizedUi.Set(MapSelectionTextBlock, TextBlock.TextProperty, () => EditorText.Get("BattleMapView_ProfileLifecycle_026"));
+        LocalizedUi.Set(LiveStatusTextBlock, TextBlock.TextProperty, () => EditorText.Get(liveStatusKey));
     }
 
 }

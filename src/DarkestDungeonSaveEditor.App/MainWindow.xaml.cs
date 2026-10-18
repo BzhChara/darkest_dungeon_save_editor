@@ -53,17 +53,17 @@ public partial class MainWindow : Window
     public MainWindow() : this(EditorLanguageSettings.DefaultPath) { }
 
     internal MainWindow(string languageSettingsPath, DesktopCodecSession? codecSession = null,
-        SaveEditorLocations? saveLocations = null)
+        SaveEditorLocations? saveLocations = null, Func<bool>? gameRunningProbe = null)
     {
+        _gameRunningProbe = gameRunningProbe ?? IsDarkestDungeonRunning;
         _saveLocations = saveLocations;
         _codecSession = codecSession ?? (Application.Current as App)?.CodecSession
             ?? DesktopCodecSession.Create([], AppContext.BaseDirectory);
         _languageSettingsPath = languageSettingsPath;
         InitializeComponent();
-        if (!_codecSession.IsNative)
-            Title += " — " + EditorText.Get("Codec_JavaReferenceTitle");
-        else if (DesktopCodecSession.IsNativeTestBuild)
-            Title += " — " + EditorText.Get("Codec_NativeTestTitle");
+        LocalizedUi.Set(this, TitleProperty, () => EditorText.Get("MainWindow_001") +
+            (!_codecSession.IsNative ? " — " + EditorText.Get("Codec_JavaReferenceTitle") :
+                DesktopCodecSession.IsNativeTestBuild ? " — " + EditorText.Get("Codec_NativeTestTitle") : string.Empty));
         CrashDiagnostics.RecordStatus($"Window DSON codec: {_codecSession.Identity}");
         InitializeLanguageSelection();
         foreach (var grid in new[] { ItemGrid, TrinketGrid, HeroGrid }) EditorNameColumns.Apply(grid);
@@ -76,7 +76,10 @@ public partial class MainWindow : Window
         BattleMapPanel.ActiveContentChanged += BattleMapPanel_ActiveContentChanged;
         BattleMapPanel.SaveEditApplied += BattleMapPanel_SaveEditApplied;
         BattleMapPanel.SaveEditBusyChanged += BattleMapPanel_SaveEditBusyChanged;
+        BattleMapPanel.ProfileBrowseChecking += BattleMapPanel_ProfileBrowseChecking;
+        BattleMapPanel.ProfileEditChecking += BattleMapPanel_ProfileEditChecking;
         UpdateCatalogMode();
+        StartGameProcessMonitoring();
     }
 
     protected override void OnSourceInitialized(EventArgs e)
@@ -105,12 +108,15 @@ public partial class MainWindow : Window
 
     protected override void OnClosed(EventArgs e)
     {
+        _gameProcessPoll?.Stop();
         StopProfileSync();
         _titleLogoTimer?.Stop();
         BattleMapPanel.SnapshotRefreshed -= BattleMapPanel_SnapshotRefreshed;
         BattleMapPanel.ActiveContentChanged -= BattleMapPanel_ActiveContentChanged;
         BattleMapPanel.SaveEditApplied -= BattleMapPanel_SaveEditApplied;
         BattleMapPanel.SaveEditBusyChanged -= BattleMapPanel_SaveEditBusyChanged;
+        BattleMapPanel.ProfileBrowseChecking -= BattleMapPanel_ProfileBrowseChecking;
+        BattleMapPanel.ProfileEditChecking -= BattleMapPanel_ProfileEditChecking;
         BattleMapPanel.ClearProfile();
         base.OnClosed(e);
     }
@@ -118,7 +124,7 @@ public partial class MainWindow : Window
     protected override void OnActivated(EventArgs e)
     {
         base.OnActivated(e);
-        CheckProfileSync(windowActive: true);
+        CheckGameProcess();
     }
 
 }

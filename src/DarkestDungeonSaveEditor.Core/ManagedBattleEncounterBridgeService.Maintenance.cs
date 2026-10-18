@@ -323,6 +323,30 @@ public sealed partial class ManagedBattleEncounterBridgeService
             removed = reindexed = 0;
         }
         if (_gameRunningProbe()) return new(false, true, removed, reindexed, 0, null, reasons) { RetryWhenGameExits = true };
+        if (invalidated && snapshot is not null && placements.Count > 0)
+        {
+            // Inspection must not advertise a write which the saved raid state
+            // forbids. Otherwise every quiet poll locks the UI and fails again.
+            // Reuse the write guard's state rules; malformed saves still fail.
+            Directory.CreateDirectory(Workspace());
+            var raidCopy = Path.Combine(Workspace(), "raid-state.source");
+            var decodedRaid = Path.Combine(Workspace(), "raid-state.json");
+            File.Copy(snapshot.RaidSavePath, raidCopy);
+            if (ComputeSha256(raidCopy) != snapshot.RaidSha256)
+                throw new IOException(EditorText.Get("ManagedBattleEncounterBridgeService_Maintenance_022"));
+            await _codec.DecodeAsync(raidCopy, decodedRaid, token).ConfigureAwait(false);
+            var raid = JsonSupport.ReadObject(decodedRaid);
+            try { BattleMapSaveEditor.ValidateStationaryRaidState(raid); }
+            catch (InvalidOperationException blocked)
+            {
+                // A save/content change will revisit maintenance. Exiting the
+                // game alone cannot clear a persisted battle/camp/loot state.
+                return new(false, true, removed, reindexed, 0, null, reasons)
+                {
+                    DeferredReason = EditorText.Format("ManagedBattleEncounterBridgeService_Maintenance_028", blocked.Message)
+                };
+            }
+        }
         if (inspectOnly)
         {
             foreach (var target in stagedFiles.Keys) GuardedSaveReplacement.ValidateReplaceAccess(target);

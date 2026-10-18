@@ -51,7 +51,7 @@ public partial class BattleMapView : UserControl
                     _roomAttachmentCatalog = null;
                 }
                 if (_currentSnapshot is not null || _isRaidAvailable)
-                    ShowUnavailableState(EditorText.Get("BattleMapView_ProfileSync_001"), EditorText.Get("BattleMapView_LiveRefresh_006"));
+                    ShowUnavailableState("BattleMapView_ProfileSync_001", "BattleMapView_LiveRefresh_006");
                 return;
             }
 

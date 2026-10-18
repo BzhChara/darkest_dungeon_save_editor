@@ -1,0 +1,151 @@
+<Window x:Class="DarkestDungeon.ModOrder.App.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Darkest Dungeon Mod Order Converter" Width="1150" Height="820"
+        MinWidth="900" MinHeight="760" WindowStartupLocation="CenterScreen"
+        Icon="Assets/save-editor.ico" FontFamily="{DynamicResource BodyFont}" FontSize="14"
+        Foreground="{DynamicResource TextPrimaryBrush}" Background="{DynamicResource AppTextureBrush}"
+        UseLayoutRounding="True" SnapsToDevicePixels="True"
+        TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType">
+  <Window.Resources>
+    <ResourceDictionary>
+        <Style x:Key="LanguageMenuItemStyle" TargetType="MenuItem">
+            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+            <Setter Property="Padding" Value="12,9" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="MenuItem">
+                        <Border x:Name="ItemChrome" Padding="{TemplateBinding Padding}" Background="Transparent">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="24" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock x:Name="CheckMark" Text="✓" Foreground="{StaticResource GoldBrush}"
+                                           Visibility="Hidden" VerticalAlignment="Center" />
+                                <ContentPresenter Grid.Column="1" ContentSource="Header" VerticalAlignment="Center" />
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="CheckMark" Property="Visibility" Value="Visible" />
+                            </Trigger>
+                            <Trigger Property="IsHighlighted" Value="True">
+                                <Setter TargetName="ItemChrome" Property="Background" Value="#541112" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+      <Style TargetType="RadioButton">
+        <Setter Property="Background" Value="{StaticResource StoneBandBrush}" />
+        <Setter Property="Foreground" Value="{StaticResource GoldBrush}" />
+        <Setter Property="FontFamily" Value="{DynamicResource HeadingFont}" />
+        <Setter Property="FontSize" Value="17" /><Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="Height" Value="42" /><Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Padding" Value="18,7" /><Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="RadioButton">
+          <Border x:Name="ModeBorder" Background="{TemplateBinding Background}" BorderBrush="#5F6663" BorderThickness="1" Padding="{TemplateBinding Padding}">
+            <Viewbox Stretch="Uniform" StretchDirection="DownOnly">
+              <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Viewbox>
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="ModeBorder" Property="BorderBrush" Value="{StaticResource GoldBrush}" /></Trigger>
+            <Trigger Property="IsChecked" Value="True"><Setter TargetName="ModeBorder" Property="Background" Value="{StaticResource RedBandBrush}" /><Setter TargetName="ModeBorder" Property="BorderBrush" Value="{StaticResource AccentStrongBrush}" /></Trigger>
+            <Trigger Property="IsEnabled" Value="False"><Setter Property="Foreground" Value="{StaticResource TextDisabledBrush}" /></Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate></Setter.Value></Setter>
+      </Style>
+    </ResourceDictionary>
+  </Window.Resources>
+  <Grid Background="{StaticResource AppTextureBrush}">
+    <Border Margin="8" Background="#90050505" BorderBrush="{StaticResource GoldDarkBrush}" BorderThickness="1">
+      <Border Margin="3" BorderBrush="#4B5351" BorderThickness="1">
+        <Grid>
+          <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+          <Border Grid.Row="0" Background="{StaticResource HeaderBrush}" BorderBrush="#59615E" BorderThickness="0,0,0,1" Padding="20,16">
+            <DockPanel>
+              <Button x:Name="LanguageButton" DockPanel.Dock="Right" Style="{StaticResource GhostButtonStyle}" Click="Language_Click" VerticalAlignment="Center" MinWidth="100">
+                <Button.ContextMenu>
+                  <ContextMenu Placement="Bottom" MinWidth="220" Padding="4" Background="#FA0A0A09"
+                               BorderBrush="{StaticResource GoldDarkBrush}" BorderThickness="1" HasDropShadow="False"
+                               FontSize="14" ItemContainerStyle="{StaticResource LanguageMenuItemStyle}">
+                    <ContextMenu.Template>
+                      <ControlTemplate TargetType="ContextMenu">
+                        <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}" Padding="{TemplateBinding Padding}">
+                          <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Cycle" />
+                        </Border>
+                      </ControlTemplate>
+                    </ContextMenu.Template>
+                    <MenuItem x:Name="SystemLanguage" Tag="system" IsCheckable="True" Click="LanguageMenuItem_Click" />
+                    <MenuItem Header="简体中文" Tag="zh-CN" IsCheckable="True" Click="LanguageMenuItem_Click" />
+                    <MenuItem Header="English" Tag="en" IsCheckable="True" Click="LanguageMenuItem_Click" />
+                  </ContextMenu>
+                </Button.ContextMenu>
+              </Button>
+              <TextBlock x:Name="Heading" Style="{StaticResource PageTitleStyle}" TextWrapping="Wrap" />
+            </DockPanel>
+          </Border>
+          <Grid Grid.Row="1" Margin="14">
+            <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" />
+              <RowDefinition Height="*" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+            <UniformGrid x:Name="DirectionPanel" Grid.Row="0" Rows="1" Columns="2" Margin="0,0,0,12">
+              <RadioButton x:Name="ToMo2" GroupName="Direction" Checked="Input_Changed" IsChecked="True" />
+              <RadioButton x:Name="ToSave" GroupName="Direction" Checked="Input_Changed" />
+            </UniformGrid>
+            <Border x:Name="InputPanel" Grid.Row="1" Style="{StaticResource OpenPanelStyle}" Padding="12,8">
+              <Grid>
+                <Grid.ColumnDefinitions><ColumnDefinition Width="210" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                <Grid.RowDefinitions><RowDefinition Height="58" /><RowDefinition Height="58" /><RowDefinition Height="58" /></Grid.RowDefinitions>
+                <TextBlock x:Name="SaveLabel" Style="{StaticResource FieldLabelStyle}" />
+                <TextBox x:Name="SavePath" Grid.Column="1" Margin="0,3,8,3" TextChanged="Input_Changed" />
+                <Button x:Name="SaveBrowse" Grid.Column="2" Tag="save" Click="Browse_Click" Margin="0,3" Style="{StaticResource GhostButtonStyle}" />
+                <TextBlock x:Name="ListLabel" Grid.Row="1" Style="{StaticResource FieldLabelStyle}" />
+                <TextBox x:Name="ListPath" Grid.Row="1" Grid.Column="1" Margin="0,3,8,3" TextChanged="Input_Changed" />
+                <Button x:Name="ListBrowse" Grid.Row="1" Grid.Column="2" Tag="list" Click="Browse_Click" Margin="0,3" Style="{StaticResource GhostButtonStyle}" />
+                <TextBlock x:Name="ModsLabel" Grid.Row="2" Style="{StaticResource FieldLabelStyle}" />
+                <TextBox x:Name="ModsPath" Grid.Row="2" Grid.Column="1" Margin="0,3,8,3" TextChanged="Input_Changed" />
+                <Button x:Name="ModsBrowse" Grid.Row="2" Grid.Column="2" Tag="mods" Click="Browse_Click" Margin="0,3" Style="{StaticResource GhostButtonStyle}" />
+              </Grid>
+            </Border>
+            <Grid Grid.Row="2" Margin="0,12,0,6">
+              <ContentControl Style="{StaticResource RedPanelHeaderStyle}" HorizontalContentAlignment="Left">
+                <TextBlock x:Name="PreviewHeading" Foreground="{StaticResource TextPrimaryBrush}" FontFamily="{DynamicResource HeadingFont}" FontSize="21" FontWeight="Bold" />
+              </ContentControl>
+              <CheckBox x:Name="OnlyEnabled" HorizontalAlignment="Right" Margin="0,0,12,0" VerticalAlignment="Center" IsChecked="True" Checked="Filter_Changed" Unchecked="Filter_Changed" />
+            </Grid>
+            <DataGrid x:Name="PreviewGrid" Grid.Row="3" AutoGenerateColumns="False" IsReadOnly="True" CanUserSortColumns="False"
+                      CanUserAddRows="False" CanUserDeleteRows="False" CanUserReorderColumns="False" SelectionChanged="Row_Selected">
+              <DataGrid.Columns>
+                <DataGridTextColumn Binding="{Binding Order}" Width="64" ElementStyle="{StaticResource DataGridTextElementStyle}" />
+                <DataGridTemplateColumn Width="75">
+                  <DataGridTemplateColumn.CellTemplate><DataTemplate>
+                    <CheckBox IsChecked="{Binding Enabled, Mode=OneWay}" IsHitTestVisible="False" Focusable="False" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                  </DataTemplate></DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTextColumn Binding="{Binding Mo2Folder}" Width="2*" ElementStyle="{StaticResource DataGridTextElementStyle}" />
+                <DataGridTextColumn Binding="{Binding NativeSource}" Width="140" ElementStyle="{StaticResource DataGridTextElementStyle}" />
+                <DataGridTextColumn Binding="{Binding NativeName}" Width="2*" ElementStyle="{StaticResource DataGridTextElementStyle}" />
+                <DataGridTextColumn Binding="{Binding Detail}" Width="2*" ElementStyle="{StaticResource DataGridTextElementStyle}" />
+              </DataGrid.Columns>
+            </DataGrid>
+            <TextBox x:Name="Details" Grid.Row="4" Style="{StaticResource LogTextBoxStyle}" IsReadOnly="True" TextWrapping="Wrap" Height="64" Margin="0,8,0,0" VerticalScrollBarVisibility="Auto" />
+            <DockPanel Grid.Row="5" Margin="0,12,0,0">
+              <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                <Button x:Name="PreviewButton" Click="Preview_Click" Style="{StaticResource GoldButtonStyle}" Margin="0,0,10,0" />
+                <Button x:Name="ExportButton" Click="Export_Click" IsEnabled="False" Style="{StaticResource PrimaryButtonStyle}" Margin="0" />
+              </StackPanel>
+                <TextBlock x:Name="Status" TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,10,16,0" />
+            </DockPanel>
+          </Grid>
+        </Grid>
+      </Border>
+    </Border>
+  </Grid>
+</Window>

@@ -173,7 +173,7 @@ public partial class BattleEncounterSelectionDialog : Window
                 _ => EditorText.Get("BattleEncounterSelectionDialog_017")
             };
             DungeonId = definition.OriginDungeonId;
-            Source = definition.SourceLabel;
+            Source = definition.DisplaySourceLabel;
             CompositionToolTip = $"{PreferredComposition}{Environment.NewLine}{Composition}";
             SearchText = string.Join(
                 '\n',

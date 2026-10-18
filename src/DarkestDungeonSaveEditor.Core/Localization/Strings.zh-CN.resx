@@ -1647,8 +1647,20 @@
     <value>{0}不存在：{1}</value>
     <comment>src/DarkestDungeonSaveEditor.App/MainWindow.Presentation.cs</comment>
   </data>
+  <data xml:space="preserve" name="MainWindow_ProfileSync_GameRunning">
+    <value>游戏运行中 · 已禁用修改 · 显示上次载入的数据</value>
+    <comment>src/DarkestDungeonSaveEditor.App/MainWindow.OperationSync.cs</comment>
+  </data>
+  <data xml:space="preserve" name="MainWindow_ProfileSync_GameExited">
+    <value>游戏已退出 · 等待存档稳定并同步</value>
+    <comment>src/DarkestDungeonSaveEditor.App/MainWindow.OperationSync.cs</comment>
+  </data>
+  <data xml:space="preserve" name="MainWindow_ProfileSync_OperationChanged">
+    <value>存档或启用内容已变化，现已刷新。请重新预览或重新选择地图操作。</value>
+    <comment>src/DarkestDungeonSaveEditor.App/MainWindow.OperationSync.cs</comment>
+  </data>
   <data xml:space="preserve" name="MainWindow_ProfileSync_001">
-    <value>首次同步未完成，请等待自动重试或重新载入。</value>
+    <value>同步未完成，请重新载入存档重试。</value>
     <comment>src/DarkestDungeonSaveEditor.App/MainWindow.ProfileSync.cs</comment>
   </data>
   <data xml:space="preserve" name="MainWindow_ProfileSync_002">
@@ -1704,11 +1716,11 @@
     <comment>src/DarkestDungeonSaveEditor.App/MainWindow.ProfileSync.cs</comment>
   </data>
   <data xml:space="preserve" name="MainWindow_ProfileSync_015">
-    <value>自动检测当前档案及资源定义变化；失效的编辑器战斗记录将在关闭游戏后自动清理。</value>
+    <value>编辑前检查存档及资源。游戏运行时禁用修改，退出后等待同步完成再恢复操作。</value>
     <comment>src/DarkestDungeonSaveEditor.App/MainWindow.ProfileSync.cs</comment>
   </data>
   <data xml:space="preserve" name="MainWindow_ProfileSync_016">
-    <value>等待完整存档 · 自动重试</value>
+    <value>同步失败 · 请重新载入存档重试</value>
     <comment>src/DarkestDungeonSaveEditor.App/MainWindow.ProfileSync.cs</comment>
   </data>
   <data xml:space="preserve" name="MainWindow_ProfileSync_017">
@@ -3559,6 +3571,10 @@
     <value>尚未写入</value>
     <comment>src/DarkestDungeonSaveEditor.Core/ManagedBattleEncounterBridgeService.Maintenance.cs</comment>
   </data>
+  <data xml:space="preserve" name="ManagedBattleEncounterBridgeService_Maintenance_028">
+    <value>战斗记录自动维护暂缓，待副本存档状态变化后再检查。{0}</value>
+    <comment>src/DarkestDungeonSaveEditor.Core/ManagedBattleEncounterBridgeService.Maintenance.cs</comment>
+  </data>
   <data xml:space="preserve" name="ManagedBattleEncounterBridgeService_Maintenance_027">
     <value>战斗自动清理失败，本次已写入文件已恢复；备份：{0}。{1}</value>
     <comment>src/DarkestDungeonSaveEditor.Core/ManagedBattleEncounterBridgeService.Maintenance.cs</comment>
@@ -4879,8 +4895,8 @@
   <data xml:space="preserve" name="Language_English">
     <value>English</value>
   </data>
-  <data xml:space="preserve" name="Language_RestartRequired">
-    <value>下次启动生效</value>
+  <data xml:space="preserve" name="Language_Immediate">
+    <value>立即生效</value>
   </data>
   <data xml:space="preserve" name="Language_SaveFailedTitle">
     <value>无法保存语言设置</value>
@@ -4916,5 +4932,8 @@
   </data>
   <data name="SaveEditService_Trinkets_Unverified" xml:space="preserve">
     <value>饰品「{0}」暂时只读：无法确认其实际生效的定义或依赖。请查看载入日志中的目录警告，处理具体原因后重新载入存档。</value>
+  </data>
+  <data name="ManagedBattleEncounterBridgeService_LegacyTitle" xml:space="preserve">
+    <value>这个 Bridge 仍使用中文括号旧标题，请先清理并重新生成后再编辑战斗：{0}。原文件和存档引用未自动迁移。</value>
   </data>
 </root>

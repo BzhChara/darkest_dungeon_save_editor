@@ -79,6 +79,7 @@ internal static partial class ContractSuite
             await RunEncounterRecordContractsAsync(runRoot, codec);
             await RunDlcNativeEncounterContractsAsync(runRoot, codec);
             await RunDedicatedBridgeContractsAsync(runRoot, codec, repositoryRoot);
+            await RunBridgeTitleContractsAsync(runRoot, codec);
         }
         await codec.EncodeAsync(decodedSeedPath, estatePath, originalBinaryPath: null);
         await codec.EncodeAsync(decodedGameSeedPath, gameSavePath, originalBinaryPath: null);
@@ -137,6 +138,7 @@ internal static partial class ContractSuite
         await RunWpfContractsAsync(async () =>
         {
             await VerifyEditorLocalizationUiAsync(repositoryRoot, runRoot);
+            await VerifySelectionAndMenuAsync(runRoot);
             await VerifyQuirkSelectionInteractionAsync(repositoryRoot);
             await VerifyProfileSyncInteractionAsync(fixture);
         });

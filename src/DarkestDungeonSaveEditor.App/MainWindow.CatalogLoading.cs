@@ -33,6 +33,7 @@ public partial class MainWindow : Window
         using var loadCancellation = new CancellationTokenSource();
         try
         {
+            RequireGameStopped();
             CrashDiagnostics.SetStage("LoadCatalog: invalidating previous catalog");
             InvalidateCatalog();
             _catalogLoadCancellation = loadCancellation;
@@ -67,6 +68,7 @@ public partial class MainWindow : Window
                 codec, workspaceRoot: locations?.WorkspaceDirectory, cancellationToken: loadCancellation.Token);
             if (generation != _catalogGeneration) return;
             CrashDiagnostics.SetStage("LoadCatalog: preparing missing Mod manifests");
+            RequireGameStopped();
             var manifestProgress = new Progress<string>(message =>
             {
                 if (generation == _catalogGeneration) AppendStatus(message);
@@ -110,9 +112,9 @@ public partial class MainWindow : Window
             _catalogEstateSaveSha256 = estateSaveSha256;
             _catalogQuantitySaveSha256 = quantityItems.SourceSaveSha256;
             _quantitySaveContext = quantityItems.SaveContext;
-            ItemTab.Header = _quantitySaveContext == QuantityItemSaveContext.Raid
+            LocalizedUi.Set(ItemTab, HeaderedContentControl.HeaderProperty, () => _quantitySaveContext == QuantityItemSaveContext.Raid
                 ? EditorText.Get("MainWindow_CatalogLoading_011")
-                : EditorText.Get("MainWindow_CatalogLoading_012");
+                : EditorText.Get("MainWindow_CatalogLoading_012"));
             try
             {
                 _ = await BattleMapPanel.LoadProfileAsync(

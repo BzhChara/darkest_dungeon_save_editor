@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>DarkestDungeonModOrderConverter</AssemblyName>
+    <ApplicationIcon>../../../src/DarkestDungeonSaveEditor.App/Assets/save-editor.ico</ApplicationIcon>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../../src/DarkestDungeonSaveEditor.App/NativeWindowTheme.cs" Link="NativeWindowTheme.cs" />
+    <Resource Include="../../../src/DarkestDungeonSaveEditor.App/Assets/charcoal-cloth.png" Link="Assets/charcoal-cloth.png" />
+    <Resource Include="../../../src/DarkestDungeonSaveEditor.App/Assets/save-editor.ico" Link="Assets/save-editor.ico" />
+    <ProjectReference Include="../Core/ModOrder.Core.csproj" />
+    <Content Include="../../../LICENSE" Link="LICENSE" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../NOTICE" Link="NOTICE" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../README.md" Link="README.md" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../../src/DarkestDungeonSaveEditor.Core/Dson/LICENSE" Link="licenses/NativeCodec/LICENSE" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

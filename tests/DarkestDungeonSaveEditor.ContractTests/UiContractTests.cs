@@ -55,7 +55,7 @@ internal static partial class ContractSuite
         }
         var battleMapIntegrationCode = File.ReadAllText(Path.Combine(appSourceDirectory, "MainWindow.BattleMapIntegration.cs"));
         Assert(liveRefreshCode.Contains("if (UsesSharedProfileMonitor ||", StringComparison.Ordinal) &&
-            battleMapIntegrationCode.Contains("RequestProfileSync(invalidatePreview: false);", StringComparison.Ordinal),
+            battleMapIntegrationCode.Contains("await CompleteProfileEditAsync();", StringComparison.Ordinal),
             "Shared profile sync must suppress legacy map-only refreshes and catch up after map operations, including failures.");
         var battleMapReaderCode = File.ReadAllText(Path.Combine(
             repositoryRoot,
@@ -370,7 +370,7 @@ internal static partial class ContractSuite
         Assert(
             mainWindowRoot.Attribute("Background")?.Value == "{StaticResource AppTextureBrush}" &&
             mainWindowRoot.Attribute("Foreground")?.Value == "{StaticResource TextPrimaryBrush}" &&
-            mainWindowRoot.Attribute("FontFamily")?.Value == "{x:Static local:EditorTypography.Body}" &&
+            mainWindowRoot.Attribute("FontFamily")?.Value == "{local:Font Body}" &&
             mainWindowRoot.Attribute("FontSize")?.Value == "14" &&
             applicationResourceKeys.Contains("AppTextureBrush") &&
                 appTextureBrush.Attribute("Stretch")?.Value == "UniformToFill" &&
@@ -499,9 +499,9 @@ internal static partial class ContractSuite
         var panelHeaderStyle = ReadAppStyle("PanelHeaderStyle");
         var logTextBoxStyle = ReadAppStyle("LogTextBoxStyle");
         Assert(
-            ReadStyleSetter(pageTitleStyle, "FontFamily") == "{x:Static local:EditorTypography.Heading}" &&
-            ReadStyleSetter(panelHeaderStyle, "FontFamily") == "{x:Static local:EditorTypography.Heading}" &&
-            ReadStyleSetter(logTextBoxStyle, "FontFamily") == "{x:Static local:EditorTypography.Body}" &&
+            ReadStyleSetter(pageTitleStyle, "FontFamily") == "{local:Font Heading}" &&
+            ReadStyleSetter(panelHeaderStyle, "FontFamily") == "{local:Font Heading}" &&
+            ReadStyleSetter(logTextBoxStyle, "FontFamily") == "{local:Font Body}" &&
             applicationResourceKeys.Contains("StoneBandBrush") &&
             applicationResourceKeys.Contains("RedBandBrush") &&
             applicationResourceKeys.Contains("BandVignetteBrush") &&
@@ -966,14 +966,14 @@ internal static partial class ContractSuite
         var forceTownViewCode = File.ReadAllText(Path.Combine(
             appSourceDirectory, "BattleMapView.ForceTown.cs"));
         var forceTownFinally = forceTownViewCode[
-            forceTownViewCode.LastIndexOf("finally", StringComparison.Ordinal)..];
+            forceTownViewCode.IndexOf("        finally", StringComparison.Ordinal)..];
         Assert(
             System.Text.RegularExpressions.Regex.IsMatch(
                 forceTownFinally,
-                @"_isApplyingEdit = false;\s*MapCanvas.IsHitTestVisible = true;\s*SaveEditBusyChanged\?\.Invoke\(false\);") &&
+                @"await NotifySaveEditBusyAsync\(false\);[\s\S]*finally[\s\S]*_isApplyingEdit = false;\s*MapCanvas.IsHitTestVisible = true;") &&
             !forceTownFinally.Contains("if (!committed)", StringComparison.Ordinal) &&
             forceTownFinally.Contains("ForceTownButton.IsEnabled = _currentSnapshot is not null;", StringComparison.Ordinal),
-            "Force-town completion must unconditionally release the map input lock before notifying the owner, on success as well as failure; the button must follow current snapshot availability.");
+            "Force-town completion must await owner synchronization and then unconditionally release its input lock, including failure; the button must follow current snapshot availability.");
         var battleMapLifecycleCode = File.ReadAllText(Path.Combine(
             appSourceDirectory, "BattleMapView.ProfileLifecycle.cs"));
         var showMapSurfaceCode = battleMapLifecycleCode[
@@ -1159,7 +1159,7 @@ internal static partial class ContractSuite
             .Select(control => control.Ancestors(presentationNamespace + "Border").First())
             .ToArray();
         Assert(
-            initialQuirkDialogXaml.Root?.Attribute("FontFamily")?.Value == "{x:Static local:EditorTypography.Body}" &&
+            initialQuirkDialogXaml.Root?.Attribute("FontFamily")?.Value == "{local:Font Body}" &&
             initialQuirkDialogXaml.Root?.Attribute("Icon")?.Value == "Assets/save-editor.ico" &&
             initialQuirkDialogXaml.Root?.Attribute("Width")?.Value == "1220" &&
             initialQuirkDialogXaml.Root?.Attribute("MinWidth")?.Value == "900" &&

@@ -1,0 +1,15 @@
+Darkest Dungeon Mod Order Converter
+Copyright (C) 2026 BzhChara and contributors
+SPDX-License-Identifier: GPL-3.0-or-later
+
+This standalone utility is part of DarkestDungeonSaveEditor.
+Source: https://github.com/BzhChara/darkest_dungeon_save_editor
+See LICENSE for the GNU General Public License, version 3 or later.
+
+The native C# DSON codec incorporates format knowledge and type paths from
+robojumper's MIT-licensed Darkest Dungeon Save Editor. Its original notice is
+included in licenses/NativeCodec/LICENSE. No Java runtime or JAR is required.
+
+Self-contained packages include .NET runtime components with their original
+licenses and notices under licenses/Microsoft.NETCore.App and
+licenses/Microsoft.WindowsDesktop.App.

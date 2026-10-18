@@ -28,7 +28,7 @@ public partial class MainWindow : Window
         _quantitySaveContext = QuantityItemSaveContext.Town;
         if (ItemTab is not null)
         {
-            ItemTab.Header = EditorText.Get("MainWindow_State_001");
+            LocalizedUi.Set(ItemTab, HeaderedContentControl.HeaderProperty, () => EditorText.Get("MainWindow_State_001"));
         }
         _allItems = [];
         _allTrinkets = [];
@@ -148,24 +148,24 @@ public partial class MainWindow : Window
         if (CatalogTabs is null || BattleMapPanel is null) return;
         var busy = IsBusy;
         var isBattleTab = CatalogTabs.SelectedIndex == BattleTabIndex;
-        PathInputsBorder.IsEnabled = !busy;
+        PathInputsBorder.IsEnabled = !busy && !_gameRunning;
         CatalogTabs.IsEnabled = !busy;
         SearchTextBox.IsEnabled = !busy && !isBattleTab;
-        BattleMapPanel.IsEnabled = !busy && _syncReady;
+        BattleMapPanel.IsEnabled = !busy && _syncReady && !_gameRunning;
         ShowUnusedItemsCheckBox.IsEnabled = !busy &&
             CatalogTabs.SelectedIndex == 0 && _allItems.Count > 0;
-        CopiesTextBox.IsEnabled = !busy && CatalogTabs.SelectedIndex is 0 or 1;
-        HeroLevelComboBox.IsEnabled = !busy &&
+        CopiesTextBox.IsEnabled = !busy && !_gameRunning && CatalogTabs.SelectedIndex is 0 or 1;
+        HeroLevelComboBox.IsEnabled = !busy && !_gameRunning &&
             CatalogTabs.SelectedIndex == 2 &&
             _heroCatalog is not null &&
             HeroGrid.SelectedItem is HeroRow;
-        InitialQuirksButton.IsEnabled = !busy &&
+        InitialQuirksButton.IsEnabled = !busy && !_gameRunning &&
             CatalogTabs.SelectedIndex == 2 &&
             _heroCatalog is not null &&
             HeroGrid.SelectedItem is HeroRow;
         PreviewButton.IsEnabled = !busy && CanPreviewCurrentTab();
         UpdateInventoryIdentityWarning();
-        ApplyButton.IsEnabled = !busy && _syncReady &&
+        ApplyButton.IsEnabled = !busy && _syncReady && !_gameRunning &&
             (_preparedQuantityItemEdit is not null ||
              _preparedTrinketEdit is not null ||
              _preparedHeroEdit is not null);
@@ -237,7 +237,7 @@ public partial class MainWindow : Window
 
     private bool CanPreviewCurrentTab()
     {
-        if (_catalogProfileDirectory is null || !_syncReady || IsBusy)
+        if (_catalogProfileDirectory is null || !_syncReady || IsBusy || _gameRunning)
         {
             return false;
         }

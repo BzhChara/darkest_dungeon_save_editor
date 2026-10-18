@@ -97,11 +97,11 @@ internal static partial class ContractSuite
                     {
                         heldGate!.Release(); heldGate = null;
                         await load.WaitAsync(TimeSpan.FromSeconds(60));
-                        ((DispatcherTimer)Get("_catalogSyncRetry")!).Stop();
+                        Assert(!Flag("_syncRequested"), "Failed loading must not schedule background retries.");
                         Assert(!Flag("_catalogLoading") && !Flag("_syncReady") && paths.IsEnabled &&
                             !((Control)Get("BattleMapPanel")!).IsEnabled && !((Button)Get("ApplyButton")!).IsEnabled &&
-                            !log.Text.Contains("当前存档载入完成") && log.Text.Contains("首次同步未完成"),
-                            "Initial-sync failure must restore retry controls without announcing success or enabling writes.");
+                            !log.Text.Contains("当前存档载入完成") && log.Text.Contains(EditorText.Get("MainWindow_ProfileSync_001")),
+                            "Initial-sync failure must restore retry controls without announcing success or enabling writes. " + log.Text);
                     }
                     Call("RequestProfileSync", false);
                     await ((Task)Get("_catalogSyncTask")!).WaitAsync(TimeSpan.FromSeconds(60));

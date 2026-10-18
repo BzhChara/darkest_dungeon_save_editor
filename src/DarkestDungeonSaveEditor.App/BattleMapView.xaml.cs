@@ -54,7 +54,34 @@ public partial class BattleMapView : UserControl
     public event Action<BattleMapSnapshot>? SnapshotRefreshed;
     public event Action<ActiveContentSnapshot>? ActiveContentChanged;
     public event Action<string>? SaveEditApplied;
-    public event Action<bool>? SaveEditBusyChanged;
+    public event Func<bool, Task>? SaveEditBusyChanged;
+    public event Func<bool>? ProfileBrowseChecking;
+    public event Func<Task<bool>>? ProfileEditChecking;
+
+    private bool CanBrowseProfile()
+    {
+        if (_isApplyingEdit || !IsEnabled) return false;
+        if (ProfileBrowseChecking is not { } handlers) return true;
+        foreach (Func<bool> handler in handlers.GetInvocationList())
+            if (!handler()) return false;
+        return true;
+    }
+
+    private async Task<bool> CheckProfileEditAsync()
+    {
+        if (_isApplyingEdit) return false;
+        if (ProfileEditChecking is not { } handlers) return true;
+        foreach (Func<Task<bool>> handler in handlers.GetInvocationList())
+            if (!await handler()) return false;
+        return true;
+    }
+
+    private async Task NotifySaveEditBusyAsync(bool busy)
+    {
+        if (SaveEditBusyChanged is not { } handlers) return;
+        foreach (Func<bool, Task> handler in handlers.GetInvocationList())
+            await handler(busy);
+    }
 
     public BattleMapSnapshot? CurrentSnapshot => _currentSnapshot;
 
@@ -62,5 +89,25 @@ public partial class BattleMapView : UserControl
     {
         InitializeComponent();
         SetRaidAvailability(false);
+    }
+
+    internal void RefreshLanguage()
+    {
+        CloseActiveContextMenu();
+        foreach (var cell in _cells)
+        {
+            if (cell.SourceAreaId is not null)
+                cell.ContentLabel = cell.Content switch
+                {
+                    PrototypeContent.Entrance => EditorText.Get("BattleMapView_CellVisuals_011"),
+                    PrototypeContent.Boss => EditorText.Get("BattleMapView_MapConstruction_006"),
+                    _ => FormatSnapshotContent((BattleMapTileContent)cell.RawContent, cell.RawContent)
+                };
+            RefreshCellVisual(cell);
+        }
+        // Do not rebuild the map or publish a snapshot: selection, zoom, scroll and
+        // the guarded edit state belong to the current profile, not its UI language.
+        System.Windows.Data.BindingOperations.GetBindingExpression(MapSelectionTextBlock, TextBlock.TextProperty)?.UpdateTarget();
+        UpdateMapBadge();
     }
 }

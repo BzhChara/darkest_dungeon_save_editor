@@ -52,7 +52,7 @@ public partial class BattleMapView : UserControl
         catch (Exception ex)
         {
             StopProfileMonitoring();
-            LiveStatusTextBlock.Text = EditorText.Format("BattleMapView_LiveRefresh_001", ex.Message);
+            LocalizedUi.Set(LiveStatusTextBlock, TextBlock.TextProperty, () => EditorText.Format("BattleMapView_LiveRefresh_001", ex.Message));
         }
     }
 
@@ -170,26 +170,22 @@ public partial class BattleMapView : UserControl
                 {
                     if (_currentSnapshot is null)
                     {
-                        ShowUnavailableState(
-                            EditorText.Get("BattleMapView_LiveRefresh_002"),
-                            EditorText.Get("BattleMapView_LiveRefresh_003"));
+                        ShowUnavailableState("BattleMapView_LiveRefresh_002", "BattleMapView_LiveRefresh_003");
                     }
                     else
                     {
-                        LiveStatusTextBlock.Text = EditorText.Get("BattleMapView_LiveRefresh_004");
+                        LocalizedUi.Set(LiveStatusTextBlock, TextBlock.TextProperty, () => EditorText.Get("BattleMapView_LiveRefresh_004"));
                     }
                     ScheduleRefreshRetry(generation);
                     return;
                 }
 
                 CancelScheduledRefreshRetry();
-                ShowUnavailableState(
-                    EditorText.Get("BattleMapView_LiveRefresh_005"),
-                    EditorText.Get("BattleMapView_LiveRefresh_006"));
+                ShowUnavailableState("BattleMapView_LiveRefresh_005", "BattleMapView_LiveRefresh_006");
                 return;
             }
 
-            LiveStatusTextBlock.Text = EditorText.Get("BattleMapView_LiveRefresh_007");
+            LocalizedUi.Set(LiveStatusTextBlock, TextBlock.TextProperty, () => EditorText.Get("BattleMapView_LiveRefresh_007"));
             var snapshot = await LoadSnapshotWithRetryAsync(
                 _snapshotReader,
                 _profileDirectory,
@@ -204,8 +200,7 @@ public partial class BattleMapView : UserControl
                 _currentSnapshot.MapSha256.Equals(snapshot.MapSha256, StringComparison.OrdinalIgnoreCase) &&
                 _currentSnapshot.RaidSha256.Equals(snapshot.RaidSha256, StringComparison.OrdinalIgnoreCase))
             {
-                LiveStatusTextBlock.Text =
-                    EditorText.Format("BattleMapView_LiveRefresh_008", snapshot.ReadAtUtc.ToLocalTime());
+                LocalizedUi.Set(LiveStatusTextBlock, TextBlock.TextProperty, () => EditorText.Format("BattleMapView_LiveRefresh_008", snapshot.ReadAtUtc.ToLocalTime()));
                 CancelScheduledRefreshRetry();
                 return;
             }
@@ -221,13 +216,11 @@ public partial class BattleMapView : UserControl
 
             if (_currentSnapshot is null)
             {
-                ShowUnavailableState(
-                    EditorText.Get("BattleMapView_LiveRefresh_009"),
-                    EditorText.Get("BattleMapView_LiveRefresh_003"));
+                ShowUnavailableState("BattleMapView_LiveRefresh_009", "BattleMapView_LiveRefresh_003");
             }
             else
             {
-                LiveStatusTextBlock.Text = EditorText.Format("BattleMapView_LiveRefresh_010", ex.Message);
+                LocalizedUi.Set(LiveStatusTextBlock, TextBlock.TextProperty, () => EditorText.Format("BattleMapView_LiveRefresh_010", ex.Message));
             }
             ScheduleRefreshRetry(generation);
         }

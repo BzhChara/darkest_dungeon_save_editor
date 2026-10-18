@@ -121,7 +121,7 @@ internal static partial class ContractSuite
                 {
                     foreach (var language in new[] { "en", "zh-CN" })
                     {
-                        CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo(language);
+                        EditorText.Initialize(language, EditorText.SystemCulture);
                         var message = await ReadRejectedTrinketMessageAsync(() =>
                             f.Service.PrepareTrinketEditAsync(f.Content.Profile, current, 1, catalog.Storage, f.Content));
                         Assert(message.Contains(language == "en" ? "definition or dependencies" : "定义或依赖", StringComparison.Ordinal) &&
@@ -130,7 +130,7 @@ internal static partial class ContractSuite
                             "An unreadable Buff must report unverified content without inventing a cross-path conflict or a missing Mod.");
                     }
                 }
-                finally { CultureInfo.CurrentUICulture = originalCulture; }
+                finally { EditorText.Initialize(originalCulture.Name, EditorText.SystemCulture); }
             }
             await RejectProviderEditAsync(() => f.Service.CommitAsync(prepared));
             Assert(ComputeSha256(f.Content.Profile.EstateSavePath) == originalHash, "Rejected dependency changes must leave the save unchanged.");
@@ -290,7 +290,7 @@ internal static partial class ContractSuite
         {
             foreach (var language in new[] { "en", "zh-CN" })
             {
-                CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo(language);
+                EditorText.Initialize(language, EditorText.SystemCulture);
                 var message = await ReadRejectedTrinketMessageAsync(action);
                 Assert(names.All(name => message.Contains(name, StringComparison.Ordinal)) &&
                     !message.Contains("different content paths", StringComparison.Ordinal) &&
@@ -328,7 +328,7 @@ internal static partial class ContractSuite
                 }
             }
         }
-        finally { CultureInfo.CurrentUICulture = originalCulture; }
+        finally { EditorText.Initialize(originalCulture.Name, EditorText.SystemCulture); }
     }
 
     private static void VerifyTrinketHeroProviders(string root, string kind)

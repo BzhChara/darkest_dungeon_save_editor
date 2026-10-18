@@ -155,7 +155,13 @@ public sealed record HeroClassDefinition(
     IReadOnlyList<string> AllSources)
 {
     public BilingualContentName LocalizedName { get; init; } = BilingualContentName.Empty;
-    public string SourceLabel { get; init; } = string.Empty;
+    private readonly string _sourceLabel = string.Empty;
+    internal ContentSourceLabel? LocalizedSource { get; init; }
+    public string SourceLabel
+    {
+        get => LocalizedSource?.ToString() ?? _sourceLabel;
+        init => _sourceLabel = value;
+    }
     public IReadOnlyList<HeroGenerationAvailability> GenerationAvailability { get; init; } = [];
     public bool CampingSkillsComplete { get; init; } = true;
     public IReadOnlyDictionary<string, IReadOnlyList<int>> CombatSkillLevels { get; init; } =
@@ -218,7 +224,13 @@ public sealed record HeroInitialQuirkDefinition(
     IReadOnlyList<string> AllSources)
 {
     public BilingualContentName LocalizedName { get; init; } = BilingualContentName.Empty;
-    public string SourceLabel { get; init; } = string.Empty;
+    private readonly string _sourceLabel = string.Empty;
+    internal ContentSourceLabel? LocalizedSource { get; init; }
+    public string SourceLabel
+    {
+        get => LocalizedSource?.ToString() ?? _sourceLabel;
+        init => _sourceLabel = value;
+    }
     public int? DefinitionLimit { get; init; }
     public bool HasEvolution => Evolution is not null;
 }
@@ -255,7 +267,13 @@ public sealed record TrinketDefinition(
     IReadOnlyList<string> AllSources)
 {
     public BilingualContentName LocalizedName { get; init; } = BilingualContentName.Empty;
-    public string SourceLabel { get; init; } = string.Empty;
+    private readonly string _sourceLabel = string.Empty;
+    internal ContentSourceLabel? LocalizedSource { get; init; }
+    public string SourceLabel
+    {
+        get => LocalizedSource?.ToString() ?? _sourceLabel;
+        init => _sourceLabel = value;
+    }
     public int? QuestUses { get; init; }
     public int? TriggerLimit { get; init; }
     public string SaveIdentityIssue => NativeInventoryIdentity.GetSaveIssue("trinket", Id);
@@ -301,7 +319,16 @@ public sealed record QuantityItemDefinition(
     IReadOnlyList<string> AllSources)
 {
     public BilingualContentName LocalizedName { get; init; } = BilingualContentName.Empty;
-    public string SourceLabel { get; init; } = string.Empty;
+    private readonly string _sourceLabel = string.Empty;
+    internal ContentSourceLabel? LocalizedSource { get; init; }
+    public string SourceLabel
+    {
+        get => IsSaveOnly
+            ? EditorText.Get(StorageKind == QuantityItemStorageKind.RaidInventory
+                ? "QuantityItemCatalog_Refresh_001" : "QuantityItemCatalog_Refresh_002")
+            : LocalizedSource?.ToString() ?? _sourceLabel;
+        init => _sourceLabel = value;
+    }
     public QuantityItemReferenceStatus ReferenceStatus { get; init; } =
         QuantityItemReferenceStatus.AnalysisIncomplete;
     public IReadOnlyList<string> ReferenceEvidence { get; init; } = [];

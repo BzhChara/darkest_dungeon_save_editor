@@ -387,7 +387,7 @@ public sealed partial class ManagedBattleEncounterBridgeService
         if (SanitizeSegment(profile.ProfileId, 64) != profile.ProfileId ||
             SanitizeSegment(profile.SteamUserId, 32) != profile.SteamUserId)
             throw new InvalidOperationException(EditorText.Get("ManagedBattleEncounterBridgeService_011"));
-        var title = $"{ProjectTitlePrefix}（{profile.ProfileId} - {profile.SteamUserId}）";
+        var title = $"{ProjectTitlePrefix}({profile.ProfileId} - {profile.SteamUserId})";
         if (Utf8NoBom.GetByteCount(title) >= 128)
             throw new InvalidOperationException(EditorText.Get("ManagedBattleEncounterBridgeService_012"));
         return title;
@@ -396,7 +396,8 @@ public sealed partial class ManagedBattleEncounterBridgeService
     public static bool IsManagedBridgeSource(ActiveContentSource source)
     {
         ArgumentNullException.ThrowIfNull(source);
-        return source.DisplayName.StartsWith(ProjectTitlePrefix + "（", StringComparison.Ordinal) ||
+        return source.DisplayName.StartsWith(ProjectTitlePrefix + "(", StringComparison.Ordinal) ||
+               source.DisplayName.StartsWith(ProjectTitlePrefix + "（", StringComparison.Ordinal) ||
                source.DisplayName.StartsWith(
                    "DDSE Managed Encounter Bridge - ",
                    StringComparison.OrdinalIgnoreCase) ||
@@ -756,6 +757,15 @@ public sealed partial class ManagedBattleEncounterBridgeService
         SaveProfile profile,
         string projectTitle)
     {
+        // The title is also the saved Mod identity. Old packages must be rebuilt
+        // explicitly; changing their XML title alone would leave save references stale.
+        if (manifest.Version == ManifestVersion &&
+            string.Equals(manifest.ProfileId, profile.ProfileId, StringComparison.Ordinal) &&
+            string.Equals(manifest.SteamUserId, profile.SteamUserId, StringComparison.Ordinal) &&
+            string.Equals(manifest.ProjectTitle,
+                $"{ProjectTitlePrefix}（{profile.ProfileId} - {profile.SteamUserId}）", StringComparison.Ordinal))
+            throw new InvalidDataException(EditorText.Format(
+                "ManagedBattleEncounterBridgeService_LegacyTitle", manifest.ProjectTitle));
         if (manifest.Version != ManifestVersion ||
             !string.Equals(manifest.ProjectTitle, projectTitle, StringComparison.Ordinal) ||
             !string.Equals(manifest.ProfileId, profile.ProfileId, StringComparison.Ordinal) ||
@@ -841,8 +851,16 @@ public sealed partial class ManagedBattleEncounterBridgeService
         return root;
     }
 
-    private static string GetPackageDirectoryName(SaveProfile profile) =>
-        GetProjectTitle(profile);
+    internal static string GetPackageDirectoryName(SaveProfile profile)
+    {
+        // The native local-Mod scanner converts relative paths through the C locale.
+        // Unicode is safe in the XML title, but not in the physical package name.
+        _ = GetProjectTitle(profile);
+        var name = $"{ProjectTitlePrefix}({profile.ProfileId} - {profile.SteamUserId})";
+        return name.All(char.IsAscii) && !name.Contains("_template", StringComparison.Ordinal)
+            ? name
+            : $"{ProjectTitlePrefix}_{Convert.ToHexString(Utf8NoBom.GetBytes(profile.ProfileId))}_{Convert.ToHexString(Utf8NoBom.GetBytes(profile.SteamUserId))}";
+    }
 
     private static string ComputeContentFingerprint(IReadOnlyList<ActiveContentSource> sources)
     {

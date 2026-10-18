@@ -65,7 +65,7 @@ public static class TrinketCatalog
             .Select(definition => definition with
             {
                 LocalizedName = localization.GetTrinketName(definition.Id),
-                SourceLabel = ContentSourceLabelFormatter.Format(
+                LocalizedSource = ContentSourceLabelFormatter.Create(
                     definition.Source,
                     definition.AllSources,
                     activeContent.Sources)

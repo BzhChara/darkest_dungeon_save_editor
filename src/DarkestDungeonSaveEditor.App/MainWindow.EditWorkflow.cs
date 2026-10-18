@@ -21,6 +21,8 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (!await CheckProfileBeforeOperationAsync()) return;
+
         InvalidatePreparedEdit();
         var previewRevision = _editRevision;
         try
@@ -238,6 +240,7 @@ public partial class MainWindow : Window
 
     private async void Apply_Click(object sender, RoutedEventArgs e)
     {
+        if (IsBusy || ObserveGameProcess()) return;
         if (_editService is null ||
             (_preparedQuantityItemEdit is null && _preparedTrinketEdit is null && _preparedHeroEdit is null))
         {
@@ -311,12 +314,15 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (!await CheckProfileBeforeOperationAsync(requireUnchanged: true)) return;
+
         var committed = false;
+        string? backupDirectory = null;
+        var reportedFailure = false;
         try
         {
             SetBusy(true);
             AppendStatusSafely(EditorText.Format("MainWindow_EditWorkflow_060", operationDetails), "Save edit: start diagnostics");
-            string backupDirectory;
             SaveCommitResult? estateCommit = null;
             if (isItemEdit)
             {
@@ -368,15 +374,11 @@ public partial class MainWindow : Window
                 UpdateCatalogMode();
             }
 
-            ThemedDialog.ShowMessage(
-                this,
-                EditorText.Format("MainWindow_EditWorkflow_062", backupDirectory),
-                EditorText.Get("MainWindow_EditWorkflow_063"),
-                ThemedDialogKind.Information);
             InvalidatePreparedEdit();
         }
         catch (Exception ex)
         {
+            reportedFailure = true;
             var failureLabel = committed ? EditorText.Get("MainWindow_EditWorkflow_064") : EditorText.Get("MainWindow_EditWorkflow_065");
             CrashDiagnostics.RecordException("Save edit: " + (committed ? "post-commit UI" : "commit"), ex, operationDetails);
             AppendStatusSafely($"{failureLabel}：{ex.Message}；{operationDetails}", "Save edit: failure diagnostics", DiagnosticLogLevel.Error);
@@ -384,9 +386,12 @@ public partial class MainWindow : Window
         }
         finally
         {
-            RequestProfileSync(invalidatePreview: false);
-            SetBusy(false);
+            await CompleteProfileEditAsync();
         }
+        if (committed && !reportedFailure && _syncReady && !_catalogCloseRequested)
+            ThemedDialog.ShowMessage(this,
+                EditorText.Format("MainWindow_EditWorkflow_062", backupDirectory),
+                EditorText.Get("MainWindow_EditWorkflow_063"), ThemedDialogKind.Information);
     }
 
 }

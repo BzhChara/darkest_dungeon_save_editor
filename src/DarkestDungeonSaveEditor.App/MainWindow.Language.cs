@@ -47,6 +47,21 @@ public partial class MainWindow
             CrashDiagnostics.RecordException("Language preference: save", ex);
             ThemedDialog.ShowMessage(this, EditorText.Format("Language_SaveFailed", ex.Message),
                 EditorText.Get("Language_SaveFailedTitle"), ThemedDialogKind.Error);
+            return;
         }
+        EditorText.Initialize(preference, EditorText.SystemCulture);
+        RefreshLanguage();
+    }
+
+    private void RefreshLanguage()
+    {
+        foreach (var grid in new[] { ItemGrid, TrinketGrid, HeroGrid }) EditorNameColumns.Apply(grid);
+        foreach (var row in _visibleItems) row.RefreshLanguage();
+        foreach (var row in _visibleTrinkets) row.RefreshLanguage();
+        foreach (var row in _visibleHeroes) row.RefreshLanguage();
+        foreach (var level in _heroLevelChoices) level.RefreshLanguage();
+        UpdateCatalogMode();
+        UpdateInventoryIdentityWarning();
+        BattleMapPanel.RefreshLanguage();
     }
 }

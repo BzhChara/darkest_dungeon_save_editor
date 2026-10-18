@@ -122,7 +122,6 @@ public sealed class BattleMapEditService
         EnsureGameIsNotRunning();
         var (mapPath, raidPath) = ValidateBattleProfile(prepared.Profile);
         ValidatePreparedTarget(prepared, mapPath, raidPath);
-        ValidateContentGuards(prepared);
         ValidateLivePair(prepared, mapPath, raidPath, EditorText.Get("BattleMapEditService_001"));
         using var gameGuard = OpenGameGuard(prepared);
 
@@ -135,7 +134,6 @@ public sealed class BattleMapEditService
         }
 
         var backupDirectory = CreateBackup(prepared.Profile, prepared);
-        ValidateContentGuards(prepared);
         ValidateLivePair(prepared, mapPath, raidPath, EditorText.Get("BattleMapEditService_003"));
         EnsureGameIsNotRunning();
 
@@ -162,6 +160,8 @@ public sealed class BattleMapEditService
                 throw new InvalidOperationException(
                     EditorText.Get("BattleMapEditService_004"));
             }
+            // Validate resources once at the actual write boundary, after backup and
+            // save locking. Repeating this during backup re-scans all MO2 inputs.
             ValidateContentGuards(prepared);
 
             replacement.Replace();

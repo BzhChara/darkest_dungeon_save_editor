@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Globalization;
 using System.IO;
 using System.Security.Cryptography;
@@ -14,8 +15,17 @@ namespace DarkestDungeonSaveEditor.App;
 
 public partial class MainWindow : Window
 {
-    private sealed record ItemRow(QuantityItemDefinition Definition)
+    // WPF tracks selected items by equality/hash. Event subscriptions change as
+    // rows are bound or recycled, so these UI objects need stable reference identity.
+    private abstract class LocalizedRow : INotifyPropertyChanged
     {
+        public event PropertyChangedEventHandler? PropertyChanged;
+        public void RefreshLanguage() => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(string.Empty));
+    }
+
+    private sealed class ItemRow(QuantityItemDefinition definition) : LocalizedRow
+    {
+        public QuantityItemDefinition Definition { get; } = definition;
         public string Id => Definition.DisplayId;
         public string ChineseName => FormatLocalizedName(Definition.LocalizedName.Chinese);
         public string EnglishName => FormatLocalizedName(Definition.LocalizedName.English);
@@ -51,8 +61,9 @@ public partial class MainWindow : Window
         public string DisplayName => EditorText.ContentName(Definition.LocalizedName, Definition.DisplayId);
     }
 
-    private sealed record TrinketRow(TrinketDefinition Definition)
+    private sealed class TrinketRow(TrinketDefinition definition) : LocalizedRow
     {
+        public TrinketDefinition Definition { get; } = definition;
         public string Id => Definition.Id;
         public string ChineseName => FormatLocalizedName(Definition.LocalizedName.Chinese);
         public string EnglishName => FormatLocalizedName(Definition.LocalizedName.English);
@@ -66,13 +77,16 @@ public partial class MainWindow : Window
         public string StatefulFieldSummary => string.Join(", ", Definition.StatefulFields);
     }
 
-    private sealed record HeroLevelChoice(int ResolveLevel, int ResolveXp)
+    private sealed class HeroLevelChoice(int resolveLevel, int resolveXp) : LocalizedRow
     {
+        public int ResolveLevel { get; } = resolveLevel;
+        public int ResolveXp { get; } = resolveXp;
         public string DisplayName => EditorText.Format("MainWindow_RowModels_007", ResolveLevel, ResolveXp);
     }
 
-    private sealed record HeroRow(HeroClassDefinition Definition)
+    private sealed class HeroRow(HeroClassDefinition definition) : LocalizedRow
     {
+        public HeroClassDefinition Definition { get; } = definition;
         public string Id => Definition.Id;
         public string ChineseName => FormatLocalizedName(Definition.LocalizedName.Chinese);
         public string EnglishName => FormatLocalizedName(Definition.LocalizedName.English);

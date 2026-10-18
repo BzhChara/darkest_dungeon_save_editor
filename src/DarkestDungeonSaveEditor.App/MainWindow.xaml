@@ -10,7 +10,7 @@
         Icon="Assets/save-editor.ico"
         Background="{StaticResource AppTextureBrush}"
         Foreground="{StaticResource TextPrimaryBrush}"
-        FontFamily="{x:Static local:EditorTypography.Body}"
+        FontFamily="{local:Font Body}"
         FontSize="14"
         UseLayoutRounding="True"
         SnapsToDevicePixels="True"
@@ -91,14 +91,14 @@
                 <Button x:Name="LanguageButton" Grid.Column="1"
                         MinWidth="100" Margin="0,0,10,0" VerticalAlignment="Center"
                         Style="{StaticResource GhostButtonStyle}"
-                        Content="{local:Text Language_Label}" ToolTip="{local:Text Language_RestartRequired}"
+                        Content="{local:Text Language_Label}" ToolTip="{local:Text Language_Immediate}"
                         AutomationProperties.Name="{local:Text Language_Label}"
                         Click="LanguageButton_Click">
                     <Button.ContextMenu>
                         <ContextMenu Placement="Bottom" MinWidth="220" Padding="4"
                                      Background="#FA0A0A09" BorderBrush="{StaticResource GoldDarkBrush}"
                                      BorderThickness="1" HasDropShadow="False"
-                                     FontFamily="{x:Static local:EditorTypography.Body}" FontSize="14"
+                                     FontFamily="{local:Font Body}" FontSize="14"
                                      ItemContainerStyle="{StaticResource LanguageMenuItemStyle}">
                             <ContextMenu.Template>
                                 <ControlTemplate TargetType="ContextMenu">
@@ -111,7 +111,6 @@
                             <MenuItem Header="{local:Text Language_System}" Tag="system" IsCheckable="True" Click="LanguageMenuItem_Click" />
                             <MenuItem Header="{local:Text Language_Chinese}" Tag="zh-CN" IsCheckable="True" Click="LanguageMenuItem_Click" />
                             <MenuItem Header="{local:Text Language_English}" Tag="en" IsCheckable="True" Click="LanguageMenuItem_Click" />
-                            <MenuItem Header="{local:Text Language_RestartRequired}" IsEnabled="False" FontSize="12" />
                         </ContextMenu>
                     </Button.ContextMenu>
                 </Button>
@@ -126,7 +125,7 @@
                         BorderBrush="#8F2826"
                         BorderThickness="1" CornerRadius="0">
                     <StackPanel>
-                        <TextBlock HorizontalAlignment="Center" FontFamily="{x:Static local:EditorTypography.Heading}"
+                        <TextBlock HorizontalAlignment="Center" FontFamily="{local:Font Heading}"
                                    FontSize="16" FontWeight="Bold"
                                    Foreground="{StaticResource GoldBrush}" Text="{local:Text MainWindow_004}" />
                         <TextBlock Margin="0,2,0,0" HorizontalAlignment="Center" FontSize="12"

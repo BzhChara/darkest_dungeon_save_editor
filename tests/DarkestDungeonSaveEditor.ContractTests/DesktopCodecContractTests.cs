@@ -88,8 +88,7 @@ internal static partial class ContractSuite
                 "Default desktop load must complete initial synchronization and use the correct build title: " + Log());
             Assert(ReferenceEquals(typeof(BattleMapView).GetField("_codec", flags)!.GetValue(Get("BattleMapPanel")), session.Codec),
                 "The map must receive the window's selected backend.");
-            ((DispatcherTimer)Get("_profilePoll")!).Stop();
-            ((ProfileSaveMonitor)Get("_catalogMonitor")!).Stop();
+            ((DispatcherTimer)Get("_gameProcessPoll")!).Stop();
 
             ((TabControl)Get("CatalogTabs")!).SelectedIndex = 0;
             var grid = (DataGrid)Get("ItemGrid")!;

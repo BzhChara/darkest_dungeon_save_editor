@@ -8,12 +8,13 @@ public partial class BattleMapView : UserControl
 {
     private async void ForceTownButton_Click(object sender, RoutedEventArgs e)
     {
+        if (!CanBrowseProfile()) return;
         if (_currentSnapshot is null ||
             _profile is null ||
             _forceTownSaveService is null ||
             _isApplyingEdit)
         {
-            MapSelectionTextBlock.Text = EditorText.Get("BattleMapView_ForceTown_001");
+            LocalizedUi.Set(MapSelectionTextBlock, TextBlock.TextProperty, () => EditorText.Get("BattleMapView_ForceTown_001"));
             return;
         }
 
@@ -38,19 +39,20 @@ public partial class BattleMapView : UserControl
             return;
         }
 
+        if (!await CheckProfileEditAsync()) return;
         var generation = _profileGeneration;
         var gateTaken = false;
         var committed = false;
         PreparedForceTownEdit? prepared = null;
         string? backupDirectory = null;
         _isApplyingEdit = true;
-        SaveEditBusyChanged?.Invoke(true);
+        await NotifySaveEditBusyAsync(true);
         CloseActiveContextMenu();
         CancelScheduledRefreshRetry();
         StopProfileMonitoring();
         MapCanvas.IsHitTestVisible = false;
         ForceTownButton.IsEnabled = false;
-        MapSelectionTextBlock.Text = EditorText.Get("BattleMapView_ForceTown_006");
+        LocalizedUi.Set(MapSelectionTextBlock, TextBlock.TextProperty, () => EditorText.Get("BattleMapView_ForceTown_006"));
 
         try
         {
@@ -72,19 +74,18 @@ public partial class BattleMapView : UserControl
                 EditorText.Format("BattleMapView_ForceTown_009", profile.ProfileDirectory, prepared.SessionId) +
                 EditorText.Format("BattleMapView_ForceTown_010", prepared.Preview.PreviousRaidDungeon, result.BackupDirectory));
             ShowUnavailableState(
-                EditorText.Format("BattleMapView_ForceTown_011", profile.ProfileId),
-                EditorText.Get("BattleMapView_ForceTown_012"));
+                "BattleMapView_ForceTown_011", "BattleMapView_ForceTown_012", profile.ProfileId);
         }
         catch (Exception ex)
         {
             CrashDiagnostics.RecordException("Force town: " + (committed ? "post-commit UI" : "edit"), ex,
                 EditorText.Format("BattleMapView_ForceTown_013", prepared?.SessionId ?? EditorText.Get("BattleMapView_Commands_092"), profile.ProfileId) +
                 EditorText.Format("BattleMapView_ForceTown_014", profile.ProfileDirectory, committed, backupDirectory ?? EditorText.Get("BattleMapView_Commands_095")));
-            MapSelectionTextBlock.Text = committed
+            LocalizedUi.Set(MapSelectionTextBlock, TextBlock.TextProperty, () => committed
                 ? EditorText.Get("BattleMapView_ForceTown_015")
                 : ex is AggregateException
                     ? EditorText.Get("BattleMapView_ForceTown_016")
-                    : EditorText.Get("BattleMapView_ForceTown_017");
+                    : EditorText.Get("BattleMapView_ForceTown_017"));
             ThemedDialog.ShowMessage(
                 owner,
                 ex.Message,
@@ -98,13 +99,16 @@ public partial class BattleMapView : UserControl
                 _refreshGate.Release();
             }
             // A successful return hides the map, but the same canvas is reused on the next raid.
-            _isApplyingEdit = false;
-            MapCanvas.IsHitTestVisible = true;
-            SaveEditBusyChanged?.Invoke(false);
-            if (generation == _profileGeneration)
+            try { await NotifySaveEditBusyAsync(false); }
+            finally
             {
-                ForceTownButton.IsEnabled = _currentSnapshot is not null;
-                StartProfileMonitoring();
+                _isApplyingEdit = false;
+                MapCanvas.IsHitTestVisible = true;
+                if (generation == _profileGeneration)
+                {
+                    ForceTownButton.IsEnabled = _currentSnapshot is not null;
+                    StartProfileMonitoring();
+                }
             }
         }
     }

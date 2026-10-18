@@ -243,7 +243,7 @@ public partial class BattleMapView : UserControl
     {
         if (GetCurrentRoomAttachmentCatalog() is null || Window.GetWindow(this) is not { } owner)
         {
-            MapSelectionTextBlock.Text = EditorText.Get("BattleMapView_Commands_009");
+            LocalizedUi.Set(MapSelectionTextBlock, TextBlock.TextProperty, () => EditorText.Get("BattleMapView_Commands_009"));
             return;
         }
 
@@ -333,7 +333,7 @@ public partial class BattleMapView : UserControl
         var catalog = GetCurrentEncounterCatalog();
         if (catalog is null || Window.GetWindow(this) is not { } owner)
         {
-            MapSelectionTextBlock.Text = EditorText.Get("BattleMapView_Commands_011");
+            LocalizedUi.Set(MapSelectionTextBlock, TextBlock.TextProperty, () => EditorText.Get("BattleMapView_Commands_011"));
             return;
         }
 
@@ -372,7 +372,7 @@ public partial class BattleMapView : UserControl
             _managedEncounterBridgeService is null ||
             string.IsNullOrWhiteSpace(_gameDirectory))
         {
-            MapSelectionTextBlock.Text = EditorText.Get("BattleMapView_Commands_012");
+            LocalizedUi.Set(MapSelectionTextBlock, TextBlock.TextProperty, () => EditorText.Get("BattleMapView_Commands_012"));
             return;
         }
 
@@ -388,7 +388,7 @@ public partial class BattleMapView : UserControl
                 owner,
                 EditorText.Format("BattleMapView_Commands_016", target.DisplayName, replacementText, encounter.DisplayName) +
                 Environment.NewLine +
-                EditorText.Format("BattleMapView_Commands_017", encounter.SourceLabel, encounter.OriginDungeonId) +
+                EditorText.Format("BattleMapView_Commands_017", encounter.DisplaySourceLabel, encounter.OriginDungeonId) +
                 difficultyWarning + Environment.NewLine +
                 EditorText.Get("BattleMapView_Commands_018") +
                 Environment.NewLine +
@@ -408,8 +408,7 @@ public partial class BattleMapView : UserControl
             BattleMapEditKind.PlaceBattle,
             encounterResolver: async () =>
             {
-                MapSelectionTextBlock.Text =
-                    EditorText.Format("BattleMapView_Commands_021", encounter.DisplayName);
+                LocalizedUi.Set(MapSelectionTextBlock, TextBlock.TextProperty, () => EditorText.Format("BattleMapView_Commands_021", encounter.DisplayName));
                 var result = await managedService.EnsureEncounterAsync(
                     profile,
                     snapshot,
@@ -487,7 +486,10 @@ public partial class BattleMapView : UserControl
     private MenuItem CreateAsyncActionMenuItem(string header, BattleMenuIcon icon, Func<Task> action)
     {
         var menuItem = CreateMenuItem(header, icon);
-        menuItem.Click += async (_, _) => await action();
+        menuItem.Click += async (_, _) =>
+        {
+            if (CanBrowseProfile()) await action();
+        };
         return menuItem;
     }
 
@@ -498,13 +500,12 @@ public partial class BattleMapView : UserControl
             target.Content = PrototypeContent.None;
             target.ContentLabel = null;
             RefreshCellVisual(target);
-            MapSelectionTextBlock.Text =
-                EditorText.Format("BattleMapView_Commands_034", target.DisplayName);
+            LocalizedUi.Set(MapSelectionTextBlock, TextBlock.TextProperty, () => EditorText.Format("BattleMapView_Commands_034", target.DisplayName));
             return;
         }
         if (!TryGetWritableContext(target, out var owner, out var profile, out var snapshot, out var service))
         {
-            MapSelectionTextBlock.Text = EditorText.Get("BattleMapView_Commands_035");
+            LocalizedUi.Set(MapSelectionTextBlock, TextBlock.TextProperty, () => EditorText.Get("BattleMapView_Commands_035"));
             return;
         }
 
@@ -540,7 +541,7 @@ public partial class BattleMapView : UserControl
         }
         if (!TryGetWritableContext(target, out var owner, out var profile, out var snapshot, out var service))
         {
-            MapSelectionTextBlock.Text = EditorText.Get("BattleMapView_Commands_035");
+            LocalizedUi.Set(MapSelectionTextBlock, TextBlock.TextProperty, () => EditorText.Get("BattleMapView_Commands_035"));
             return;
         }
 
@@ -568,12 +569,12 @@ public partial class BattleMapView : UserControl
     {
         if (!TryGetWritableContext(target, out var owner, out var profile, out var snapshot, out var service))
         {
-            MapSelectionTextBlock.Text = EditorText.Get("BattleMapView_Commands_035");
+            LocalizedUi.Set(MapSelectionTextBlock, TextBlock.TextProperty, () => EditorText.Get("BattleMapView_Commands_035"));
             return;
         }
         if (!encounter.CanPlaceDirectly || encounter.MashIndex is null)
         {
-            MapSelectionTextBlock.Text = EditorText.Get("BattleMapView_Commands_047");
+            LocalizedUi.Set(MapSelectionTextBlock, TextBlock.TextProperty, () => EditorText.Get("BattleMapView_Commands_047"));
             return;
         }
 
@@ -587,7 +588,7 @@ public partial class BattleMapView : UserControl
         if (!ThemedDialog.Confirm(
                 owner,
                 EditorText.Format("BattleMapView_Commands_016", target.DisplayName, replacementText, encounter.DisplayName) +
-                Environment.NewLine + EditorText.Format("BattleMapView_Commands_049", encounter.SourceLabel) +
+                Environment.NewLine + EditorText.Format("BattleMapView_Commands_049", encounter.DisplaySourceLabel) +
                 Environment.NewLine +
                 EditorText.Format("BattleMapView_Commands_050", encounter.MashType, encounter.MashIndex) +
                 naturalQuotaWarning + Environment.NewLine +
@@ -612,7 +613,7 @@ public partial class BattleMapView : UserControl
     {
         if (!TryGetWritableContext(target, out var owner, out var profile, out var snapshot, out var service))
         {
-            MapSelectionTextBlock.Text = EditorText.Get("BattleMapView_Commands_035");
+            LocalizedUi.Set(MapSelectionTextBlock, TextBlock.TextProperty, () => EditorText.Get("BattleMapView_Commands_035"));
             return;
         }
 
@@ -627,7 +628,7 @@ public partial class BattleMapView : UserControl
                 EditorText.Format("BattleMapView_Commands_054", target.DisplayName, actionLabel,
                     EditorText.ContentName(attachment.LocalizedName, attachment.Id), attachment.Id) +
                 Environment.NewLine + $"ID：{attachment.Id}" +
-                Environment.NewLine + EditorText.Format("BattleMapView_Commands_049", attachment.SourceLabel) +
+                Environment.NewLine + EditorText.Format("BattleMapView_Commands_049", attachment.DisplaySourceLabel) +
                 Environment.NewLine +
                 EditorText.Get("BattleMapView_Commands_055"),
                 EditorText.Format("BattleMapView_Commands_056", kindLabel)))
@@ -648,7 +649,7 @@ public partial class BattleMapView : UserControl
     {
         if (!TryGetWritableContext(target, out var owner, out var profile, out var snapshot, out var service))
         {
-            MapSelectionTextBlock.Text = EditorText.Get("BattleMapView_Commands_035");
+            LocalizedUi.Set(MapSelectionTextBlock, TextBlock.TextProperty, () => EditorText.Get("BattleMapView_Commands_035"));
             return;
         }
 
@@ -700,6 +701,7 @@ public partial class BattleMapView : UserControl
         BattleRoomAttachmentDefinition? attachment = null,
         Func<Task<BattleEncounterDefinition>>? encounterResolver = null)
     {
+        if (!await CheckProfileEditAsync()) return;
         var generation = _profileGeneration;
         var gateTaken = false;
         var committed = false;
@@ -708,12 +710,12 @@ public partial class BattleMapView : UserControl
         PreparedBattleMapEdit? prepared = null;
         string? backupDirectory = null;
         _isApplyingEdit = true;
-        SaveEditBusyChanged?.Invoke(true);
+        await NotifySaveEditBusyAsync(true);
         CloseActiveContextMenu();
         CancelScheduledRefreshRetry();
         StopProfileMonitoring();
         MapCanvas.IsHitTestVisible = false;
-        MapSelectionTextBlock.Text = kind switch
+        LocalizedUi.Set(MapSelectionTextBlock, TextBlock.TextProperty, () => kind switch
         {
             BattleMapEditKind.DeleteContent => EditorText.Format("BattleMapView_Commands_060", target.DisplayName),
             BattleMapEditKind.MoveParty => EditorText.Format("BattleMapView_Commands_061", target.DisplayName),
@@ -722,7 +724,7 @@ public partial class BattleMapView : UserControl
             BattleMapEditKind.SetBattleAttachment => EditorText.Format("BattleMapView_Commands_064", target.DisplayName),
             BattleMapEditKind.RemoveBattleAttachment => EditorText.Format("BattleMapView_Commands_065", target.DisplayName),
             _ => EditorText.Get("BattleMapView_Commands_066")
-        };
+        });
 
         try
         {
@@ -745,6 +747,8 @@ public partial class BattleMapView : UserControl
                 var maintenance = await _managedEncounterBridgeService.ReconcileAsync(currentContent, _gameDirectory, _localModDirectory);
                 if (maintenance.Changed)
                 {
+                    currentContent = await ActiveContentResolver.ResolveAsync(profile, _gameDirectory,
+                        _workshopDirectory, _localModDirectory, _codec, SaveEditorLocations.CreateDefault().WorkspaceDirectory);
                     SaveEditApplied?.Invoke(maintenance.Message);
                     ActiveContentChanged?.Invoke(currentContent);
                     if (_snapshotReader is not null)
@@ -754,7 +758,7 @@ public partial class BattleMapView : UserControl
                         _activeContentSnapshot = currentContent;
                         RenderSnapshot(updated, fitToView: false);
                     }
-                    MapSelectionTextBlock.Text = EditorText.Get("BattleMapView_Commands_068");
+                    LocalizedUi.Set(MapSelectionTextBlock, TextBlock.TextProperty, () => EditorText.Get("BattleMapView_Commands_068"));
                     return;
                 }
                 if (maintenance.Deferred) throw new InvalidOperationException(maintenance.Message);
@@ -849,7 +853,7 @@ public partial class BattleMapView : UserControl
 
             RenderSnapshot(refreshed, fitToView: false);
             refreshedSuccessfully = true;
-            MapSelectionTextBlock.Text = kind switch
+            LocalizedUi.Set(MapSelectionTextBlock, TextBlock.TextProperty, () => kind switch
             {
                 BattleMapEditKind.DeleteContent => EditorText.Format("BattleMapView_Commands_085", target.DisplayName),
                 BattleMapEditKind.MoveParty => EditorText.Format("BattleMapView_Commands_086", target.DisplayName),
@@ -858,7 +862,7 @@ public partial class BattleMapView : UserControl
                 BattleMapEditKind.SetBattleAttachment => EditorText.Format("BattleMapView_Commands_089", target.DisplayName),
                 BattleMapEditKind.RemoveBattleAttachment => EditorText.Format("BattleMapView_Commands_090", target.DisplayName),
                 _ => EditorText.Get("BattleMapView_Commands_091")
-            };
+            });
         }
         catch (Exception ex)
         {
@@ -866,13 +870,13 @@ public partial class BattleMapView : UserControl
                 EditorText.Format("BattleMapView_Commands_093", kind, prepared?.SessionId ?? EditorText.Get("BattleMapView_Commands_092"), profile.ProfileId) +
                 EditorText.Format("BattleMapView_Commands_094", profile.ProfileDirectory, target.SourceAreaId, target.SourceTileId) +
                 EditorText.Format("BattleMapView_Commands_096", committed, managedEncounterResolved, backupDirectory ?? EditorText.Get("BattleMapView_Commands_095")));
-            MapSelectionTextBlock.Text = committed
+            LocalizedUi.Set(MapSelectionTextBlock, TextBlock.TextProperty, () => committed
                 ? EditorText.Get("BattleMapView_Commands_097")
                 : ex is AggregateException
                     ? EditorText.Get("BattleMapView_Commands_098")
                     : managedEncounterResolved
                         ? EditorText.Get("BattleMapView_Commands_099")
-                        : EditorText.Get("BattleMapView_Commands_100");
+                        : EditorText.Get("BattleMapView_Commands_100"));
             if (Window.GetWindow(this) is { } owner)
             {
                 ThemedDialog.ShowMessage(
@@ -888,12 +892,12 @@ public partial class BattleMapView : UserControl
             {
                 _refreshGate.Release();
             }
-            _isApplyingEdit = false;
-            MapCanvas.IsHitTestVisible = true;
-            SaveEditBusyChanged?.Invoke(false);
-            if (generation == _profileGeneration)
+            try { await NotifySaveEditBusyAsync(false); }
+            finally
             {
-                StartProfileMonitoring();
+                _isApplyingEdit = false;
+                MapCanvas.IsHitTestVisible = true;
+                if (generation == _profileGeneration) StartProfileMonitoring();
             }
         }
 
@@ -911,8 +915,7 @@ public partial class BattleMapView : UserControl
             RefreshCellVisual(cell);
         }
 
-        MapSelectionTextBlock.Text =
-            EditorText.Format("BattleMapView_Commands_103", target.DisplayName);
+        LocalizedUi.Set(MapSelectionTextBlock, TextBlock.TextProperty, () => EditorText.Format("BattleMapView_Commands_103", target.DisplayName));
     }
 
 }
