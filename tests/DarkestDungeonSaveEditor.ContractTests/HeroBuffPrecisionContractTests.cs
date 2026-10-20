@@ -155,9 +155,12 @@ internal static partial class ContractSuite
                    .SetEquals(["BP_SIGNAL", "bp_signal"]) &&
                hero.RecruitEvents.Where(e => e.Id.StartsWith("BP_", StringComparison.Ordinal) || e.Id == "bp_event").Select(e => e.Id)
                    .ToHashSet(StringComparer.Ordinal).SetEquals(["BP_EVENT", "bp_event"]),
-            "Case-distinct Effect/event IDs and downstream signals must remain separate, while real hash collisions remain unresolved.");
-        Assert(identities.Issues.Count(issue => issue.Contains("BP_COLLIDE", StringComparison.Ordinal) && issue.Contains("conflicting native identities")) == 4,
-            "Changing case-sensitive groups must retain each genuine Effect/event collision diagnostic.");
+            "Case-distinct Effect/event IDs and downstream signals remain separate.");
+        var collisionSignals = hero.RuntimeQuirkSignals.Where(s => s.EffectName.StartsWith("BP_COLLIDE", StringComparison.Ordinal)).ToArray();
+        Assert(collisionSignals.Length == 2 && collisionSignals.All(s => s.QuirkId == "bp_signal") &&
+            identities.Issues.Count(issue => issue.Contains("BP_COLLIDE", StringComparison.Ordinal) && issue.Contains("conflicting native identities")) == 2 &&
+            identities.Issues.Any(issue => issue.StartsWith("[DDSE:NativeHashResolution]", StringComparison.Ordinal) && issue.Contains("BP_COLLIDE")),
+            "Colliding Effect references resolve the final explicit disease assignment; event collision guards remain unchanged.");
         Console.WriteLine("PASS: native Buff float/strings/mode hashes, HP guard and DSON write, exact Effect/event identities.");
     }
 }

@@ -19,9 +19,9 @@ public static partial class HeroClassCatalog
         var issues = new List<string>();
         var candidates = new Dictionary<string, List<HeroCandidate>>(StringComparer.Ordinal);
         var eventCandidates = new Dictionary<string, List<RecruitEventGroup>>(StringComparer.Ordinal);
-        var effectCandidates = new Dictionary<string, List<EffectQuirkAssignment>>(StringComparer.Ordinal);
-        var quirkCandidates = new Dictionary<string, List<QuirkDefinition>>(StringComparer.Ordinal);
-        var buffCandidates = new Dictionary<string, List<BuffDefinition>>(StringComparer.Ordinal);
+        var effectCandidates = new List<EffectQuirkAssignment>();
+        var quirkCandidates = new List<QuirkDefinition>();
+        var buffCandidates = new List<BuffDefinition>();
         var campingSkills = new Dictionary<string, CampingSkillBuilder>(StringComparer.Ordinal);
         var heroNames = new HashSet<string>(StringComparer.Ordinal);
         var sourceFiles = new List<SourceFiles>();
@@ -114,27 +114,29 @@ public static partial class HeroClassCatalog
                 string.Join(" | ", pair.Value.Select(file => file.Path)));
         }
 
-        var effectReads = new OrderedDefinitionReadState(firstMatch: false, orderKnown: effectResolutionIssues.Count == 0);
+        var effectReads = new OrderedDefinitionReadState<uint>(firstMatch: false,
+            orderKnown: effectResolutionIssues.Count == 0);
         foreach (var file in effectFiles)
         {
             try
             {
                 foreach (var effect in ReadEffectAssignments(file.Path, file.Source.Id).ToArray())
                 {
-                    AddCandidate(effectCandidates, effect.Name, effect);
+                    effectCandidates.Add(effect);
                     // Omission preserves the old field, so only an explicit
                     // disease assignment (including "") can recover certainty.
-                    if (effect.QuirkId is not null) effectReads.RecordDefinition(effect.Name);
+                    if (effect.QuirkId is not null) effectReads.RecordDefinition(NativeResourceIdentity.HashCString(effect.Name));
                 }
             }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or EncoderFallbackException or DecoderFallbackException)
             {
                 effectReads.RecordFailure();
                 issues.Add($"Failed to read effect definitions '{file.Path}': {ex.Message}");
             }
         }
 
-        var quirkReads = new OrderedDefinitionReadState(firstMatch: false, orderKnown: quirkResolutionIssues.Count == 0);
+        var quirkReads = new OrderedDefinitionReadState<uint>(firstMatch: false,
+            orderKnown: quirkResolutionIssues.Count == 0);
         foreach (var file in quirkFiles)
         {
             try
@@ -150,11 +152,8 @@ public static partial class HeroClassCatalog
                         out var declaringSources)
                         ? declaringSources
                         : [file.Source.Id];
-                    AddCandidate(
-                        quirkCandidates,
-                        quirk.Id,
-                        quirk with { AllSources = providerSources });
-                    quirkReads.RecordDefinition(quirk.Id);
+                    quirkCandidates.Add(quirk with { AllSources = providerSources });
+                    quirkReads.RecordDefinition(NativeResourceIdentity.HashCString(quirk.Id));
                 }
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
@@ -164,22 +163,22 @@ public static partial class HeroClassCatalog
             }
         }
 
-        var verifiedBuffIds = new HashSet<string>(StringComparer.Ordinal);
+        var verifiedBuffHashes = new HashSet<uint>();
         foreach (var file in buffFiles)
         {
             try
             {
                 foreach (var buff in ReadBuffDefinitions(file.Path, file.Source.Id).ToArray())
                 {
-                    AddCandidate(buffCandidates, buff.Id, buff);
-                    verifiedBuffIds.Add(buff.Id);
+                    buffCandidates.Add(buff);
+                    verifiedBuffHashes.Add(NativeResourceIdentity.HashCString(buff.Id));
                 }
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
             {
-                // An unreadable slot may redefine any earlier ID. Later whole
-                // definitions can establish their values again in native order.
-                verifiedBuffIds.Clear();
+                // An unreadable slot may redefine any earlier hash. Later whole
+                // definitions, including differently named aliases, can restore it.
+                verifiedBuffHashes.Clear();
                 issues.Add($"Failed to read buff definitions '{file.Path}': {ex.Message}");
             }
         }
@@ -187,7 +186,7 @@ public static partial class HeroClassCatalog
             activeContent.Sources.Any(source => !Directory.Exists(source.Directory)))
         {
             // Unknown providers have no provable slot relative to the files above.
-            verifiedBuffIds.Clear();
+            verifiedBuffHashes.Clear();
             issues.Add("Hero Buff provider discovery is incomplete; referenced attributes could not be verified.");
         }
 
@@ -261,44 +260,15 @@ public static partial class HeroClassCatalog
             activeContent,
             candidates.Keys
                 .Select(ContentLocalizationCatalog.GetHeroClassKey)
-                .Concat(quirkCandidates.Keys.Select(ContentLocalizationCatalog.GetQuirkKey)));
+                .Concat(quirkCandidates.Select(quirk => NativeJsonReader.CString(quirk.Id))
+                    .Select(ContentLocalizationCatalog.GetQuirkKey)));
         issues.AddRange(localization.Issues);
-        var quirkProviderSourcesById = quirkCandidates.ToDictionary(
-            pair => pair.Key,
-            pair => (IReadOnlyList<string>)pair.Value
-                .SelectMany(quirk => quirk.AllSources)
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToArray(),
-            StringComparer.Ordinal);
-
-        var effectiveEffects = ResolveOrderedDefinitions(
-            effectCandidates,
-            definition => definition.Name,
-            definitions => definitions.LastOrDefault(definition => definition.QuirkId is not null) ?? definitions[^1],
-            "Effect",
-            issues).Where(pair => effectReads.IsVerified(pair.Key))
-            .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
-        // Native quirk lookup (0x1404ABD00) walks the entire loaded vector and
-        // returns the last matching ID. Different filenames do not imply ambiguity.
-        var quirkHashCollisions = NativeResourceIdentity.FindCollisions(quirkCandidates.Values.SelectMany(group => group),
-            quirk => quirk.Id, quirk => NativeResourceIdentity.HashCString(quirk.Id));
-        if (quirkHashCollisions.Count > 0) issues.Add("Quirk IDs share native hashes and remain unresolved: " + string.Join(", ", quirkHashCollisions));
-        var effectiveQuirks = quirkCandidates.Where(pair => !pair.Value.Any(quirk => quirkHashCollisions.Contains(quirk.Id)) && pair.Value.Select(value => value.Id)
-                .Distinct(StringComparer.Ordinal).Count() == 1).ToDictionary(pair => pair.Key,
-            pair => pair.Value[^1], StringComparer.Ordinal);
-        var effectiveBuffs = ResolveOrderedDefinitions(
-            buffCandidates,
-            definition => definition.Id,
-            definitions => definitions[^1],
-            "Buff",
-            issues,
-            NativeResourceIdentity.HashCString);
+        var effectiveEffects = ResolveEffectDefinitions(effectCandidates, effectReads, issues);
+        var effectiveQuirks = ResolveQuirkDefinitions(quirkCandidates, quirkReads, issues);
         var verifiedQuirks = effectiveQuirks.Where(pair => quirkReads.IsVerified(pair.Key))
-            .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
-        var quirksByHash = verifiedQuirks.Values.ToDictionary(quirk => NativeResourceIdentity.HashCString(quirk.Id));
-        var buffsByHash = effectiveBuffs.Values.Where(buff => verifiedBuffIds.Contains(buff.Id))
-            .ToDictionary(buff => NativeResourceIdentity.HashCString(buff.Id));
-        var knownBuffHashes = buffCandidates.Keys.Select(NativeResourceIdentity.HashCString).ToHashSet();
+            .ToDictionary(pair => pair.Key, pair => pair.Value);
+        var buffsByHash = ResolveBuffDefinitions(buffCandidates, verifiedBuffHashes, issues);
+        var knownBuffHashes = buffCandidates.Select(buff => NativeResourceIdentity.HashCString(buff.Id)).ToHashSet();
         var effectiveUpgrades = ResolveHeroUpgradeTrees(upgradeFiles, issues, upgradeResolutionIssues.Count == 0);
         var resolveLevelThresholds = ReadEffectiveResolveLevelThresholds(rosterVariableFiles, enabledDlcPrefixes, issues);
         var effectiveEvents = ResolveOrderedDefinitions(
@@ -350,30 +320,19 @@ public static partial class HeroClassCatalog
             })
             .OrderBy(item => item.Id, StringComparer.OrdinalIgnoreCase)
             .ToArray();
-        // Keep unresolved native-identity conflicts in the selection catalog so
-        // the editor can show them as unavailable. When one definition was
-        // resolved (including repeated declarations in the same path), show only
-        // that selected definition to keep display and runtime semantics aligned.
-        var initialQuirks = quirkCandidates.Values
-            .SelectMany(definitions =>
-                effectiveQuirks.TryGetValue(definitions[0].Id, out var effectiveQuirk)
-                    ? new[] { effectiveQuirk }
-                    : definitions.ToArray())
+        // One selectable row per native identity. Keep unverified winners visible,
+        // but never offer a shadowed alias as another independently writable quirk.
+        var initialQuirks = effectiveQuirks.Values
             .Select(quirk =>
             {
-                var mergedQuirk = quirk with
+                return BuildInitialQuirk(quirk, verifiedQuirks, buffsByHash, knownBuffHashes) with
                 {
-                    AllSources = quirkProviderSourcesById.TryGetValue(quirk.Id, out var providerSources)
-                        ? providerSources
-                        : quirk.AllSources
-                };
-                return BuildInitialQuirk(mergedQuirk, quirksByHash, buffsByHash, knownBuffHashes) with
-                {
-                    LocalizedName = localization.GetQuirkName(mergedQuirk.Id),
+                    LocalizedName = localization.GetQuirkName(quirk.Id),
                     LocalizedSource = ContentSourceLabelFormatter.Create(
-                        mergedQuirk.Source,
-                        mergedQuirk.AllSources,
-                        activeContent.Sources)
+                        quirk.Source,
+                        quirk.AllSources,
+                        activeContent.Sources,
+                        useDeclaredEffectiveSource: true)
                 };
             })
             .OrderBy(quirk => quirk.Id, StringComparer.OrdinalIgnoreCase)

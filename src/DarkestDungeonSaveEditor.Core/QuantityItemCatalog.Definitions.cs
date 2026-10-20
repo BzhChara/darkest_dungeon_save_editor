@@ -263,7 +263,7 @@ public static partial class QuantityItemCatalog
         if (saveContext == QuantityItemSaveContext.Raid)
         {
             return string.IsNullOrWhiteSpace(inventoryType) ||
-                   inventoryType.Equals("trinket", StringComparison.Ordinal)
+                   NativeResourceIdentity.HashCString(inventoryType) == NativeResourceIdentity.HashCString("trinket")
                 ? null
                 : QuantityItemStorageKind.RaidInventory;
         }

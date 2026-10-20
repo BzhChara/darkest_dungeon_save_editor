@@ -26,6 +26,7 @@ internal static partial class ContractSuite
 
     private static async Task RunHeroReferenceDependencyContractsAsync(string runRoot, DsonSaveCodec codec)
     {
+        await VerifyBuffHashCollisionsAsync(runRoot, codec);
         foreach (var kind in QuirkRuleSourceKinds)
         {
             var root = Path.Combine(runRoot, "hero-native-references", kind);
@@ -78,16 +79,20 @@ internal static partial class ContractSuite
                 definitions["buffs"]!.AsArray().Add(JsonNode.Parse(ReferenceHpBuff(collision, 1))!["buffs"]![0]!.DeepClone());
                 File.WriteAllText(buffPath, definitions.ToJsonString());
                 File.WriteAllText(f.Quirks, ReferenceQuirks("buffs", "Az"));
-                AssertQuirkRuleRejected(HeroClassCatalog.Load(f.Content), ["other"], "Buff");
+                Assert(GenerateQuirkRuleHero(HeroClassCatalog.Load(f.Content), "other").Preview.CurrentHp == 40,
+                    "A later complete Buff replaces the shared native hash, including differently spelled or NUL aliases.");
                 File.WriteAllText(buffPath, ReferenceHpBuff("Az", 0.5));
                 var quirks = JsonNode.Parse(ReferenceQuirks("evolution_class_id", "Az"))!.AsObject();
                 quirks["quirks"]!.AsArray().Add(new JsonObject { ["id"] = collision, ["is_positive"] = true });
                 File.WriteAllText(f.Quirks, quirks.ToJsonString());
-                var ambiguous = HeroClassCatalog.Load(f.Content);
-                AssertQuirkRuleRejected(ambiguous, ["other"], "进化目标");
-                AssertQuirkRuleRejected(ambiguous, ["Az"], "未能唯一解析");
+                var resolved = HeroClassCatalog.Load(f.Content);
+                var winnerId = collision.Split('\0')[0];
+                Assert(resolved.InitialQuirks.Count == 2 &&
+                    resolved.InitialQuirks.Single(q => q.Id == "other").Evolution?.TargetQuirkId == winnerId,
+                    "Quirk references select the final native hash match and expose only its canonical selection row.");
+                GenerateQuirkRuleHero(resolved, "other", winnerId);
             }
-            Console.WriteLine($"PASS: {kind} quirk/Buff reference hashes, NUL, case/space controls, cycles, multiplicity, true definition collisions and DSON.");
+            Console.WriteLine($"PASS: {kind} quirk/Buff reference hashes, NUL, case/space controls, cycles, multiplicity, resolved definition collisions and DSON.");
         }
         foreach (var kind in new[] { "base", "local", "workshop" })
             await VerifyHeroBuffReadGuardsAsync(Path.Combine(runRoot, "hero-buff-read-guards", kind), kind, codec);
@@ -122,7 +127,7 @@ internal static partial class ContractSuite
         Assert(generated.Preview.CurrentHp == 30, "Healthy first definition establishes the initial preview.");
         var prepared = await service.PrepareStagecoachHeroEditAsync(f.Content.Profile, generated, initial, f.Content);
         var before = ProfileCatalogContentFingerprint.Capture(f.Content.Sources);
-        File.WriteAllText(last, ReferenceHpBuff("Az", 1));
+        File.WriteAllText(last, ReferenceHpBuff("BE", 1));
         using (var held = new FileStream(last, FileMode.Open, FileAccess.Read, FileShare.None))
         {
             var partial = HeroClassCatalog.Load(f.Content);
@@ -137,10 +142,10 @@ internal static partial class ContractSuite
         Assert(GenerateQuirkRuleHero(HeroClassCatalog.Load(f.Content), "other").Preview.CurrentHp == 40, "Releasing the file restores its real whole definition.");
         using (var held = new FileStream(first, FileMode.Open, FileAccess.Read, FileShare.None))
             Assert(GenerateQuirkRuleHero(HeroClassCatalog.Load(f.Content), "other").Preview.CurrentHp == 40,
-                "A readable later whole definition re-establishes the ID after an earlier read failure.");
+                "A readable later whole definition under an alias re-establishes the hash after an earlier read failure.");
         File.WriteAllText(last, "invalid JSON");
         AssertQuirkRuleRejected(HeroClassCatalog.Load(f.Content), ["other"], "Buff");
-        File.WriteAllText(last, ReferenceHpBuff("Az", 1));
+        File.WriteAllText(last, ReferenceHpBuff("BE", 1));
         if (kind != "base")
         {
             // Establish both native result slots in order. If the baseline only
@@ -149,7 +154,7 @@ internal static partial class ContractSuite
             var hidden = WriteMultiMash(Path.Combine(root, "baseline"), "shared/buffs/z.buffs.json", ReferenceHpBuff("Az", 3));
             File.Delete(last);
             AssertQuirkRuleRejected(HeroClassCatalog.Load(f.Content), ["other"], "Buff");
-            File.WriteAllText(last, ReferenceHpBuff("Az", 1));
+            File.WriteAllText(last, ReferenceHpBuff("BE", 1));
             File.Delete(hidden);
             Assert(GenerateQuirkRuleHero(HeroClassCatalog.Load(f.Content), "other").Preview.CurrentHp == 40,
                 "Neither a missing winning manifest slot nor a missing shadowed file revives the lower definition.");

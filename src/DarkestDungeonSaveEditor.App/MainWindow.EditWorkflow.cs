@@ -53,6 +53,13 @@ public partial class MainWindow : Window
                     throw new InvalidOperationException(EditorText.Get("MainWindow_EditWorkflow_003"));
                 }
 
+                if (selectedItem.Definition.StorageKind == QuantityItemStorageKind.Wallet &&
+                    targetAmount > QuantityItemSaveEditor.MaximumWalletAmount)
+                {
+                    throw new InvalidOperationException(EditorText.Format("QuantityItemSaveEditor_WalletAmountLimit",
+                        QuantityItemSaveEditor.MaximumWalletAmount));
+                }
+
                 if (_activeContentSnapshot is null)
                 {
                     throw new InvalidOperationException(EditorText.Get("MainWindow_EditWorkflow_004"));

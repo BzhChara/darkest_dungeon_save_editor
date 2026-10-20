@@ -33,7 +33,7 @@ The editor disables loading and editing while the game runs, then synchronizes a
 - Session logs are in `logs` beside the EXE for a standalone installation. Logs can contain local paths and save details; inspect them before sharing.
 - Workspaces and backups are under `%LOCALAPPDATA%\DarkestDungeonSaveEditor`. Keep the backup for any profile you edit.
 - To update, close the editor and extract the new release into a new folder. Do not mix files from different versions. Existing backups remain in the location above.
-- If you use MO2, install the compatibility package for the same editor version and follow its included README. Do not reuse a beta.3 replacement Core DLL with beta.4. Keep your existing `mo2-compat.json` settings when updating the optional patch.
+- If you use MO2, install the compatibility package for the same editor version and follow its included README. Do not reuse a replacement Core DLL from an older release with beta.5. Keep your existing `mo2-compat.json` settings when updating the optional patch.
 - Report a problem through [GitHub Issues](https://github.com/BzhChara/darkest_dungeon_save_editor/issues), including the release version and reproduction steps.
 
 ## Scope and licenses

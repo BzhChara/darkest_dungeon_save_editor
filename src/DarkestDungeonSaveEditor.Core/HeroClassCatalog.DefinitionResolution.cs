@@ -2,6 +2,72 @@ namespace DarkestDungeonSaveEditor.Core;
 
 public static partial class HeroClassCatalog
 {
+    private static IReadOnlyDictionary<uint, QuirkDefinition> ResolveQuirkDefinitions(
+        IReadOnlyList<QuirkDefinition> candidates, OrderedDefinitionReadState<uint> reads, List<string> issues)
+    {
+        var result = new Dictionary<uint, QuirkDefinition>();
+        foreach (var group in candidates.GroupBy(quirk => NativeResourceIdentity.HashCString(quirk.Id)))
+        {
+            // Native lookup walks the whole vector. Group the original sequence,
+            // so A/B/A selects the final A even when the strings share one hash.
+            var winner = group.Last();
+            result.Add(group.Key, winner with
+            {
+                Id = NativeJsonReader.CString(winner.Id),
+                AllSources = group.SelectMany(quirk => quirk.AllSources).Distinct(StringComparer.OrdinalIgnoreCase).ToArray()
+            });
+            if (reads.IsVerified(group.Key) && NativeResourceIdentity.DescribeHashResolution(
+                    group, winner, quirk => quirk.Id, quirk => quirk.SourcePath, "Catalog_QuirkHashResolution") is { } notice)
+                issues.Add(notice);
+        }
+        return result;
+    }
+
+    private static IReadOnlyDictionary<uint, EffectQuirkAssignment> ResolveEffectDefinitions(
+        IReadOnlyList<EffectQuirkAssignment> candidates, OrderedDefinitionReadState<uint> reads, List<string> issues)
+    {
+        var result = new Dictionary<uint, EffectQuirkAssignment>();
+        foreach (var group in candidates.GroupBy(effect => NativeResourceIdentity.HashCString(effect.Name)))
+        {
+            if (!reads.IsVerified(group.Key)) continue;
+            // Effects reuse a hash-keyed object. Only the disease field is consumed
+            // here: omission retains its value, including a previous explicit "".
+            var winner = group.Last(effect => effect.QuirkId is not null);
+            result.Add(group.Key, winner);
+            if (NativeResourceIdentity.DescribeHashResolution(
+                    group, winner, effect => effect.Name, effect => effect.SourcePath, "Catalog_EffectHashResolution") is { } notice)
+                issues.Add(notice);
+        }
+        return result;
+    }
+
+    private static IReadOnlyDictionary<uint, BuffDefinition> ResolveBuffDefinitions(
+        IReadOnlyList<BuffDefinition> candidates,
+        IReadOnlySet<uint> verifiedHashes,
+        List<string> issues)
+    {
+        // Native Buff loading assigns a complete object to a uint32-keyed slot.
+        // Group the original sequence by hash, not by textual ID: A/B/A must
+        // retain the final A, including when A and B are different hash aliases.
+        var result = new Dictionary<uint, BuffDefinition>();
+        foreach (var group in candidates.GroupBy(buff => NativeResourceIdentity.HashCString(buff.Id)))
+        {
+            if (!verifiedHashes.Contains(group.Key)) continue;
+            var winner = group.Last();
+            result.Add(group.Key, winner);
+            if (group.Select(buff => buff.Id).Distinct(StringComparer.Ordinal).Skip(1).Any())
+            {
+                var providers = string.Join("; ", group.Select(buff => (buff.Id, buff.SourcePath))
+                    .Distinct().Select(provider => $"'{provider.Id}' ('{provider.SourcePath}')"));
+                issues.Add(CatalogIssueCode.BuffHashOverride + EditorText.Format(
+                    "HeroClassCatalog_BuffHashOverride",
+                    group.Key.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                    providers, winner.Id, winner.SourcePath));
+            }
+        }
+        return result;
+    }
+
     private static IReadOnlyList<EffectiveContentFile> ResolveFiles(
         IReadOnlyList<SourceFiles> sourceFiles,
         Func<SourceFileSet, IReadOnlyList<string>> selectFiles,

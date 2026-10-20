@@ -35,7 +35,7 @@ public static partial class QuantityItemCatalog
         string PersistedId,
         int Amount)
     {
-        public string CatalogKey =>
-            QuantityItemDefinition.CreateCatalogKey(StorageKind, PersistedType, PersistedId);
+        public NativeQuantityItemIdentity NativeIdentity =>
+            NativeQuantityItemIdentity.FromSaved(StorageKind, PersistedType, PersistedId);
     }
 }

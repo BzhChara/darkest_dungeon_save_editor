@@ -86,7 +86,7 @@ public static partial class QuantityItemCatalog
                 continue;
             }
 
-            if (persistedType.Equals("trinket", StringComparison.Ordinal))
+            if (NativeQuantityItemIdentity.IsSavedTrinketType(persistedType))
             {
                 // Trinkets remain instance-based content even when carried in the raid bag.
                 // They belong to the dedicated trinket workflow and must never be exposed as
@@ -104,16 +104,7 @@ public static partial class QuantityItemCatalog
         return result;
     }
 
-    private static int SumAmounts(IEnumerable<int> amounts, string catalogKey)
-    {
-        try
-        {
-            return amounts.Aggregate(0, checked((sum, amount) => sum + amount));
-        }
-        catch (OverflowException ex)
-        {
-            throw new InvalidDataException($"Quantity total exceeds Int32 for '{catalogKey}'.", ex);
-        }
-    }
+    private static int SumAmounts(IEnumerable<int> amounts, NativeQuantityItemIdentity identity) =>
+        QuantityItemSaveEditor.SumAmounts(amounts, identity.StorageKind, identity.ToString());
 
 }

@@ -81,7 +81,7 @@ $buildInfo = [ordered]@{
     builtAtUtc = [DateTime]::UtcNow.ToString('O')
     ordinaryCoreSha256 = (Get-FileHash -LiteralPath $ordinaryDll -Algorithm SHA256).Hash
     replacementCoreSha256 = (Get-FileHash -LiteralPath (Join-Path $payload 'DarkestDungeonSaveEditor.Core.dll') -Algorithm SHA256).Hash
-    compatibilityRevision = 'mapper-20261016-guards-20261018-beta4'
+    compatibilityRevision = 'mapper-20261016-guards-20261018-separators-20261020-beta5'
     supportedMapper = 'game_support_DarkestDungeon_20261016_004446 (merge mod mapper)'
 }
 $buildInfo | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $package 'build-info.json') -Encoding utf8NoBOM

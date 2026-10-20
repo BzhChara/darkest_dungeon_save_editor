@@ -25,23 +25,11 @@ internal static partial class ContractSuite
         var triggerStateful = state.TriggerStateful;
         var unlimited = state.Unlimited;
         var service = new SaveEditService(codec, locations);
-        var ambiguousTrinketBlocked = false;
-        try
-        {
-            _ = await service.PrepareTrinketEditAsync(
-                profile,
-                ambiguousTrinket,
-                1,
-                activeCatalog.Storage,
-                activeContent);
-        }
-        catch (InvalidOperationException ex) when (ex.Message.Contains(ambiguousTrinket.Id, StringComparison.Ordinal) &&
-            ex.Message.Contains(EditorText.IsChinese ? "暂时只读" : "read-only", StringComparison.Ordinal))
-        {
-            ambiguousTrinketBlocked = true;
-        }
-
-        Assert(ambiguousTrinketBlocked, "An unresolved trinket definition must not enter the save preview path.");
+        var resolvedTrinketPreview = await service.PrepareTrinketEditAsync(
+            profile, ambiguousTrinket, 1, activeCatalog.Storage, activeContent);
+        Assert(resolvedTrinketPreview.Trinket.Id == "ambiguous_trinketAz" &&
+            resolvedTrinketPreview.Trinket.Price == 100,
+            "A resolved native hash uses the first eligible trinket's original identity and attributes in preview.");
         var workspaceCountBeforeUnknownCapacity = Directory.Exists(locations.WorkspaceDirectory)
             ? Directory.GetDirectories(locations.WorkspaceDirectory).Length
             : 0;

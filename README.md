@@ -14,7 +14,7 @@ Download a **Windows x64 ZIP** from [GitHub Releases](https://github.com/BzhChar
 
 See [Installation and first use](docs/release-installation.md) for requirements, checksum verification, backups and updates. This is a prerelease: keep a separate save backup and check the selected profile before editing. The **Source code** archives on GitHub require building the project.
 
-The current source version is `0.1.0-beta.4`. See the [beta.4 release notes](docs/releases/v0.1.0-beta.4.md) for the synchronization, language, Bridge, and optional MO2 compatibility changes.
+The current source version is `0.1.0-beta.5`. See the [beta.5 release notes](docs/releases/v0.1.0-beta.5.md) for native resource identity matching, the wallet limit, accurate source labels, and the optional MO2 compatibility fix.
 
 ## License
 

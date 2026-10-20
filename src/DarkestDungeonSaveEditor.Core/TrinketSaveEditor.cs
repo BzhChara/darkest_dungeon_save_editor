@@ -4,16 +4,18 @@ namespace DarkestDungeonSaveEditor.Core;
 
 public static class TrinketSaveEditor
 {
+    private static readonly uint TrinketTypeHash = NativeResourceIdentity.HashCString("trinket");
+
     public static SaveProfileSummary Summarize(JsonObject estateRoot)
     {
         var baseRoot = JsonSupport.RequireObject(estateRoot, "base_root");
         var items = JsonSupport.RequireObject(baseRoot, "trinkets", "items");
-        var ids = new HashSet<string>(StringComparer.Ordinal);
+        var ids = new HashSet<uint>();
         var copies = 0;
         foreach (var pair in items)
         {
             if (pair.Value is not JsonObject item ||
-                !JsonSupport.ReadRawString(item, "type").Equals("trinket", StringComparison.Ordinal))
+                NativeInventoryIdentity.HashSavedField(JsonSupport.ReadRawString(item, "type")) != TrinketTypeHash)
             {
                 continue;
             }
@@ -21,7 +23,7 @@ public static class TrinketSaveEditor
             var id = JsonSupport.ReadRawString(item, "id");
             if (!string.IsNullOrWhiteSpace(id))
             {
-                ids.Add(id);
+                ids.Add(NativeInventoryIdentity.HashSavedField(id));
                 copies++;
             }
         }
@@ -95,10 +97,11 @@ public static class TrinketSaveEditor
 
     private static int CountCopiesInItems(JsonObject items, string trinketId)
     {
+        var hash = NativeResourceIdentity.HashCString(trinketId);
         return items.Count(pair =>
             pair.Value is JsonObject item &&
-            JsonSupport.ReadRawString(item, "type").Equals("trinket", StringComparison.Ordinal) &&
-            JsonSupport.ReadRawString(item, "id").Equals(trinketId, StringComparison.Ordinal));
+            NativeInventoryIdentity.HashSavedField(JsonSupport.ReadRawString(item, "type")) == TrinketTypeHash &&
+            NativeInventoryIdentity.HashSavedField(JsonSupport.ReadRawString(item, "id")) == hash);
     }
 
     private static int FindHighestNumericKey(JsonObject items)

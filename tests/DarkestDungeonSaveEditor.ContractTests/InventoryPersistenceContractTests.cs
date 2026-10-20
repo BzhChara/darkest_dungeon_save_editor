@@ -108,9 +108,10 @@ internal static partial class ContractSuite
         Assert(town.Issues.Any(s => s.Contains("UTF-8", StringComparison.Ordinal)) &&
                trinkets.Issues.Any(s => s.Contains("UTF-8", StringComparison.Ordinal)),
             "Unavailable save identities must carry a catalog diagnostic.");
-        Assert(trinkets.Trinkets.Where(t => t.Id.StartsWith("nul_alias", StringComparison.Ordinal)).All(t => t.HasProviderConflict),
-            "A NUL-terminated definition must not evade native hash collision checks and leave its short alias writable.");
-        RejectIdentity(() => TrinketSaveEditor.AddCopies(estate, trinkets.Trinkets.Single(t => t.Id.Contains('\0')), 1, 100));
+        var nulAlias = trinkets.Trinkets.Single(t => t.Id.StartsWith("nul_alias", StringComparison.Ordinal));
+        Assert(nulAlias.Id == "nul_alias" && !nulAlias.HasProviderConflict && nulAlias.SaveIdentityIssue.Length == 0,
+            "A later NUL alias cannot replace or disable the first eligible, safely writable trinket.");
+        RejectIdentity(() => TrinketSaveEditor.AddCopies(estate, nulAlias with { Id = "nul_alias\0suffix" }, 1, 100));
         RejectIdentity(() => TrinketSaveEditor.AddCopies(estate, trinkets.Trinkets.First() with { Id = "bad\ud800" }, 1, 100));
 
         var longWallet = town.Items.Single(i => i.InventoryType == "heirloom" && i.ItemId == ascii + "b");

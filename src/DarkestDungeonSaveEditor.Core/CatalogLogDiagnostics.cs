@@ -113,6 +113,14 @@ public static partial class CatalogLogDiagnostics
         {
             return (raw, DiagnosticLogLevel.Information, Clean(raw[CatalogIssueCode.TownRaidResidue.Length..]), null);
         }
+        if (raw.StartsWith(CatalogIssueCode.BuffHashOverride, StringComparison.Ordinal))
+        {
+            return (raw, DiagnosticLogLevel.Information, Clean(raw[CatalogIssueCode.BuffHashOverride.Length..]), null);
+        }
+        if (raw.StartsWith(CatalogIssueCode.NativeHashResolution, StringComparison.Ordinal))
+        {
+            return (raw, DiagnosticLogLevel.Information, Clean(raw[CatalogIssueCode.NativeHashResolution.Length..]), null);
+        }
         if (raw.StartsWith("Enabled content directory appears more than once and was scanned once:", StringComparison.Ordinal))
         {
             return (raw, DiagnosticLogLevel.Information, Clean(raw), null);

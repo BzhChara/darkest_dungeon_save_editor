@@ -10,6 +10,8 @@ internal static class CatalogIssueCode
     internal const string Record = ";record=";
     internal const string PartialLocalization = "[DDSE:PartialLocalization]'";
     internal const string TownRaidResidue = "[DDSE:TownRaidResidue]";
+    internal const string BuffHashOverride = "[DDSE:BuffHashOverride]";
+    internal const string NativeHashResolution = "[DDSE:NativeHashResolution]";
     internal const string LocalizationEvidence = "\n[DDSE:LocalizationEvidence]";
 
     internal static string FormatEncounterSlots(string path, int line, int record) =>

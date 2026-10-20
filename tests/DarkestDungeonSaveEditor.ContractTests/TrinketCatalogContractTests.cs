@@ -30,7 +30,7 @@ internal static partial class ContractSuite
         Assert(
             catalogWithEmptyDlc.Trinkets.Count == activeCatalog.Trinkets.Count,
             "An enabled DLC source without a trinkets directory should be ignored without failing the catalog.");
-        Assert(activeCatalog.Trinkets.Count == 16, "Active catalog should contain base, stateful fixtures, enabled DLC package/feature, active Workshop, default/extra local Mods, provenance probes, and two unresolved native-hash collisions.");
+        Assert(activeCatalog.Trinkets.Count == 15, "Active catalog should contain base, stateful fixtures, enabled DLC package/feature, active Workshop, default/extra local Mods, provenance probes, and one resolved native-hash selection row.");
         var activeWorkshopTrinket = activeCatalog.Trinkets.Single(item => item.Id == "active_workshop_trinket");
         Assert(
             activeWorkshopTrinket.LocalizedName == new BilingualContentName("编译工坊饰品", "Compiled Workshop Trinket"),
@@ -249,11 +249,12 @@ internal static partial class ContractSuite
             !overriddenDlcFeatureTrinket.HasProviderConflict,
             "A Mod should override an enabled DLC feature trinket through its full virtual path.");
         Assert(
-            ambiguousTrinket.HasProviderConflict && ambiguousTrinket.Source == "unresolved",
-            "Trinket IDs sharing a native hash must remain unavailable.");
+            !ambiguousTrinket.HasProviderConflict && ambiguousTrinket.Price == 100 &&
+            !activeCatalog.Trinkets.Any(item => item.Id == "ambiguous_trinketBE"),
+            "Trinket IDs sharing a native hash expose the first eligible entry, including its original attributes.");
         Assert(
-            activeCatalog.Issues.Any(issue => issue.Contains("Trinket IDs share native hashes", StringComparison.Ordinal)),
-            "An unresolved native trinket identity should be reported.");
+            activeCatalog.Issues.Any(issue => issue.StartsWith("[DDSE:NativeHashResolution]", StringComparison.Ordinal)),
+            "A resolved native trinket identity should be reported as information.");
 
 
         return new TrinketCatalogContractState(

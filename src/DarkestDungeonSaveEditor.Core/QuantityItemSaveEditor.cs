@@ -5,6 +5,17 @@ namespace DarkestDungeonSaveEditor.Core;
 
 public static class QuantityItemSaveEditor
 {
+    public const int MaximumWalletAmount = 2_000_000_000;
+
+    internal static void ValidateTargetAmount(QuantityItemDefinition definition, int targetAmount)
+    {
+        if (targetAmount < 0)
+            throw new ArgumentOutOfRangeException(nameof(targetAmount), "Target amount cannot be negative.");
+        if (definition.StorageKind == QuantityItemStorageKind.Wallet && targetAmount > MaximumWalletAmount)
+            throw new ArgumentOutOfRangeException(nameof(targetAmount),
+                EditorText.Format("QuantityItemSaveEditor_WalletAmountLimit", MaximumWalletAmount));
+    }
+
     public static (JsonObject UpdatedRoot, QuantityItemMutationPreview Preview) SetAmount(
         JsonObject estateRoot,
         QuantityItemDefinition definition,
@@ -13,16 +24,14 @@ public static class QuantityItemSaveEditor
         ArgumentNullException.ThrowIfNull(estateRoot);
         ArgumentNullException.ThrowIfNull(definition);
         NativeInventoryIdentity.RequireWritable(definition.SaveIdentityIssue);
-        if (targetAmount < 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(targetAmount), "Target amount cannot be negative.");
-        }
+        ValidateTargetAmount(definition, targetAmount);
 
         var updated = estateRoot.DeepClone() as JsonObject
             ?? throw new InvalidDataException("Failed to clone decoded estate save.");
         var items = GetStorageItems(updated, definition.StorageKind);
         var matches = FindMatches(items, definition).ToArray();
-        var existingAmount = SumAmounts(matches, definition.DisplayId);
+        var existingAmount = SumAmounts(matches.Select(item => ReadRequiredAmount(item, definition.DisplayId)),
+            definition.StorageKind, definition.DisplayId);
         if (existingAmount == targetAmount)
         {
             throw new InvalidOperationException(
@@ -82,7 +91,8 @@ public static class QuantityItemSaveEditor
         ArgumentNullException.ThrowIfNull(estateRoot);
         ArgumentNullException.ThrowIfNull(definition);
         var items = GetStorageItems(estateRoot, definition.StorageKind);
-        return SumAmounts(FindMatches(items, definition), definition.DisplayId);
+        return SumAmounts(FindMatches(items, definition).Select(item => ReadRequiredAmount(item, definition.DisplayId)),
+            definition.StorageKind, definition.DisplayId);
     }
 
     private static JsonObject GetStorageItems(JsonObject estateRoot, QuantityItemStorageKind storageKind)
@@ -97,33 +107,19 @@ public static class QuantityItemSaveEditor
         JsonObject items,
         QuantityItemDefinition definition)
     {
-        foreach (var pair in items)
-        {
-            if (pair.Value is not JsonObject item ||
-                !JsonSupport.ReadRawString(item, "type")
-                    .Equals(definition.PersistedType, StringComparison.Ordinal))
-            {
-                continue;
-            }
-
-            if (definition.StorageKind == QuantityItemStorageKind.EstateItems &&
-                !JsonSupport.ReadRawString(item, "id")
-                    .Equals(definition.PersistedId, StringComparison.Ordinal))
-            {
-                continue;
-            }
-
-            yield return item;
-        }
+        var identity = NativeQuantityItemIdentity.FromDefinition(definition);
+        return items.Select(pair => pair.Value).OfType<JsonObject>().Where(identity.Matches);
     }
 
-    private static int SumAmounts(IEnumerable<JsonObject> items, string itemId)
+    internal static int SumAmounts(IEnumerable<int> amounts, QuantityItemStorageKind storageKind, string itemId)
     {
         try
         {
-            return items.Aggregate(
+            return amounts.Aggregate(
                 0,
-                (sum, item) => checked(sum + ReadRequiredAmount(item, itemId)));
+                (sum, amount) => storageKind == QuantityItemStorageKind.Wallet
+                    ? (int)Math.Min(MaximumWalletAmount, (long)sum + amount)
+                    : checked(sum + amount));
         }
         catch (OverflowException ex)
         {

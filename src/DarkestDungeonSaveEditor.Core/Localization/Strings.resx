@@ -4945,4 +4945,19 @@ Backup directory:
   <data name="ManagedBattleEncounterBridgeService_LegacyTitle" xml:space="preserve">
     <value>This Bridge uses an old title with fullwidth parentheses and must be cleaned up and recreated before editing battles: {0}. Its files and save references have not been migrated.</value>
   </data>
+  <data name="HeroClassCatalog_BuffHashOverride" xml:space="preserve">
+    <value>Buff IDs share native hash {0}: {1}. Following native load order, the last complete definition '{2}' from '{3}' is effective. All references to this hash use that definition.</value>
+  </data>
+  <data name="Catalog_QuirkHashResolution" xml:space="preserve">
+    <value>Quirk IDs share native hash {0}: {1}. ID lookups use the last complete definition '{2}' from '{3}'; the selection catalog shows this effective definition once.</value>
+  </data>
+  <data name="Catalog_TrinketHashResolution" xml:space="preserve">
+    <value>Trinket IDs share native hash {0}: {1}. ID lookups use the first eligible definition '{2}' from '{3}'; the selection catalog shows this effective definition once.</value>
+  </data>
+  <data name="Catalog_EffectHashResolution" xml:space="preserve">
+    <value>Effect names share native hash {0}: {1}. They update one object; the last explicit disease assignment is from '{2}' in '{3}'. Omitted disease fields retain the previous value.</value>
+  </data>
+  <data name="QuantityItemSaveEditor_WalletAmountLimit" xml:space="preserve">
+    <value>Wallet amounts must be between 0 and {0}, the game's maximum.</value>
+  </data>
 </root>

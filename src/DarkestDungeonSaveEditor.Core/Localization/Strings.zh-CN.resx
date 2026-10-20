@@ -4945,4 +4945,19 @@
   <data name="ManagedBattleEncounterBridgeService_LegacyTitle" xml:space="preserve">
     <value>这个 Bridge 仍使用中文括号旧标题，请先清理并重新生成后再编辑战斗：{0}。原文件和存档引用未自动迁移。</value>
   </data>
+  <data name="HeroClassCatalog_BuffHashOverride" xml:space="preserve">
+    <value>以下 Buff ID 共用原生哈希 {0}：{1}。已按游戏读取顺序采用最后一份完整定义「{2}」，来源「{3}」。所有引用该哈希的 Buff 均使用此定义。</value>
+  </data>
+  <data name="Catalog_QuirkHashResolution" xml:space="preserve">
+    <value>以下怪癖 ID 共用原生哈希 {0}：{1}。按 ID 查找时采用最后一份完整定义「{2}」，来源「{3}」；选择列表只显示这一份生效定义。</value>
+  </data>
+  <data name="Catalog_TrinketHashResolution" xml:space="preserve">
+    <value>以下饰品 ID 共用原生哈希 {0}：{1}。按 ID 查找时采用第一份通过依赖检查的定义「{2}」，来源「{3}」；选择列表只显示这一份生效定义。</value>
+  </data>
+  <data name="Catalog_EffectHashResolution" xml:space="preserve">
+    <value>以下 Effect 名称共用原生哈希 {0}：{1}。它们更新同一个对象，最后一次明确设置 disease 字段的是「{2}」，来源「{3}」；省略该字段时保留先前的值。</value>
+  </data>
+  <data name="QuantityItemSaveEditor_WalletAmountLimit" xml:space="preserve">
+    <value>钱包数量必须在 0 到 {0} 之间，游戏上限为 20 亿。</value>
+  </data>
 </root>

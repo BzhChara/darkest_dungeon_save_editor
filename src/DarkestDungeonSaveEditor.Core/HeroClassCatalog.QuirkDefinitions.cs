@@ -83,8 +83,8 @@ public static partial class HeroClassCatalog
                 }
                 else
                 {
-                    // A colliding native key may resolve to a different Buff whose stat
-                    // is HP, even when this string's own candidates are all non-HP.
+                    // A later unreadable file or unknown provider may replace
+                    // this hash, even if the readable candidates are non-HP.
                     unverifiedReasons.Add(EditorText.Format("HeroClassCatalog_QuirkDefinitions_006", buffId));
                 }
 
@@ -197,13 +197,12 @@ public static partial class HeroClassCatalog
 
     private static HeroRuntimeQuirkSignal? ResolveRuntimeQuirk(
         SkillEffectReference reference,
-        IReadOnlyDictionary<string, EffectQuirkAssignment> effectiveEffects,
-        IReadOnlyDictionary<string, QuirkDefinition> effectiveQuirks)
+        IReadOnlyDictionary<uint, EffectQuirkAssignment> effectiveEffects,
+        IReadOnlyDictionary<uint, QuirkDefinition> effectiveQuirks)
     {
-        if (!effectiveEffects.TryGetValue(reference.EffectName, out var effect) ||
+        if (!effectiveEffects.TryGetValue(NativeResourceIdentity.HashCString(reference.EffectName), out var effect) ||
             string.IsNullOrWhiteSpace(effect.QuirkId) ||
-            !effectiveQuirks.TryGetValue(effect.QuirkId, out var quirk) ||
-            !quirk.Id.Equals(effect.QuirkId, StringComparison.Ordinal) ||
+            !effectiveQuirks.TryGetValue(NativeResourceIdentity.HashCString(effect.QuirkId), out var quirk) ||
             quirk.RandomChance is null or > 0)
         {
             return null;
@@ -225,8 +224,8 @@ public static partial class HeroClassCatalog
         foreach (var (kind, body) in NativeDarkestReader.ReadRecords(path))
         {
             if (kind != "effect") continue;
-            var name = NativeDarkestReader.ReadString(body, ".name");
-            var quirkId = NativeDarkestReader.ReadString(body, ".disease");
+            var name = ReadEffectString(body, ".name");
+            var quirkId = ReadEffectString(body, ".disease");
             // The native Effect object survives duplicate declarations:
             // omitted disease retains the old string; explicit "" clears it.
             // Keep even non-disease entries for native identity validation.
@@ -239,6 +238,17 @@ public static partial class HeroClassCatalog
                     Path.GetFullPath(path));
             }
         }
+    }
+
+    private static string? ReadEffectString(string body, string field)
+    {
+        var value = NativeDarkestReader.ReadString(body, field);
+        if (value is null) return null;
+        // Both fields use a 64-byte native buffer before hash lookup. Do not
+        // silently substitute replacement characters for a split UTF-8 sequence.
+        var utf8 = new UTF8Encoding(false, true);
+        var bytes = utf8.GetBytes(NativeJsonReader.CString(value));
+        return utf8.GetString(bytes, 0, Math.Min(bytes.Length, 63));
     }
 
     private static IEnumerable<QuirkDefinition> ReadQuirkDefinitions(

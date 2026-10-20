@@ -212,6 +212,9 @@ internal sealed record Mo2ContentPlan(string Key, string CacheDirectory, byte[] 
             var name = line[1..].Trim();
             SafePath.SingleName(name);
             if (!seen.Add(name)) throw Mo2Compatibility.Error($"Duplicate MO2 Mod: {name}.");
+            // MO2's case-sensitive separator suffix marks headings, even for '+' rows.
+            // Headings are not active content layers and must not consume virtual alias indices.
+            if (name.EndsWith("_separator", StringComparison.Ordinal)) continue;
             if (line[0] == '+') names.Add(name);
         }
         // MO2 persists highest priority first; the game plugin enumerates low to high.

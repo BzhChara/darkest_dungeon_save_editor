@@ -171,25 +171,23 @@ internal static partial class ContractSuite
         var trinkets = TrinketCatalog.Load(snapshot).Trinkets;
         var heroes = HeroClassCatalog.Load(snapshot);
         Assert(items.Where(item => item.ItemId != "safe").All(item => item.HasProviderConflict) &&
-            trinkets.Where(item => item.Id != "safe").All(item => item.HasProviderConflict) &&
+            trinkets.Count == 2 && trinkets.Single(item => item.Id == "Az") is { QuestUses: 2, HasProviderConflict: false } &&
             !items.Single(item => item.ItemId == "safe").HasProviderConflict &&
             !trinkets.Single(item => item.Id == "safe").HasProviderConflict &&
-            heroes.InitialQuirks.Where(quirk => quirk.Id != "safe").All(quirk =>
-                quirk.WriteStatus == HeroInitialQuirkWriteStatus.Unverified && !quirk.IsNaturalRandomEligible) &&
+            heroes.InitialQuirks.Count == 3 && heroes.InitialQuirks.All(quirk => quirk.WriteStatus == HeroInitialQuirkWriteStatus.Direct) &&
+            heroes.InitialQuirks.Single(quirk => quirk.Id == "BE") is { IsPositive: false, IsNaturalRandomEligible: true } &&
+            heroes.InitialQuirks.Single(quirk => quirk.Id == "evolves").Evolution?.TargetQuirkId == "BE" &&
             heroes.HeroClasses.All(hero => hero.HasProviderConflict),
-            "Hash collisions must block only affected definitions and evolution references, without suppressing unrelated resources.");
+            "Known trinket/quirk hash rules resolve their winners while quantity-item and hero collision guards remain active.");
         var sizes = BattleEncounterCatalog.ReadMaintenanceMonsterSizes(snapshot.Sources);
         Assert(sizes["Az_A"] is null && sizes["BE_A"] is null,
             "Colliding monster hashes must defer index calculations instead of using independent string-keyed sizes.");
         var locations = new SaveEditorLocations(directory, Path.Combine(directory, "workspaces"), Path.Combine(directory, "backups"));
         var service = new SaveEditService(codec, locations);
         var itemRejected = false;
-        var trinketRejected = false;
         try { await service.PrepareQuantityItemEditAsync(content.Profile, items.Single(item => item.ItemId == "BE"), 3, snapshot); }
         catch (InvalidOperationException error) when (error.Message.Contains("unresolved definitions", StringComparison.Ordinal)) { itemRejected = true; }
-        try { await service.PrepareTrinketEditAsync(content.Profile, trinkets.Single(item => item.Id == "BE"), 1, null, snapshot); }
-        catch (InvalidOperationException error) when (error.Message == EditorText.Format("SaveEditService_Trinkets_Unverified", "BE")) { trinketRejected = true; }
-        Assert(itemRejected && trinketRejected && !Directory.Exists(locations.BackupDirectory),
-            "Native hash collisions must be rejected by the real preview services before any save mutation or backup.");
+        Assert(itemRejected && !Directory.Exists(locations.BackupDirectory),
+            "Unresolved quantity-item collisions remain rejected by the real preview service before any save mutation or backup.");
     }
 }

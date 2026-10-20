@@ -97,6 +97,62 @@ try
             Assert(File.ReadAllText(Path.Combine(snapshot, "effects/999002test.effects.darkest")) == "generated", "overwrite alias");
             Assert(!File.Exists(Path.Combine(snapshot, "effects/test.effects.darkest")), "original name excluded");
         }),
+        ("separator rows preserve KCC aliases, overwrite index and provider priority", f =>
+        {
+            var lowNames = Enumerable.Range(0, 47).Select(index => $"Low{index:D3}").ToArray();
+            lowNames[1] = "Tools_separator_patch";
+            lowNames[2] = "NotAGroup_SEPARATOR";
+            foreach (var name in lowNames) f.Mod(name);
+            var separators = new[] { "肉盾_separator", "辅助_separator", "输出_separator", "角色_separator" };
+            foreach (var name in separators)
+            {
+                f.Mod(name);
+                f.File(name, "inventory/test.darkest", "fake");
+            }
+            f.Mod("KCC"); f.Mod("High");
+            f.List(new[] { "+High", "+KCC", "+" + separators[3], "+" + separators[2] }
+                .Concat(lowNames.Reverse().Select(name => "+" + name))
+                .Concat(new[] { "+" + separators[1], "+" + separators[0] }).ToArray());
+            f.File(lowNames[0], "effects/test.effects.darkest", "low");
+            f.File(lowNames[0], "inventory/test.darkest", "base");
+            f.File("KCC", "campaign/town/provision/kcc.provision.layout.darkest", "kcc");
+            f.File("KCC", "inventory/test.darkest", "kcc!");
+            f.File("High", "effects/test.effects.darkest", "top");
+            f.File("High", "inventory/test.darkest", "high");
+            f.Overwrite("effects/test.effects.darkest", "out");
+            var manifest = new[]
+            {
+                (Path: "campaign/town/provision/999047kcc.provision.layout.darkest", Text: "kcc"),
+                (Path: "effects/999000test.effects.darkest", Text: "low"),
+                (Path: "effects/999048test.effects.darkest", Text: "top"),
+                (Path: "effects/999049test.effects.darkest", Text: "out"),
+                (Path: "inventory/test.darkest", Text: "high")
+            };
+            f.Manifest(manifest);
+            var modlist = File.ReadAllBytes(Path.Combine(f.Profile, "modlist.txt"));
+            var finalManifest = File.ReadAllBytes(Path.Combine(f.OverwriteRoot, "modfiles.txt"));
+            var snapshot = f.Prepare();
+            foreach (var (path, value) in manifest)
+                Assert(File.ReadAllText(Path.Combine(snapshot, path)) == value, "provider bytes: " + path);
+            Assert(Mo2Compatibility.ResolveForValidation(f.Config, f.Game, f.Workshop) == snapshot,
+                "pre-write validation uses the same separator-free bindings");
+            Assert(modlist.SequenceEqual(File.ReadAllBytes(Path.Combine(f.Profile, "modlist.txt"))) &&
+                finalManifest.SequenceEqual(File.ReadAllBytes(Path.Combine(f.OverwriteRoot, "modfiles.txt"))),
+                "MO2 profile and final manifest remain unchanged");
+        }),
+        ("separators need no directory and never provide resources", f =>
+        {
+            f.Mod("A"); f.List("+Empty_separator", "+A", "-Closed_separator");
+            f.File("A", "inventory/test.darkest", "live");
+            f.Manifest(("inventory/test.darkest", "live"));
+            Assert(File.ReadAllText(Path.Combine(f.Prepare(), "inventory/test.darkest")) == "live",
+                "enabled and disabled separators need no physical directory");
+            f.File("Empty_separator", "inventory/separator-only.darkest", "fake");
+            f.Manifest(("inventory/separator-only.darkest", "fake"));
+            Throws<InvalidDataException>(() => f.Prepare(), "No enabled provider");
+            f.List("+../Escape_separator", "+A"); f.Manifest();
+            Throws<InvalidDataException>(() => f.Prepare(), "Invalid path component");
+        }),
         ("last-only quirk alias uses generated overwrite", f =>
         {
             f.Mod("A"); f.Mod("B"); f.List("+B", "+A");

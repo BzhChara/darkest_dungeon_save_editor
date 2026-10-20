@@ -4,6 +4,21 @@ try
     // The localization group switches both cultures explicitly and restores this baseline.
     DarkestDungeonSaveEditor.Core.EditorText.Initialize("zh-CN", System.Globalization.CultureInfo.CurrentUICulture);
     if (await ContractSuite.TryRunCodecProcessProbeAsync(args)) return;
+    if (args.Length == 2 && args[1] == "--quantity-native")
+    {
+        await ContractSuite.RunQuantityNativeOnlyAsync(Path.GetFullPath(args[0]));
+        return;
+    }
+    if (args.Length == 2 && args[1] == "--native-identities")
+    {
+        await ContractSuite.RunNativeCatalogHashesOnlyAsync(Path.GetFullPath(args[0]));
+        return;
+    }
+    if (args.Length == 2 && args[1] == "--buff-collisions")
+    {
+        await ContractSuite.RunBuffHashCollisionsOnlyAsync(Path.GetFullPath(args[0]));
+        return;
+    }
     if (args.Length == 2 && args[1] == "--mod-load-preflight")
     {
         await ContractSuite.RunMissingModLoadOnlyAsync(Path.GetFullPath(args[0]));

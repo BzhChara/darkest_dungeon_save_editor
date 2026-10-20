@@ -7,27 +7,30 @@ namespace DarkestDungeonSaveEditor.Core;
 internal sealed class ContentSourceLabel(
     string effectiveSourceId,
     IReadOnlyList<string> providerSourceIds,
-    IReadOnlyList<ActiveContentSource> activeSources)
+    IReadOnlyList<ActiveContentSource> activeSources,
+    bool useDeclaredEffectiveSource)
 {
     // Source lookup can be substantial with many Mods. Resolve at most once per
     // language, rather than on each cell repaint or search keystroke.
     private readonly Lazy<string> _english = new(() => ContentSourceLabelFormatter.Format(
-        effectiveSourceId, providerSourceIds, activeSources, CultureInfo.GetCultureInfo("en")));
+        effectiveSourceId, providerSourceIds, activeSources, CultureInfo.GetCultureInfo("en"), useDeclaredEffectiveSource));
     private readonly Lazy<string> _chinese = new(() => ContentSourceLabelFormatter.Format(
-        effectiveSourceId, providerSourceIds, activeSources, CultureInfo.GetCultureInfo("zh-CN")));
+        effectiveSourceId, providerSourceIds, activeSources, CultureInfo.GetCultureInfo("zh-CN"), useDeclaredEffectiveSource));
     public override string ToString() => EditorText.IsChinese ? _chinese.Value : _english.Value;
 }
 
 internal static class ContentSourceLabelFormatter
 {
     public static ContentSourceLabel Create(string effectiveSourceId, IEnumerable<string> providerSourceIds,
-        IReadOnlyList<ActiveContentSource> activeSources) => new(effectiveSourceId, providerSourceIds.ToArray(), activeSources);
+        IReadOnlyList<ActiveContentSource> activeSources, bool useDeclaredEffectiveSource = false) =>
+        new(effectiveSourceId, providerSourceIds.ToArray(), activeSources, useDeclaredEffectiveSource);
 
     public static string Format(
         string effectiveSourceId,
         IEnumerable<string> providerSourceIds,
         IReadOnlyList<ActiveContentSource> activeSources,
-        CultureInfo? culture = null)
+        CultureInfo? culture = null,
+        bool useDeclaredEffectiveSource = false)
     {
         culture ??= EditorText.Culture;
         var sourcesById = activeSources.ToDictionary(source => source.Id, StringComparer.OrdinalIgnoreCase);
@@ -52,7 +55,9 @@ internal static class ContentSourceLabelFormatter
             return effectiveSourceId;
         }
 
-        var effectiveSource = providerIds
+        // A resolved definition's first/last-match order need not agree with Mod
+        // priority. Keep its chosen provider when the catalog has established it.
+        var effectiveSource = useDeclaredEffectiveSource ? declaredEffectiveSource : providerIds
             .Select(id => sourcesById.TryGetValue(id, out var source) ? source : null)
             .Where(source => source is not null)
             .Select(source => source!)

@@ -268,7 +268,8 @@ public static class StagecoachHeroSaveEditor
     {
         var quirks = hero["quirks"] as JsonObject ??
                      hero["hero_file_data"]?["raw_data"]?["base_root"]?["quirks"] as JsonObject;
-        return quirks?.ContainsKey(quirkId) == true;
+        var hash = NativeResourceIdentity.HashCString(quirkId);
+        return quirks?.Any(pair => NativeResourceIdentity.HashCString(pair.Key) == hash) == true;
     }
 
     private static int ReadRequiredNonNegativeInt(JsonObject candidate, string propertyName)

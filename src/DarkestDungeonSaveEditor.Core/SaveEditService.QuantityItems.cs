@@ -18,10 +18,7 @@ public sealed partial class SaveEditService
         ArgumentNullException.ThrowIfNull(profile);
         ArgumentNullException.ThrowIfNull(item);
         NativeInventoryIdentity.RequireWritable(item.SaveIdentityIssue);
-        if (targetAmount < 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(targetAmount), "Target amount cannot be negative.");
-        }
+        QuantityItemSaveEditor.ValidateTargetAmount(item, targetAmount);
 
         if (item.HasProviderConflict)
         {
@@ -61,7 +58,8 @@ public sealed partial class SaveEditService
         if (item.IsSaveOnly)
         {
             RequireCompleteSaveOnlyDefinitions(readFailures);
-            if (currentItem is not null)
+            if (currentDefinitions.Any(definition =>
+                    NativeQuantityItemIdentity.FromDefinition(definition) == NativeQuantityItemIdentity.FromDefinition(item)))
             {
                 throw new InvalidOperationException(
                     "The selected save-only item gained an active content definition after the catalog was loaded; reload the content catalog.");
@@ -399,7 +397,8 @@ public sealed partial class SaveEditService
         if (prepared.Item.IsSaveOnly)
         {
             RequireCompleteSaveOnlyDefinitions(readFailures);
-            if (currentItem is not null)
+            if (currentDefinitions.Any(definition =>
+                    NativeQuantityItemIdentity.FromDefinition(definition) == NativeQuantityItemIdentity.FromDefinition(prepared.Item)))
             {
                 throw new InvalidOperationException(
                     "The selected save-only item gained an active content definition after preview; prepare a new preview.");

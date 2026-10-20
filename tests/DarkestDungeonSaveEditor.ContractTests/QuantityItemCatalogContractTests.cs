@@ -346,11 +346,11 @@ internal static partial class ContractSuite
         var (maxQuantityRoot, maxQuantityPreview) = QuantityItemSaveEditor.SetAmount(
             quantityEstateRoot,
             catalogGold,
-            int.MaxValue);
+            QuantityItemSaveEditor.MaximumWalletAmount);
         Assert(
-            maxQuantityPreview.TargetAmount == int.MaxValue &&
-            QuantityItemSaveEditor.CountAmount(maxQuantityRoot, catalogGold) == int.MaxValue,
-            "An existing positive quantity must support Int32.MaxValue without intermediate arithmetic overflow.");
+            maxQuantityPreview.TargetAmount == 2_000_000_000 &&
+            QuantityItemSaveEditor.CountAmount(maxQuantityRoot, catalogGold) == 2_000_000_000,
+            "Wallet amounts must support the native maximum of two billion without intermediate arithmetic overflow.");
 
         var quantityRaidRoot = JsonNode.Parse(
             """

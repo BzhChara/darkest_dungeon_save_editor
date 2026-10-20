@@ -46,6 +46,8 @@ internal static partial class ContractSuite
         await RunTrinketDependencyContractsAsync(runRoot, codec);
         await RunBuffEnumContractsAsync(runRoot, codec);
         await RunHeroReferenceDependencyContractsAsync(runRoot, codec);
+        await RunNativeCatalogHashContractsAsync(runRoot, codec);
+        await RunQuantityNativeContractsAsync(runRoot, codec);
         await RunDefinitionReadCompletenessContractsAsync(runRoot, codec);
         await RunHeroSupportingReadContractsAsync(runRoot, codec);
         await RunInventoryProviderContractsAsync(runRoot, codec);

@@ -14,19 +14,22 @@ public static partial class QuantityItemCatalog
         var issues = new List<string>();
         var entries = cached.SaveContext == QuantityItemSaveContext.Raid
             ? ReadSavedRaidEntries(saveRoot, issues) : ReadSavedEntries(saveRoot, issues);
-        var saved = entries.GroupBy(entry => entry.CatalogKey, StringComparer.Ordinal)
-            .ToDictionary(group => group.Key, group => group.ToArray(), StringComparer.Ordinal);
+        var saved = entries.GroupBy(entry => entry.NativeIdentity)
+            .ToDictionary(group => group.Key, group => group.ToArray());
         var merged = new List<QuantityItemDefinition>();
-        foreach (var definition in cached.Items)
+        var consumed = new HashSet<NativeQuantityItemIdentity>();
+        foreach (var definition in cached.Items.OrderBy(item => item.IsSaveOnly))
         {
-            saved.Remove(definition.CatalogKey, out var matches);
-            if (definition.IsSaveOnly && matches is null)
+            var identity = NativeQuantityItemIdentity.FromDefinition(definition);
+            saved.TryGetValue(identity, out var matches);
+            if (definition.IsSaveOnly && (matches is null || consumed.Contains(identity)))
             {
                 continue;
             }
+            consumed.Add(identity);
             merged.Add(definition with
             {
-                CurrentAmount = matches is null ? 0 : SumAmounts(matches.Select(entry => entry.Amount), definition.CatalogKey),
+                CurrentAmount = matches is null ? 0 : SumAmounts(matches.Select(entry => entry.Amount), identity),
                 SavedEntryCount = matches?.Length ?? 0,
                 IsPresentInSave = matches is not null
             });
@@ -35,6 +38,7 @@ public static partial class QuantityItemCatalog
         var residue = new List<QuantityItemDefinition>();
         foreach (var (key, matches) in saved)
         {
+            if (consumed.Contains(key)) continue;
             var entry = matches[0];
             residue.Add(new QuantityItemDefinition(entry.PersistedType,
                 entry.StorageKind == QuantityItemStorageKind.Wallet ? string.Empty : entry.PersistedId,

@@ -63,7 +63,8 @@ internal static partial class ContractSuite
         Reject(["ni_excludes", " ni_select "]);
         Reject(["ni_excludes", "NI_SELECT"]);
         Reject(["ni_missing_buff"]);
-        Reject(["ni_collision"]);
+        Assert(Generate("ni_collision").Preview.CurrentHp == 30,
+            "Different Buff IDs sharing a native hash must use the last complete definition, including HP.");
         Reject(["ni_blank_buff"]);
         Generate("ni_excludes", "ni_select");
         Assert(catalog.InitialQuirks.Single(q => q.Id == "ni_evolving").Evolution?.TargetQuirkId == " ni_select " &&

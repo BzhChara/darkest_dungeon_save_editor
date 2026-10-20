@@ -15,6 +15,16 @@ internal static class NativeInventoryIdentity
         GetFieldIssue(type, "type") is { Length: > 0 } typeIssue
             ? typeIssue : GetFieldIssue(id, "id");
 
+    internal static uint HashSavedField(string value)
+    {
+        var bytes = Utf8.GetBytes(NativeJsonReader.CString(value));
+        var hash = 0u;
+        // Hash the retained bytes directly, even if truncation splits a UTF-8 character.
+        for (var index = 0; index < Math.Min(bytes.Length, MaximumSaveBytes); index++)
+            hash = unchecked(hash * 53u + bytes[index]);
+        return hash;
+    }
+
     private static string GetFieldIssue(string value, string field)
     {
         if (value.Contains('\0'))

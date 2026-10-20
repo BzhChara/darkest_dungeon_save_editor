@@ -107,17 +107,15 @@ public static partial class QuantityItemCatalog
         var definitions = LoadDefinitions(activeContent, QuantityItemSaveContext.Town, issues, readFailures, referenceDefinitions);
         var savedEntries = ReadSavedEntries(estateRoot, issues);
         var savedEntryCounts = savedEntries
-            .GroupBy(entry => entry.CatalogKey, StringComparer.Ordinal)
+            .GroupBy(entry => entry.NativeIdentity)
             .ToDictionary(
                 group => group.Key,
-                group => group.Count(),
-                StringComparer.Ordinal);
+                group => group.Count());
         var amounts = savedEntries
-            .GroupBy(entry => entry.CatalogKey, StringComparer.Ordinal)
+            .GroupBy(entry => entry.NativeIdentity)
             .ToDictionary(
                 group => group.Key,
-                group => SumAmounts(group.Select(entry => entry.Amount), group.Key),
-                StringComparer.Ordinal);
+                group => SumAmounts(group.Select(entry => entry.Amount), group.Key));
 
         var referenceAnalysis = QuantityItemReferenceAnalyzer.Analyze(
             activeContent,
@@ -125,10 +123,13 @@ public static partial class QuantityItemCatalog
             QuantityItemSaveContext.Town,
             issues);
         var merged = new List<QuantityItemDefinition>(definitions.Count + savedEntries.Count);
+        var definedIdentities = new HashSet<NativeQuantityItemIdentity>();
         foreach (var definition in definitions)
         {
-            amounts.Remove(definition.CatalogKey, out var currentAmount);
-            savedEntryCounts.TryGetValue(definition.CatalogKey, out var savedEntryCount);
+            var identity = NativeQuantityItemIdentity.FromDefinition(definition);
+            definedIdentities.Add(identity);
+            amounts.TryGetValue(identity, out var currentAmount);
+            savedEntryCounts.TryGetValue(identity, out var savedEntryCount);
             referenceAnalysis.TryGetValue(definition.CatalogKey, out var reference);
             merged.Add(definition with
             {
@@ -141,8 +142,8 @@ public static partial class QuantityItemCatalog
         }
 
         foreach (var entry in savedEntries
-                     .Where(entry => amounts.ContainsKey(entry.CatalogKey))
-                     .DistinctBy(entry => entry.CatalogKey, StringComparer.Ordinal))
+                     .Where(entry => !definedIdentities.Contains(entry.NativeIdentity))
+                     .DistinctBy(entry => entry.NativeIdentity))
         {
             merged.Add(new QuantityItemDefinition(
                 entry.PersistedType,
@@ -150,7 +151,7 @@ public static partial class QuantityItemCatalog
                 entry.StorageKind,
                 null,
                 null,
-                amounts[entry.CatalogKey],
+                amounts[entry.NativeIdentity],
                 "save",
                 string.Empty,
                 readFailures.Count > 0,
@@ -158,7 +159,7 @@ public static partial class QuantityItemCatalog
             {
                 SourceLabel = EditorText.Get("QuantityItemCatalog_Refresh_002"),
                 IsPresentInSave = true,
-                SavedEntryCount = savedEntryCounts[entry.CatalogKey],
+                SavedEntryCount = savedEntryCounts[entry.NativeIdentity],
                 ReferenceStatus = QuantityItemReferenceStatus.SaveOnly,
                 ReferenceEvidence = readFailures.Count > 0
                     ? [EditorText.Get("QuantityItemCatalog_Refresh_003")]
@@ -178,7 +179,8 @@ public static partial class QuantityItemCatalog
                     : ContentSourceLabelFormatter.Create(
                         definition.Source,
                         definition.AllSources,
-                        activeContent.Sources)
+                        activeContent.Sources,
+                        useDeclaredEffectiveSource: true)
             })
             .OrderBy(definition => definition.DisplayId, StringComparer.OrdinalIgnoreCase)
             .ThenBy(definition => definition.InventoryType, StringComparer.OrdinalIgnoreCase)
@@ -212,24 +214,26 @@ public static partial class QuantityItemCatalog
         var definitions = LoadDefinitions(activeContent, QuantityItemSaveContext.Raid, issues, readFailures);
         var savedEntries = ReadSavedRaidEntries(raidRoot, issues);
         var savedEntryCounts = savedEntries
-            .GroupBy(entry => entry.CatalogKey, StringComparer.Ordinal)
-            .ToDictionary(group => group.Key, group => group.Count(), StringComparer.Ordinal);
+            .GroupBy(entry => entry.NativeIdentity)
+            .ToDictionary(group => group.Key, group => group.Count());
         var amounts = savedEntries
-            .GroupBy(entry => entry.CatalogKey, StringComparer.Ordinal)
+            .GroupBy(entry => entry.NativeIdentity)
             .ToDictionary(
                 group => group.Key,
-                group => SumAmounts(group.Select(entry => entry.Amount), group.Key),
-                StringComparer.Ordinal);
+                group => SumAmounts(group.Select(entry => entry.Amount), group.Key));
         var referenceAnalysis = QuantityItemReferenceAnalyzer.Analyze(
             activeContent,
             definitions,
             QuantityItemSaveContext.Raid,
             issues);
         var merged = new List<QuantityItemDefinition>(definitions.Count + savedEntries.Count);
+        var definedIdentities = new HashSet<NativeQuantityItemIdentity>();
         foreach (var definition in definitions)
         {
-            amounts.Remove(definition.CatalogKey, out var currentAmount);
-            savedEntryCounts.TryGetValue(definition.CatalogKey, out var savedEntryCount);
+            var identity = NativeQuantityItemIdentity.FromDefinition(definition);
+            definedIdentities.Add(identity);
+            amounts.TryGetValue(identity, out var currentAmount);
+            savedEntryCounts.TryGetValue(identity, out var savedEntryCount);
             referenceAnalysis.TryGetValue(definition.CatalogKey, out var reference);
             merged.Add(definition with
             {
@@ -242,8 +246,8 @@ public static partial class QuantityItemCatalog
         }
 
         foreach (var entry in savedEntries
-                     .Where(entry => amounts.ContainsKey(entry.CatalogKey))
-                     .DistinctBy(entry => entry.CatalogKey, StringComparer.Ordinal))
+                     .Where(entry => !definedIdentities.Contains(entry.NativeIdentity))
+                     .DistinctBy(entry => entry.NativeIdentity))
         {
             merged.Add(new QuantityItemDefinition(
                 entry.PersistedType,
@@ -251,7 +255,7 @@ public static partial class QuantityItemCatalog
                 QuantityItemStorageKind.RaidInventory,
                 null,
                 null,
-                amounts[entry.CatalogKey],
+                amounts[entry.NativeIdentity],
                 "save",
                 string.Empty,
                 readFailures.Count > 0,
@@ -259,7 +263,7 @@ public static partial class QuantityItemCatalog
             {
                 SourceLabel = EditorText.Get("QuantityItemCatalog_Refresh_001"),
                 IsPresentInSave = true,
-                SavedEntryCount = savedEntryCounts[entry.CatalogKey],
+                SavedEntryCount = savedEntryCounts[entry.NativeIdentity],
                 ReferenceStatus = QuantityItemReferenceStatus.SaveOnly,
                 ReferenceEvidence = readFailures.Count > 0
                     ? [EditorText.Get("QuantityItemCatalog_002")]
@@ -279,7 +283,8 @@ public static partial class QuantityItemCatalog
                     : ContentSourceLabelFormatter.Create(
                         definition.Source,
                         definition.AllSources,
-                        activeContent.Sources)
+                        activeContent.Sources,
+                        useDeclaredEffectiveSource: true)
             })
             .OrderBy(definition => definition.DisplayId, StringComparer.OrdinalIgnoreCase)
             .ThenBy(definition => definition.InventoryType, StringComparer.OrdinalIgnoreCase)

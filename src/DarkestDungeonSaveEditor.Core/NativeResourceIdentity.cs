@@ -16,4 +16,14 @@ internal static class NativeResourceIdentity
 
     public static IReadOnlySet<string> FindCollisions(IEnumerable<string> ids) =>
         FindCollisions(ids, id => id, Loc2LocalizationReader.HashName);
+
+    internal static string? DescribeHashResolution<T>(
+        IGrouping<uint, T> group, T winner, Func<T, string> id, Func<T, string> path, string messageKey)
+    {
+        if (!group.Select(id).Distinct(StringComparer.Ordinal).Skip(1).Any()) return null;
+        var providers = string.Join("; ", group.Select(value => (Id: id(value), Path: path(value)))
+            .Distinct().Select(value => $"'{value.Id}' ('{value.Path}')"));
+        return CatalogIssueCode.NativeHashResolution + EditorText.Format(messageKey,
+            group.Key.ToString(System.Globalization.CultureInfo.InvariantCulture), providers, id(winner), path(winner));
+    }
 }
