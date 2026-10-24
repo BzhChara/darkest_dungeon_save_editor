@@ -39,8 +39,10 @@ internal static partial class ContractSuite
             Set("_allItems", items);
             Set("_allTrinkets", trinkets);
             Set("_allHeroes", heroes);
+            Set("_allEvents", new[] { "first", "second" }.Select(id => new TownEventDefinition(
+                id, [new("free_activity", "abbey", 1)], "base", "fixture", false)).ToArray());
             typeof(MainWindow).GetMethod("ApplyFilter", flags)!.Invoke(window, [false]);
-            var grids = new[] { "ItemGrid", "TrinketGrid", "HeroGrid" }
+            var grids = new[] { "ItemGrid", "TrinketGrid", "EventGrid", "HeroGrid" }
                 .Select(name => (DataGrid)window.FindName(name)).ToArray();
             foreach (var grid in grids) grid.SelectedIndex = 0;
             for (var cycle = 0; cycle < 3; cycle++)
@@ -68,6 +70,30 @@ internal static partial class ContractSuite
                         "Unbinding and selecting the original row again must still have one edit target.");
                 }
             }
+            Set("_catalogProfileDirectory", root);
+            Set("_syncReady", true);
+            var tabs = (TabControl)window.FindName("CatalogTabs");
+            tabs.SelectedIndex = 2;
+            var preview = (Button)window.FindName("PreviewButton");
+            foreach (var scene in new[] { QuantityItemSaveContext.Town, QuantityItemSaveContext.Raid, QuantityItemSaveContext.Town })
+            {
+                Set("_quantitySaveContext", scene);
+                typeof(MainWindow).GetMethod("UpdateEnabledState", flags)!.Invoke(window, null);
+                Assert(preview.IsEnabled == (scene == QuantityItemSaveContext.Town), "Event preview follows the current town/raid scene.");
+            }
+            Set("_gameRunning", true);
+            typeof(MainWindow).GetMethod("UpdateEnabledState", flags)!.Invoke(window, null);
+            Assert(!preview.IsEnabled, "Running the game disables event preview.");
+            Set("_gameRunning", false);
+            Set("_syncReady", false);
+            typeof(MainWindow).GetMethod("UpdateEnabledState", flags)!.Invoke(window, null);
+            Assert(!preview.IsEnabled, "An unfinished or failed synchronization keeps event preview disabled.");
+            Set("_heroCatalog", new HeroClassCatalogResult("base", [0], heroes, [], [], [], []));
+            Set("_syncReady", true);
+            tabs.SelectedIndex = 3;
+            typeof(MainWindow).GetMethod("UpdateInitialQuirkSelectionSummary", flags)!.Invoke(window, null);
+            Assert(((Button)window.FindName("InitialQuirksButton")).IsEnabled,
+                "Refreshing hero quirks after inserting Events must use the new Heroes tab index.");
             var choiceType = typeof(MainWindow).GetNestedType("HeroLevelChoice", BindingFlags.NonPublic)!;
             var first = Activator.CreateInstance(choiceType, [0, 0])!;
             var second = Activator.CreateInstance(choiceType, [1, 2])!;
@@ -79,7 +105,7 @@ internal static partial class ContractSuite
             choices.SelectedItem = second;
             Assert(ReferenceEquals(choices.SelectedItem, second), "Hero level selection must survive late bindings and language refresh.");
             BindingOperations.ClearBinding(choiceLabel, TextBlock.TextProperty);
-            Console.WriteLine("PASS: actual editor item/trinket/hero grids keep one correct edit target through repeated sync restoration, late binding and language refresh.");
+            Console.WriteLine("PASS: actual editor item/trinket/event/hero grids keep one correct edit target through repeated sync restoration, late binding and language refresh.");
         }
         finally { window.Close(); }
 

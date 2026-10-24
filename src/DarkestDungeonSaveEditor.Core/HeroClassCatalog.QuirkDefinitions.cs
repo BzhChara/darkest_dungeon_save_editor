@@ -191,7 +191,8 @@ public static partial class HeroClassCatalog
             quirk.SourcePath,
             quirk.AllSources)
         {
-            DefinitionLimit = definitionLimit
+            DefinitionLimit = definitionLimit,
+            Tags = quirk.Tags
         };
     }
 

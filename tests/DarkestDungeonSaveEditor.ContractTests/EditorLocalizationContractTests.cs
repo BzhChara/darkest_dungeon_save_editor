@@ -172,7 +172,7 @@ internal static partial class ContractSuite
                     Assert(languageOptions.Count(item => item.IsChecked) == 1 &&
                            (string)languageOptions.Single(item => item.IsChecked).Tag == language,
                         "The compact language menu must show exactly one saved preference.");
-                    foreach (var gridName in new[] { "ItemGrid", "TrinketGrid", "HeroGrid" })
+                    foreach (var gridName in new[] { "ItemGrid", "TrinketGrid", "EventGrid", "HeroGrid" })
                     {
                         var grid = (DataGrid)window.FindName(gridName);
                         Assert(grid.ColumnFromDisplayIndex(language == "en" ? 1 : 2).Header as string == "English",

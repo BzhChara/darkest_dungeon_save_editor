@@ -78,7 +78,10 @@ public sealed record HeroGenerationDefinition(
     int? RandomCombatSkills,
     int? CardsInDeck,
     double? CardChance,
-    string TownEventDependency);
+    string TownEventDependency)
+{
+    public string DeckReductionTarget { get; init; } = string.Empty;
+}
 
 public sealed record HeroRecruitEventDefinition(
     string Id,
@@ -232,6 +235,7 @@ public sealed record HeroInitialQuirkDefinition(
         init => _sourceLabel = value;
     }
     public int? DefinitionLimit { get; init; }
+    internal IReadOnlyList<string> Tags { get; init; } = [];
     public bool HasEvolution => Evolution is not null;
 }
 

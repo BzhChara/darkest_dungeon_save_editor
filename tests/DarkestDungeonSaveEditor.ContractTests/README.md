@@ -4,6 +4,9 @@
 
 The suite is split by responsibility:
 
+- `TownEventContractTests.cs` and `TownEventBoundaryContracts.cs`: all 31 native effect types, replacement without week/history growth, pending-offer cleanup, preservation of delivered results, composite events, native saved identities, revival HP, quest prerequisites, DSON round trips, stale-preview guards and per-file failure recovery (`--town-events`, also included in the full suite).
+- `TownEventNativeResourceContracts.cs`: optional installed base/DLC event initialization against synthetic private saves (`--town-events-native <game-directory>`). It reads game resources without touching real profiles; passing is not a claim of in-game playtesting.
+
 - `DesktopCodecContractTests.cs`: `--native-desktop` verifies the regular C# default without a JAR, explicit backend arguments and JAR reference title, shared catalog/map/preview/commit codec, isolated guarded writes and backups, saved-value refresh, and initial-load failure/cancellation handling. `--native-all` runs the full business suite with C# fixtures; `--native-codec` covers binary preservation and format edge cases. These native groups do not require Java. The default suite without a mode still uses Java reference fixtures and requires Java.
 
 - `EditorLocalizationContractTests.cs`: `--ui-localization` validates compiled English/Chinese resources, matching keys/placeholders, culture and name fallback, invariant diagnostic classification, atomic language preferences, next-start selection behavior, and WPF rendering at normal/minimum sizes. The legacy groups explicitly use Chinese for existing message assertions. See [UI localization](../../docs/ui-localization.md).

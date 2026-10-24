@@ -59,6 +59,7 @@ public partial class MainWindow : Window
             _visibleTrinkets.Add(new TrinketRow(definition));
         }
 
+        FilterEvents(keyword);
         var filteredHeroes = _allHeroes.Where(definition =>
             string.IsNullOrWhiteSpace(keyword) ||
             definition.Id.Contains(keyword, StringComparison.OrdinalIgnoreCase) ||

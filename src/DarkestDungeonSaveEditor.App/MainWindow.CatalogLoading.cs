@@ -90,6 +90,7 @@ public partial class MainWindow : Window
             var staticCatalogTask = Task.Run(() => new
             {
                 Trinkets = diagnosticBatch.Capture(EditorText.Get("MainWindow_CatalogLoading_008"), () => TrinketCatalog.Load(activeContent), catalog => catalog.Issues),
+                Events = diagnosticBatch.Capture(EditorText.Get("TownEvent_Tab"), () => TownEventCatalog.Load(activeContent), catalog => catalog.Issues),
                 Heroes = diagnosticBatch.Capture(EditorText.Get("MainWindow_CatalogLoading_009"), () => HeroClassCatalog.Load(activeContent), catalog => catalog.Issues)
             });
             var quantityItemCatalogTask = diagnosticBatch.CaptureAsync(EditorText.Get("MainWindow_CatalogLoading_010"),
@@ -102,6 +103,7 @@ public partial class MainWindow : Window
             _allItems = quantityItems.Items;
             _allTrinkets = catalogs.Trinkets.Trinkets;
             _allHeroes = catalogs.Heroes.HeroClasses;
+            _allEvents = catalogs.Events.Events;
             _heroCatalog = catalogs.Heroes;
             _trinketStorage = catalogs.Trinkets.Storage;
             _raidInventoryStorage = quantityItems.RaidStorage;

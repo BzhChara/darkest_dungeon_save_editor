@@ -4960,4 +4960,35 @@ Backup directory:
   <data name="QuantityItemSaveEditor_WalletAmountLimit" xml:space="preserve">
     <value>Wallet amounts must be between 0 and {0}, the game's maximum.</value>
   </data>
+  <data name="TownOnlyOperation" xml:space="preserve">
+    <value>This operation is available only while the save is in the Hamlet. Return to town and reload the profile first.</value>
+  </data>
+  <data name="TownEvent_Tab" xml:space="preserve"><value>EVENTS</value></data>
+  <data name="TownEvent_Id" xml:space="preserve"><value>Event ID</value></data>
+  <data name="TownEvent_Preview" xml:space="preserve"><value>Preview event replacement</value></data>
+  <data name="TownEvent_Select" xml:space="preserve"><value>Select an event first.</value></data>
+  <data name="TownEvent_NoCurrent" xml:space="preserve"><value>There is no current event to replace.</value></data>
+  <data name="TownEvent_SameEvent" xml:space="preserve"><value>This event is already active.</value></data>
+  <data name="TownEvent_Unresolved" xml:space="preserve"><value>The selected event or its content dependencies cannot be verified. Reload the catalog.</value></data>
+  <data name="TownEvent_StaleWeek" xml:space="preserve"><value>The event does not belong to the current campaign week. Load the profile again.</value></data>
+  <data name="TownEvent_HistoryMismatch" xml:space="preserve"><value>Current event and campaign history do not agree; no changes were written.</value></data>
+  <data name="TownEvent_UnsupportedEffect" xml:space="preserve"><value>Unknown event effect: {0}.</value></data>
+  <data name="TownEvent_MissingHero" xml:space="preserve"><value>Event hero class is unavailable: {0}.</value></data>
+  <data name="TownEvent_MissingCurrency" xml:space="preserve"><value>Event currency is unavailable: {0}.</value></data>
+  <data name="TownEvent_NoRecruitClasses" xml:space="preserve"><value>No eligible hero classes are available for this event.</value></data>
+  <data name="TownEvent_CurrencyChange" xml:space="preserve"><value>{0}: {1} → {2}.</value></data>
+  <data name="TownEvent_EventCandidates" xml:space="preserve"><value>New event recruitment offers: {0}.</value></data>
+  <data name="TownEvent_StagecoachCandidates" xml:space="preserve"><value>Additional stagecoach candidates: {0}.</value></data>
+  <data name="TownEvent_DistrictsUnlocked" xml:space="preserve"><value>District construction unlocked.</value></data>
+  <data name="TownEvent_NewRules" xml:space="preserve"><value>The new event rules replace the old ones. Previously delivered results remain intact.</value></data>
+  <data name="TownEvent_Replacement" xml:space="preserve"><value>{0} → {1}. Week {2} stays unchanged.</value></data>
+  <data name="TownEvent_RemovedOffers" xml:space="preserve"><value>Clear old event offers: {0} recruits, {1} revival candidates.</value></data>
+  <data name="TownEvent_RevivalOffers" xml:space="preserve"><value>New revival offers: {0}.</value></data>
+  <data name="TownEvent_CuredVampires" xml:space="preserve"><value>Crimson Curse removed from {0} roster heroes.</value></data>
+  <data name="TownEvent_StolenTrinkets" xml:space="preserve"><value>{0} trinkets moved from storage into the recovery pool.</value></data>
+  <data name="TownEvent_RevivalTrinkets" xml:space="preserve"><value>A dead candidate still has equipped trinkets; revival HP cannot be verified.</value></data>
+  <data name="TownEvent_RevivalConditionalHp" xml:space="preserve"><value>A dead candidate has a conditional HP effect that cannot be evaluated outside its original combat.</value></data>
+  <data name="TownEvent_QuestCreated" xml:space="preserve"><value>Event quest added: {0}.</value></data>
+  <data name="TownEvent_QuestAlreadyPresent" xml:space="preserve"><value>Quest already exists and is preserved: {0}.</value></data>
+  <data name="TownEvent_QuestNotEligible" xml:space="preserve"><value>Quest {0} does not meet its generation requirements; no new quest was added.</value></data>
 </root>

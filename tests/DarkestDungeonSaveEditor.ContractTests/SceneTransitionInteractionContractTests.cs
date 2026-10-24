@@ -177,7 +177,7 @@ internal static partial class ContractSuite
                 }
             };
             dialogs.Start();
-            tabs.SelectedIndex = 3;
+            tabs.SelectedIndex = 4;
             var forceTownButton = (Button)panel.FindName("ForceTownButton");
             Assert(forceTownButton.IsEnabled, "Force town must be available on the actual battle tab.");
             forceTownButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));

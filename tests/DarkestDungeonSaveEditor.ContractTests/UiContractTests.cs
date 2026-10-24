@@ -694,16 +694,16 @@ internal static partial class ContractSuite
             tabHeaderPresenter.Attribute("HorizontalAlignment")?.Value == "Center" &&
             tabHeaderPresenter.Attribute("VerticalAlignment")?.Value == "Center" &&
             catalogTabHeaderPanel.Attribute("Rows")?.Value == "1" &&
-                catalogTabHeaderPanel.Attribute("Columns")?.Value == "4" &&
+            catalogTabHeaderPanel.Attribute("Columns")?.Value == "5" &&
             catalogTabHeaderPanel.Attribute("Margin")?.Value == "0,0,0,5" &&
             !tabItemStyle.Descendants(presentationNamespace + "Trigger")
                 .Any(trigger => trigger.Attribute("Property")?.Value == "IsKeyboardFocused") &&
-            mainWindowXaml.Descendants(presentationNamespace + "TabItem").Take(3)
+            mainWindowXaml.Descendants(presentationNamespace + "TabItem").Take(4)
                 .All(tabItem => tabItem.Elements(presentationNamespace + "DataGrid").Count() == 1 &&
                                 !tabItem.Elements(presentationNamespace + "Border").Any()) &&
-            mainWindowXaml.Descendants(presentationNamespace + "TabItem").Skip(3).Single()
+            mainWindowXaml.Descendants(presentationNamespace + "TabItem").Skip(4).Single()
                 .Elements().Single().Name.LocalName == "BattleMapView",
-                "The three catalogs plus battle workspace must share the full width equally, keep their headers centered, and avoid wrapping the existing catalog grids in nested borders.");
+            "The four catalogs plus battle workspace must share the full width equally, keep their headers centered, and avoid wrapping the catalog grids in nested borders.");
         var catalogTabHeaders = mainWindowXaml
             .Descendants(presentationNamespace + "TabItem")
             .Select(tab => tab.Attribute("Header")?.Value)
@@ -726,7 +726,7 @@ internal static partial class ContractSuite
                 StringComparison.Ordinal);
         Assert(
             catalogTabHeaders.SequenceEqual(
-                new[] { "物品  /  ITEMS", "饰品  /  TRINKETS", "人物  /  HEROES", "战斗  /  BATTLE" },
+                new[] { "物品  /  ITEMS", "饰品  /  TRINKETS", "事件 / EVENTS", "人物  /  HEROES", "战斗  /  BATTLE" },
                 StringComparer.Ordinal) &&
             mainWindowCode.Contains("QuantityItemCatalog.LoadAsync(activeContent, codec)", StringComparison.Ordinal) &&
             showUnusedItemsCheckBox.Attribute("Checked")?.Value == "ShowUnusedItemsCheckBox_Changed" &&
@@ -1044,7 +1044,7 @@ internal static partial class ContractSuite
             mainWindowXaml.Descendants()
                 .Any(element => element.Name.LocalName == "BattleMapView" &&
                                 element.Attribute(xamlName)?.Value == "BattleMapPanel") &&
-            mainWindowCode.Contains("private const int BattleTabIndex = 3;", StringComparison.Ordinal) &&
+            mainWindowCode.Contains("private const int BattleTabIndex = 4;", StringComparison.Ordinal) &&
             mainWindowCode.Contains("CatalogToolsPanel.Visibility = isBattleTab ? Visibility.Collapsed", StringComparison.Ordinal) &&
             mainWindowCode.Contains("CatalogActionPanel.Visibility = isBattleTab ? Visibility.Collapsed", StringComparison.Ordinal) &&
             mainWindowCode.Contains("BattleMapPanel.LoadProfileAsync", StringComparison.Ordinal) &&

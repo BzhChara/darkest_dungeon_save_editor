@@ -50,7 +50,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        InitialQuirksButton.IsEnabled = CatalogTabs is { IsEnabled: true, SelectedIndex: 2 } &&
+        InitialQuirksButton.IsEnabled = CatalogTabs is { IsEnabled: true, SelectedIndex: HeroTabIndex } &&
             _heroCatalog is not null;
 
         var positiveCount = 0;

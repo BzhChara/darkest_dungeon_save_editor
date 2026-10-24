@@ -23,9 +23,7 @@ public sealed partial class SaveEditService
         ValidateProfile(profile);
         EnsureNoUnfinishedStagecoachTransaction(profile);
         ValidateActiveContentSnapshot(profile, activeContent);
-        var gameRoot = JsonSupport.RequireObject(JsonSupport.ReadObject(activeContent.DecodedGamePath), "base_root");
-        var mayRefreshOnTownReturn = gameRoot["inraid"] is JsonValue inRaidNode &&
-            inRaidNode.TryGetValue<bool>(out var inRaid) && inRaid;
+        TownSceneGuard.RequireTown(activeContent);
         var manifestFingerprints = CaptureManifestFingerprints(activeContent.Sources);
         var expectedCatalogSha256 = ComputeHeroCatalogSha256(expectedCatalog);
         var currentCatalog = HeroClassCatalog.Load(activeContent);
@@ -116,8 +114,7 @@ public sealed partial class SaveEditService
             generatedCandidate.UpgradePurchases);
         var preview = mutationPreview with
         {
-            QuirkLimits = quirkLimits,
-            MayRefreshOnTownReturn = mayRefreshOnTownReturn
+            QuirkLimits = quirkLimits
         };
         JsonSupport.WriteObject(townProposedPath, updatedTown);
         JsonSupport.WriteObject(rosterProposedPath, updatedRoster);

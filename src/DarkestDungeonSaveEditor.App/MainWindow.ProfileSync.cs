@@ -302,6 +302,8 @@ public partial class MainWindow : Window
                         .Where(name => snapshot.FileHashes[name] != _catalogFileHashes[name]).ToArray();
                     var trinkets = contentChanged
                         ? await Task.Run(() => TrinketCatalog.Load(snapshot.Content), token) : null;
+                    var events = contentChanged
+                        ? await Task.Run(() => TownEventCatalog.Load(snapshot.Content), token) : null;
                     var heroes = contentChanged
                         ? await Task.Run(() => HeroClassCatalog.Load(snapshot.Content), token) : null;
                     if (generation != _catalogGeneration || token.IsCancellationRequested) return;
@@ -338,12 +340,14 @@ public partial class MainWindow : Window
                         _allTrinkets = trinkets.Trinkets;
                         _trinketStorage = trinkets.Storage;
                         _allHeroes = heroes.HeroClasses;
+                        _allEvents = events!.Events;
                         _heroCatalog = heroes;
                         var diagnostics = new CatalogDiagnosticBatch();
                         diagnostics.Add(EditorText.Get("MainWindow_CatalogLoading_005"), snapshot.Content.Issues);
                         diagnostics.Add(EditorText.Get("MainWindow_CatalogLoading_010"), snapshot.QuantityItems.Issues);
                         diagnostics.Add(EditorText.Get("MainWindow_CatalogLoading_008"), trinkets.Issues);
                         diagnostics.Add(EditorText.Get("MainWindow_CatalogLoading_009"), heroes.Issues);
+                        diagnostics.Add(EditorText.Get("TownEvent_Tab"), events!.Issues);
                         CrashDiagnostics.RecordCatalogDiagnostics(diagnostics);
                         AppendStatus(EditorText.Get("MainWindow_ProfileSync_008"));
                     }

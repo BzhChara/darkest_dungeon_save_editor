@@ -17,6 +17,19 @@ public static class StagecoachHeroSaveEditor
             JsonObject upgradesRoot,
             JsonObject candidate,
             IReadOnlyList<HeroUpgradePurchase> upgradePurchases)
+        => AddCandidateToPool(townRoot, rosterRoot, upgradesRoot, candidate, upgradePurchases, null);
+
+    internal static (
+        JsonObject UpdatedTown,
+        JsonObject UpdatedRoster,
+        JsonObject UpdatedUpgrades,
+        StagecoachHeroMutationPreview Preview) AddCandidateToPool(
+            JsonObject townRoot,
+            JsonObject rosterRoot,
+            JsonObject upgradesRoot,
+            JsonObject candidate,
+            IReadOnlyList<HeroUpgradePurchase> upgradePurchases,
+            StagecoachRecruitPool? requestedPool)
     {
         ArgumentNullException.ThrowIfNull(townRoot);
         ArgumentNullException.ThrowIfNull(rosterRoot);
@@ -56,9 +69,9 @@ public static class StagecoachHeroSaveEditor
             "buildings",
             "stage_coach",
             "store");
-        var targetPool = IsShardRecruitCandidate(candidate)
+        var targetPool = requestedPool ?? (IsShardRecruitCandidate(candidate)
             ? StagecoachRecruitPool.Shard
-            : StagecoachRecruitPool.Ordinary;
+            : StagecoachRecruitPool.Ordinary);
         var targetRecruitKey = targetPool == StagecoachRecruitPool.Shard
             ? "shard_hero_recruit"
             : "hero_recruit";
@@ -165,6 +178,26 @@ public static class StagecoachHeroSaveEditor
         }
 
         return previews;
+    }
+
+    // Called only on the event preview's private decoded copies. Event offers
+    // have their own pool even when a forced quirk is shard_hungry; routing
+    // through a shop would incorrectly require a shard shop to exist.
+    internal static void AddEventCandidate(JsonObject town, JsonObject roster, JsonObject upgrades,
+        JsonObject townEvent, JsonObject candidate, IReadOnlyList<HeroUpgradePurchase> purchases)
+    {
+        var root = JsonSupport.RequireObject(roster, "base_root");
+        var guid = ReadRequiredNonNegativeInt(root, "nextGuid");
+        if (guid == int.MaxValue) throw new InvalidDataException("Roster nextGuid is exhausted.");
+        var heroes = JsonSupport.RequireObject(root, "heroes");
+        var store = JsonSupport.RequireObject(town, "base_root", "buildings", "stage_coach", "store");
+        ValidateNextGuidInvariant(guid, heroes, store);
+        var offers = JsonSupport.RequireObject(townEvent, "base_root", "bonus_hero_entries");
+        if (offers.Any(pair => !int.TryParse(pair.Key, NumberStyles.None, CultureInfo.InvariantCulture, out var id) || id >= guid))
+            throw new InvalidDataException("Roster nextGuid does not follow the event candidates.");
+        AddUpgradePurchases(upgrades, guid, purchases);
+        offers[guid.ToString(CultureInfo.InvariantCulture)] = candidate.DeepClone();
+        root["nextGuid"] = guid + 1;
     }
 
     private static bool IsShardRecruitCandidate(JsonObject candidate)

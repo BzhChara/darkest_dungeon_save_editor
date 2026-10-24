@@ -11,10 +11,11 @@ public partial class MainWindow : Window
     {
         var itemKey = (ItemGrid.SelectedItem as ItemRow)?.Definition.CatalogKey;
         var trinketId = (TrinketGrid.SelectedItem as TrinketRow)?.Id;
+        var eventId = (EventGrid.SelectedItem as TownEventRow)?.Id;
         var heroId = (HeroGrid.SelectedItem as HeroRow)?.Id;
         var level = (HeroLevelComboBox.SelectedItem as HeroLevelChoice)?.ResolveLevel;
         var quirks = _selectedInitialQuirkIds;
-        var grids = contentChanged ? new[] { ItemGrid, TrinketGrid, HeroGrid } : new[] { ItemGrid };
+        var grids = contentChanged ? new[] { ItemGrid, TrinketGrid, EventGrid, HeroGrid } : new[] { ItemGrid };
         var scrolls = grids.Select(grid => FindSyncScrollViewer(grid))
             .Where(scroll => scroll is not null)
             .Select(scroll => (Scroll: scroll!, Vertical: scroll!.VerticalOffset, Horizontal: scroll.HorizontalOffset))
@@ -27,6 +28,7 @@ public partial class MainWindow : Window
             if (contentChanged)
             {
                 TrinketGrid.SelectedItem = _visibleTrinkets.FirstOrDefault(row => row.Id == trinketId);
+                EventGrid.SelectedItem = _visibleEvents.FirstOrDefault(row => row.Id == eventId);
                 HeroGrid.SelectedItem = _visibleHeroes.FirstOrDefault(row => row.Id == heroId);
                 if (_heroCatalog is not null)
                 {

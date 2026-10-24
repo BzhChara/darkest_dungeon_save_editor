@@ -406,6 +406,37 @@
                                     </DataGrid.Columns>
                             </DataGrid>
                         </TabItem>
+                        <TabItem Header="{local:Text TownEvent_Tab}">
+                            <DataGrid x:Name="EventGrid"
+                                      AutoGenerateColumns="False"
+                                      IsReadOnly="True"
+                                      SelectionMode="Single"
+                                      RowDetailsVisibilityMode="VisibleWhenSelected"
+                                      AreRowDetailsFrozen="True"
+                                      VirtualizingPanel.ScrollUnit="Pixel"
+                                      SelectionChanged="EventGrid_SelectionChanged"
+                                      CanUserAddRows="False"
+                                      HeadersVisibility="Column">
+                                <DataGrid.RowDetailsTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Margin="12,6,12,8" TextWrapping="Wrap"
+                                                   Foreground="{StaticResource TextSecondaryBrush}">
+                                            <Run Text="{Binding Description, Mode=OneWay}" />
+                                        </TextBlock>
+                                    </DataTemplate>
+                                </DataGrid.RowDetailsTemplate>
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="{local:Text TownEvent_Id}" Binding="{Binding Id}" Width="1.3*" MinWidth="105"
+                                                        ElementStyle="{StaticResource DataGridTextElementStyle}" />
+                                    <DataGridTextColumn Header="{local:Text BattleRoomAttachmentSelectionDialog_009}" Binding="{Binding ChineseName}" Width="1.2*" MinWidth="110"
+                                                        ElementStyle="{StaticResource DataGridTextElementStyle}" />
+                                    <DataGridTextColumn Header="English" Binding="{Binding EnglishName}" Width="1.2*" MinWidth="110"
+                                                        ElementStyle="{StaticResource DataGridTextElementStyle}" />
+                                    <DataGridTextColumn Header="{local:Text BattleEncounterSelectionDialog_029}" Binding="{Binding Source}" Width="1.8*" MinWidth="180"
+                                                        ElementStyle="{StaticResource DataGridTextElementStyle}" />
+                                    </DataGrid.Columns>
+                            </DataGrid>
+                        </TabItem>
                         <TabItem Header="{local:Text MainWindow_037}">
                             <DataGrid x:Name="HeroGrid"
                                       AutoGenerateColumns="False"

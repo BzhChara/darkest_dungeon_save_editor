@@ -164,6 +164,21 @@ public partial class MainWindow : Window
                 return;
             }
 
+            if (CatalogTabs.SelectedIndex == EventTabIndex)
+            {
+                if (EventGrid.SelectedItem is not TownEventRow selectedEvent || _activeContentSnapshot is null)
+                    throw new InvalidOperationException(EditorText.Get("TownEvent_Select"));
+                var eventEdit = await Task.Run(() => editService.PrepareTownEventEditAsync(profile,
+                    selectedEvent.Definition, _activeContentSnapshot));
+                if (previewRevision != _editRevision || CatalogTabs.SelectedIndex != EventTabIndex) return;
+                _editService = editService;
+                _preparedTownEventEdit = eventEdit;
+                PreviewSummaryTextBlock.Text = FormatTownEventPreview(eventEdit.Preview);
+                AppendStatus(PreviewSummaryTextBlock.Text);
+                ApplyButton.IsEnabled = true;
+                return;
+            }
+
             if (HeroGrid.SelectedItem is not HeroRow selectedHero || _heroCatalog is null)
             {
                 throw new InvalidOperationException(EditorText.Get("MainWindow_CatalogInteraction_001"));
@@ -184,7 +199,7 @@ public partial class MainWindow : Window
                 generated,
                 _heroCatalog,
                 _activeContentSnapshot);
-            if (previewRevision != _editRevision || CatalogTabs.SelectedIndex != 2)
+            if (previewRevision != _editRevision || CatalogTabs.SelectedIndex != HeroTabIndex)
             {
                 AppendStatus(EditorText.Get("MainWindow_EditWorkflow_005"), level: DiagnosticLogLevel.Warning);
                 return;
@@ -249,13 +264,14 @@ public partial class MainWindow : Window
     {
         if (IsBusy || ObserveGameProcess()) return;
         if (_editService is null ||
-            (_preparedQuantityItemEdit is null && _preparedTrinketEdit is null && _preparedHeroEdit is null))
+            (_preparedQuantityItemEdit is null && _preparedTrinketEdit is null && _preparedHeroEdit is null && _preparedTownEventEdit is null))
         {
             return;
         }
 
         var isItemEdit = _preparedQuantityItemEdit is not null;
         var isHeroEdit = _preparedHeroEdit is not null;
+        var isEventEdit = _preparedTownEventEdit is not null;
         string profileDirectory;
         string changeSummary;
         string definitionLimitWarningText;
@@ -267,6 +283,12 @@ public partial class MainWindow : Window
                 EditorText.Format("MainWindow_EditWorkflow_045", _preparedQuantityItemEdit.Preview.ExistingAmount) +
                 $"{_preparedQuantityItemEdit.Preview.TargetAmount}";
             definitionLimitWarningText = FormatQuantityItemBoundaryWarning(_preparedQuantityItemEdit.Item);
+        }
+        else if (isEventEdit)
+        {
+            profileDirectory = _preparedTownEventEdit!.Profile.ProfileDirectory;
+            changeSummary = FormatTownEventPreview(_preparedTownEventEdit.Preview);
+            definitionLimitWarningText = string.Empty;
         }
         else if (isHeroEdit)
         {
@@ -294,7 +316,7 @@ public partial class MainWindow : Window
                 : string.Empty;
         }
 
-        var operationDetails = isItemEdit
+        var operationDetails = isEventEdit ? FormatTownEventPreview(_preparedTownEventEdit!.Preview) : isItemEdit
             ? SaveEditLogFormatter.Describe(_preparedQuantityItemEdit!)
             : isHeroEdit
                 ? SaveEditLogFormatter.Describe(_preparedHeroEdit!, _preparedHeroCandidatePreview)
@@ -315,7 +337,7 @@ public partial class MainWindow : Window
             return;
         }
         if (confirmationRevision != _editRevision || _editService is null ||
-            (_preparedQuantityItemEdit is null && _preparedTrinketEdit is null && _preparedHeroEdit is null))
+            (_preparedQuantityItemEdit is null && _preparedTrinketEdit is null && _preparedHeroEdit is null && _preparedTownEventEdit is null))
         {
             AppendStatus(EditorText.Get("MainWindow_EditWorkflow_059"), level: DiagnosticLogLevel.Warning);
             return;
@@ -335,6 +357,10 @@ public partial class MainWindow : Window
             {
                 estateCommit = await _editService.CommitAsync(_preparedQuantityItemEdit!);
                 backupDirectory = estateCommit.BackupDirectory;
+            }
+            else if (isEventEdit)
+            {
+                backupDirectory = (await Task.Run(() => _editService.CommitAsync(_preparedTownEventEdit!))).BackupDirectory;
             }
             else if (isHeroEdit)
             {

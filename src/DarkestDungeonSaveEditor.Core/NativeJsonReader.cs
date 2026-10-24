@@ -35,8 +35,11 @@ internal static class NativeJsonReader
     internal static string ReadCString(JsonElement node, string name) => CString(ReadString(node, name));
 
     internal static string ReadBoundedString(JsonElement node, string name, int payloadBytes)
+        => BoundedCString(ReadCString(node, name), payloadBytes);
+
+    internal static string BoundedCString(string value, int payloadBytes)
     {
-        var bytes = Utf8.GetBytes(ReadCString(node, name));
+        var bytes = Utf8.GetBytes(CString(value));
         return Utf8.GetString(bytes, 0, Math.Min(bytes.Length, payloadBytes));
     }
 

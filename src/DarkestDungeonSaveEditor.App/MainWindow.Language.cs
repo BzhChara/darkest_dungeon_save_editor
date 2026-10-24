@@ -55,9 +55,10 @@ public partial class MainWindow
 
     private void RefreshLanguage()
     {
-        foreach (var grid in new[] { ItemGrid, TrinketGrid, HeroGrid }) EditorNameColumns.Apply(grid);
+        foreach (var grid in new[] { ItemGrid, TrinketGrid, EventGrid, HeroGrid }) EditorNameColumns.Apply(grid);
         foreach (var row in _visibleItems) row.RefreshLanguage();
         foreach (var row in _visibleTrinkets) row.RefreshLanguage();
+        foreach (var row in _visibleEvents) row.RefreshLanguage();
         foreach (var row in _visibleHeroes) row.RefreshLanguage();
         foreach (var level in _heroLevelChoices) level.RefreshLanguage();
         UpdateCatalogMode();

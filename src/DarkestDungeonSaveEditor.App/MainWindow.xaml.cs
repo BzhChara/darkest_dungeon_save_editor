@@ -15,7 +15,9 @@ namespace DarkestDungeonSaveEditor.App;
 
 public partial class MainWindow : Window
 {
-    private const int BattleTabIndex = 3;
+    private const int EventTabIndex = 2;
+    private const int HeroTabIndex = 3;
+    private const int BattleTabIndex = 4;
     private const int TitleLogoFrameWidth = 320;
     private const int TitleLogoFrameHeight = 100;
     private const int TitleLogoFrameColumns = 10;
@@ -66,11 +68,12 @@ public partial class MainWindow : Window
                 DesktopCodecSession.IsNativeTestBuild ? " — " + EditorText.Get("Codec_NativeTestTitle") : string.Empty));
         CrashDiagnostics.RecordStatus($"Window DSON codec: {_codecSession.Identity}");
         InitializeLanguageSelection();
-        foreach (var grid in new[] { ItemGrid, TrinketGrid, HeroGrid }) EditorNameColumns.Apply(grid);
+        foreach (var grid in new[] { ItemGrid, TrinketGrid, EventGrid, HeroGrid }) EditorNameColumns.Apply(grid);
         BattleMapPanel.UsesSharedProfileMonitor = true;
         ItemGrid.ItemsSource = _visibleItems;
         TrinketGrid.ItemsSource = _visibleTrinkets;
         HeroGrid.ItemsSource = _visibleHeroes;
+        EventGrid.ItemsSource = _visibleEvents;
         HeroLevelComboBox.ItemsSource = _heroLevelChoices;
         BattleMapPanel.SnapshotRefreshed += BattleMapPanel_SnapshotRefreshed;
         BattleMapPanel.ActiveContentChanged += BattleMapPanel_ActiveContentChanged;

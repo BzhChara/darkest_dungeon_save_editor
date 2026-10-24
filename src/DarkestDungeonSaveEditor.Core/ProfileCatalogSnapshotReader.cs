@@ -19,7 +19,8 @@ public sealed class ProfileCatalogSnapshotReader
     public static IReadOnlyList<string> WatchedFileNames { get; } = Array.AsReadOnly(new[]
     {
         "persist.game.json", "persist.estate.json", "persist.roster.json", "persist.town.json",
-        "persist.upgrades.json", "persist.raid.json", "persist.map.json"
+        "persist.upgrades.json", "persist.raid.json", "persist.map.json",
+        "persist.town_event.json", "persist.campaign_log.json", "persist.quest.json", "persist.progression.json"
     });
 
     private readonly SaveProfile _profile;

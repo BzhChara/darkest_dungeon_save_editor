@@ -118,7 +118,7 @@ public static class TrinketSaveEditor
         return highest;
     }
 
-    private static JsonObject CreatePristineInstance(TrinketDefinition definition)
+    internal static JsonObject CreatePristineInstance(TrinketDefinition definition)
     {
         var instance = new JsonObject
         {

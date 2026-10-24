@@ -22,6 +22,7 @@ public static partial class HeroClassCatalog
         private int? _cardsInDeck;
         private double? _cardChance;
         private string _townEventDependency = string.Empty;
+        private string _deckReductionTarget = string.Empty;
         private readonly List<string> _combatSkillIds = [];
         private readonly HashSet<string> _combatSkillSet = new(StringComparer.Ordinal);
         private readonly Dictionary<string, HashSet<int>> _combatSkillLevels =
@@ -68,6 +69,7 @@ public static partial class HeroClassCatalog
                 _cardsInDeck = generation.CardsInDeck;
                 _cardChance = generation.CardChance;
                 _townEventDependency = generation.TownEventDependency;
+                _deckReductionTarget = generation.DeckReductionTarget;
             }
 
             foreach (var skill in candidate.CombatSkillLevels)
@@ -234,6 +236,7 @@ public static partial class HeroClassCatalog
             _cardsInDeck = NativeDarkestReader.ReadInt(body, ".number_of_cards_in_deck") ?? _cardsInDeck;
             _cardChance = NativeDarkestReader.ReadFloat(body, ".card_chance") ?? _cardChance;
             _townEventDependency = NativeDarkestReader.ReadString(body, ".town_event_dependency") ?? _townEventDependency;
+            _deckReductionTarget = NativeDarkestReader.ReadString(body, ".reduce_number_of_cards_in_deck_hero_class_id") ?? _deckReductionTarget;
         }
 
         public HeroCandidate Build()
@@ -251,6 +254,9 @@ public static partial class HeroClassCatalog
                     _cardsInDeck,
                     _cardChance,
                     _townEventDependency)
+                {
+                    DeckReductionTarget = _deckReductionTarget
+                }
                 : null;
             var skillEffects = _skillEffects
                 .SelectMany(skill => skill.Value.SelectMany(attribute =>

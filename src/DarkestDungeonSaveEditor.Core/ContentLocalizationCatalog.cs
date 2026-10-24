@@ -13,6 +13,8 @@ internal sealed class ContentLocalizationCatalog
     private const string TrinketPrefix = "str_inventory_title_trinket";
     private const string MonsterNamePrefix = "str_monstername_";
     private const string CurioTitlePrefix = "str_curio_title_";
+    private const string TownEventTitlePrefix = "town_event_title_";
+    private const string TownEventDescriptionPrefix = "town_event_description_";
     private readonly IReadOnlyDictionary<string, BilingualContentName> _entries;
 
     private ContentLocalizationCatalog(
@@ -56,6 +58,13 @@ internal sealed class ContentLocalizationCatalog
     public BilingualContentName GetMonsterName(string id) => Get(MonsterNamePrefix + id);
 
     public BilingualContentName GetCurioTitle(string id) => Get(CurioTitlePrefix + id);
+
+    public BilingualContentName GetTownEventName(string id) => Get(TownEventTitlePrefix + id);
+
+    public BilingualContentName GetTownEventDescription(string id) => Get(TownEventDescriptionPrefix + id);
+
+    internal static IReadOnlyList<string> GetTownEventKeys(string id) =>
+        [TownEventTitlePrefix + id, TownEventDescriptionPrefix + id];
 
     internal static string GetHeroClassKey(string id) => HeroClassPrefix + id;
 
@@ -296,7 +305,9 @@ internal sealed class ContentLocalizationCatalog
         key.StartsWith(QuirkPrefix, StringComparison.OrdinalIgnoreCase) ||
         key.StartsWith(InventoryTitlePrefix, StringComparison.OrdinalIgnoreCase) ||
         key.StartsWith(MonsterNamePrefix, StringComparison.OrdinalIgnoreCase) ||
-        key.StartsWith(CurioTitlePrefix, StringComparison.OrdinalIgnoreCase);
+        key.StartsWith(CurioTitlePrefix, StringComparison.OrdinalIgnoreCase) ||
+        key.StartsWith(TownEventTitlePrefix, StringComparison.OrdinalIgnoreCase) ||
+        key.StartsWith(TownEventDescriptionPrefix, StringComparison.OrdinalIgnoreCase);
 
     private static IReadOnlyList<string> EnumerateLocalizationFiles(
         ActiveContentSource source,

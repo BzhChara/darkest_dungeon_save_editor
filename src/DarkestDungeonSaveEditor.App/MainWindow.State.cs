@@ -33,6 +33,9 @@ public partial class MainWindow : Window
         _allItems = [];
         _allTrinkets = [];
         _allHeroes = [];
+        _allEvents = [];
+        _visibleEvents.Clear();
+        if (EventGrid is not null) EventGrid.SelectedItem = null;
         _selectedInitialQuirkIds = [];
         _heroCatalog = null;
         _trinketStorage = null;
@@ -79,6 +82,7 @@ public partial class MainWindow : Window
         _preparedQuantityItemEdit = null;
         _preparedTrinketEdit = null;
         _preparedHeroEdit = null;
+        _preparedTownEventEdit = null;
         _preparedHeroCandidatePreview = null;
         _editService = null;
         if (ApplyButton is not null)
@@ -96,6 +100,7 @@ public partial class MainWindow : Window
         }
         UpdateHeroGenerationAvailability();
         UpdateInventoryIdentityWarning();
+        UpdateEventAvailability();
     }
 
     private string SelectedInventoryIdentityIssue => CatalogTabs?.SelectedIndex switch
@@ -121,14 +126,19 @@ public partial class MainWindow : Window
 
     private void UpdateHeroGenerationAvailability()
     {
-        if (CatalogTabs?.SelectedIndex != 2 || PreviewButton is null || PreviewWarningTextBlock is null)
+        if (CatalogTabs?.SelectedIndex != HeroTabIndex || PreviewButton is null || PreviewWarningTextBlock is null)
         {
             return;
         }
 
         var availability = SelectedHeroGenerationAvailability;
         PreviewButton.IsEnabled = CatalogTabs.IsEnabled && CanPreviewCurrentTab();
-        if (availability is { CanGenerate: false })
+        if (_quantitySaveContext != QuantityItemSaveContext.Town)
+        {
+            PreviewWarningTextBlock.Text = EditorText.Get("TownOnlyOperation");
+            PreviewWarningTextBlock.Visibility = Visibility.Visible;
+        }
+        else if (availability is { CanGenerate: false })
         {
             PreviewWarningTextBlock.Text = availability.UnavailableReason;
             PreviewWarningTextBlock.Visibility = Visibility.Visible;
@@ -156,19 +166,20 @@ public partial class MainWindow : Window
             CatalogTabs.SelectedIndex == 0 && _allItems.Count > 0;
         CopiesTextBox.IsEnabled = !busy && !_gameRunning && CatalogTabs.SelectedIndex is 0 or 1;
         HeroLevelComboBox.IsEnabled = !busy && !_gameRunning &&
-            CatalogTabs.SelectedIndex == 2 &&
+            CatalogTabs.SelectedIndex == HeroTabIndex &&
             _heroCatalog is not null &&
             HeroGrid.SelectedItem is HeroRow;
         InitialQuirksButton.IsEnabled = !busy && !_gameRunning &&
-            CatalogTabs.SelectedIndex == 2 &&
+            CatalogTabs.SelectedIndex == HeroTabIndex &&
             _heroCatalog is not null &&
             HeroGrid.SelectedItem is HeroRow;
         PreviewButton.IsEnabled = !busy && CanPreviewCurrentTab();
         UpdateInventoryIdentityWarning();
+        UpdateEventAvailability();
         ApplyButton.IsEnabled = !busy && _syncReady && !_gameRunning &&
             (_preparedQuantityItemEdit is not null ||
              _preparedTrinketEdit is not null ||
-             _preparedHeroEdit is not null);
+             _preparedHeroEdit is not null || _preparedTownEventEdit is not null);
     }
 
     private void EnsureCatalogMatches(
@@ -246,7 +257,9 @@ public partial class MainWindow : Window
         {
             0 => ItemGrid.SelectedItem is ItemRow && SelectedInventoryIdentityIssue.Length == 0,
             1 => TrinketGrid.SelectedItem is TrinketRow && SelectedInventoryIdentityIssue.Length == 0,
-            2 => _heroCatalog is not null &&
+            EventTabIndex => _quantitySaveContext == QuantityItemSaveContext.Town &&
+                EventGrid.SelectedItem is TownEventRow row && TownEventAvailability.UnavailableReason(row.Definition).Length == 0,
+            HeroTabIndex => _quantitySaveContext == QuantityItemSaveContext.Town && _heroCatalog is not null &&
                  SelectedHeroGenerationAvailability is { CanGenerate: true },
             _ => false
         };
@@ -261,18 +274,19 @@ public partial class MainWindow : Window
         }
 
         var isItemTab = CatalogTabs.SelectedIndex == 0;
-        var isHeroTab = CatalogTabs.SelectedIndex == 2;
+        var isEventTab = CatalogTabs.SelectedIndex == EventTabIndex;
+        var isHeroTab = CatalogTabs.SelectedIndex == HeroTabIndex;
         var isBattleTab = CatalogTabs.SelectedIndex == BattleTabIndex;
         CatalogToolsPanel.Visibility = isBattleTab ? Visibility.Collapsed : Visibility.Visible;
         CatalogActionPanel.Visibility = isBattleTab ? Visibility.Collapsed : Visibility.Visible;
-        PreviewButton.Content = isHeroTab
+        PreviewButton.Content = isEventTab ? EditorText.Get("TownEvent_Preview") : isHeroTab
             ? EditorText.Get("MainWindow_State_009")
             : isItemTab
                 ? EditorText.Get("MainWindow_State_010")
                 : EditorText.Get("MainWindow_State_011");
         CopiesLabel.Text = isItemTab ? EditorText.Get("MainWindow_State_012") : EditorText.Get("MainWindow_State_013");
-        CopiesLabel.Visibility = isHeroTab || isBattleTab ? Visibility.Collapsed : Visibility.Visible;
-        CopiesTextBox.Visibility = isHeroTab || isBattleTab ? Visibility.Collapsed : Visibility.Visible;
+        CopiesLabel.Visibility = isHeroTab || isBattleTab || isEventTab ? Visibility.Collapsed : Visibility.Visible;
+        CopiesTextBox.Visibility = isHeroTab || isBattleTab || isEventTab ? Visibility.Collapsed : Visibility.Visible;
         HeroLevelLabel.Visibility = isHeroTab ? Visibility.Visible : Visibility.Collapsed;
         HeroLevelComboBox.Visibility = isHeroTab ? Visibility.Visible : Visibility.Collapsed;
         HeroLevelComboBox.IsEnabled = isHeroTab &&

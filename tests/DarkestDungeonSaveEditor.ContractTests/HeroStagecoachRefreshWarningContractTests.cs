@@ -49,9 +49,24 @@ internal static partial class ContractSuite
                 var candidate = pool == StagecoachRecruitPool.Ordinary ? candidates.ContextLimitedCandidate : candidates.ShardCandidate;
                 var before = sourceFiles.Append("persist.raid.json").ToDictionary(name => name,
                     name => ComputeSha256(Path.Combine(profileRoot, name)), StringComparer.Ordinal);
+                if (inRaid)
+                {
+                    var rejected = false;
+                    try
+                    {
+                        await service.PrepareStagecoachHeroEditAsync(scenarioProfile, candidate, catalog, scenarioContent);
+                    }
+                    catch (InvalidOperationException error) when (error.Message == EditorText.Get("TownOnlyOperation"))
+                    {
+                        rejected = true;
+                    }
+                    Assert(rejected && before.All(pair => ComputeSha256(Path.Combine(profileRoot, pair.Key)) == pair.Value),
+                        "Both stagecoach pools must reject in-raid generation before changing any save.");
+                    continue;
+                }
                 var prepared = await service.PrepareStagecoachHeroEditAsync(scenarioProfile, candidate, catalog, scenarioContent);
-                Assert(prepared.Preview.MayRefreshOnTownReturn == inRaid && prepared.Preview.TargetPool == pool,
-                    "Both stagecoach pools must warn only when the guarded game snapshot is in a raid, not because a raid file exists.");
+                Assert(!prepared.Preview.MayRefreshOnTownReturn && prepared.Preview.TargetPool == pool,
+                    "A stale raid file must not block generation in a town profile.");
                 Assert(before.All(pair => ComputeSha256(Path.Combine(profileRoot, pair.Key)) == pair.Value),
                     "Preparing a scene warning must not mutate any source save.");
                 if (pool == StagecoachRecruitPool.Ordinary)
@@ -60,19 +75,7 @@ internal static partial class ContractSuite
                         "A refresh warning must coexist with the existing singleton limit warning.");
                 }
 
-                if (inRaid)
-                {
-                    var result = await service.CommitAsync(prepared);
-                    Assert(result.Files.Count == 3 &&
-                           ComputeSha256(prepared.TownFile.TargetPath).Equals(prepared.TownFile.EncodedSha256, StringComparison.OrdinalIgnoreCase) &&
-                           ComputeSha256(prepared.RosterFile.TargetPath).Equals(prepared.RosterFile.EncodedSha256, StringComparison.OrdinalIgnoreCase) &&
-                           ComputeSha256(prepared.UpgradesFile.TargetPath).Equals(prepared.UpgradesFile.EncodedSha256, StringComparison.OrdinalIgnoreCase),
-                        "The in-raid warning must not block normal three-file stagecoach commits.");
-                    Assert(ComputeSha256(gamePath) == before["persist.game.json"] &&
-                           ComputeSha256(scenarioProfile.RaidSavePath) == before["persist.raid.json"],
-                        "Warning-only generation must not change the expedition or force a return to town.");
-                }
-                else if (pool == StagecoachRecruitPool.Ordinary)
+                if (pool == StagecoachRecruitPool.Ordinary)
                 {
                     game["base_root"]!["inraid"] = true;
                     game["base_root"]!["raiddungeon"] = "weald";
