@@ -116,7 +116,7 @@ The relevant assertions live in [UiContractTests.cs](../tests/DarkestDungeonSave
 
 ## 4. Historical evidence and reproducibility
 
-The original investigation used user-provided base-game screenshots, editor screenshots, and comparison boards under `workspaces/title_logo_renderer`. Those paths were temporary or ignored by Git and are intentionally not permanent links here.
+The original investigation used user-provided base-game screenshots, editor screenshots, and comparison boards under `artifacts/title_logo_renderer`. Those paths were temporary or ignored by Git and are intentionally not permanent links here.
 
 When a title regression must be investigated again, prefer:
 

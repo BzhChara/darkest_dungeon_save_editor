@@ -2,7 +2,7 @@ internal static partial class ContractSuite
 {
     public static void RunInventoryCapacitiesOnly(string repositoryRoot)
     {
-        var root = Path.Combine(repositoryRoot, "workspaces", "contract_tests", $"capacities_{Guid.NewGuid():N}");
+        var root = Path.Combine(repositoryRoot, "artifacts", "contract_tests", $"capacities_{Guid.NewGuid():N}");
         RunInventoryCapacityContracts(root);
         Console.WriteLine($"Artifacts: {root}");
     }

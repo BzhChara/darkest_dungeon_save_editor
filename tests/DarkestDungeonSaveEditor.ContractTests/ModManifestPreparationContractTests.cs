@@ -10,7 +10,7 @@ internal static partial class ContractSuite
 
     public static async Task RunManifestsOnlyAsync(string repositoryRoot)
     {
-        var root = Path.Combine(repositoryRoot, "workspaces", "manifest_contracts", Guid.NewGuid().ToString("N"));
+        var root = Path.Combine(repositoryRoot, "artifacts", "manifest_contracts", Guid.NewGuid().ToString("N"));
         await RunModManifestPreparationContractsAsync(root);
         var game = Environment.GetEnvironmentVariable("DDSE_TEST_GAME_DIRECTORY");
         if (!string.IsNullOrWhiteSpace(game)) await RunOfficialManifestContractAsync(root, game);

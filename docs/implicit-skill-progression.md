@@ -4,7 +4,7 @@
 
 This concerns generated heroes that define a combat skill without a corresponding guild upgrade tree. Skill selectability does not determine eligibility: `true`, `false`, and unspecified classes use the same implicit purchase policy. Their existing equipped-skill selection rules remain unchanged. This does not add or alter a Mod, an existing hero, or a building tree.
 
-The previous base-only policy made Kaltsit's `Kaltsit_Ranged_8` usable but did not upgrade it. The user cast this recall command with generated level-6 hero GUID 894; the saved party received `Kaltsit_PROT5` and `Kaltsit_StressHealRec5`, each `0.05`. The Mod's defined level 4 instead references the `25` buffs. Purchases remained intact: only code `0` for skill 8. The captured report is `workspaces/hero_live_verification_20260906/recall_20260906_055044/analysis.md` (ignored local evidence).
+The previous base-only policy made Kaltsit's `Kaltsit_Ranged_8` usable but did not upgrade it. The user cast this recall command with generated level-6 hero GUID 894; the saved party received `Kaltsit_PROT5` and `Kaltsit_StressHealRec5`, each `0.05`. The Mod's defined level 4 instead references the `25` buffs. Purchases remained intact: only code `0` for skill 8. The captured report is `artifacts/hero_live_verification_20260906/recall_20260906_055044/analysis.md` (ignored local evidence).
 
 ## Native evidence, not a guessed save field
 
@@ -35,7 +35,7 @@ Thus writing only code `4` would not work: the lower consecutive purchases must 
 
 The constructed class/skill hash target is limited to the first 63 UTF-8 bytes by native `0x14036B3A0`. Since 2026-09-11, both explicit and implicit combat purchases and the catalog's tree binding share that bound. Original skill IDs remain separate for variant metadata and majority voting. The same native consecutive-code lookup also applies to authored trees: their base code `0` must be purchasable, and an intervening missing code produces a warning stating the reachable tier. It does not authorize renaming or synthesizing authored codes. See [combat purchase consumption](resource-duplicate-semantics.md#842-combat-purchase-targets-and-reachable-tiers) for guards and implementation evidence.
 
-The read-only reproduction helper is `workspaces/hero_live_verification_20260906/inspect_skill_binary.py`. It uses standard-library PE parsing plus the already-installed Visual Studio `dumpbin`, without attaching to a process, injecting, installing dependencies, or modifying the executable.
+The read-only reproduction helper is `artifacts/hero_live_verification_20260906/inspect_skill_binary.py`. It uses standard-library PE parsing plus the already-installed Visual Studio `dumpbin`, without attaching to a process, injecting, installing dependencies, or modifying the executable.
 
 ## Choosing a resolve-level schedule
 
@@ -58,24 +58,24 @@ With the currently inspected three classes' consistent `0,1,2,3,5` resolve prere
 - Contract coverage includes every selectable resolve level with true/false/unspecified skill selectability, equipped-count preservation, real catalog compatibility, strict majorities, ties, pluralities without a majority, duplicate-vote prevention, invalid/ineligible reference exclusion, same-class custom schedules, shorter target skills, single-level skills, missing metadata, definition gaps, unsupported extra tiers, invalid codes, mismatched reference counts, and absent combat reference trees.
 - Candidate serialization remains unchanged. Tests exercise the existing GUID/hash purchase writer and the real DDSaveEditor DSON codec for town, roster, and upgrades using synthetic saves in the test workspace.
 - Ordinary authored-tree purchases, weapon/armor rank, camping unlocks, pool selection, source-save guards, and backup/rollback are unchanged.
-- Both the old 5% result and the new 25% Kaltsit result are live-tested. Newly generated resolve-level-6 Kaltsit GUID 901 applied `Kaltsit_PROT25` and `Kaltsit_StressHealRec25`, each `0.25`, to all four party members after recall. All 53 personal purchases remained, including skill 8 codes `0..4`; selected-skill values remained `0`. See the ignored local report `workspaces/hero_live_verification_20260906/recall_upgraded_20260906_061506/analysis.md`. This does not claim live coverage of every Mod, selectable tree-less skill, or majority-inferred schedule.
+- Both the old 5% result and the new 25% Kaltsit result are live-tested. Newly generated resolve-level-6 Kaltsit GUID 901 applied `Kaltsit_PROT25` and `Kaltsit_StressHealRec25`, each `0.25`, to all four party members after recall. All 53 personal purchases remained, including skill 8 codes `0..4`; selected-skill values remained `0`. See the ignored local report `artifacts/hero_live_verification_20260906/recall_upgraded_20260906_061506/analysis.md`. This does not claim live coverage of every Mod, selectable tree-less skill, or majority-inferred schedule.
 - Existing generated characters are not retroactively upgraded. The guild missing-tree message can remain even after the saved combat level is corrected; removing that message would require separate content changes, which this feature does not perform.
 
 ### Executed editor checks
 
 - Release solution build: passed, zero warnings/errors after correcting a test-only helper-access compile error.
-- Full contract suite, including the new three-file DSON round trip: passed. Run: `workspaces/contract_tests/20260905_220422_452_c305c255a5f24173a8813f191da889b7`. The unrelated symbolic-link inventory fixture was skipped because the OS privilege was unavailable.
+- Full contract suite, including the new three-file DSON round trip: passed. Run: `artifacts/contract_tests/20260905_220422_452_c305c255a5f24173a8813f191da889b7`. The unrelated symbolic-link inventory fixture was skipped because the OS privilege was unavailable.
 - Changed C# files: whitespace verification passed.
-- Active `profile_1` content: all 21 in-memory plans for EosNyx, HMSTerror, and Kaltsit at resolve levels 0-6 matched the expected per-skill codes. All 18 source save hashes remained unchanged. Report: `workspaces/hero_live_verification_20260906/progression_probe/20260906_060445/report.json`.
+- Active `profile_1` content: all 21 in-memory plans for EosNyx, HMSTerror, and Kaltsit at resolve levels 0-6 matched the expected per-skill codes. All 18 source save hashes remained unchanged. Report: `artifacts/hero_live_verification_20260906/progression_probe/20260906_060445/report.json`.
 - At resolve 6, Kaltsit has 53 purchases instead of the old policy's 49: exactly four additional codes for Ranged 8. This is an editor-plan result, not a claim that the user's existing GUID 894 was modified.
 - Initial independent read-only completion review: no task-scoped correctness or regression findings. The reviewer independently reproduced the two key native disassembly sections and checked the DSON/21-plan artifacts. The subsequent live 25% result is recorded above.
 
 ### Selectability and strict-majority update (2026-09-06)
 
 - Release solution build: passed with zero warnings/errors after closing the locked editor and correcting a test's internal-method call.
-- Full contract suite: passed after updating the old missing-tree rejection assertion to the approved base-unlock behavior. Run: `workspaces/contract_tests/20260905_223645_064_5405072c07cf4c5b80735e0127bfa27a`. The symbolic-link inventory fixture remains skipped for unavailable OS privilege; all skill-policy tests executed.
+- Full contract suite: passed after updating the old missing-tree rejection assertion to the approved base-unlock behavior. Run: `artifacts/contract_tests/20260905_223645_064_5405072c07cf4c5b80735e0127bfa27a`. The symbolic-link inventory fixture remains skipped for unavailable OS privilege; all skill-policy tests executed.
 - New coverage verifies all three selectability states over resolve levels 0-6, strict-majority and no-majority cases, existing minority-tree preservation, voting eligibility, and a four-tier target capped under a five-tier majority schedule. The real DSON round trip uses a selectable hero with an unequipped implicit skill.
 - Changed C# whitespace verification and `git diff --check`: passed.
-- Read-only real-content recheck: EosNyx, HMSTerror, and Kaltsit all retained the expected 21 generation plans, and all 18 source save hashes stayed unchanged. Report: `workspaces/hero_live_verification_20260906/progression_probe/20260906_063646/report.json`.
+- Read-only real-content recheck: EosNyx, HMSTerror, and Kaltsit all retained the expected 21 generation plans, and all 18 source save hashes stayed unchanged. Report: `artifacts/hero_live_verification_20260906/progression_probe/20260906_063646/report.json`.
 - No new live game session was performed for majority inference or selectable tree-less skills. Existing heroes, Mod files, and live saves were not modified.
 - Independent read-only review of the 11-file task-scoped diff found no actionable issues. It checked catalog-to-writer consistency, the DSON artifacts, and the stored 21-plan report; it did not rerun the full suite or perform gameplay.

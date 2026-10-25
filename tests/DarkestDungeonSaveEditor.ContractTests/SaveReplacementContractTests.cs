@@ -2,7 +2,7 @@ internal static partial class ContractSuite
 {
     public static void RunSaveReplacementOnly(string repositoryRoot)
     {
-        var root = Path.Combine(repositoryRoot, "workspaces", "replacement_contracts", Guid.NewGuid().ToString("N"));
+        var root = Path.Combine(repositoryRoot, "artifacts", "replacement_contracts", Guid.NewGuid().ToString("N"));
         RunSaveReplacementContracts(root);
         Console.WriteLine($"Artifacts: {root}");
     }

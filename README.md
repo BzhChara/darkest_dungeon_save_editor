@@ -6,6 +6,8 @@ Confirmed content overlays, hero and quirk rules, trinkets, HP calculations, sav
 
 Current rules and design documents under `docs/` are versioned project documentation. Review reports, experiment records, and historical fix notes under `docs/change-history/` are local-only material: Git ignores that entire directory, and a new clone does not include it. Historical record names in the rule documents are provenance references, not links to files shipped with the project.
 
+See [Local storage layout](docs/local-storage.md) for generated artifacts, external research material, retained save samples and backups. Development tools write new output under `artifacts/`; the former repository-level `workspaces/` is retired. The installed editor's application-data directories are unchanged.
+
 The editor supports English and Simplified Chinese. Use the compact **Language** button beside **Support** to choose **Follow system**, **Simplified Chinese**, or **English**. Changes apply immediately; new installations follow the system language by default. Game and Mod names remain searchable in both languages. See [UI localization](docs/ui-localization.md) for fallback rules, preferences, and translation maintenance.
 
 ## Download and run

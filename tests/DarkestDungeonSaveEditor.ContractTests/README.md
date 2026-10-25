@@ -2,6 +2,8 @@
 
 `Program.cs` only handles the command-line boundary and reports an unhandled failure. `ContractSuite.cs` owns the intentionally serial execution order.
 
+Repository-local test output belongs under `artifacts/`, including the shared `artifacts/contract_tests/` fixtures and dedicated codec, localization and manifest runs. A fixture may contain a nested `workspaces/` directory to model the installed editor's application data; it must not create the retired repository-level `workspaces/`. See [Local storage layout](../../docs/local-storage.md).
+
 The suite is split by responsibility:
 
 - `TownEventContractTests.cs` and `TownEventBoundaryContracts.cs`: all 31 native effect types, replacement without week/history growth, pending-offer cleanup, preservation of delivered results, composite events, native saved identities, revival HP, quest prerequisites, DSON round trips, stale-preview guards and per-file failure recovery (`--town-events`, also included in the full suite).

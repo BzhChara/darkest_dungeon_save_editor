@@ -2,7 +2,7 @@ internal static partial class ContractSuite
 {
     public static async Task RunCodecJsonEscapingOnlyAsync(string repositoryRoot)
     {
-        var root = Path.Combine(repositoryRoot, "workspaces", "codec-json-contracts", Guid.NewGuid().ToString("N"));
+        var root = Path.Combine(repositoryRoot, "artifacts", "codec-json-contracts", Guid.NewGuid().ToString("N"));
         var codec = new DsonSaveCodec(Path.Combine(repositoryRoot, "tools", "DDSaveEditor", "DDSaveEditor.jar"));
         await RunCodecJsonEscapingContractsAsync(root, codec);
         Console.WriteLine($"Artifacts: {root}");

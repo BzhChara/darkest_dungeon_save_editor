@@ -10,7 +10,7 @@ internal static partial class ContractSuite
 {
     public static async Task RunEditorLocalizationOnlyAsync(string repositoryRoot)
     {
-        var runRoot = Path.Combine(repositoryRoot, "workspaces", "localization-contracts-" + Guid.NewGuid().ToString("N"));
+        var runRoot = Path.Combine(repositoryRoot, "artifacts", "localization-contracts-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(runRoot);
         VerifyEditorLocalizationResources(repositoryRoot, runRoot);
         RunUiContracts(repositoryRoot);

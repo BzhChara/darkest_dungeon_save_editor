@@ -38,7 +38,7 @@ internal static partial class ContractSuite
             "DDSaveEditor.jar");
         var runRoot = Path.Combine(
             repositoryRoot,
-            "workspaces",
+            "artifacts",
             "contract_tests",
             $"{DateTime.UtcNow:yyyyMMdd_HHmmss_fff}_{Guid.NewGuid():N}");
         var syntheticProjectRoot = Path.Combine(runRoot, "synthetic-log-project");

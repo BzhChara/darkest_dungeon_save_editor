@@ -7,7 +7,7 @@ internal static partial class ContractSuite
 
     public static async Task RunCodecCancellationOnlyAsync(string repositoryRoot)
     {
-        var root = Path.Combine(repositoryRoot, "workspaces", "codec_contracts", Guid.NewGuid().ToString("N"));
+        var root = Path.Combine(repositoryRoot, "artifacts", "codec_contracts", Guid.NewGuid().ToString("N"));
         await RunCodecCancellationContractsAsync(root);
         Console.WriteLine($"Artifacts: {root}");
     }

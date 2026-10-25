@@ -13,7 +13,7 @@ foreach ($project in @($coreProject, $testProject, $ordinaryProject)) {
     if ($LASTEXITCODE -ne 0) { throw "Build failed: $project" }
 }
 $testHost = Join-Path $PSScriptRoot "Tests\bin\$Configuration\net8.0-windows\Mo2.Compatibility.Tests.dll"
-& dotnet $testHost (Join-Path $PSScriptRoot 'Tests\workspaces')
+& dotnet $testHost (Join-Path $PSScriptRoot 'artifacts\tests')
 if ($LASTEXITCODE -ne 0) { throw 'MO2 compatibility contracts failed.' }
 $ordinaryDll = Join-Path $repo "src\DarkestDungeonSaveEditor.Core\bin\$Configuration\net8.0-windows\DarkestDungeonSaveEditor.Core.dll"
 $version = ([xml][IO.File]::ReadAllText((Join-Path $repo 'Directory.Build.props'))).Project.PropertyGroup.Version

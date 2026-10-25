@@ -16,11 +16,13 @@ TestResults/
 *.userosscache
 *.sln.docstates
 
-# Save-editor runtime data (may contain local paths or save data)
-workspaces/
+# Preserved local backups and save evidence (see docs/local-storage.md)
 backups/
-logs/
 local-analysis/
+
+# Runtime data and legacy output paths; new development output belongs in artifacts/
+workspaces/
+logs/
 *.log
 
 # Local review, experiment and change-history records

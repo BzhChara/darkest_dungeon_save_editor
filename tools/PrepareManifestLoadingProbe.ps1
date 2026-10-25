@@ -14,6 +14,8 @@ if (-not (Test-Path -LiteralPath $coreProject -PathType Leaf)) {
 }
 $gameRoot = (Resolve-Path -LiteralPath $GameDirectory).Path
 $utf8 = [System.Text.UTF8Encoding]::new($false, $true)
+$guidePath = Join-Path $PSScriptRoot 'manifest-loading-probe.md'
+$guideBytes = [System.IO.File]::ReadAllBytes($guidePath)
 
 function Get-BytesSha256([byte[]]$Bytes) {
     return [Convert]::ToHexString([System.Security.Cryptography.SHA256]::HashData($Bytes)).ToLowerInvariant()
@@ -107,9 +109,9 @@ foreach ($probe in $probes) {
     $sharedFiles[$probe.RelativePath] = $probe.Bytes
 }
 
-$outputRoot = Join-Path $projectRoot 'workspaces/manifest_loading_probe'
+$outputRoot = Join-Path $projectRoot 'artifacts/manifest_loading_probe'
 # Do not follow an existing junction/symlink when creating the project-local package.
-foreach ($directory in @((Join-Path $projectRoot 'workspaces'), $outputRoot)) {
+foreach ($directory in @((Join-Path $projectRoot 'artifacts'), $outputRoot)) {
     if (Test-Path -LiteralPath $directory) {
         $entry = Get-Item -LiteralPath $directory -Force
         if (-not $entry.PSIsContainer -or ($entry.Attributes -band [System.IO.FileAttributes]::ReparsePoint)) {
@@ -177,8 +179,7 @@ foreach ($file in $fileEvidence) {
     }
 }
 
-$guidePath = Join-Path $projectRoot 'docs/manifest-loading-probe.md'
-Write-NewPackageFile -RelativePath 'README.zh-CN.md' -Bytes ([System.IO.File]::ReadAllBytes($guidePath))
+Write-NewPackageFile -RelativePath 'README.md' -Bytes $guideBytes
 $evidence = [ordered]@{
     SchemaVersion = 1
     GeneratedAt = [DateTimeOffset]::Now.ToString('o')
@@ -196,7 +197,7 @@ Write-NewPackageFile -RelativePath 'evidence.json' -Bytes ($utf8.GetBytes(($evid
 
 [pscustomobject]@{
     PackageDirectory = $packageRoot
-    Instructions = Join-Path $packageRoot 'README.zh-CN.md'
+    Instructions = Join-Path $packageRoot 'README.md'
     A = Join-Path $packageRoot "A-listed/$modFolder"
     BManifest = Join-Path $packageRoot "B-unlisted/$modFolder/modfiles.txt"
     Installed = $false

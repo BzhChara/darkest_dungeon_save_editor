@@ -500,7 +500,7 @@ try
             Assert(english != chinese && chinese.Any(ch => ch > 127), "satellite resource lookup");
         })
     };
-    var root = args.Length == 1 ? Path.GetFullPath(args[0]) : Path.Combine(AppContext.BaseDirectory, "workspaces");
+    var root = args.Length == 1 ? Path.GetFullPath(args[0]) : Path.Combine(AppContext.BaseDirectory, "artifacts");
     root = Path.Combine(root, "mo2-contracts-" + Guid.NewGuid().ToString("N"));
     foreach (var (name, run) in tests)
     {
