@@ -12,7 +12,8 @@ internal sealed partial class TownEventInitializer
         .SelectMany(root => Objects(root["plot_quests"]))
         .GroupBy(item => Hash(Text(item, "id"))).Select(group => group.First()).ToArray();
 
-    private void AddPlotQuests(IReadOnlyDictionary<string, JsonObject> saves, IReadOnlyList<TownEventEffect> effects, List<string> changes)
+    private void AddPlotQuests(IReadOnlyDictionary<string, JsonObject> saves, IReadOnlyList<TownEventEffect> effects,
+        List<string> changes, List<string> warnings)
     {
         if (effects.Count == 0) return;
         var definitions = ReadPlotQuestDefinitions();
@@ -23,7 +24,7 @@ internal sealed partial class TownEventInitializer
         // The native quest callback walks definitions, not effect rows. A
         // duplicate effect must not create a second copy or change precedence.
         foreach (var definition in definitions.Where(item => requested.Contains(Hash(Text(item, "id")))))
-            AddPlotQuest(saves, definition, changes);
+            AddPlotQuest(saves, definition, changes, warnings);
     }
 
     private void ReserveExistingRecoveryQuests(IReadOnlyDictionary<string, JsonObject> saves)
@@ -37,19 +38,24 @@ internal sealed partial class TownEventInitializer
                 _generatedRetentionDungeons.Add(Hash(Text(quest, "dungeon")));
     }
 
-    private void AddPlotQuest(IReadOnlyDictionary<string, JsonObject> saves, JsonObject definition, List<string> changes)
+    private void AddPlotQuest(IReadOnlyDictionary<string, JsonObject> saves, JsonObject definition,
+        List<string> changes, List<string> warnings)
     {
         var id = Text(definition, "id");
         var board = JsonSupport.RequireObject(Root(saves, "quest"), "quests");
         if (Objects(board).Any(quest => Hash(Text(quest, "id")) == Hash(id)))
         {
-            changes.Add(EditorText.Format("TownEvent_QuestAlreadyPresent", id));
+            var warning = EditorText.Format("TownEvent_QuestAlreadyPresent", id);
+            changes.Add(warning);
+            warnings.Add(warning);
             return;
         }
         var unavailable = PlotQuestUnavailableReason(saves, definition);
         if (unavailable.Length > 0)
         {
-            changes.Add(EditorText.Format("TownEvent_QuestNotEligible", id, unavailable));
+            var warning = EditorText.Format("TownEvent_QuestNotEligible", id, unavailable);
+            changes.Add(warning);
+            warnings.Add(warning);
             return;
         }
         var template = definition["quest"] as JsonObject ?? throw new InvalidDataException($"Missing quest template: {id}.");

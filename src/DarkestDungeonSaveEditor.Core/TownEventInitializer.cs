@@ -23,7 +23,7 @@ internal sealed partial class TownEventInitializer(ActiveContentSnapshot content
         Hash(type) == Hash(effect.Type)) ?? throw new InvalidOperationException(
             EditorText.Format("TownEvent_UnsupportedEffect", effect.Type));
 
-    internal void Initialize(IReadOnlyDictionary<string, JsonObject> saves, TownEventDefinition definition, List<string> changes)
+    internal IReadOnlyList<string> Initialize(IReadOnlyDictionary<string, JsonObject> saves, TownEventDefinition definition, List<string> changes)
     {
         var unavailable = TownEventAvailability.UnavailableReason(definition);
         if (unavailable.Length > 0) throw new InvalidOperationException(unavailable);
@@ -100,7 +100,9 @@ internal sealed partial class TownEventInitializer(ActiveContentSnapshot content
         ReserveExistingRecoveryQuests(saves);
         // Event editing only creates explicitly requested plots. The separate
         // weekly recovery-quest scan is not part of starting or replacing an event.
-        AddPlotQuests(saves, definition.Effects.Where(effect => EffectType(effect) == "plot_quest").ToArray(), changes);
+        var warnings = new List<string>();
+        AddPlotQuests(saves, definition.Effects.Where(effect => EffectType(effect) == "plot_quest").ToArray(), changes, warnings);
+        return warnings.ToArray();
     }
 
     private string ResolveCurrency(IReadOnlyDictionary<string, JsonObject> saves, string id)

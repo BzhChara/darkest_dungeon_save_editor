@@ -105,6 +105,78 @@ internal static partial class ContractSuite
         }
     }
 
+    private static void VerifyTownEventPreviewWarningsUi(MainWindow window, string runRoot)
+    {
+        const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic;
+        var type = typeof(MainWindow);
+        var contextField = type.GetField("_quantitySaveContext", flags)!;
+        var eventsField = type.GetField("_allEvents", flags)!;
+        var preparedField = type.GetField("_preparedTownEventEdit", flags)!;
+        var filter = type.GetMethod("FilterEvents", flags)!;
+        var update = type.GetMethod("UpdateTownEventPreview", flags)!;
+        var enabled = type.GetMethod("UpdateEnabledState", flags)!;
+        var tabs = (TabControl)window.FindName("CatalogTabs");
+        var grid = (DataGrid)window.FindName("EventGrid");
+        var summary = (TextBlock)window.FindName("PreviewSummaryTextBlock");
+        var warning = (TextBlock)window.FindName("PreviewWarningTextBlock");
+        var oldContext = contextField.GetValue(window);
+        var oldEvents = eventsField.GetValue(window);
+        var oldTab = tabs.SelectedIndex;
+        // These are presentation fixtures, not new native event combinations.
+        TownEventDefinition[] definitions = [new("preview_notice", [], "base", "", false), new("other_notice", [], "base", "", false)];
+        var normal = EditorText.Format("TownEvent_QuestCreated", "new_plot");
+        var existing = EditorText.Format("TownEvent_QuestAlreadyPresent", "existing_plot");
+        var skipped = EditorText.Format("TownEvent_QuestNotEligible", "locked_plot",
+            EditorText.Format("TownEvent_QuestDependencyIncomplete", "previous_plot"));
+        var preview = new TownEventMutationPreview(17, definitions[0].Id, 13, 2, 1, [normal, existing, skipped])
+            { Warnings = [existing, skipped] };
+        var profile = new SaveProfile("profile", runRoot, Path.Combine(runRoot, "unused.estate.json"), "ui", DateTime.UtcNow);
+        void Show(TownEventMutationPreview value)
+        {
+            preparedField.SetValue(window, new PreparedTownEventEdit("ui", profile, value, null!, "", new Dictionary<string, string?>(),
+                runRoot, [], DateTime.UtcNow));
+            update.Invoke(window, null);
+            enabled.Invoke(window, null);
+        }
+        try
+        {
+            contextField.SetValue(window, QuantityItemSaveContext.Town);
+            tabs.SelectedIndex = 2;
+            eventsField.SetValue(window, definitions);
+            filter.Invoke(window, [string.Empty]);
+            grid.SelectedIndex = 0;
+            Show(preview);
+            var heading = EditorText.Format("TownEvent_Replacement", "17", definitions[0].Id, 13);
+            var full = (string)type.GetMethod("FormatTownEventPreview", flags)!.Invoke(window, [preview])!;
+            Assert(summary.Text == heading + Environment.NewLine + normal &&
+                warning.Text == existing + Environment.NewLine + skipped && warning.Visibility == Visibility.Visible &&
+                Grid.GetRow(warning) == 1 && Grid.GetColumnSpan(warning) == 3 && warning.TextWrapping == TextWrapping.Wrap &&
+                full == string.Join(Environment.NewLine, heading, normal, existing, skipped),
+                "Normal event changes belong beside the buttons; only exceptional quest notices belong below them, while the full report keeps every reason.");
+            RenderContractWindow(window, new Size(1120, 720), Path.Combine(runRoot, $"event-preview-warnings-{EditorText.Culture.Name}.png"));
+
+            Show(preview with { Changes = [normal], Warnings = [] });
+            Assert(summary.Text == heading + Environment.NewLine + normal && warning.Text.Length == 0 && warning.Visibility == Visibility.Collapsed,
+                "A successful quest preview must hide the old warning area and keep its normal result in the summary.");
+            Show(preview);
+            grid.SelectedIndex = 1;
+            Assert(preparedField.GetValue(window) is null && summary.Text.Length == 0 && warning.Visibility == Visibility.Collapsed,
+                "Selecting another event must invalidate both the old summary and quest warnings.");
+            Show(preview);
+            tabs.SelectedIndex = 1;
+            Assert(preparedField.GetValue(window) is null && summary.Text.Length == 0 && warning.Visibility == Visibility.Collapsed,
+                "Event quest warnings must not leak into another feature tab.");
+        }
+        finally
+        {
+            type.GetMethod("InvalidatePreparedEdit", flags)!.Invoke(window, null);
+            contextField.SetValue(window, oldContext);
+            eventsField.SetValue(window, oldEvents);
+            filter.Invoke(window, [string.Empty]);
+            tabs.SelectedIndex = oldTab;
+        }
+    }
+
     private static ScrollContentPresenter FindViewport(DependencyObject child)
     {
         for (var parent = VisualTreeHelper.GetParent(child); parent is not null; parent = VisualTreeHelper.GetParent(parent))

@@ -64,6 +64,8 @@ internal static partial class ContractSuite
                     var result = Apply(configure, arrange);
                     Assert(result.Preview.Changes.Single() == Skipped("event_plot", chinese ? zh : en),
                         culture + ": the skipped quest must identify its exact cause and dependency values: " + en);
+                    Assert(result.Preview.Warnings.SequenceEqual(result.Preview.Changes),
+                        "A skipped quest must also reach the warning area without removing its complete report.");
                     Assert(JsonNode.DeepEquals(result.OldQuest, result.Saves["persist.quest.json"]),
                         "Explaining an ineligible quest must preserve the existing board and retention inventory.");
                 }
@@ -108,12 +110,14 @@ internal static partial class ContractSuite
 
                 var progression = Apply(d => d["is_progression"] = true, secondProgression: true);
                 Assert(Root(progression.Saves, "quest")["quests"]!.AsObject().Count == 2 &&
+                    progression.Preview.Warnings.SequenceEqual(progression.Preview.Changes.Skip(1)) &&
                     progression.Preview.Changes.Last() == Skipped("next_plot", chinese
                         ? "本次操作已为区域 weald 生成了另一个进度任务"
                         : "another progression quest has already been added for weald during this operation"),
                     "The per-dungeon progression limit must explain which region was reserved without changing definition order.");
                 var existing = Apply(arrange: s => Root(s, "quest")["quests"]!["1"] = new JsonObject { ["id"] = "event_plot" });
                 Assert(existing.Preview.Changes.Single() == (chinese ? "任务已存在，保留原样：event_plot。" : "Quest already exists and is preserved: event_plot.") &&
+                    existing.Preview.Warnings.SequenceEqual(existing.Preview.Changes) &&
                     JsonNode.DeepEquals(existing.OldQuest, existing.Saves["persist.quest.json"]),
                     "An existing quest must keep its distinct preservation message and must not be duplicated.");
 
@@ -121,7 +125,8 @@ internal static partial class ContractSuite
                 {
                     var result = Apply(configure, arrange);
                     Assert(Root(result.Saves, "quest")["quests"]!.AsObject().Count == 2 &&
-                        result.Preview.Changes.Single() == (chinese ? "已添加事件任务：event_plot。" : "Event quest added: event_plot."),
+                        result.Preview.Warnings.Count == 0 &&
+                        result.Preview.Changes.Single() == (chinese ? "新增事件任务：event_plot。" : "New event quest: event_plot."),
                         "Detailed reasons must not add restrictions to an eligible quest.");
                 }
                 CheckAllowed();

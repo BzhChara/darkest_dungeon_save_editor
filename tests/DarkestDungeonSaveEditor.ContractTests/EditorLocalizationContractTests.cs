@@ -172,11 +172,9 @@ internal static partial class ContractSuite
                         [new TownEventMutationPreview(0, "selected_event", 13, 0, 0, [])])!;
                     var replacement = (string)eventPreview.Invoke(window,
                         [new TownEventMutationPreview(17, "selected_event", 13, 2, 1, [])])!;
-                    Assert(insertion.StartsWith(EditorText.Format("TownEvent_Addition", "selected_event", 13), StringComparison.Ordinal) &&
-                        !insertion.Contains(EditorText.Format("TownEvent_RemovedOffers", 0, 0), StringComparison.Ordinal) &&
-                        replacement.StartsWith(EditorText.Format("TownEvent_Replacement", "17", "selected_event", 13), StringComparison.Ordinal) &&
-                        replacement.Contains(EditorText.Format("TownEvent_RemovedOffers", 2, 1), StringComparison.Ordinal),
-                        "Both languages distinguish adding an absent event from replacing its pending offers.");
+                    Assert(insertion == EditorText.Format("TownEvent_Addition", "selected_event", 13) &&
+                        replacement == EditorText.Format("TownEvent_Replacement", "17", "selected_event", 13),
+                        "Both languages distinguish insertion from replacement without showing old-offer cleanup counts, even when nonzero.");
                     var languageButton = (Button)window.FindName("LanguageButton");
                     var languageOptions = languageButton.ContextMenu.Items.OfType<MenuItem>()
                         .Where(item => item.Tag is string).ToArray();
@@ -222,6 +220,7 @@ internal static partial class ContractSuite
                     foreach (var size in new[] { new Size(1440, 900), new Size(1120, 720) })
                         RenderContractWindow(window, size, Path.Combine(runRoot, $"main-{language}-{size.Width}.png"));
                     VerifyTownEventRequirementUi(window, runRoot);
+                    VerifyTownEventPreviewWarningsUi(window, runRoot);
                     RenderContractElement(languageButton.ContextMenu, new Size(240, 164), Path.Combine(runRoot, $"language-menu-{language}.png"));
                     var tabs = (TabControl)window.FindName("CatalogTabs");
                     for (var index = 1; index < tabs.Items.Count; index++)

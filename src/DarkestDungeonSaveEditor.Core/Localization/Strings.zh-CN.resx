@@ -4994,15 +4994,14 @@
   <data name="TownEvent_CurrencyChange" xml:space="preserve"><value>{0}：{1} → {2}。</value></data>
   <data name="TownEvent_EventCandidates" xml:space="preserve"><value>新事件招募候选：{0}。</value></data>
   <data name="TownEvent_StagecoachCandidates" xml:space="preserve"><value>新增马车候选：{0}。</value></data>
-  <data name="TownEvent_DistrictsUnlocked" xml:space="preserve"><value>已解锁区域建筑。</value></data>
+  <data name="TownEvent_DistrictsUnlocked" xml:space="preserve"><value>解锁区域建筑。</value></data>
   <data name="TownEvent_Replacement" xml:space="preserve"><value>{0} → {1}。保持第 {2} 周不变。</value></data>
-  <data name="TownEvent_RemovedOffers" xml:space="preserve"><value>清除旧事件未领取的候选：招募 {0} 人，复活 {1} 人。</value></data>
   <data name="TownEvent_RevivalOffers" xml:space="preserve"><value>新复活候选：{0} 人。</value></data>
   <data name="TownEvent_CuredVampires" xml:space="preserve"><value>清除 {0} 名名单英雄的猩红诅咒。</value></data>
   <data name="TownEvent_StolenTrinkets" xml:space="preserve"><value>将仓库中的 {0} 件饰品移入失物找回池。</value></data>
   <data name="TownEvent_RevivalTrinkets" xml:space="preserve"><value>死亡候选仍佩戴饰品，无法验证复活生命值。</value></data>
   <data name="TownEvent_RevivalConditionalHp" xml:space="preserve"><value>死亡候选带有无法在原战斗之外计算的条件生命值效果。</value></data>
-  <data name="TownEvent_QuestCreated" xml:space="preserve"><value>已添加事件任务：{0}。</value></data>
+  <data name="TownEvent_QuestCreated" xml:space="preserve"><value>新增事件任务：{0}。</value></data>
   <data name="TownEvent_QuestAlreadyPresent" xml:space="preserve"><value>任务已存在，保留原样：{0}。</value></data>
   <data name="TownEvent_QuestNotEligible" xml:space="preserve"><value>未生成任务 {0}：{1}。</value></data>
   <data name="TownEvent_QuestDisabled" xml:space="preserve"><value>该任务在定义中被禁用</value></data>

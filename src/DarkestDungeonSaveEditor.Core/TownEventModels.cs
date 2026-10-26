@@ -27,7 +27,12 @@ public sealed record TownEventMutationPreview(
     int Week,
     int RemovedEventCandidates,
     int RemovedRevivalOffers,
-    IReadOnlyList<string> Changes);
+    IReadOnlyList<string> Changes)
+{
+    // Subset of Changes for the warning area; the complete ordered report is
+    // retained for confirmation and logging.
+    public IReadOnlyList<string> Warnings { get; init; } = [];
+}
 
 public sealed record PreparedTownEventEdit(
     string SessionId,

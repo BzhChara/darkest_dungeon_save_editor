@@ -277,6 +277,10 @@ public partial class MainWindow : Window
         var isEventTab = CatalogTabs.SelectedIndex == EventTabIndex;
         var isHeroTab = CatalogTabs.SelectedIndex == HeroTabIndex;
         var isBattleTab = CatalogTabs.SelectedIndex == BattleTabIndex;
+        // Keep the filter and amount fields aligned across items, trinkets and events.
+        CatalogValueLabelColumn.Width = isHeroTab ? GridLength.Auto : new GridLength(110);
+        CatalogValueColumn.Width = isHeroTab ? new GridLength(2, GridUnitType.Star) : new GridLength(116);
+        CatalogValueColumn.MinWidth = isHeroTab ? 190 : 116;
         CatalogToolsPanel.Visibility = isBattleTab ? Visibility.Collapsed : Visibility.Visible;
         CatalogActionPanel.Visibility = isBattleTab ? Visibility.Collapsed : Visibility.Visible;
         PreviewButton.Content = isEventTab ? EditorText.Get("TownEvent_Preview") : isHeroTab
@@ -293,7 +297,8 @@ public partial class MainWindow : Window
             _heroCatalog is not null &&
             HeroGrid.SelectedItem is HeroRow;
         InitialQuirksButton.Visibility = isHeroTab ? Visibility.Visible : Visibility.Collapsed;
-        ShowUnusedItemsCheckBox.Visibility = isItemTab ? Visibility.Visible : Visibility.Collapsed;
+        ShowUnusedItemsCheckBox.Visibility = isItemTab ? Visibility.Visible :
+            isHeroTab || isBattleTab ? Visibility.Collapsed : Visibility.Hidden;
         ShowUnusedItemsCheckBox.IsEnabled = isItemTab && _allItems.Count > 0 && CatalogTabs.IsEnabled;
         ShowUnusedItemsCheckBox.Content =
             EditorText.Format("MainWindow_State_014", _allItems.Count(item => item.IsHiddenByDefault));

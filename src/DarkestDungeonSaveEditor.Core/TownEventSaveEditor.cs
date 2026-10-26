@@ -11,7 +11,7 @@ internal static class TownEventSaveEditor
     internal static TownEventMutationPreview ReplaceCurrent(
         IReadOnlyDictionary<string, JsonObject> saves,
         TownEventDefinition next,
-        Action<IReadOnlyDictionary<string, JsonObject>, TownEventDefinition, List<string>> initialize)
+        Func<IReadOnlyDictionary<string, JsonObject>, TownEventDefinition, List<string>, IReadOnlyList<string>> initialize)
     {
         TownSceneGuard.RequireTown(saves["persist.game.json"]);
         var state = Root(saves, "town_event");
@@ -42,9 +42,9 @@ internal static class TownEventSaveEditor
         state["current_result_event_id"] = next.NativeId;
 
         var changes = new List<string>();
-        initialize(saves, next, changes);
+        var warnings = initialize(saves, next, changes);
         return new TownEventMutationPreview(oldId, next.Id, week,
-            removedCandidates, removedDead, changes);
+            removedCandidates, removedDead, changes) { Warnings = warnings };
     }
 
     internal static JsonObject Root(IReadOnlyDictionary<string, JsonObject> saves, string name) =>

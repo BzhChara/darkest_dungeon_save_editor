@@ -44,11 +44,23 @@ public partial class MainWindow
         var warning = _quantitySaveContext != QuantityItemSaveContext.Town ? EditorText.Get("TownOnlyOperation") :
             EventGrid?.SelectedItem is TownEventRow row
                 ? TownEventAvailability.UnavailableReason(row.Definition) : string.Empty;
+        if (warning.Length == 0 && _preparedTownEventEdit is { } prepared)
+            warning = string.Join(Environment.NewLine, prepared.Preview.Warnings);
         PreviewWarningTextBlock.Text = warning;
         PreviewWarningTextBlock.Visibility = warning.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
     }
 
-    private string FormatTownEventPreview(TownEventMutationPreview preview)
+    private void UpdateTownEventPreview()
+    {
+        if (_preparedTownEventEdit is not { } prepared) return;
+        PreviewSummaryTextBlock.Text = FormatTownEventSummary(prepared.Preview, includeWarnings: false);
+        UpdateEventAvailability();
+    }
+
+    private string FormatTownEventPreview(TownEventMutationPreview preview) =>
+        FormatTownEventSummary(preview, includeWarnings: true);
+
+    private string FormatTownEventSummary(TownEventMutationPreview preview, bool includeWarnings)
     {
         var old = _allEvents.FirstOrDefault(item => item.NativeId == preview.OldEventId);
         var next = _allEvents.FirstOrDefault(item => item.Id == preview.NewEventId);
@@ -58,9 +70,8 @@ public partial class MainWindow
             : EditorText.Format("TownEvent_Replacement", old is null ? preview.OldEventId.ToString() :
                 EditorText.ContentName(old.LocalizedName, old.Id), nextName, preview.Week);
         var lines = new List<string> { summary };
-        if (preview.OldEventId != 0)
-            lines.Add(EditorText.Format("TownEvent_RemovedOffers", preview.RemovedEventCandidates, preview.RemovedRevivalOffers));
-        lines.AddRange(preview.Changes);
+        lines.AddRange(includeWarnings ? preview.Changes :
+            preview.Changes.Where(change => !preview.Warnings.Contains(change, StringComparer.Ordinal)));
         return string.Join(Environment.NewLine, lines);
     }
 }

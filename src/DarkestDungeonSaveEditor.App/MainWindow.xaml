@@ -269,8 +269,8 @@
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="3*" MinWidth="140" />
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="2*" MinWidth="190" MaxWidth="260" />
+                                <ColumnDefinition x:Name="CatalogValueLabelColumn" Width="Auto" />
+                                <ColumnDefinition x:Name="CatalogValueColumn" Width="2*" MinWidth="190" MaxWidth="260" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
                             <TextBlock Grid.Column="0" Margin="2,0,8,0"

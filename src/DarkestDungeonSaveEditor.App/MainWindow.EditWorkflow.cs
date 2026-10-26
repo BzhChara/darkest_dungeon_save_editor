@@ -173,8 +173,8 @@ public partial class MainWindow : Window
                 if (previewRevision != _editRevision || CatalogTabs.SelectedIndex != EventTabIndex) return;
                 _editService = editService;
                 _preparedTownEventEdit = eventEdit;
-                PreviewSummaryTextBlock.Text = FormatTownEventPreview(eventEdit.Preview);
-                AppendStatus(PreviewSummaryTextBlock.Text);
+                UpdateTownEventPreview();
+                AppendStatus(FormatTownEventPreview(eventEdit.Preview));
                 ApplyButton.IsEnabled = true;
                 return;
             }

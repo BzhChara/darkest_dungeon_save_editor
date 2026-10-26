@@ -4994,15 +4994,14 @@ Backup directory:
   <data name="TownEvent_CurrencyChange" xml:space="preserve"><value>{0}: {1} → {2}.</value></data>
   <data name="TownEvent_EventCandidates" xml:space="preserve"><value>New event recruitment offers: {0}.</value></data>
   <data name="TownEvent_StagecoachCandidates" xml:space="preserve"><value>Additional stagecoach candidates: {0}.</value></data>
-  <data name="TownEvent_DistrictsUnlocked" xml:space="preserve"><value>District construction unlocked.</value></data>
+  <data name="TownEvent_DistrictsUnlocked" xml:space="preserve"><value>Unlock district construction.</value></data>
   <data name="TownEvent_Replacement" xml:space="preserve"><value>{0} → {1}. Week {2} stays unchanged.</value></data>
-  <data name="TownEvent_RemovedOffers" xml:space="preserve"><value>Clear old event offers: {0} recruits, {1} revival candidates.</value></data>
   <data name="TownEvent_RevivalOffers" xml:space="preserve"><value>New revival offers: {0}.</value></data>
-  <data name="TownEvent_CuredVampires" xml:space="preserve"><value>Crimson Curse removed from {0} roster heroes.</value></data>
-  <data name="TownEvent_StolenTrinkets" xml:space="preserve"><value>{0} trinkets moved from storage into the recovery pool.</value></data>
+  <data name="TownEvent_CuredVampires" xml:space="preserve"><value>Remove Crimson Curse from {0} roster heroes.</value></data>
+  <data name="TownEvent_StolenTrinkets" xml:space="preserve"><value>Move {0} trinkets from storage into the recovery pool.</value></data>
   <data name="TownEvent_RevivalTrinkets" xml:space="preserve"><value>A dead candidate still has equipped trinkets; revival HP cannot be verified.</value></data>
   <data name="TownEvent_RevivalConditionalHp" xml:space="preserve"><value>A dead candidate has a conditional HP effect that cannot be evaluated outside its original combat.</value></data>
-  <data name="TownEvent_QuestCreated" xml:space="preserve"><value>Event quest added: {0}.</value></data>
+  <data name="TownEvent_QuestCreated" xml:space="preserve"><value>New event quest: {0}.</value></data>
   <data name="TownEvent_QuestAlreadyPresent" xml:space="preserve"><value>Quest already exists and is preserved: {0}.</value></data>
   <data name="TownEvent_QuestNotEligible" xml:space="preserve"><value>Quest {0} was not added: {1}.</value></data>
   <data name="TownEvent_QuestDisabled" xml:space="preserve"><value>the quest is disabled in its definition</value></data>
