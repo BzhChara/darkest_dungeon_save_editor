@@ -48,7 +48,10 @@ public static class TownEventCatalog
                         NativeJsonReader.ReadBoundedString(effect, "type", 63),
                         NativeJsonReader.ReadCString(effect, "string_data"),
                         NativeJsonReader.ReadFloat(effect, "number_data") ?? 0)).ToArray();
-                    parsed.Add(new TownEventDefinition(id, effects, file.Source.Id, file.Path, false));
+                    parsed.Add(new TownEventDefinition(id, effects, file.Source.Id, file.Path, false)
+                    {
+                        TriggerRules = TownEventTriggerRules.Read(entry)
+                    });
                 }
                 foreach (var definition in parsed)
                 {

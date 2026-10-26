@@ -50,8 +50,15 @@ internal static partial class ContractSuite
         TownEventSaveEditor.ReplaceCurrent(identities, catalog.Events.Single(item => item.Id == "test_trinket_retention_add_from_storage"),
             new TownEventInitializer(f.Content, 7).Initialize);
         Assert(identities["persist.estate.json"]["base_root"]!["trinkets"]!["items"]!.AsObject().ContainsKey("0") &&
-            identities["persist.quest.json"]["base_root"]!["trinket_retention_ids"]![0]!.GetValue<int>() == unchecked((int)HashLoc2Key("old_owned")),
+            identities["persist.quest.json"]["base_root"]!["trinket_retention_ids"]!["items"]!["0"]!["id"]!.GetValue<string>() == "old_owned",
             "Theft and quest protection use bounded saved inventory identities, including NUL aliases.");
+        var retainedBeforeReplacement = identities["persist.quest.json"].DeepClone();
+        var storageBeforeReplacement = identities["persist.estate.json"].DeepClone();
+        TownEventSaveEditor.ReplaceCurrent(identities, catalog.Events.Single(item => item.Id == "test_free_activity"),
+            new TownEventInitializer(f.Content, 8).Initialize);
+        Assert(JsonNode.DeepEquals(retainedBeforeReplacement, identities["persist.quest.json"]) &&
+            JsonNode.DeepEquals(storageBeforeReplacement, identities["persist.estate.json"]),
+            "Already stolen trinkets remain recoverable after replacing the event without returning or deleting them.");
         var currency = Copies();
         currency["persist.estate.json"]["base_root"]!["wallet"]!["0"]!["type"] = "gold\0suffix";
         TownEventSaveEditor.ReplaceCurrent(currency, catalog.Events.Single(item => item.Id == "test_bonus_currency"),
@@ -178,16 +185,31 @@ internal static partial class ContractSuite
         definition["trinket_retention_count"] = 2;
         definition["trinket_retention_minimum_rarity"] = "event_rarity";
         void Retained(Dictionary<string, JsonObject> saves, params string[] ids) => saves["persist.quest.json"]["base_root"]!["trinket_retention_ids"] =
-            new JsonArray(ids.Select(id => (JsonNode?)JsonValue.Create(unchecked((int)HashLoc2Key(id)))).ToArray());
+            new JsonObject { ["items"] = new JsonObject(ids.Select((id, index) =>
+                KeyValuePair.Create<string, JsonNode?>(index.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                    new JsonObject { ["id"] = id, ["type"] = "trinket", ["amount"] = 1 }))) };
         Assert(Count(Apply(saves => Retained(saves, "old_owned", "protected"))) == 1, "Enough low-rarity trinkets alone cannot satisfy the rarity predicate.");
-        var retention = Apply(saves => Retained(saves, "old_owned", "quest_prize"));
+        var retention = Apply(saves =>
+        {
+            Retained(saves, "old_owned", "quest_prize");
+            // A retained death memento carries the original owner's name.
+            saves["persist.quest.json"]["base_root"]!["trinket_retention_ids"]!["items"]!["1"]!["hero_name"] = "Reynauld";
+        });
         var rewards = retention["persist.quest.json"]["base_root"]!["quests"]!["1"]!["completion_reward"]!["trinket_retention_ids"]!["items"]!;
         Assert(rewards["0"]!["id"]!.GetValue<string>() == "quest_prize" && rewards.AsObject().Count == 2,
             "Recovery rewards use retained identities in rarity order.");
+        Assert(!retention["persist.quest.json"]["base_root"]!["quests"]!["1"]!["completion_reward"]!["items_definition"]!["items"]!
+            .AsObject().Any(pair => pair.Value?["id"]?.GetValue<string>() == "quest_prize"),
+            "A limited trinket in the retained inventory must not be duplicated as an ordinary additional quest reward.");
+        Assert(retention["persist.quest.json"]["base_root"]!["trinket_retention_ids"]!["items"]!.AsObject().Count == 2,
+            "Preparing recovery rewards does not consume retained items before quest settlement.");
+        var originalRetained = retention["persist.quest.json"]["base_root"]!["trinket_retention_ids"]!["items"]!["1"]!;
+        Assert(JsonNode.DeepEquals(rewards["0"], originalRetained) && !ReferenceEquals(rewards["0"], originalRetained),
+            "A recovery reward is an independent copy of the retained instance, preserving its saved owner and item state.");
         var roundtrip = Path.Combine(root, "retention-roundtrip");
         Directory.CreateDirectory(roundtrip);
         var restored = await RoundtripDirectoryQueryAsync(roundtrip, "quest", retention["persist.quest.json"], DsonSaveCodec.CreateNative());
-        Assert(JsonNode.DeepEquals(retention["persist.quest.json"], restored), "Reward inventory and top-level retention IDs have different DSON shapes.");
+        Assert(JsonNode.DeepEquals(retention["persist.quest.json"], restored), "Recovery rewards and top-level retained items both use native inventory objects through DSON roundtrip.");
         Console.WriteLine("PASS: plot quest infestation/inventory/rarity predicates and retained reward DSON shape.");
     }
 

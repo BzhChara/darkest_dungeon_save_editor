@@ -4965,9 +4965,25 @@ Backup directory:
   </data>
   <data name="TownEvent_Tab" xml:space="preserve"><value>EVENTS</value></data>
   <data name="TownEvent_Id" xml:space="preserve"><value>Event ID</value></data>
-  <data name="TownEvent_Preview" xml:space="preserve"><value>Preview event replacement</value></data>
+  <data name="TownEvent_Preview" xml:space="preserve"><value>Preview event</value></data>
+  <data name="TownEvent_RequirementsLabel" xml:space="preserve"><value>Trigger conditions: </value></data>
+  <data name="TownEvent_RequirementsHint" xml:space="preserve"><value>These conditions govern natural event selection, which also depends on weights, priority and event frequency. Manual replacement keeps its existing checks; associated quests have separate generation requirements.</value></data>
+  <data name="TownEvent_RequirementsNone" xml:space="preserve"><value>No configured prerequisites or repeat restrictions.</value></data>
+  <data name="TownEvent_RequirementWeek" xml:space="preserve"><value>Week ≥ {0}</value></data>
+  <data name="TownEvent_RequirementDead" xml:space="preserve"><value>Dead heroes ≥ {0}</value></data>
+  <data name="TownEvent_RequirementHeroes" xml:space="preserve"><value>Available heroes at resolve level {0} or higher: ≥ {1}</value></data>
+  <data name="TownEvent_RequirementUpgrade" xml:space="preserve"><value>Purchased upgrade: {0} / {1}</value></data>
+  <data name="TownEvent_RequirementTrinkets" xml:space="preserve"><value>Trinkets in storage ≥ {0}</value></data>
+  <data name="TownEvent_RequirementEvents" xml:space="preserve"><value>All prior events: {0}</value></data>
+  <data name="TownEvent_RequirementFinishedPlots" xml:space="preserve"><value>All completed plot quests: {0}</value></data>
+  <data name="TownEvent_RequirementAvailablePlot" xml:space="preserve"><value>Plot quest on the board: {0}</value></data>
+  <data name="TownEvent_RequirementInfestation" xml:space="preserve"><value>Current infestation stage is one of: {0}</value></data>
+  <data name="TownEvent_RequirementDistricts" xml:space="preserve"><value>Loaded district building definitions ≥ {0} (construction not required)</value></data>
+  <data name="TownEvent_RequirementBuilding" xml:space="preserve"><value>Unlocked town building: {0}</value></data>
+  <data name="TownEvent_RequirementUnique" xml:space="preserve"><value>This event has not occurred before</value></data>
+  <data name="TownEvent_RequirementCooldown" xml:space="preserve"><value>Absent from the last {0} events</value></data>
   <data name="TownEvent_Select" xml:space="preserve"><value>Select an event first.</value></data>
-  <data name="TownEvent_NoCurrent" xml:space="preserve"><value>There is no current event to replace.</value></data>
+  <data name="TownEvent_Addition" xml:space="preserve"><value>No active event → {0}. Add an event for week {1} without advancing the week.</value></data>
   <data name="TownEvent_SameEvent" xml:space="preserve"><value>This event is already active.</value></data>
   <data name="TownEvent_Unresolved" xml:space="preserve"><value>The selected event or its content dependencies cannot be verified. Reload the catalog.</value></data>
   <data name="TownEvent_StaleWeek" xml:space="preserve"><value>The event does not belong to the current campaign week. Load the profile again.</value></data>
@@ -4980,7 +4996,7 @@ Backup directory:
   <data name="TownEvent_EventCandidates" xml:space="preserve"><value>New event recruitment offers: {0}.</value></data>
   <data name="TownEvent_StagecoachCandidates" xml:space="preserve"><value>Additional stagecoach candidates: {0}.</value></data>
   <data name="TownEvent_DistrictsUnlocked" xml:space="preserve"><value>District construction unlocked.</value></data>
-  <data name="TownEvent_NewRules" xml:space="preserve"><value>The new event rules replace the old ones. Previously delivered results remain intact.</value></data>
+  <data name="TownEvent_NewRules" xml:space="preserve"><value>The selected event rules apply. Previously delivered results remain intact.</value></data>
   <data name="TownEvent_Replacement" xml:space="preserve"><value>{0} → {1}. Week {2} stays unchanged.</value></data>
   <data name="TownEvent_RemovedOffers" xml:space="preserve"><value>Clear old event offers: {0} recruits, {1} revival candidates.</value></data>
   <data name="TownEvent_RevivalOffers" xml:space="preserve"><value>New revival offers: {0}.</value></data>

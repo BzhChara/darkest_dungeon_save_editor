@@ -817,6 +817,7 @@
 
         <Style TargetType="TabControl">
             <Setter Property="Background" Value="Transparent" />
+            <Setter Property="AlternationCount" Value="5" />
             <Setter Property="BorderThickness" Value="0" />
             <Setter Property="HorizontalContentAlignment" Value="Stretch" />
             <Setter Property="VerticalContentAlignment" Value="Stretch" />
@@ -828,14 +829,17 @@
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="*" />
                             </Grid.RowDefinitions>
-                            <UniformGrid x:Name="HeaderPanel"
-                                         Grid.Row="0"
-                                         Rows="1"
-                                             Columns="5"
-                                         Margin="0,0,0,5"
-                                         IsItemsHost="True"
-                                         Panel.ZIndex="1"
-                                         KeyboardNavigation.TabIndex="1" />
+                            <Grid x:Name="HeaderPanel" Grid.Row="0" Margin="0,0,0,5"
+                                  IsItemsHost="True" Panel.ZIndex="1" UseLayoutRounding="True"
+                                  SnapsToDevicePixels="True" KeyboardNavigation.TabIndex="1">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                            </Grid>
                             <ContentPresenter x:Name="PART_SelectedContentHost"
                                               Grid.Row="1"
                                               ContentSource="SelectedContent"
@@ -849,6 +853,7 @@
         </Style>
 
         <Style TargetType="TabItem">
+            <Setter Property="Grid.Column" Value="{Binding RelativeSource={RelativeSource Self}, Path=(ItemsControl.AlternationIndex)}" />
             <Setter Property="Foreground" Value="{StaticResource GoldBrush}" />
             <Setter Property="Background" Value="{StaticResource StoneBandBrush}" />
             <Setter Property="Padding" Value="18,7" />

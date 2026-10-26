@@ -17,31 +17,17 @@ internal static class TownEventSaveEditor
         var state = Root(saves, "town_event");
         var log = Root(saves, "campaign_log");
         var oldId = RequiredInt(state, "current_result_event_id");
-        var week = RequiredInt(state, "last_town_event_week");
-        if (oldId == 0 || week < 0)
-            throw new InvalidOperationException(EditorText.Get("TownEvent_NoCurrent"));
         if (oldId == next.NativeId)
             throw new InvalidOperationException(EditorText.Get("TownEvent_SameEvent"));
         if (next.HasProviderConflict || next.NativeId == 0)
             throw new InvalidOperationException(EditorText.Get("TownEvent_Unresolved"));
-        var totalWeeks = RequiredInt(log, "total_weeks");
-        if (totalWeeks != checked(week + 1))
-            throw new InvalidOperationException(EditorText.Get("TownEvent_StaleWeek"));
-        var history = state["result_event_history"] as JsonArray
-            ?? throw new InvalidDataException("Missing town event history.");
-        if (history.Count == 0 || history[^1]?.GetValue<int>() != oldId)
-            throw new InvalidDataException(EditorText.Get("TownEvent_HistoryMismatch"));
-        var chapter = JsonSupport.RequireObject(log, "chapters", week.ToString(CultureInfo.InvariantCulture));
-        var records = chapter.Select(pair => pair.Value).OfType<JsonObject>()
-            .Where(record => JsonSupport.ReadInt(record, "town_event_result_id") == oldId).ToArray();
-        if (records.Length != 1)
-            throw new InvalidDataException(EditorText.Get("TownEvent_HistoryMismatch"));
 
         var candidates = JsonSupport.RequireObject(state, "bonus_hero_entries");
         var dead = state["dead_hero_entries"] as JsonArray
             ?? throw new InvalidDataException("Missing town event revival offers.");
         var removedCandidates = candidates.Count;
         var removedDead = dead.Count;
+        var week = TownEventHistory.SetCurrent(state, log, oldId, next.NativeId);
 
         // The native load recreates rules/callbacks for current_result_event_id,
         // but does not replay StartEvent. Explicitly reset the old pending state
@@ -55,8 +41,6 @@ internal static class TownEventSaveEditor
         state["nomad_wagon_trinket_discount_available"] = false;
         state["nomad_wagon_trinket_discount"] = Float(0);
         state["current_result_event_id"] = next.NativeId;
-        history[^1] = next.NativeId;
-        records[0]["town_event_result_id"] = next.NativeId;
 
         var changes = new List<string>();
         initialize(saves, next, changes);

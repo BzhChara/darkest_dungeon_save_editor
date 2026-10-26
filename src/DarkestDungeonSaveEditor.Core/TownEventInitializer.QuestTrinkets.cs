@@ -19,27 +19,25 @@ internal sealed partial class TownEventInitializer
             throw new InvalidDataException($"Unresolved event quest rarity: {id}.");
     }
 
-    private IEnumerable<uint> OrderedRetainedTrinkets(IReadOnlyDictionary<string, JsonObject> saves) =>
-        (Root(saves, "quest")["trinket_retention_ids"] as JsonArray ?? throw new InvalidDataException("Missing retained trinket list."))
-            .Select(value => unchecked((uint)value!.GetValue<int>()))
-            .OrderBy(value => RarityRank(RequireEventTrinket(value).Rarity));
+    // Quest::Load (0x140572D33) opens this node and calls the ordinary
+    // inventory loader (0x1405D5420): despite its name, it is not an ID array.
+    private static JsonObject RetainedTrinketItems(IReadOnlyDictionary<string, JsonObject> saves) =>
+        JsonSupport.RequireObject(Root(saves, "quest"), "trinket_retention_ids", "items");
 
-    private Dictionary<uint, EventTrinket> LoadEventTrinkets()
-    {
-        var files = new Dictionary<string, JsonObject>();
-        var result = new Dictionary<uint, EventTrinket>();
-        foreach (var definition in TrinketCatalog.Load(content).Trinkets)
-        {
-            if (!files.TryGetValue(definition.SourcePath, out var root))
-                files[definition.SourcePath] = root = ReadResource(definition.SourcePath);
-            var entry = Objects(root["entries"]).FirstOrDefault(item => Hash(Text(item, "id")) == Hash(definition.Id))
-                ?? throw new InvalidDataException($"Missing effective trinket: {definition.Id}.");
-            var transforms = new[] { "transform_on_quest_complete", "transform_on_wearer_killed", "transform_on_trigger_limit_exhausted" }
-                .Select(key => Hash(Text(entry, key))).Where(hash => hash != 0).ToArray();
-            result[Hash(definition.Id)] = new EventTrinket(definition, Text(entry, "origin_dungeon"), transforms);
-        }
-        return result;
-    }
+    private static IEnumerable<JsonObject> RetainedTrinkets(IReadOnlyDictionary<string, JsonObject> saves) =>
+        Objects(RetainedTrinketItems(saves)).Where(item => JsonSupport.ReadInt(item, "amount") > 0 &&
+            NativeInventoryIdentity.HashSavedField(Text(item, "type")) == Hash("trinket"));
+
+    private IEnumerable<JsonObject> OrderedRetainedTrinkets(IReadOnlyDictionary<string, JsonObject> saves) =>
+        RetainedTrinkets(saves).OrderBy(item => RetainedTrinketRarity(item));
+
+    private int RetainedTrinketRarity(JsonObject item) =>
+        RarityRank(RequireEventTrinket(NativeInventoryIdentity.HashSavedField(Text(item, "id"))).Rarity);
+
+    private Dictionary<uint, EventTrinket> LoadEventTrinkets() =>
+        TrinketCatalog.Load(content).Trinkets.ToDictionary(definition => Hash(definition.Id),
+            definition => new EventTrinket(definition, definition.OriginDungeon,
+                definition.TransformTargetIds.Select(Hash).Where(hash => hash != 0).ToArray()));
 
     private TrinketDefinition RequireEventTrinket(uint id)
     {
@@ -84,11 +82,7 @@ internal sealed partial class TownEventInitializer
         Inventory(Root(saves, "estate")["trinkets"]?["items"]);
         foreach (var hero in RosterHeroes(saves).Where(hero => JsonSupport.ReadInt(hero, "roster.status") != 3))
             Inventory(hero["trinkets"]?["items"]);
-        foreach (var id in Root(saves, "quest")["trinket_retention_ids"]!.AsArray())
-        {
-            var hash = unchecked((uint)id!.GetValue<int>());
-            counts[hash] = checked(counts.GetValueOrDefault(hash) + 1);
-        }
+        Inventory(RetainedTrinketItems(saves));
         foreach (var quest in Objects(Root(saves, "quest")["quests"]))
             Inventory(quest["completion_reward"]?["items_definition"]?["items"]);
         // Native includes the ordinary Nomad Wagon stock, not shard stock.

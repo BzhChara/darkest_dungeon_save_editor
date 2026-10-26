@@ -166,6 +166,17 @@ internal static partial class ContractSuite
                     Assert(window.Title == expectedTitle &&
                            ((Button)window.FindName("LoadCatalogButton")).Content as string == EditorText.Get("MainWindow_021"),
                         "The actual compiled main window must resolve its title and load action in both languages.");
+                    var eventPreview = typeof(MainWindow).GetMethod("FormatTownEventPreview",
+                        System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
+                    var insertion = (string)eventPreview.Invoke(window,
+                        [new TownEventMutationPreview(0, "selected_event", 13, 0, 0, [])])!;
+                    var replacement = (string)eventPreview.Invoke(window,
+                        [new TownEventMutationPreview(17, "selected_event", 13, 2, 1, [])])!;
+                    Assert(insertion.StartsWith(EditorText.Format("TownEvent_Addition", "selected_event", 13), StringComparison.Ordinal) &&
+                        !insertion.Contains(EditorText.Format("TownEvent_RemovedOffers", 0, 0), StringComparison.Ordinal) &&
+                        replacement.StartsWith(EditorText.Format("TownEvent_Replacement", "17", "selected_event", 13), StringComparison.Ordinal) &&
+                        replacement.Contains(EditorText.Format("TownEvent_RemovedOffers", 2, 1), StringComparison.Ordinal),
+                        "Both languages distinguish adding an absent event from replacing its pending offers.");
                     var languageButton = (Button)window.FindName("LanguageButton");
                     var languageOptions = languageButton.ContextMenu.Items.OfType<MenuItem>()
                         .Where(item => item.Tag is string).ToArray();
@@ -210,6 +221,7 @@ internal static partial class ContractSuite
                             "Name column order must switch back in both directions.");
                     foreach (var size in new[] { new Size(1440, 900), new Size(1120, 720) })
                         RenderContractWindow(window, size, Path.Combine(runRoot, $"main-{language}-{size.Width}.png"));
+                    VerifyTownEventRequirementUi(window, runRoot);
                     RenderContractElement(languageButton.ContextMenu, new Size(240, 164), Path.Combine(runRoot, $"language-menu-{language}.png"));
                     var tabs = (TabControl)window.FindName("CatalogTabs");
                     for (var index = 1; index < tabs.Items.Count; index++)

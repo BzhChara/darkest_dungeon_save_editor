@@ -419,10 +419,17 @@
                                       HeadersVisibility="Column">
                                 <DataGrid.RowDetailsTemplate>
                                     <DataTemplate>
-                                        <TextBlock Margin="12,6,12,8" TextWrapping="Wrap"
-                                                   Foreground="{StaticResource TextSecondaryBrush}">
-                                            <Run Text="{Binding Description, Mode=OneWay}" />
-                                        </TextBlock>
+                                        <Grid Width="{Binding ActualWidth, RelativeSource={RelativeSource AncestorType={x:Type ScrollContentPresenter}}}">
+                                            <StackPanel Margin="12,6,12,8">
+                                                <TextBlock x:Name="EventDescriptionText" Text="{Binding Description, Mode=OneWay}"
+                                                           TextWrapping="Wrap" Foreground="{StaticResource TextSecondaryBrush}" />
+                                                <TextBlock x:Name="EventTriggerConditionsText" Margin="0,6,0,0"
+                                                           TextWrapping="Wrap" Foreground="{StaticResource TextSecondaryBrush}"
+                                                           ToolTip="{local:Text TownEvent_RequirementsHint}">
+                                                    <Run Text="{local:Text TownEvent_RequirementsLabel}" /><Run Text="{Binding TriggerConditions, Mode=OneWay}" />
+                                                </TextBlock>
+                                            </StackPanel>
+                                        </Grid>
                                     </DataTemplate>
                                 </DataGrid.RowDetailsTemplate>
                                 <DataGrid.Columns>

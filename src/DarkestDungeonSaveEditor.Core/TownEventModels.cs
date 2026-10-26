@@ -12,6 +12,7 @@ public sealed record TownEventDefinition(
     public int NativeId => unchecked((int)NativeResourceIdentity.HashCString(Id));
     public BilingualContentName LocalizedName { get; init; } = BilingualContentName.Empty;
     public BilingualContentName LocalizedDescription { get; init; } = BilingualContentName.Empty;
+    public TownEventTriggerRules TriggerRules { get; init; } = new();
     internal ContentSourceLabel? LocalizedSource { get; init; }
     public string SourceLabel => LocalizedSource?.ToString() ?? Source;
 }

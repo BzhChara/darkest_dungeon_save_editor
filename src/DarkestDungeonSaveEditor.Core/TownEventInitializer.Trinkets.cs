@@ -16,8 +16,7 @@ internal sealed partial class TownEventInitializer
                 NativeInventoryIdentity.HashSavedField(Text(item, "type")) == Hash("trinket") &&
                 !protectedIds.Contains(NativeInventoryIdentity.HashSavedField(Text(item, "id"))))
             .Select(item => NativeInventoryIdentity.HashSavedField(Text(item, "id"))).ToList();
-        var retained = quest["trinket_retention_ids"] as JsonArray
-            ?? throw new InvalidDataException("Missing retained trinket list.");
+        var retained = RetainedTrinketItems(saves);
         var count = Math.Min(Integer(effect.NumberData), candidates.Count);
         if (count < 0) throw new InvalidDataException("Negative trinket retention count.");
         for (var index = 0; index < count; index++)
@@ -33,7 +32,9 @@ internal sealed partial class TownEventInitializer
             var value = (JsonObject)entry.Value!;
             var amount = TownEventSaveEditor.RequiredInt(value, "amount");
             if (amount == 1) storage.Remove(entry.Key); else value["amount"] = amount - 1;
-            retained.Add(unchecked((int)id));
+            // Native 0x14058EE49 creates a fresh amount-one trinket instance
+            // before adding it to the retention inventory at 0x14058EE5D.
+            retained[NextKey(retained)] = TrinketSaveEditor.CreatePristineInstance(RequireEventTrinket(id));
         }
         changes.Add(EditorText.Format("TownEvent_StolenTrinkets", count));
     }

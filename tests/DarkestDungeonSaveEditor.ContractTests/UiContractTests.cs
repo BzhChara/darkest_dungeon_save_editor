@@ -679,7 +679,7 @@ internal static partial class ContractSuite
                 element.Attribute("TargetType")?.Value == "TabItem" &&
                 element.Attribute(xamlNamespace) is null);
         var catalogTabHeaderPanel = appXaml
-            .Descendants(presentationNamespace + "UniformGrid")
+            .Descendants(presentationNamespace + "Grid")
             .Single(element => element.Attribute(xamlName)?.Value == "HeaderPanel");
         var tabHeaderPresenter = tabItemStyle
             .Descendants(presentationNamespace + "ContentPresenter")
@@ -693,8 +693,8 @@ internal static partial class ContractSuite
             ReadStyleSetter(tabItemStyle, "VerticalContentAlignment") == "Stretch" &&
             tabHeaderPresenter.Attribute("HorizontalAlignment")?.Value == "Center" &&
             tabHeaderPresenter.Attribute("VerticalAlignment")?.Value == "Center" &&
-            catalogTabHeaderPanel.Attribute("Rows")?.Value == "1" &&
-            catalogTabHeaderPanel.Attribute("Columns")?.Value == "5" &&
+            catalogTabHeaderPanel.Descendants(presentationNamespace + "ColumnDefinition").Count() == 5 &&
+            catalogTabHeaderPanel.Descendants(presentationNamespace + "ColumnDefinition").All(column => column.Attribute("Width")?.Value == "*") &&
             catalogTabHeaderPanel.Attribute("Margin")?.Value == "0,0,0,5" &&
             !tabItemStyle.Descendants(presentationNamespace + "Trigger")
                 .Any(trigger => trigger.Attribute("Property")?.Value == "IsKeyboardFocused") &&

@@ -4965,9 +4965,25 @@
   </data>
   <data name="TownEvent_Tab" xml:space="preserve"><value>事件 / EVENTS</value></data>
   <data name="TownEvent_Id" xml:space="preserve"><value>事件 ID</value></data>
-  <data name="TownEvent_Preview" xml:space="preserve"><value>预览事件替换</value></data>
+  <data name="TownEvent_Preview" xml:space="preserve"><value>生成事件安全预览</value></data>
+  <data name="TownEvent_RequirementsLabel" xml:space="preserve"><value>触发条件：</value></data>
+  <data name="TownEvent_RequirementsHint" xml:space="preserve"><value>这些条件用于游戏自然选取事件，抽取还受权重、优先级和事件频率影响。手动替换沿用现有检查；附带任务另有生成条件。</value></data>
+  <data name="TownEvent_RequirementsNone" xml:space="preserve"><value>未配置前置条件或重复触发限制。</value></data>
+  <data name="TownEvent_RequirementWeek" xml:space="preserve"><value>周数 ≥ {0}</value></data>
+  <data name="TownEvent_RequirementDead" xml:space="preserve"><value>死亡英雄 ≥ {0} 人</value></data>
+  <data name="TownEvent_RequirementHeroes" xml:space="preserve"><value>意志等级 {0} 级及以上的可用英雄 ≥ {1} 人</value></data>
+  <data name="TownEvent_RequirementUpgrade" xml:space="preserve"><value>已购买升级：{0} / {1}</value></data>
+  <data name="TownEvent_RequirementTrinkets" xml:space="preserve"><value>仓库饰品 ≥ {0} 件</value></data>
+  <data name="TownEvent_RequirementEvents" xml:space="preserve"><value>已发生以下全部事件：{0}</value></data>
+  <data name="TownEvent_RequirementFinishedPlots" xml:space="preserve"><value>已完成以下全部剧情任务：{0}</value></data>
+  <data name="TownEvent_RequirementAvailablePlot" xml:space="preserve"><value>任务板已有剧情任务：{0}</value></data>
+  <data name="TownEvent_RequirementInfestation" xml:space="preserve"><value>当前感染阶段属于以下之一：{0}</value></data>
+  <data name="TownEvent_RequirementDistricts" xml:space="preserve"><value>已加载的区域建筑定义 ≥ {0} 种（无需建成）</value></data>
+  <data name="TownEvent_RequirementBuilding" xml:space="preserve"><value>已解锁城镇建筑：{0}</value></data>
+  <data name="TownEvent_RequirementUnique" xml:space="preserve"><value>该事件此前未发生过</value></data>
+  <data name="TownEvent_RequirementCooldown" xml:space="preserve"><value>最近 {0} 次事件中没有该事件</value></data>
   <data name="TownEvent_Select" xml:space="preserve"><value>请先选择事件。</value></data>
-  <data name="TownEvent_NoCurrent" xml:space="preserve"><value>当前没有可替换的事件。</value></data>
+  <data name="TownEvent_Addition" xml:space="preserve"><value>无当前事件 → {0}。在第 {1} 周新增事件，不推进周数。</value></data>
   <data name="TownEvent_SameEvent" xml:space="preserve"><value>该事件已经是当前事件。</value></data>
   <data name="TownEvent_Unresolved" xml:space="preserve"><value>所选事件或其内容依赖无法验证，请重新载入内容目录。</value></data>
   <data name="TownEvent_StaleWeek" xml:space="preserve"><value>事件不属于当前周，请重新载入存档。</value></data>
@@ -4980,7 +4996,7 @@
   <data name="TownEvent_EventCandidates" xml:space="preserve"><value>新事件招募候选：{0}。</value></data>
   <data name="TownEvent_StagecoachCandidates" xml:space="preserve"><value>新增马车候选：{0}。</value></data>
   <data name="TownEvent_DistrictsUnlocked" xml:space="preserve"><value>已解锁区域建筑。</value></data>
-  <data name="TownEvent_NewRules" xml:space="preserve"><value>新事件规则替换旧规则，已经进入其他系统的结果予以保留。</value></data>
+  <data name="TownEvent_NewRules" xml:space="preserve"><value>所选事件的规则生效，已经进入其他系统的结果予以保留。</value></data>
   <data name="TownEvent_Replacement" xml:space="preserve"><value>{0} → {1}。保持第 {2} 周不变。</value></data>
   <data name="TownEvent_RemovedOffers" xml:space="preserve"><value>清除旧事件未领取的候选：招募 {0} 人，复活 {1} 人。</value></data>
   <data name="TownEvent_RevivalOffers" xml:space="preserve"><value>新复活候选：{0} 人。</value></data>

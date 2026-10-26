@@ -97,7 +97,11 @@ internal static partial class ContractSuite
             ((TextBox)Get("CopiesTextBox")!).Text = "4321";
             Call("Preview_Click", window, new RoutedEventArgs());
             var deadline = DateTime.UtcNow.AddSeconds(60);
-            while ((int)Get("_busyDepth")! > 0 && DateTime.UtcNow < deadline) await Task.Delay(15);
+            // Preview awaits the profile precheck before entering its busy phase.
+            while (((bool)Get("_checkingProfileOperation")! || (int)Get("_busyDepth")! > 0) && DateTime.UtcNow < deadline)
+                await Task.Delay(15);
+            Assert(!(bool)Get("_checkingProfileOperation")! && (int)Get("_busyDepth")! == 0,
+                "The desktop preview must finish both its precheck and preparation before the timeout: " + Log());
             var prepared = Get("_preparedQuantityItemEdit") as PreparedQuantityItemEdit;
             var service = Get("_editService") as SaveEditService;
             Assert(prepared is not null && service is not null && ((Button)Get("ApplyButton")!).IsEnabled,

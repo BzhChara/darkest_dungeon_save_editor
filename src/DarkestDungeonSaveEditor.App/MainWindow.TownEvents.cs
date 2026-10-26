@@ -19,6 +19,7 @@ public partial class MainWindow
         public string EnglishName => FormatLocalizedName(Definition.LocalizedName.English);
         public string Source => Definition.SourceLabel;
         public string Description => EditorText.ContentName(Definition.LocalizedDescription, Definition.Id);
+        public string TriggerConditions => Definition.TriggerRules.Describe();
     }
 
     private void FilterEvents(string keyword)
@@ -51,10 +52,13 @@ public partial class MainWindow
     {
         var old = _allEvents.FirstOrDefault(item => item.NativeId == preview.OldEventId);
         var next = _allEvents.FirstOrDefault(item => item.Id == preview.NewEventId);
-        return EditorText.Format("TownEvent_Replacement", old is null ? preview.OldEventId.ToString() :
-                EditorText.ContentName(old.LocalizedName, old.Id), next is null ? preview.NewEventId :
-                EditorText.ContentName(next.LocalizedName, next.Id), preview.Week) + Environment.NewLine +
+        var nextName = next is null ? preview.NewEventId : EditorText.ContentName(next.LocalizedName, next.Id);
+        var summary = preview.OldEventId == 0
+            ? EditorText.Format("TownEvent_Addition", nextName, preview.Week)
+            : EditorText.Format("TownEvent_Replacement", old is null ? preview.OldEventId.ToString() :
+                EditorText.ContentName(old.LocalizedName, old.Id), nextName, preview.Week);
+        return summary + Environment.NewLine + (preview.OldEventId == 0 ? string.Empty :
             EditorText.Format("TownEvent_RemovedOffers", preview.RemovedEventCandidates, preview.RemovedRevivalOffers) +
-            Environment.NewLine + string.Join(Environment.NewLine, preview.Changes);
+            Environment.NewLine) + string.Join(Environment.NewLine, preview.Changes);
     }
 }

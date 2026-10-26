@@ -18,6 +18,7 @@ internal static partial class ContractSuite
             Path.Combine(fixture.Content.Profile.ProfileDirectory, "persist.game.json"), null);
         var content = await ActiveContentResolver.ResolveAsync(fixture.Content.Profile, gameDirectory, null, codec, Path.Combine(root, "native-resolve"));
         var events = TownEventCatalog.Load(content);
+        VerifyInstalledEventTriggerRules(events);
         var heroes = HeroClassCatalog.Load(content);
         var crusader = heroes.HeroClasses.Single(hero => hero.Id == "crusader");
         var candidate = StagecoachHeroCandidateFactory.Generate(heroes, crusader, 42, 6, []).Candidate;

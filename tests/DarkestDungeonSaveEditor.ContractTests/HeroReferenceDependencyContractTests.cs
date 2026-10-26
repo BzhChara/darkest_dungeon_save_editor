@@ -186,7 +186,7 @@ internal static partial class ContractSuite
         WriteMultiMash(game, "shared/buffs/a.buffs.json", ReferenceHpBuff("Az", 0.5));
         WriteMultiMash(game, "shared/quirk/a.quirk_library.json", ReferenceQuirks("buffs", "Az"));
         WriteMultiMash(f.Content.Profile.ProfileDirectory, "persist.game.json", """
-            {"base_root":{"inraid":false,"game_mode":"base","applied_ugcs_1_0":{
+            {"base_root":{"inraid":false,"raiddungeon":"none","game_mode":"base","applied_ugcs_1_0":{
                 "0":{"name":"Unavailable Buff Provider","source":"mod_local_source"}}}}
             """);
         var service = await SeedReferenceHeroProfileAsync(root, f.Content.Profile, codec);

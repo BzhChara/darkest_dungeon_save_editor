@@ -42,9 +42,9 @@ The [native C# codec](docs/dson-codec-migration.md) is the default throughout de
 
 ### Current town event (unreleased source)
 
-The **Events** tab is between **Trinkets** and **Heroes**. In town, select an event from the active content, generate a preview, and apply it to replace the current event without advancing the campaign week. Event replacement and hero generation are both unavailable during an expedition.
+The **Events** tab is between **Trinkets** and **Heroes**. In town, select an event from the active content, generate a preview, and apply it to replace the current event or add one when none is active. Neither operation advances the campaign week. Event editing and hero generation are both unavailable during an expedition.
 
-Replacement removes the old event's pending recruitment/revival offers, unused quotas and event-only interaction state. It preserves results already delivered to other systems: stagecoach candidates, roster heroes, existing quests, inventory, currency, cures, unlocks and settled progression. Existing quests are not failed or abandoned. The new event initializes its one-time results; later recruitment, interaction and departure effects remain game-managed. See [Town event replacement](docs/town-events.md) for lifecycle details, validation coverage and limitations.
+Replacement removes the old event's pending recruitment/revival offers, unused quotas and event-only interaction state. It preserves results already delivered to other systems: stagecoach candidates, roster heroes, existing quests, inventory, currency, cures, unlocks and settled progression. Existing quests are not failed or abandoned. The new event initializes its one-time results; later recruitment, interaction and departure effects remain game-managed. See [Town event editing](docs/town-events.md) for lifecycle details, validation coverage and limitations.
 
 ### Items and trinkets
 

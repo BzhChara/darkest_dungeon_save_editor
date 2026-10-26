@@ -4,6 +4,13 @@ namespace DarkestDungeonSaveEditor.Core;
 
 public static class TrinketCatalog
 {
+    private static readonly string[] TransformFieldNames =
+    [
+        "transform_on_quest_complete",
+        "transform_on_wearer_killed",
+        "transform_on_trigger_limit_exhausted"
+    ];
+
     private static readonly string[] StatefulFieldNames =
     [
         "quest_uses",
@@ -185,7 +192,13 @@ public static class TrinketCatalog
                     providerSources)
                 {
                     QuestUses = questUses,
-                    TriggerLimit = triggerLimit
+                    TriggerLimit = triggerLimit,
+                    // Keep event reward metadata on the same admitted entry as
+                    // the counters. Re-reading the first raw ID can revive an
+                    // earlier entry discarded for missing class/Buff dependencies.
+                    OriginDungeon = NativeJsonReader.ReadString(entry, "origin_dungeon"),
+                    TransformTargetIds = TransformFieldNames.Select(name => NativeJsonReader.ReadString(entry, name))
+                        .Where(target => target.Length > 0).ToArray()
                 };
 
                 parsed.Add(definition);

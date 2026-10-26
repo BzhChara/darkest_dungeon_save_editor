@@ -280,6 +280,8 @@ public sealed record TrinketDefinition(
     }
     public int? QuestUses { get; init; }
     public int? TriggerLimit { get; init; }
+    public string OriginDungeon { get; init; } = string.Empty;
+    public IReadOnlyList<string> TransformTargetIds { get; init; } = [];
     public string SaveIdentityIssue => NativeInventoryIdentity.GetSaveIssue("trinket", Id);
 }
 

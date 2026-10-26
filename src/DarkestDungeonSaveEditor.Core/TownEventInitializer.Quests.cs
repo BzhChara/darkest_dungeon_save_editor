@@ -8,12 +8,14 @@ internal sealed partial class TownEventInitializer
     private readonly HashSet<uint> _generatedProgressionDungeons = [];
     private readonly HashSet<uint> _generatedRetentionDungeons = [];
 
+    private JsonObject[] ReadPlotQuestDefinitions() => ReadResources("campaign/quest", NativeReferenceJsonKind.PlotQuests)
+        .SelectMany(root => Objects(root["plot_quests"]))
+        .GroupBy(item => Hash(Text(item, "id"))).Select(group => group.First()).ToArray();
+
     private void AddPlotQuests(IReadOnlyDictionary<string, JsonObject> saves, IReadOnlyList<TownEventEffect> effects, List<string> changes)
     {
         if (effects.Count == 0) return;
-        var definitions = ReadResources("campaign/quest", NativeReferenceJsonKind.PlotQuests)
-            .SelectMany(root => Objects(root["plot_quests"]))
-            .GroupBy(item => Hash(Text(item, "id"))).Select(group => group.First()).ToArray();
+        var definitions = ReadPlotQuestDefinitions();
         var requested = effects.Select(effect => Hash(effect.StringData)).ToHashSet();
         foreach (var effect in effects)
             if (!definitions.Any(item => Hash(Text(item, "id")) == Hash(effect.StringData)))
@@ -22,6 +24,17 @@ internal sealed partial class TownEventInitializer
         // duplicate effect must not create a second copy or change precedence.
         foreach (var definition in definitions.Where(item => requested.Contains(Hash(Text(item, "id")))))
             AddPlotQuest(saves, definition, changes);
+    }
+
+    private void ReserveExistingRecoveryQuests(IReadOnlyDictionary<string, JsonObject> saves)
+    {
+        // A mid-week replacement keeps the existing board. Do not append a
+        // second recovery quest for the same dungeon or rewrite its rewards.
+        // A crow quest with an ordinary trinket reward does not reserve this slot.
+        foreach (var quest in Objects(Root(saves, "quest")["quests"]))
+            if (Objects(quest["completion_reward"]?["trinket_retention_ids"]?["items"])
+                .Any(item => JsonSupport.ReadInt(item, "amount") > 0))
+                _generatedRetentionDungeons.Add(Hash(Text(quest, "dungeon")));
     }
 
     private void AddPlotQuest(IReadOnlyDictionary<string, JsonObject> saves, JsonObject definition, List<string> changes)
@@ -83,10 +96,11 @@ internal sealed partial class TownEventInitializer
         if (retentionCount > 0)
         {
             var rewards = new JsonObject();
-            foreach (var idHash in OrderedRetainedTrinkets(saves).Take(retentionCount))
+            foreach (var retained in OrderedRetainedTrinkets(saves).Take(retentionCount))
             {
-                var trinket = RequireEventTrinket(idHash);
-                rewards[NextKey(rewards)] = TrinketSaveEditor.CreatePristineInstance(trinket);
+                // Native 0x14057726C-0x140577280 copies the existing inventory
+                // instance, preserving counters and other saved item state.
+                rewards[NextKey(rewards)] = retained.DeepClone();
             }
             // The top-level retention list remains unchanged until settlement.
             if (rewards.Count > 0) reward["trinket_retention_ids"] = new JsonObject { ["items"] = rewards };
@@ -146,16 +160,15 @@ internal sealed partial class TownEventInitializer
             var highestLevel = Math.Max(0, Heroes.ResolveLevelThresholds.Count(threshold => threshold <= highestXp) - 1);
             if (highestLevel < requiredHeroLevel) return false;
         }
-        var retained = Root(saves, "quest")["trinket_retention_ids"] as JsonArray;
         var requiredRetained = JsonSupport.ReadInt(definition, "trinket_retention_count") ?? 0;
-        if (requiredRetained > (retained?.Count ?? 0)) return false;
+        if (requiredRetained > 0 && requiredRetained > RetainedTrinkets(saves).Count()) return false;
         if (requiredRetained > 0)
         {
             if (_generatedRetentionDungeons.Contains(dungeonHash)) return false;
             var threshold = RarityRank(Text(definition, "trinket_retention_minimum_rarity"));
             // Lower rarity indices are more valuable. The native predicate
             // requires at least one retained trinket at the minimum rarity.
-            if (!OrderedRetainedTrinkets(saves).Any(value => RarityRank(RequireEventTrinket(value).Rarity) <= threshold)) return false;
+            if (!RetainedTrinkets(saves).Any(item => RetainedTrinketRarity(item) <= threshold)) return false;
         }
         var infestationDependency = Hash(Text(definition, "infestation_sequence_element_dependency"));
         if (infestationDependency != 0)

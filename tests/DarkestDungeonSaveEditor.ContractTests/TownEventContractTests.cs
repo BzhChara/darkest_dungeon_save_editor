@@ -94,7 +94,7 @@ internal static partial class ContractSuite
                 "heirloom_gain_multiplier":2.0,"nomad_wagon_trinket_discount_available":true,"nomad_wagon_trinket_discount":0.25,
                 "non_rolled_additional_chances":{"keep":{"chance":0.5}}}}
                 """),
-            ["persist.campaign_log.json"] = Save("""{"base_root":{"total_weeks":5,"chapters":{"4":{"0":{"town_event_result_id":17},"1":{"keep":"already settled"}}}}}"""),
+            ["persist.campaign_log.json"] = Save("""{"base_root":{"total_weeks":5,"chapters":{"4":{"chapterIndex":4,"0":{"rtti":844919810,"town_event_result_id":17},"1":{"keep":"already settled"}}}}}"""),
             ["persist.estate.json"] = Save("""
                 {"base_root":{"wallet":{"0":{"type":"gold","amount":100}},"estate_items":{"items":{"0":{"id":"keep","type":"estate","amount":7}}},
                 "trinkets":{"items":{"0":{"id":"old_owned","type":"trinket","amount":1},"1":{"id":"protected","type":"trinket","amount":1}}}}}
@@ -108,7 +108,7 @@ internal static partial class ContractSuite
             ["persist.upgrades.json"] = Save("""{"base_root":{"purchases":{"0":{"instance_number":0,"tree_id":0,"requirement_code":"0","is_purchased":true}}}}"""),
             ["persist.quest.json"] = Save("""
                 {"base_root":{"quests":{"0":{"id":"old_event_quest","keep":"do not settle or remove","completion_reward":{"items_definition":{"items":{"0":{"id":"protected","type":"trinket","amount":1}}}}}},
-                "trinket_retention_ids":[],"plot_quest_total":77}}
+                "trinket_retention_ids":{"items":{}},"plot_quest_total":77}}
                 """),
             ["persist.progression.json"] = Save("""{"base_root":{"completed_plot_quests_data":{},"dungeon":{},"keep":"settled progress"}}""")
         };
@@ -159,7 +159,7 @@ internal static partial class ContractSuite
             var log = saves["persist.campaign_log.json"]["base_root"]!;
             Assert(state["current_result_event_id"]!.GetValue<int>() == selected.NativeId && state["last_town_event_week"]!.GetValue<int>() == 4 &&
                    state["result_event_history"]!.AsArray().Select(value => value!.GetValue<int>()).SequenceEqual([12, selected.NativeId]) &&
-                   log["total_weeks"]!.GetValue<int>() == 5 && log["chapters"]!["4"]!.AsObject().Count == 2,
+                   log["total_weeks"]!.GetValue<int>() == 5 && log["chapters"]!["4"]!.AsObject().Count == 3,
                 test.Type + ": replacement must edit the existing occurrence without adding time/history.");
             Assert(!state["bonus_hero_entries"]!.AsObject().ContainsKey("90") &&
                    JsonNode.DeepEquals(log["chapters"]!["4"]!["1"], fixture.Saves["persist.campaign_log.json"]["base_root"]!["chapters"]!["4"]!["1"]),
@@ -176,8 +176,12 @@ internal static partial class ContractSuite
             Console.WriteLine("PASS: town event " + test.Type);
         }
         await VerifyEventTransactionsAsync(root, fixture, catalog);
+        await VerifyTownEventHistoryAsync(Path.Combine(root, "history"));
+        await VerifyTownEventTriggerRulesAsync(Path.Combine(root, "trigger-rules"));
         await VerifyEventBoundariesAsync(Path.Combine(root, "boundaries"));
         await VerifyEventQuestDependenciesAsync(Path.Combine(root, "quest-dependencies"));
+        await VerifyEventQuestGenerationScopeAsync(Path.Combine(root, "quest-generation-scope"));
+        await VerifyEventTrinketDefinitionSelectionAsync(Path.Combine(root, "trinket-definitions"));
         await VerifyOrdinaryEventRecruitRoutingAsync(Path.Combine(root, "ordinary-routing"));
         await VerifyEventRecruitSingletonScopeAsync(Path.Combine(root, "singleton-scope"));
     }
@@ -221,7 +225,9 @@ internal static partial class ContractSuite
         }
         if (type == "trinket_retention_add_from_storage")
             Assert(Root("estate")["trinkets"]!["items"]!.AsObject().Single().Value!["id"]!.GetValue<string>() == "protected" &&
-                   Root("quest")["trinket_retention_ids"]!.AsArray().Single()!.GetValue<int>() == HashLoc2Key("old_owned"), "Theft protects existing quest rewards and stores recoverable identities.");
+                   Root("quest")["trinket_retention_ids"]!["items"]!["0"]!["id"]!.GetValue<string>() == "old_owned" &&
+                   Root("quest")["trinket_retention_ids"]!["items"]!["0"]!["amount"]!.GetValue<int>() == 1,
+                   "Theft protects existing quest rewards and stores a recoverable inventory instance.");
         if (type == "remove_vampire")
         {
             var quirks = Root("roster")["heroes"]!.AsObject().Select(pair =>
