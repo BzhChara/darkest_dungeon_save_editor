@@ -101,7 +101,6 @@ internal sealed partial class TownEventInitializer(ActiveContentSnapshot content
         // Event editing only creates explicitly requested plots. The separate
         // weekly recovery-quest scan is not part of starting or replacing an event.
         AddPlotQuests(saves, definition.Effects.Where(effect => EffectType(effect) == "plot_quest").ToArray(), changes);
-        changes.Add(EditorText.Get("TownEvent_NewRules"));
     }
 
     private string ResolveCurrency(IReadOnlyDictionary<string, JsonObject> saves, string id)

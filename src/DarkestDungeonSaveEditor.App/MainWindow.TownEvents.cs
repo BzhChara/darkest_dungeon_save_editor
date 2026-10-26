@@ -57,8 +57,10 @@ public partial class MainWindow
             ? EditorText.Format("TownEvent_Addition", nextName, preview.Week)
             : EditorText.Format("TownEvent_Replacement", old is null ? preview.OldEventId.ToString() :
                 EditorText.ContentName(old.LocalizedName, old.Id), nextName, preview.Week);
-        return summary + Environment.NewLine + (preview.OldEventId == 0 ? string.Empty :
-            EditorText.Format("TownEvent_RemovedOffers", preview.RemovedEventCandidates, preview.RemovedRevivalOffers) +
-            Environment.NewLine) + string.Join(Environment.NewLine, preview.Changes);
+        var lines = new List<string> { summary };
+        if (preview.OldEventId != 0)
+            lines.Add(EditorText.Format("TownEvent_RemovedOffers", preview.RemovedEventCandidates, preview.RemovedRevivalOffers));
+        lines.AddRange(preview.Changes);
+        return string.Join(Environment.NewLine, lines);
     }
 }

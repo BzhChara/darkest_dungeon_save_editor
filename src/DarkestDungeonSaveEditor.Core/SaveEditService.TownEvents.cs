@@ -55,7 +55,10 @@ public sealed partial class SaveEditService
         foreach (var name in TownEventSaveNames.Where(name => saves.ContainsKey(name))
                      .OrderBy(name => name == "persist.town_event.json" ? 1 : 0))
         {
-            if (JsonNode.DeepEquals(originals[name], saves[name])) continue;
+            // Reinitializing the same event can leave its identity/history intact.
+            // Keep both required event files in the guarded transaction anyway.
+            if (name is not ("persist.town_event.json" or "persist.campaign_log.json") &&
+                JsonNode.DeepEquals(originals[name], saves[name])) continue;
             var source = Path.Combine(workspace, "source", name);
             var proposed = Path.Combine(workspace, "proposed", name);
             var encoded = Path.Combine(workspace, "encoded", name);

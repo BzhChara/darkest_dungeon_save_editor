@@ -46,9 +46,10 @@ internal sealed partial class TownEventInitializer
             changes.Add(EditorText.Format("TownEvent_QuestAlreadyPresent", id));
             return;
         }
-        if (!PlotQuestEligible(saves, definition))
+        var unavailable = PlotQuestUnavailableReason(saves, definition);
+        if (unavailable.Length > 0)
         {
-            changes.Add(EditorText.Format("TownEvent_QuestNotEligible", id));
+            changes.Add(EditorText.Format("TownEvent_QuestNotEligible", id, unavailable));
             return;
         }
         var template = definition["quest"] as JsonObject ?? throw new InvalidDataException($"Missing quest template: {id}.");
@@ -126,29 +127,33 @@ internal sealed partial class TownEventInitializer
         changes.Add(EditorText.Format("TownEvent_QuestCreated", id));
     }
 
-    private bool PlotQuestEligible(IReadOnlyDictionary<string, JsonObject> saves, JsonObject definition)
+    private string PlotQuestUnavailableReason(IReadOnlyDictionary<string, JsonObject> saves, JsonObject definition)
     {
-        if (!Flag(definition, "is_enabled", true)) return false;
-        var dungeonHash = Hash(Text(definition["quest"]!.AsObject(), "dungeon"));
-        if (Flag(definition, "is_progression", false) && _generatedProgressionDungeons.Contains(dungeonHash)) return false;
+        if (!Flag(definition, "is_enabled", true)) return EditorText.Get("TownEvent_QuestDisabled");
+        var dungeon = Text(definition["quest"]!.AsObject(), "dungeon");
+        var dungeonHash = Hash(dungeon);
+        if (Flag(definition, "is_progression", false) && _generatedProgressionDungeons.Contains(dungeonHash))
+            return EditorText.Format("TownEvent_QuestProgressionReserved", dungeon);
         var progression = Root(saves, "progression");
         var completed = Objects(progression["completed_plot_quests_data"])
             .Select(item => unchecked((uint)TownEventSaveEditor.RequiredInt(item, "plot_quest_id"))).ToHashSet();
         var id = Hash(Text(definition, "id"));
         if (completed.Contains(id) && (!Flag(definition, "is_repeatable", false) || Flag(definition, "is_progression", false)))
-            return false;
-        var dependency = Hash(Text(definition, "plot_quest_dependency"));
-        if (dependency != 0 && !completed.Contains(dependency)) return false;
+            return EditorText.Get(!Flag(definition, "is_repeatable", false)
+                ? "TownEvent_QuestCompletedNonRepeatable" : "TownEvent_QuestCompletedProgression");
+        var dependencyId = Text(definition, "plot_quest_dependency");
+        var dependency = Hash(dependencyId);
+        if (dependency != 0 && !completed.Contains(dependency))
+            return EditorText.Format("TownEvent_QuestDependencyIncomplete", dependencyId);
         var requiredLevel = JsonSupport.ReadInt(definition, "dungeon_level") ?? 0;
         if (requiredLevel > 0)
         {
-            var dungeon = Text(definition["quest"]!.AsObject(), "dungeon");
             var dungeonState = (progression["dungeon"] as JsonObject)?.FirstOrDefault(pair => Hash(pair.Key) == Hash(dungeon)).Value as JsonObject;
             var xp = dungeonState is null ? 0 : JsonSupport.ReadInt(dungeonState, "xp") ?? 0;
             var thresholds = OpenResource("campaign/progression/progression.json")["dungeon"]?["level_threshold_table"] as JsonArray
                 ?? throw new InvalidDataException("Missing dungeon level thresholds.");
             var level = thresholds.Count(value => value!.GetValue<int>() <= xp) - 1;
-            if (level < requiredLevel) return false;
+            if (level < requiredLevel) return EditorText.Format("TownEvent_QuestDungeonLevel", dungeon, requiredLevel, level);
         }
         var requiredHeroLevel = JsonSupport.ReadInt(definition, "highest_hero_resolve_level_dependency") ?? 0;
         if (requiredHeroLevel > 0)
@@ -158,34 +163,54 @@ internal sealed partial class TownEventInitializer
             // incorrectly revoke a dependency after a death or dismissal.
             var highestXp = TownEventSaveEditor.RequiredInt(Root(saves, "roster"), "highest_resolve_xp");
             var highestLevel = Math.Max(0, Heroes.ResolveLevelThresholds.Count(threshold => threshold <= highestXp) - 1);
-            if (highestLevel < requiredHeroLevel) return false;
+            if (highestLevel < requiredHeroLevel)
+                return EditorText.Format("TownEvent_QuestHeroLevel", requiredHeroLevel, highestLevel);
         }
         var requiredRetained = JsonSupport.ReadInt(definition, "trinket_retention_count") ?? 0;
-        if (requiredRetained > 0 && requiredRetained > RetainedTrinkets(saves).Count()) return false;
         if (requiredRetained > 0)
         {
-            if (_generatedRetentionDungeons.Contains(dungeonHash)) return false;
-            var threshold = RarityRank(Text(definition, "trinket_retention_minimum_rarity"));
+            var retainedCount = RetainedTrinkets(saves).Count();
+            if (requiredRetained > retainedCount)
+                return EditorText.Format("TownEvent_QuestRetainedCount", requiredRetained, retainedCount);
+            if (_generatedRetentionDungeons.Contains(dungeonHash))
+                return EditorText.Format("TownEvent_QuestRecoveryReserved", dungeon);
+            var rarity = Text(definition, "trinket_retention_minimum_rarity");
+            var threshold = RarityRank(rarity);
             // Lower rarity indices are more valuable. The native predicate
             // requires at least one retained trinket at the minimum rarity.
-            if (!RetainedTrinkets(saves).Any(item => RetainedTrinketRarity(item) <= threshold)) return false;
+            if (!RetainedTrinkets(saves).Any(item => RetainedTrinketRarity(item) <= threshold))
+                return EditorText.Format("TownEvent_QuestRetainedRarity", rarity);
         }
-        var infestationDependency = Hash(Text(definition, "infestation_sequence_element_dependency"));
+        var infestationDependencyId = Text(definition, "infestation_sequence_element_dependency");
+        var infestationDependency = Hash(infestationDependencyId);
         if (infestationDependency != 0)
         {
             var sequence = Objects(OpenResource("campaign/progression/infestation.progression.json")["infestation"]?["sequence_elements"])
                 .Select(item => Hash(Text(item, "id"))).ToArray();
             var current = unchecked((uint)(JsonSupport.ReadInt(progression["infestation"] as JsonObject ?? new JsonObject(), "sequence_element_id") ?? 0));
             var dependencyIndex = Array.LastIndexOf(sequence, infestationDependency);
-            if (dependencyIndex < 0 || Array.LastIndexOf(sequence, current) <= dependencyIndex) return false;
+            if (dependencyIndex < 0) return EditorText.Format("TownEvent_QuestInfestationUnknown", infestationDependencyId);
+            if (Array.LastIndexOf(sequence, current) <= dependencyIndex)
+                return EditorText.Format("TownEvent_QuestInfestationProgress", infestationDependencyId);
         }
         if (definition["estate_inventory_dependency"] is JsonObject inventory && !Flag(inventory, "consume_on_attempt", false))
         {
             var required = InventoryAmounts(inventory["items_definition"]?["items"]);
             var available = InventoryAmounts(Root(saves, "estate")["estate_items"]?["items"]);
-            if (required.Any(pair => available.GetValueOrDefault(pair.Key) < pair.Value)) return false;
+            foreach (var pair in required)
+            {
+                var amount = available.GetValueOrDefault(pair.Key);
+                if (amount >= pair.Value) continue;
+                var item = Objects(inventory["items_definition"]?["items"]).First(item =>
+                    JsonSupport.ReadInt(item, "amount") > 0 &&
+                    NativeInventoryIdentity.HashSavedField(Text(item, "type")) == pair.Key.Type &&
+                    NativeInventoryIdentity.HashSavedField(Text(item, "id")) == pair.Key.Id);
+                var itemId = Text(item, "id");
+                var itemName = Text(item, "type") + (itemId.Length == 0 ? string.Empty : "/" + itemId);
+                return EditorText.Format("TownEvent_QuestInventoryMissing", itemName, pair.Value, amount);
+            }
         }
-        return true;
+        return string.Empty;
     }
 
     private static Dictionary<(uint Type, uint Id), long> InventoryAmounts(JsonNode? items) => Objects(items)

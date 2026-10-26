@@ -17,8 +17,6 @@ internal static class TownEventSaveEditor
         var state = Root(saves, "town_event");
         var log = Root(saves, "campaign_log");
         var oldId = RequiredInt(state, "current_result_event_id");
-        if (oldId == next.NativeId)
-            throw new InvalidOperationException(EditorText.Get("TownEvent_SameEvent"));
         if (next.HasProviderConflict || next.NativeId == 0)
             throw new InvalidOperationException(EditorText.Get("TownEvent_Unresolved"));
 
@@ -31,7 +29,8 @@ internal static class TownEventSaveEditor
 
         // The native load recreates rules/callbacks for current_result_event_id,
         // but does not replay StartEvent. Explicitly reset the old pending state
-        // and initialize the new one once; never advance a week or run quest failure.
+        // and initialize the selected event once, even when its ID is unchanged.
+        // Never advance a week or run quest failure.
         state["bonus_hero_entries"] = new JsonObject();
         state["dead_hero_entries"] = new JsonArray();
         state["event_cost"] = new JsonObject();

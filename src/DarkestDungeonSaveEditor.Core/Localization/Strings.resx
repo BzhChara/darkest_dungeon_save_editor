@@ -4984,7 +4984,6 @@ Backup directory:
   <data name="TownEvent_RequirementCooldown" xml:space="preserve"><value>Absent from the last {0} events</value></data>
   <data name="TownEvent_Select" xml:space="preserve"><value>Select an event first.</value></data>
   <data name="TownEvent_Addition" xml:space="preserve"><value>No active event → {0}. Add an event for week {1} without advancing the week.</value></data>
-  <data name="TownEvent_SameEvent" xml:space="preserve"><value>This event is already active.</value></data>
   <data name="TownEvent_Unresolved" xml:space="preserve"><value>The selected event or its content dependencies cannot be verified. Reload the catalog.</value></data>
   <data name="TownEvent_StaleWeek" xml:space="preserve"><value>The event does not belong to the current campaign week. Load the profile again.</value></data>
   <data name="TownEvent_HistoryMismatch" xml:space="preserve"><value>Current event and campaign history do not agree; no changes were written.</value></data>
@@ -4996,7 +4995,6 @@ Backup directory:
   <data name="TownEvent_EventCandidates" xml:space="preserve"><value>New event recruitment offers: {0}.</value></data>
   <data name="TownEvent_StagecoachCandidates" xml:space="preserve"><value>Additional stagecoach candidates: {0}.</value></data>
   <data name="TownEvent_DistrictsUnlocked" xml:space="preserve"><value>District construction unlocked.</value></data>
-  <data name="TownEvent_NewRules" xml:space="preserve"><value>The selected event rules apply. Previously delivered results remain intact.</value></data>
   <data name="TownEvent_Replacement" xml:space="preserve"><value>{0} → {1}. Week {2} stays unchanged.</value></data>
   <data name="TownEvent_RemovedOffers" xml:space="preserve"><value>Clear old event offers: {0} recruits, {1} revival candidates.</value></data>
   <data name="TownEvent_RevivalOffers" xml:space="preserve"><value>New revival offers: {0}.</value></data>
@@ -5006,5 +5004,18 @@ Backup directory:
   <data name="TownEvent_RevivalConditionalHp" xml:space="preserve"><value>A dead candidate has a conditional HP effect that cannot be evaluated outside its original combat.</value></data>
   <data name="TownEvent_QuestCreated" xml:space="preserve"><value>Event quest added: {0}.</value></data>
   <data name="TownEvent_QuestAlreadyPresent" xml:space="preserve"><value>Quest already exists and is preserved: {0}.</value></data>
-  <data name="TownEvent_QuestNotEligible" xml:space="preserve"><value>Quest {0} does not meet its generation requirements; no new quest was added.</value></data>
+  <data name="TownEvent_QuestNotEligible" xml:space="preserve"><value>Quest {0} was not added: {1}.</value></data>
+  <data name="TownEvent_QuestDisabled" xml:space="preserve"><value>the quest is disabled in its definition</value></data>
+  <data name="TownEvent_QuestProgressionReserved" xml:space="preserve"><value>another progression quest has already been added for {0} during this operation</value></data>
+  <data name="TownEvent_QuestCompletedNonRepeatable" xml:space="preserve"><value>the quest is already completed and cannot be repeated</value></data>
+  <data name="TownEvent_QuestCompletedProgression" xml:space="preserve"><value>the progression quest is already completed and cannot be generated again</value></data>
+  <data name="TownEvent_QuestDependencyIncomplete" xml:space="preserve"><value>prerequisite quest {0} has not been completed</value></data>
+  <data name="TownEvent_QuestDungeonLevel" xml:space="preserve"><value>the progression level of {0} is too low (requires {1}, current {2})</value></data>
+  <data name="TownEvent_QuestHeroLevel" xml:space="preserve"><value>the saved highest hero resolve level is too low (requires {0}, recorded {1})</value></data>
+  <data name="TownEvent_QuestRetainedCount" xml:space="preserve"><value>not enough lost trinkets (requires {0}, current {1})</value></data>
+  <data name="TownEvent_QuestRecoveryReserved" xml:space="preserve"><value>a trinket recovery quest for {0} already exists or has been added during this operation</value></data>
+  <data name="TownEvent_QuestRetainedRarity" xml:space="preserve"><value>no lost trinket meets the minimum rarity {0} or higher</value></data>
+  <data name="TownEvent_QuestInfestationUnknown" xml:space="preserve"><value>required infestation stage {0} is missing from the stage definitions</value></data>
+  <data name="TownEvent_QuestInfestationProgress" xml:space="preserve"><value>infestation has not advanced beyond the required stage {0}</value></data>
+  <data name="TownEvent_QuestInventoryMissing" xml:space="preserve"><value>not enough required items {0} (requires {1}, current {2})</value></data>
 </root>

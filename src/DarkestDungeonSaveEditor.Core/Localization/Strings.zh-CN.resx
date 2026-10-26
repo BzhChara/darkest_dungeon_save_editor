@@ -4984,7 +4984,6 @@
   <data name="TownEvent_RequirementCooldown" xml:space="preserve"><value>最近 {0} 次事件中没有该事件</value></data>
   <data name="TownEvent_Select" xml:space="preserve"><value>请先选择事件。</value></data>
   <data name="TownEvent_Addition" xml:space="preserve"><value>无当前事件 → {0}。在第 {1} 周新增事件，不推进周数。</value></data>
-  <data name="TownEvent_SameEvent" xml:space="preserve"><value>该事件已经是当前事件。</value></data>
   <data name="TownEvent_Unresolved" xml:space="preserve"><value>所选事件或其内容依赖无法验证，请重新载入内容目录。</value></data>
   <data name="TownEvent_StaleWeek" xml:space="preserve"><value>事件不属于当前周，请重新载入存档。</value></data>
   <data name="TownEvent_HistoryMismatch" xml:space="preserve"><value>当前事件与历史记录不一致，未写入任何修改。</value></data>
@@ -4996,7 +4995,6 @@
   <data name="TownEvent_EventCandidates" xml:space="preserve"><value>新事件招募候选：{0}。</value></data>
   <data name="TownEvent_StagecoachCandidates" xml:space="preserve"><value>新增马车候选：{0}。</value></data>
   <data name="TownEvent_DistrictsUnlocked" xml:space="preserve"><value>已解锁区域建筑。</value></data>
-  <data name="TownEvent_NewRules" xml:space="preserve"><value>所选事件的规则生效，已经进入其他系统的结果予以保留。</value></data>
   <data name="TownEvent_Replacement" xml:space="preserve"><value>{0} → {1}。保持第 {2} 周不变。</value></data>
   <data name="TownEvent_RemovedOffers" xml:space="preserve"><value>清除旧事件未领取的候选：招募 {0} 人，复活 {1} 人。</value></data>
   <data name="TownEvent_RevivalOffers" xml:space="preserve"><value>新复活候选：{0} 人。</value></data>
@@ -5006,5 +5004,18 @@
   <data name="TownEvent_RevivalConditionalHp" xml:space="preserve"><value>死亡候选带有无法在原战斗之外计算的条件生命值效果。</value></data>
   <data name="TownEvent_QuestCreated" xml:space="preserve"><value>已添加事件任务：{0}。</value></data>
   <data name="TownEvent_QuestAlreadyPresent" xml:space="preserve"><value>任务已存在，保留原样：{0}。</value></data>
-  <data name="TownEvent_QuestNotEligible" xml:space="preserve"><value>任务 {0} 不满足生成条件；未新增任务。</value></data>
+  <data name="TownEvent_QuestNotEligible" xml:space="preserve"><value>未生成任务 {0}：{1}。</value></data>
+  <data name="TownEvent_QuestDisabled" xml:space="preserve"><value>该任务在定义中被禁用</value></data>
+  <data name="TownEvent_QuestProgressionReserved" xml:space="preserve"><value>本次操作已为区域 {0} 生成了另一个进度任务</value></data>
+  <data name="TownEvent_QuestCompletedNonRepeatable" xml:space="preserve"><value>任务已完成且不可重复</value></data>
+  <data name="TownEvent_QuestCompletedProgression" xml:space="preserve"><value>该进度任务已完成，不能再次生成</value></data>
+  <data name="TownEvent_QuestDependencyIncomplete" xml:space="preserve"><value>前置任务 {0} 尚未完成</value></data>
+  <data name="TownEvent_QuestDungeonLevel" xml:space="preserve"><value>区域 {0} 的进度等级不足（需要 {1}，当前 {2}）</value></data>
+  <data name="TownEvent_QuestHeroLevel" xml:space="preserve"><value>存档记录的英雄最高意志等级不足（需要 {0}，记录为 {1}）</value></data>
+  <data name="TownEvent_QuestRetainedCount" xml:space="preserve"><value>丢失饰品数量不足（需要 {0}，当前 {1}）</value></data>
+  <data name="TownEvent_QuestRecoveryReserved" xml:space="preserve"><value>区域 {0} 已有饰品找回任务，或本次操作已为该区域生成找回任务</value></data>
+  <data name="TownEvent_QuestRetainedRarity" xml:space="preserve"><value>失物中没有稀有度为 {0} 或更高的饰品</value></data>
+  <data name="TownEvent_QuestInfestationUnknown" xml:space="preserve"><value>阶段定义中找不到任务要求的猩红诅咒蔓延阶段 {0}</value></data>
+  <data name="TownEvent_QuestInfestationProgress" xml:space="preserve"><value>猩红诅咒蔓延进度尚未超过所需阶段 {0}</value></data>
+  <data name="TownEvent_QuestInventoryMissing" xml:space="preserve"><value>所需物品 {0} 数量不足（需要 {1}，当前 {2}）</value></data>
 </root>

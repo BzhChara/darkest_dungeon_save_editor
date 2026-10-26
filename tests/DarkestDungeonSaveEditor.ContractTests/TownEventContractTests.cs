@@ -173,13 +173,42 @@ internal static partial class ContractSuite
                 Assert(JsonNode.DeepEquals(pair.Value, restored), test.Type + "/" + name + ": native DSON round trip.");
             }
             VerifyEventOutcome(test.Type, saves);
-            Console.WriteLine("PASS: town event " + test.Type);
+            var once = saves.ToDictionary(pair => pair.Key, pair => pair.Value.DeepClone());
+            var repeated = TownEventSaveEditor.ReplaceCurrent(saves, selected, new TownEventInitializer(fixture.Content, 8).Initialize);
+            Assert(repeated.OldEventId == selected.NativeId && repeated.NewEventId == selected.Id && repeated.Week == 4 &&
+                JsonNode.DeepEquals(once["persist.campaign_log.json"], saves["persist.campaign_log.json"]) &&
+                JsonNode.DeepEquals(once["persist.town_event.json"]["base_root"]!["result_event_history"], state["result_event_history"]),
+                test.Type + ": setting the same event again reuses its occurrence and week.");
+            foreach (var pair in saves)
+            {
+                var name = pair.Key.Replace("persist.", "").Replace(".json", "");
+                if (name != "town_event" && !test.Files.Contains(name))
+                    Assert(JsonNode.DeepEquals(pair.Value, once[pair.Key]), test.Type + ": repeat preserves unrelated " + name + ".");
+            }
+            if (test.Type == "plot_quest")
+                Assert(JsonNode.DeepEquals(once["persist.quest.json"], saves["persist.quest.json"]), "Repeating an event must not duplicate its existing quest.");
+            if (test.Type == "bonus_currency")
+                Assert(saves["persist.estate.json"]["base_root"]!["wallet"]!["0"]!["amount"]!.GetValue<int>() == 150,
+                    "Setting a currency event again applies its initial grant once more.");
+            if (test.Type is "bonus_recruit" or "bonus_recruit_stage_coach_level" or "quirked_recruit")
+                Assert(state["bonus_hero_entries"]!.AsObject().Count == (test.Type == "bonus_recruit" ? 2 : 1) &&
+                    !state["bonus_hero_entries"]!.AsObject().Any(pair => once["persist.town_event.json"]["base_root"]!["bonus_hero_entries"]!.AsObject().ContainsKey(pair.Key)),
+                    "Repeating recruitment replaces pending offers instead of accumulating them.");
+            if (test.Type == "stage_coach_bonus_recruits")
+                Assert(saves["persist.town.json"]["base_root"]!["buildings"]!["stage_coach"]!["store"]!["hero_recruit"]!["generated"]!.AsObject().Count == 5,
+                    "Repeating a stagecoach bonus preserves previously delivered candidates and adds the next bonus.");
+            if (test.Type == "upgrade_tag_free") Assert(state["free_upgrade_tags"]!["0"]!["amount"]!.GetValue<int>() == 3, "Repeated free quotas reset rather than accumulate.");
+            if (test.Type == "heirloom_gain_multiplier") Assert(state["heirloom_gain_multiplier"]!.GetValue<double>() == 1.25, "Repeated multipliers do not compound.");
+            if (test.Type == "nomad_wagon_trinket_discount") Assert(state["nomad_wagon_trinket_discount"]!.GetValue<double>() == .5, "Repeated discounts do not compound.");
+            Console.WriteLine("PASS: town event and same-event initialization " + test.Type);
         }
         await VerifyEventTransactionsAsync(root, fixture, catalog);
+        await VerifyRepeatedEventTransactionsAsync(Path.Combine(root, "repeat-transactions"));
         await VerifyTownEventHistoryAsync(Path.Combine(root, "history"));
         await VerifyTownEventTriggerRulesAsync(Path.Combine(root, "trigger-rules"));
         await VerifyEventBoundariesAsync(Path.Combine(root, "boundaries"));
         await VerifyEventQuestDependenciesAsync(Path.Combine(root, "quest-dependencies"));
+        await VerifyEventQuestReasonsAsync(Path.Combine(root, "quest-reasons"));
         await VerifyEventQuestGenerationScopeAsync(Path.Combine(root, "quest-generation-scope"));
         await VerifyEventTrinketDefinitionSelectionAsync(Path.Combine(root, "trinket-definitions"));
         await VerifyOrdinaryEventRecruitRoutingAsync(Path.Combine(root, "ordinary-routing"));
