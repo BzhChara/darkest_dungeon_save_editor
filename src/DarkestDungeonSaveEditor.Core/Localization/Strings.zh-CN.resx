@@ -952,7 +952,7 @@
     <comment>src/DarkestDungeonSaveEditor.App/BattleMapView.ProfileSync.cs</comment>
   </data>
   <data xml:space="preserve" name="BattleMapView_ProfileSync_002">
-    <value>地图仍在保存，稍后自动重试。</value>
+    <value>同步期间地图或副本存档发生变化。</value>
     <comment>src/DarkestDungeonSaveEditor.App/BattleMapView.ProfileSync.cs</comment>
   </data>
   <data xml:space="preserve" name="BattleRoomAttachmentSelectionDialog_001">
@@ -1680,11 +1680,11 @@
     <comment>src/DarkestDungeonSaveEditor.App/MainWindow.ProfileSync.cs</comment>
   </data>
   <data xml:space="preserve" name="MainWindow_ProfileSync_006">
-    <value>游戏仍在保存，等待完整存档后自动重试。</value>
+    <value>同步期间存档文件发生变化。</value>
     <comment>src/DarkestDungeonSaveEditor.App/MainWindow.ProfileSync.cs</comment>
   </data>
   <data xml:space="preserve" name="MainWindow_ProfileSync_007">
-    <value>资源文件仍在更新，等待完整内容后自动重试。</value>
+    <value>同步期间资源文件发生变化。</value>
     <comment>src/DarkestDungeonSaveEditor.App/MainWindow.ProfileSync.cs</comment>
   </data>
   <data xml:space="preserve" name="MainWindow_ProfileSync_008">
@@ -1692,7 +1692,7 @@
     <comment>src/DarkestDungeonSaveEditor.App/MainWindow.ProfileSync.cs</comment>
   </data>
   <data xml:space="preserve" name="MainWindow_ProfileSync_009">
-    <value>档案自动同步：档案={0}；</value>
+    <value>存档同步完成：档案={0}；</value>
     <comment>src/DarkestDungeonSaveEditor.App/MainWindow.ProfileSync.cs</comment>
   </data>
   <data xml:space="preserve" name="MainWindow_ProfileSync_010">
@@ -1712,7 +1712,7 @@
     <comment>src/DarkestDungeonSaveEditor.App/MainWindow.ProfileSync.cs</comment>
   </data>
   <data xml:space="preserve" name="MainWindow_ProfileSync_014">
-    <value>档案自动同步已恢复。</value>
+    <value>存档同步已恢复。</value>
     <comment>src/DarkestDungeonSaveEditor.App/MainWindow.ProfileSync.cs</comment>
   </data>
   <data xml:space="preserve" name="MainWindow_ProfileSync_015">
@@ -1724,7 +1724,7 @@
     <comment>src/DarkestDungeonSaveEditor.App/MainWindow.ProfileSync.cs</comment>
   </data>
   <data xml:space="preserve" name="MainWindow_ProfileSync_017">
-    <value>档案自动同步暂缓，保留上一完整快照并暂停写入：{0}</value>
+    <value>存档同步失败，已禁用修改。请重新载入存档。原因：{0}</value>
     <comment>src/DarkestDungeonSaveEditor.App/MainWindow.ProfileSync.cs</comment>
   </data>
   <data xml:space="preserve" name="MainWindow_ProfileSync_018">
@@ -2756,23 +2756,23 @@
     <comment>src/DarkestDungeonSaveEditor.Core/BattleRoomAttachmentCatalog.cs</comment>
   </data>
   <data xml:space="preserve" name="CatalogLogDiagnostics_FileIssues_001">
-    <value>遭遇槽位截取；文件={0}；.types 后存在第五项，原生只读取前四个原始槽位；</value>
+    <value>遭遇槽位截取；文件={0}；原版只读取前四个原始槽位；</value>
     <comment>src/DarkestDungeonSaveEditor.Core/CatalogLogDiagnostics.FileIssues.cs</comment>
   </data>
   <data xml:space="preserve" name="CatalogLogDiagnostics_FileIssues_002">
-    <value>后续项可能是条件字段或额外 ID，不据此判断超过四只怪物；此截取提示本身不影响候选资格</value>
+    <value>.types 后续项未作为怪物槽位读取</value>
     <comment>src/DarkestDungeonSaveEditor.Core/CatalogLogDiagnostics.FileIssues.cs</comment>
   </data>
   <data xml:space="preserve" name="CatalogLogDiagnostics_FileIssues_003">
-    <value>；涉及记录 {0} 条；位置（行/从零计的记录号）=</value>
+    <value>；涉及记录 {0} 条；位置（行/从零计的记录号；区间含首尾）=</value>
     <comment>src/DarkestDungeonSaveEditor.Core/CatalogLogDiagnostics.FileIssues.cs</comment>
   </data>
   <data xml:space="preserve" name="CatalogLogDiagnostics_FileIssues_004">
-    <value>文件访问问题；文件={0}；清单缺失与该文件的读取失败合并展示；</value>
+    <value>Mod 清单列出的文件不存在；文件={0}；</value>
     <comment>src/DarkestDungeonSaveEditor.Core/CatalogLogDiagnostics.FileIssues.cs</comment>
   </data>
   <data xml:space="preserve" name="CatalogLogDiagnostics_FileIssues_005">
-    <value>具体原因见各模块记录，不能据此判断整个 Mod 不可用</value>
+    <value>相关读取失败合并如下</value>
     <comment>src/DarkestDungeonSaveEditor.Core/CatalogLogDiagnostics.FileIssues.cs</comment>
   </data>
   <data xml:space="preserve" name="CatalogLogDiagnostics_001">
@@ -2812,7 +2812,7 @@
     <comment>src/DarkestDungeonSaveEditor.Core/CatalogLogDiagnostics.cs</comment>
   </data>
   <data xml:space="preserve" name="CatalogLogDiagnostics_010">
-    <value>其他有效译文仍按既定规则使用，不代表所有名称缺失；人物随机姓名候选另由 XML 提供</value>
+    <value>可用译文仍保留；随机姓名需读取 XML</value>
     <comment>src/DarkestDungeonSaveEditor.Core/CatalogLogDiagnostics.cs</comment>
   </data>
   <data xml:space="preserve" name="CatalogLogDiagnostics_011">
@@ -3040,15 +3040,15 @@
     <comment>src/DarkestDungeonSaveEditor.Core/ContentLocalizationCatalog.cs</comment>
   </data>
   <data xml:space="preserve" name="ContentLocalizationCatalog_002">
-    <value>名称读取器已从同一来源的其他编译表取得有效条目（LOC={0}，</value>
+    <value>本次名称读取命中的同源编译表（文件数：LOC={0}，</value>
     <comment>src/DarkestDungeonSaveEditor.Core/ContentLocalizationCatalog.cs</comment>
   </data>
   <data xml:space="preserve" name="ContentLocalizationCatalog_003">
-    <value>LOC2={0}）；不保证覆盖失败文件的所有名称</value>
+    <value>LOC2={0}）；不保证补全全部名称</value>
     <comment>src/DarkestDungeonSaveEditor.Core/ContentLocalizationCatalog.cs</comment>
   </data>
   <data xml:space="preserve" name="ContentLocalizationCatalog_004">
-    <value>本次所请求的名称中，未从同一来源的其他编译表取得有效条目；这不是其他来源或语言全部缺失的结论</value>
+    <value>本次请求未命中同源编译表</value>
     <comment>src/DarkestDungeonSaveEditor.Core/ContentLocalizationCatalog.cs</comment>
   </data>
   <data xml:space="preserve" name="ContentLocalizationCatalog_005">
@@ -3956,7 +3956,7 @@
     <comment>src/DarkestDungeonSaveEditor.Core/OfficialModManifestGenerator.cs</comment>
   </data>
   <data xml:space="preserve" name="ProfileCatalogSnapshotReader_001">
-    <value>副本入口在同步期间发生变化，稍后自动重试。</value>
+    <value>读取存档期间 persist.game.json 发生变化。</value>
     <comment>src/DarkestDungeonSaveEditor.Core/ProfileCatalogSnapshotReader.cs</comment>
   </data>
   <data xml:space="preserve" name="ProfileCatalogSnapshotReader_002">
@@ -3964,7 +3964,7 @@
     <comment>src/DarkestDungeonSaveEditor.Core/ProfileCatalogSnapshotReader.cs</comment>
   </data>
   <data xml:space="preserve" name="ProfileCatalogSnapshotReader_003">
-    <value>存档复制期间发生变化，稍后自动重试。</value>
+    <value>复制存档期间文件发生变化。</value>
     <comment>src/DarkestDungeonSaveEditor.Core/ProfileCatalogSnapshotReader.cs</comment>
   </data>
   <data xml:space="preserve" name="QuantityItemCatalog_Refresh_001">
@@ -5018,4 +5018,16 @@
   <data name="TownEvent_QuestInfestationUnknown" xml:space="preserve"><value>阶段定义中找不到任务要求的猩红诅咒蔓延阶段 {0}</value></data>
   <data name="TownEvent_QuestInfestationProgress" xml:space="preserve"><value>猩红诅咒蔓延进度尚未超过所需阶段 {0}</value></data>
   <data name="TownEvent_QuestInventoryMissing" xml:space="preserve"><value>所需物品 {0} 数量不足（需要 {1}，当前 {2}）</value></data>
+  <data xml:space="preserve" name="TrinketCatalog_IgnoredDefinition">
+    <value>跳过饰品 '{0}' 的定义：{1}；文件={2}</value>
+  </data>
+  <data xml:space="preserve" name="TrinketCatalog_MissingHeroClasses">
+    <value>未找到依赖职业：{0}</value>
+  </data>
+  <data xml:space="preserve" name="TrinketCatalog_InvalidHeroRequirements">
+    <value>hero_class_requirements 包含非字符串值</value>
+  </data>
+  <data xml:space="preserve" name="TrinketCatalog_MissingBuffs">
+    <value>未找到依赖 Buff：{0}</value>
+  </data>
 </root>

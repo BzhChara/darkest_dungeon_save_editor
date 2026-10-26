@@ -952,7 +952,7 @@ Right-click to open the action menu</value>
     <comment>src/DarkestDungeonSaveEditor.App/BattleMapView.ProfileSync.cs</comment>
   </data>
   <data xml:space="preserve" name="BattleMapView_ProfileSync_002">
-    <value>The map is still being saved. Retrying automatically shortly.</value>
+    <value>The map or raid save changed during synchronization.</value>
     <comment>src/DarkestDungeonSaveEditor.App/BattleMapView.ProfileSync.cs</comment>
   </data>
   <data xml:space="preserve" name="BattleRoomAttachmentSelectionDialog_001">
@@ -1680,11 +1680,11 @@ Backup directory:
     <comment>src/DarkestDungeonSaveEditor.App/MainWindow.ProfileSync.cs</comment>
   </data>
   <data xml:space="preserve" name="MainWindow_ProfileSync_006">
-    <value>The game is still saving. Retrying automatically when a complete save is available.</value>
+    <value>Save files changed during synchronization.</value>
     <comment>src/DarkestDungeonSaveEditor.App/MainWindow.ProfileSync.cs</comment>
   </data>
   <data xml:space="preserve" name="MainWindow_ProfileSync_007">
-    <value>Resource files are still updating. Retrying automatically when content is complete.</value>
+    <value>Resource files changed during synchronization.</value>
     <comment>src/DarkestDungeonSaveEditor.App/MainWindow.ProfileSync.cs</comment>
   </data>
   <data xml:space="preserve" name="MainWindow_ProfileSync_008">
@@ -1692,7 +1692,7 @@ Backup directory:
     <comment>src/DarkestDungeonSaveEditor.App/MainWindow.ProfileSync.cs</comment>
   </data>
   <data xml:space="preserve" name="MainWindow_ProfileSync_009">
-    <value>Profile auto-sync: profile={0};</value>
+    <value>Profile synchronized: profile={0};</value>
     <comment>src/DarkestDungeonSaveEditor.App/MainWindow.ProfileSync.cs</comment>
   </data>
   <data xml:space="preserve" name="MainWindow_ProfileSync_010">
@@ -1712,7 +1712,7 @@ Backup directory:
     <comment>src/DarkestDungeonSaveEditor.App/MainWindow.ProfileSync.cs</comment>
   </data>
   <data xml:space="preserve" name="MainWindow_ProfileSync_014">
-    <value>Profile auto-sync has recovered.</value>
+    <value>Profile synchronization has recovered.</value>
     <comment>src/DarkestDungeonSaveEditor.App/MainWindow.ProfileSync.cs</comment>
   </data>
   <data xml:space="preserve" name="MainWindow_ProfileSync_015">
@@ -1724,7 +1724,7 @@ Backup directory:
     <comment>src/DarkestDungeonSaveEditor.App/MainWindow.ProfileSync.cs</comment>
   </data>
   <data xml:space="preserve" name="MainWindow_ProfileSync_017">
-    <value>Profile auto-sync deferred; keeping the last complete snapshot and disabling writes: {0}</value>
+    <value>Profile synchronization failed; editing is disabled. Reload the profile. Reason: {0}</value>
     <comment>src/DarkestDungeonSaveEditor.App/MainWindow.ProfileSync.cs</comment>
   </data>
   <data xml:space="preserve" name="MainWindow_ProfileSync_018">
@@ -2756,23 +2756,23 @@ Backup directory:
     <comment>src/DarkestDungeonSaveEditor.Core/BattleRoomAttachmentCatalog.cs</comment>
   </data>
   <data xml:space="preserve" name="CatalogLogDiagnostics_FileIssues_001">
-    <value>Encounter slot truncation; file={0}; a fifth item follows .types, but the native reader reads only the first four original slots;</value>
+    <value>Encounter slot truncation; file={0}; the game reads only the first four original .types slots;</value>
     <comment>src/DarkestDungeonSaveEditor.Core/CatalogLogDiagnostics.FileIssues.cs</comment>
   </data>
   <data xml:space="preserve" name="CatalogLogDiagnostics_FileIssues_002">
-    <value> later items may be condition fields or extra IDs, so this does not imply more than four monsters. This notice alone does not affect eligibility</value>
+    <value> later items are not read as monster slots</value>
     <comment>src/DarkestDungeonSaveEditor.Core/CatalogLogDiagnostics.FileIssues.cs</comment>
   </data>
   <data xml:space="preserve" name="CatalogLogDiagnostics_FileIssues_003">
-    <value>; affected records={0}; locations (line/zero-based record)=</value>
+    <value>; affected records={0}; locations (line/zero-based record; ranges inclusive)=</value>
     <comment>src/DarkestDungeonSaveEditor.Core/CatalogLogDiagnostics.FileIssues.cs</comment>
   </data>
   <data xml:space="preserve" name="CatalogLogDiagnostics_FileIssues_004">
-    <value>File access issue; file={0}; missing manifest entries and read failures for this file are grouped;</value>
+    <value>File listed in the Mod manifest does not exist; file={0};</value>
     <comment>src/DarkestDungeonSaveEditor.Core/CatalogLogDiagnostics.FileIssues.cs</comment>
   </data>
   <data xml:space="preserve" name="CatalogLogDiagnostics_FileIssues_005">
-    <value> see module records for specific reasons. This does not establish that the entire Mod is unusable</value>
+    <value> related read failures are grouped below</value>
     <comment>src/DarkestDungeonSaveEditor.Core/CatalogLogDiagnostics.FileIssues.cs</comment>
   </data>
   <data xml:space="preserve" name="CatalogLogDiagnostics_001">
@@ -2812,7 +2812,7 @@ Backup directory:
     <comment>src/DarkestDungeonSaveEditor.Core/CatalogLogDiagnostics.cs</comment>
   </data>
   <data xml:space="preserve" name="CatalogLogDiagnostics_010">
-    <value> other valid translations are still used under existing rules. This does not mean all names are missing; random hero names are supplied separately by XML</value>
+    <value> valid translations remain available; random hero names require XML</value>
     <comment>src/DarkestDungeonSaveEditor.Core/CatalogLogDiagnostics.cs</comment>
   </data>
   <data xml:space="preserve" name="CatalogLogDiagnostics_011">
@@ -3040,15 +3040,15 @@ Backup directory:
     <comment>src/DarkestDungeonSaveEditor.Core/ContentLocalizationCatalog.cs</comment>
   </data>
   <data xml:space="preserve" name="ContentLocalizationCatalog_002">
-    <value>The name reader found valid entries in other compiled tables from the same source (LOC={0},</value>
+    <value>Same-source compiled tables with requested names (file counts: LOC={0},</value>
     <comment>src/DarkestDungeonSaveEditor.Core/ContentLocalizationCatalog.cs</comment>
   </data>
   <data xml:space="preserve" name="ContentLocalizationCatalog_003">
-    <value> LOC2={0}); these may not cover every name in the failed file</value>
+    <value> LOC2={0}); coverage may be incomplete</value>
     <comment>src/DarkestDungeonSaveEditor.Core/ContentLocalizationCatalog.cs</comment>
   </data>
   <data xml:space="preserve" name="ContentLocalizationCatalog_004">
-    <value>No requested names were obtained from other compiled tables in this source. This does not mean all other sources or languages are missing</value>
+    <value>No requested names were found in same-source compiled tables</value>
     <comment>src/DarkestDungeonSaveEditor.Core/ContentLocalizationCatalog.cs</comment>
   </data>
   <data xml:space="preserve" name="ContentLocalizationCatalog_005">
@@ -3956,7 +3956,7 @@ Backup directory:
     <comment>src/DarkestDungeonSaveEditor.Core/OfficialModManifestGenerator.cs</comment>
   </data>
   <data xml:space="preserve" name="ProfileCatalogSnapshotReader_001">
-    <value>The expedition entry point changed during synchronization. Retrying automatically shortly.</value>
+    <value>persist.game.json changed while reading the profile.</value>
     <comment>src/DarkestDungeonSaveEditor.Core/ProfileCatalogSnapshotReader.cs</comment>
   </data>
   <data xml:space="preserve" name="ProfileCatalogSnapshotReader_002">
@@ -3964,7 +3964,7 @@ Backup directory:
     <comment>src/DarkestDungeonSaveEditor.Core/ProfileCatalogSnapshotReader.cs</comment>
   </data>
   <data xml:space="preserve" name="ProfileCatalogSnapshotReader_003">
-    <value>The save changed during copying. Retrying automatically shortly.</value>
+    <value>Save files changed while being copied.</value>
     <comment>src/DarkestDungeonSaveEditor.Core/ProfileCatalogSnapshotReader.cs</comment>
   </data>
   <data xml:space="preserve" name="QuantityItemCatalog_Refresh_001">
@@ -5018,4 +5018,16 @@ Backup directory:
   <data name="TownEvent_QuestInfestationUnknown" xml:space="preserve"><value>required infestation stage {0} is missing from the stage definitions</value></data>
   <data name="TownEvent_QuestInfestationProgress" xml:space="preserve"><value>infestation has not advanced beyond the required stage {0}</value></data>
   <data name="TownEvent_QuestInventoryMissing" xml:space="preserve"><value>not enough required items {0} (requires {1}, current {2})</value></data>
+  <data xml:space="preserve" name="TrinketCatalog_IgnoredDefinition">
+    <value>Trinket '{0}' definition skipped: {1}; file={2}</value>
+  </data>
+  <data xml:space="preserve" name="TrinketCatalog_MissingHeroClasses">
+    <value>required hero classes not found: {0}</value>
+  </data>
+  <data xml:space="preserve" name="TrinketCatalog_InvalidHeroRequirements">
+    <value>hero_class_requirements contains non-string entries</value>
+  </data>
+  <data xml:space="preserve" name="TrinketCatalog_MissingBuffs">
+    <value>required Buffs not found: {0}</value>
+  </data>
 </root>

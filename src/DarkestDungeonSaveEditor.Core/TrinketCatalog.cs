@@ -138,24 +138,38 @@ public static class TrinketCatalog
 
                 // Native references use full C-string hashes, not literal names.
                 // Every required class must be present in the actor table.
-                var heroStates = NativeJsonReader.Array(entry, "hero_class_requirements")
+                var heroRequirements = NativeJsonReader.Array(entry, "hero_class_requirements").ToArray();
+                var heroStates = heroRequirements
                     .Select(value => value.ValueKind == JsonValueKind.String ? heroes.Contains(value.GetString()!) : false)
                     .ToArray();
                 if (heroStates.Contains(false))
                 {
-                    issues.Add($"Trinket '{id}' requires an unloaded hero class and was ignored: {path}");
+                    var reasons = new List<string>();
+                    var missingHeroes = heroRequirements
+                        .Where((value, index) => value.ValueKind == JsonValueKind.String && heroStates[index] == false)
+                        .Select(value => value.GetString()!).Distinct(StringComparer.Ordinal).ToArray();
+                    if (missingHeroes.Length > 0)
+                        reasons.Add(EditorText.Format("TrinketCatalog_MissingHeroClasses",
+                            string.Join(", ", missingHeroes.Select(value => $"'{value}'"))));
+                    if (heroRequirements.Any(value => value.ValueKind != JsonValueKind.String))
+                        reasons.Add(EditorText.Get("TrinketCatalog_InvalidHeroRequirements"));
+                    issues.Add(EditorText.Format("TrinketCatalog_IgnoredDefinition", id, string.Join("; ", reasons), path));
                     continue;
                 }
 
                 // The native loader discards entries with missing ordinary Buffs
                 // before first-ID selection. An unreadable dependency is unknown,
                 // so retain the candidate as read-only instead of choosing a later ID.
-                var buffStates = NativeJsonReader.Array(entry, "buffs")
+                var buffRequirements = NativeJsonReader.Array(entry, "buffs").ToArray();
+                var buffStates = buffRequirements
                     .Select(value => value.ValueKind == JsonValueKind.String ? buffs.Contains(value.GetString()!) : null)
                     .ToArray();
                 if (buffStates.Contains(false))
                 {
-                    issues.Add($"Trinket '{id}' references a missing Buff and was ignored: {path}");
+                    var missingBuffs = buffRequirements.Where((_, index) => buffStates[index] == false)
+                        .Select(value => value.GetString()!).Distinct(StringComparer.Ordinal);
+                    issues.Add(EditorText.Format("TrinketCatalog_IgnoredDefinition", id,
+                        EditorText.Format("TrinketCatalog_MissingBuffs", string.Join(", ", missingBuffs.Select(value => $"'{value}'"))), path));
                     continue;
                 }
                 var unresolvedBuffs = buffStates.Contains(null);

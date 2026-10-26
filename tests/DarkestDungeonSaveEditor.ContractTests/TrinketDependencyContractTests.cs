@@ -86,6 +86,7 @@ internal static partial class ContractSuite
                     "Actual DSON commits must persist the first valid definition's counters.");
             }
             await VerifyTrinketDependencyChangesAsync(f, resources);
+            if (kind == "base") VerifyTrinketDependencyDiagnostics(f.Content, resources);
             Console.WriteLine($"PASS: {kind} trinket Buff/hero dependencies, {count} selection cases, DSON counters, preview/commit/recovery guards.");
         }
         foreach (var kind in new[] { "local", "workshop" })
@@ -94,6 +95,50 @@ internal static partial class ContractSuite
             VerifyTrinketHeroProviders(Path.Combine(runRoot, "trinket-hero-providers", kind), kind);
         }
         await VerifyUnmappedTrinketSourcesAsync(Path.Combine(runRoot, "unmapped-trinket-dependencies"), codec);
+    }
+
+    private static void VerifyTrinketDependencyDiagnostics(ActiveContentSnapshot content, string resources)
+    {
+        var originalCulture = CultureInfo.CurrentUICulture;
+        try
+        {
+            WriteDependencyEntries(resources, DependencyLastPath);
+            foreach (var language in new[] { "en", "zh-CN" })
+            {
+                EditorText.Initialize(language, EditorText.SystemCulture);
+                foreach (var field in new[] { "hero_class_requirements", "buffs" })
+                {
+                    WriteDependencyEntries(resources, DependencyFirstPath,
+                        DependencyTrinket(2, field, "Az", "BE", "missing_a", "missing_b", "missing_a"));
+                    var catalog = TrinketCatalog.Load(content);
+                    var message = catalog.Issues.Single(value => value.Contains("'dependency_trinket'", StringComparison.Ordinal));
+                    var dependencyName = field == "buffs" ? "Buff" : language == "en" ? "hero classes" : "职业";
+                    Assert(catalog.Trinkets.Count == 0 &&
+                           message.Contains(dependencyName, StringComparison.Ordinal) &&
+                           message.Contains("'missing_a', 'missing_b'", StringComparison.Ordinal) &&
+                           message.Split("'missing_a'", StringSplitOptions.None).Length == 2 &&
+                           !message.Contains("'Az'", StringComparison.Ordinal) && !message.Contains("'BE'", StringComparison.Ordinal) &&
+                           message.Contains(Path.GetFullPath(Path.Combine(resources, DependencyFirstPath)), StringComparison.Ordinal),
+                        "Missing-dependency logs must name only absent IDs, deduplicate them, retain the definition path, and respect native hash aliases in both languages.");
+                }
+
+                // Invalid JSON field values test parser diagnostics, not a native event or Mod behavior.
+                var malformed = DependencyTrinket(2, "hero_class_requirements");
+                malformed["hero_class_requirements"] = new JsonArray(JsonValue.Create(7));
+                WriteDependencyEntries(resources, DependencyFirstPath, malformed);
+                var invalidHero = TrinketCatalog.Load(content);
+                Assert(invalidHero.Trinkets.Count == 0 && invalidHero.Issues.Any(value =>
+                    value.Contains(language == "en" ? "contains non-string entries" : "包含非字符串值", StringComparison.Ordinal)),
+                    "A non-string hero requirement must report malformed data rather than invent a missing class ID.");
+                var malformedBuff = DependencyTrinket(2, "buffs");
+                malformedBuff["buffs"] = new JsonArray(JsonValue.Create(7));
+                WriteDependencyEntries(resources, DependencyFirstPath, malformedBuff);
+                Assert(TrinketCatalog.Load(content).Trinkets.Single().HasProviderConflict,
+                    "A malformed Buff reference must retain the existing unresolved/read-only behavior.");
+            }
+        }
+        finally { EditorText.Initialize(originalCulture.Name, EditorText.SystemCulture); }
+        Console.WriteLine("PASS: bilingual dependency diagnostics identify missing IDs and malformed references without changing admission rules.");
     }
 
     private static async Task VerifyTrinketDependencyChangesAsync(InventoryProviderFixture f, string resources)

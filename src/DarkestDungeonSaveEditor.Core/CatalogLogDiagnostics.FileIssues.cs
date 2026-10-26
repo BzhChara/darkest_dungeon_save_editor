@@ -32,9 +32,30 @@ public static partial class CatalogLogDiagnostics
         return true;
     }
 
-    private static string FormatLocations(LogGroup group) => group.Locations.Count == 0 ? string.Empty :
-        EditorText.Format("CatalogLogDiagnostics_FileIssues_003", group.Locations.Count) +
-        string.Join(", ", group.Locations.Select(location => $"{location.Line}/{location.Record}"));
+    private static string FormatLocations(LogGroup group)
+    {
+        if (group.Locations.Count == 0) return string.Empty;
+        var ranges = new List<string>();
+        var start = group.Locations.First();
+        var end = start;
+        foreach (var location in group.Locations.Skip(1))
+        {
+            // Compress only when both coordinates advance together; gaps and
+            // multiple records on one line must retain their exact positions.
+            if ((long)location.Line == (long)end.Line + 1 && (long)location.Record == (long)end.Record + 1)
+            {
+                end = location;
+                continue;
+            }
+            ranges.Add(FormatRange(start, end));
+            start = end = location;
+        }
+        ranges.Add(FormatRange(start, end));
+        return EditorText.Format("CatalogLogDiagnostics_FileIssues_003", group.Locations.Count) + string.Join(", ", ranges);
+
+        static string FormatRange((int Line, int Record) start, (int Line, int Record) end) => start == end
+            ? $"{start.Line}/{start.Record}" : $"{start.Line}/{start.Record}–{end.Line}/{end.Record}";
+    }
 
     private static string? ReadMissingFilePath(string raw)
     {

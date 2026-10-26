@@ -106,7 +106,8 @@ internal static partial class ContractSuite
         var failure = entries.Single(entry => entry.Message.Contains(reason, StringComparison.Ordinal));
         Assert(failure.Message.Contains("人物/怪癖/姓名", StringComparison.Ordinal) &&
                failure.Message.Contains("物品", StringComparison.Ordinal) && failure.Message.Contains("饰品", StringComparison.Ordinal) &&
-               failure.Message.Contains("不代表所有名称缺失", StringComparison.Ordinal) &&
+               failure.Message.Contains("可用译文仍保留", StringComparison.Ordinal) &&
+               failure.Message.Contains("随机姓名需读取 XML", StringComparison.Ordinal) &&
                failure.Message.Contains(path, StringComparison.Ordinal),
             "Merged localization failures must retain the original file, reason and every reporting module without claiming all translations are missing.");
         var counts = CatalogLogDiagnostics.FormatSourceCounts(content with
@@ -146,6 +147,7 @@ internal static partial class ContractSuite
         VerifySessionLogContracts(runRoot);
         VerifyCatalogDiagnosticBatchContracts();
         VerifyFileIssueLogGrouping();
+        VerifyEncounterLocationRanges();
     }
 
     private static void VerifyFileIssueLogGrouping()
@@ -166,7 +168,7 @@ internal static partial class ContractSuite
                 $"Failed to read quantity-item reference file '{unreadable}': sharing violation",
                 CatalogIssueCode.EncounterSlots + "malformed" })
         ]);
-        var access = logs.Single(entry => entry.Message.Contains("文件访问问题", StringComparison.Ordinal));
+        var access = logs.Single(entry => entry.Message.Contains("Mod 清单列出的文件不存在", StringComparison.Ordinal));
         var slots = logs.Single(entry => entry.Level == DiagnosticLogLevel.Information);
         Assert(logs.Count == 5 && access.Level == DiagnosticLogLevel.Warning &&
                access.Message.Contains(missing, StringComparison.Ordinal) &&
@@ -177,45 +179,66 @@ internal static partial class ContractSuite
             "A missing file and dependent failures must be grouped across modules/case variants while retaining every reason and original issue.");
         Assert(slots.Message.Contains("涉及记录 2 条", StringComparison.Ordinal) &&
                slots.Message.Contains("7/3, 7/4", StringComparison.Ordinal) &&
-               slots.Message.Contains("不据此判断超过四只怪物", StringComparison.Ordinal) &&
+               slots.Message.Contains("后续项未作为怪物槽位读取", StringComparison.Ordinal) &&
                logs.Count(entry => entry.Message.Contains(unreadable, StringComparison.Ordinal)) == 2 &&
                logs.Any(entry => entry.Level == DiagnosticLogLevel.Warning &&
                    entry.Message.Contains(CatalogIssueCode.EncounterSlots + "malformed", StringComparison.Ordinal)),
             "Slot notices must retain distinct logical records, and unconfirmed read failures or malformed diagnostics must not disappear into a missing-file group.");
         var fresh = CatalogLogDiagnostics.Summarize([("战斗遭遇", new[] { boss })]);
         Assert(fresh.Count == 1 && fresh[0].Message.Contains(boss, StringComparison.Ordinal) &&
-               !fresh[0].Message.Contains("文件访问问题", StringComparison.Ordinal),
+               !fresh[0].Message.Contains("Mod 清单列出的文件不存在", StringComparison.Ordinal),
             "Missing-file evidence from a prior summary must not leak into a later load.");
         Console.WriteLine("PASS: file-scoped diagnostic grouping, preserved reasons and informational slot notices.");
+    }
+
+    private static void VerifyEncounterLocationRanges()
+    {
+        const string path = @"E:\fixture\dungeons\carnival\conditional.mash.darkest";
+        (int Line, int Record)[] locations = Enumerable.Range(1, 510).Select(line => (Line: line, Record: line - 1))
+            .Concat([(512, 510), (512, 511), (514, 513), (515, 514), (516, 516)]).ToArray();
+        var issues = locations.AsEnumerable().Reverse().Select(location =>
+            CatalogIssueCode.FormatEncounterSlots(path, location.Line, location.Record)).ToArray();
+        var entry = CatalogLogDiagnostics.Summarize([
+            ("战斗遭遇", issues), ("物品", new[] { issues[0] })
+        ]).Single();
+        Assert(entry.Level == DiagnosticLogLevel.Information && entry.Message.Length < 400 &&
+               entry.Message.Contains("涉及记录 515 条", StringComparison.Ordinal) &&
+               entry.Message.Contains("1/0–510/509, 512/510, 512/511, 514/513–515/514, 516/516", StringComparison.Ordinal),
+            "Large encounter logs must compact consecutive line/record pairs without losing gaps, same-line records, or distinct positions.");
+        Console.WriteLine("PASS: lossless encounter location ranges with gaps, same-line records and cross-module duplicates.");
     }
 
     private static void VerifyLocalizationLogEvidence(ActiveContentSnapshot content, string runRoot)
     {
         const string key = "hero_class_name_log_probe";
+        const string secondKey = "hero_class_name_log_probe_second";
         var root = Path.Combine(runRoot, "logging-localization");
         var localization = Path.Combine(root, "localization");
         Directory.CreateDirectory(localization);
         var xml = Path.Combine(localization, "bad.string_table.xml");
         var binary = Path.Combine(localization, "valid_english.loc2");
         File.WriteAllText(xml, "<root>", new UTF8Encoding(false));
-        WriteLoc2(binary, new Dictionary<string, string> { [key] = "Compiled name" });
+        WriteLoc2(binary, new Dictionary<string, string> { [key] = "Compiled name", [secondKey] = "Second compiled name" });
         WriteFixtureManifest(root);
         var isolated = content with { Sources = [new ActiveContentSource("local:logging", "logging", "local", root, 0)] };
         var originalHash = ComputeSha256(binary);
-        var read = ReadLocalizationProbe(isolated, [key]);
+        var read = ReadLocalizationProbe(isolated, [key, secondKey]);
         var issue = read.Issues.Single(value => value.StartsWith("Failed to read localization", StringComparison.Ordinal));
-        Assert(read.Names[key].English == "Compiled name" && issue.Contains("LOC=0，LOC2=1", StringComparison.Ordinal) &&
+        Assert(read.Names[key].English == "Compiled name" && read.Names[secondKey].English == "Second compiled name" &&
+               issue.Contains("文件数：LOC=0，LOC2=1", StringComparison.Ordinal) &&
                !issue.Contains(binary, StringComparison.Ordinal) &&
-               issue.Contains("已从同一来源的其他编译表取得有效条目", StringComparison.Ordinal) &&
-               issue.Contains("不保证覆盖失败文件的所有名称", StringComparison.Ordinal) && ComputeSha256(binary) == originalHash,
-            "Localization logs may cite actually read same-source compiled entries, without claiming complete replacement or mutating the table.");
+               issue.Contains("本次名称读取命中的同源编译表", StringComparison.Ordinal) &&
+               issue.Contains("不保证补全全部名称", StringComparison.Ordinal) && ComputeSha256(binary) == originalHash,
+            "Localization evidence counts same-source files, not matching entries, without claiming complete replacement or mutating the table.");
         var grouped = CatalogLogDiagnostics.Summarize([("名称", new[] { issue }),
             ("姓名", new[] { $"Failed to read hero names '{xml}': " + issue.Split("': ", 2)[1].Split('\n')[0] })]);
         Assert(grouped.Count == 1 && grouped[0].Message.Contains("LOC=0，LOC2=1", StringComparison.Ordinal),
             "Adding compiler evidence must not prevent file-and-reason deduplication against the XML-only hero-name reader.");
+        var unmatched = ReadLocalizationProbe(isolated, ["unmatched_name"]);
+        var unmatchedIssue = unmatched.Issues.Single(value => value.StartsWith("Failed to read localization", StringComparison.Ordinal));
         var differentScopes = CatalogLogDiagnostics.Summarize([
             ("人物", new[] { issue }),
-            ("物品", new[] { issue.Split('\n')[0] + CatalogLogDiagnostics.LocalizationEvidenceMarker + "本次所请求的名称中，未取得有效编译条目" })
+            ("物品", new[] { unmatchedIssue })
         ]);
         Assert(differentScopes.Count == 1 && differentScopes[0].Message.Contains("读取范围[人物]", StringComparison.Ordinal) &&
                differentScopes[0].Message.Contains("读取范围[物品]", StringComparison.Ordinal),
@@ -224,8 +247,8 @@ internal static partial class ContractSuite
         File.WriteAllText(Path.Combine(root, "modfiles.txt"), "localization/bad.string_table.xml 7\n", new UTF8Encoding(false));
         var unlisted = ReadLocalizationProbe(isolated, [key]);
         Assert(unlisted.Names[key] == BilingualContentName.Empty &&
-               unlisted.Issues.Any(value => value.Contains("未从同一来源的其他编译表取得有效条目", StringComparison.Ordinal)) &&
-               unlisted.Issues.All(value => !value.Contains("已从同一来源的其他编译表取得有效条目", StringComparison.Ordinal)),
+               unlisted.Issues.Any(value => value.Contains("本次请求未命中同源编译表", StringComparison.Ordinal)) &&
+               unlisted.Issues.All(value => !value.Contains("本次名称读取命中的同源编译表", StringComparison.Ordinal)),
             "An installed but unlisted binary must not be reported as available translation evidence or be loaded for logging.");
     }
 
