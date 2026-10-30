@@ -1,5 +1,7 @@
 # Battle Map Editor Design
 
+For the exceptional offline objective-completion operation, see [Force complete expedition objectives](quest-completion.md). It is separate from force return to town and does not simulate skipped combat or interaction loot.
+
 UI labels in this document are English descriptions of localized controls, not a change to the application language.
 
 ## Status
@@ -71,6 +73,10 @@ The main runtime log remains visible below the workspace.
 - Zoom is clamped to a usable range; the UI prototype uses 45% through 240%.
 
 ## State presentation
+
+Wave expeditions display a dedicated unsupported message instead of the map and its edit controls. Detection uses the saved quest type `wave` or nonempty `wave_logic`, not a Farmstead-specific region name, so Mod wave expeditions use the same behavior. Initial loading and later synchronization skip encounter and prop catalog construction for these expeditions. The verified map/raid snapshot is retained for **Force return to town**, which remains available through its existing confirmation, backup, game-process and stale-save checks. It is a recovery action, not quest completion or reward settlement. Switching back to an ordinary expedition restores the map and its controls; leaving the raid clears the recovery action.
+
+The Old Road instead displays **Complete the tutorial first**, with map editing, force completion and force return to town all disabled. The native starting save identifies it by `raid_instance.id = tutorial` and the game route `raiddungeon = tutorial`; its region is actually `weald`. The first Ruins plot, `plot_tutorial_crypts`, remains editable. Initial loading and synchronization detach map targets and skip encounter/prop catalogs for the Old Road, and the core write paths enforce the same exclusion.
 
 The real map renderer retains at least:
 

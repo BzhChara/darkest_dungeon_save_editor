@@ -14,144 +14,11 @@
              PreviewMouseRightButtonUp="BattleMapView_PreviewMouseRightButtonUp"
              PreviewMouseMove="BattleMapView_PreviewMouseMove">
     <UserControl.Resources>
-        <Style x:Key="MapToolbarButtonStyle"
-               TargetType="Button"
-               BasedOn="{StaticResource GhostButtonStyle}">
-            <Setter Property="MinWidth" Value="42" />
-            <Setter Property="MinHeight" Value="32" />
-            <Setter Property="Margin" Value="3,0" />
-            <Setter Property="Padding" Value="10,4" />
-            <Setter Property="FontSize" Value="13" />
-        </Style>
-
-        <Style x:Key="BattleMapContextMenuStyle" TargetType="ContextMenu">
-            <Setter Property="Background" Value="#F20A0A09" />
-            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
-            <Setter Property="BorderBrush" Value="{StaticResource GoldDarkBrush}" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Padding" Value="3" />
-            <Setter Property="HasDropShadow" Value="False" />
-            <Setter Property="FontFamily" Value="{local:Font Body}" />
-            <Setter Property="FontSize" Value="13.5" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="ContextMenu">
-                        <Border Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                Padding="{TemplateBinding Padding}"
-                                SnapsToDevicePixels="True">
-                            <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Cycle"
-                                            KeyboardNavigation.TabNavigation="Cycle"
-                                            SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}" />
-                        </Border>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <Style x:Key="BattleMapMenuItemStyle" TargetType="MenuItem">
-            <Setter Property="Background" Value="Transparent" />
-            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
-            <Setter Property="Padding" Value="10,7" />
-            <Setter Property="MinWidth" Value="190" />
-            <Setter Property="MinHeight" Value="36" />
-            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-            <Setter Property="VerticalContentAlignment" Value="Center" />
-            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="MenuItem">
-                        <Grid SnapsToDevicePixels="True">
-                            <Border x:Name="ItemChrome"
-                                    Background="{TemplateBinding Background}"
-                                    Padding="{TemplateBinding Padding}">
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="30" />
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="18" />
-                                    </Grid.ColumnDefinitions>
-                                    <ContentPresenter Grid.Column="0"
-                                                      Width="22" Height="22"
-                                                      Margin="0,0,8,0"
-                                                      ContentSource="Icon"
-                                                      HorizontalAlignment="Left"
-                                                      VerticalAlignment="Center" />
-                                    <ContentPresenter Grid.Column="1"
-                                                      ContentSource="Header"
-                                                      RecognizesAccessKey="True"
-                                                      VerticalAlignment="Center" />
-                                    <Path x:Name="SubmenuArrow"
-                                          Grid.Column="2"
-                                          Width="5" Height="8"
-                                          HorizontalAlignment="Right"
-                                          VerticalAlignment="Center"
-                                          Fill="{StaticResource GoldBrush}"
-                                          Data="M 0,0 L 5,4 L 0,8 Z"
-                                          Visibility="Collapsed" />
-                                </Grid>
-                            </Border>
-                            <Popup x:Name="PART_Popup"
-                                   Placement="Right"
-                                   VerticalOffset="-3"
-                                   AllowsTransparency="True"
-                                   Focusable="False"
-                                   PopupAnimation="None"
-                                   IsOpen="{Binding IsSubmenuOpen,
-                                       RelativeSource={RelativeSource TemplatedParent}}">
-                                <Border Margin="0"
-                                        Padding="3"
-                                        Background="#F70A0A09"
-                                        BorderBrush="{StaticResource GoldDarkBrush}"
-                                        BorderThickness="1"
-                                        Grid.IsSharedSizeScope="True">
-                                    <ScrollViewer x:Name="SubMenuScrollViewer"
-                                                  MaxHeight="480"
-                                                  CanContentScroll="True"
-                                                  VerticalScrollBarVisibility="Auto">
-                                        <ItemsPresenter x:Name="ItemsPresenter"
-                                                        KeyboardNavigation.DirectionalNavigation="Cycle"
-                                                        KeyboardNavigation.TabNavigation="Cycle"
-                                                        SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}" />
-                                    </ScrollViewer>
-                                </Border>
-                            </Popup>
-                        </Grid>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="Role" Value="SubmenuHeader">
-                                <Setter TargetName="SubmenuArrow" Property="Visibility" Value="Visible" />
-                            </Trigger>
-                            <Trigger Property="IsHighlighted" Value="True">
-                                <Setter TargetName="ItemChrome" Property="Background" Value="#6D1718" />
-                                <Setter Property="Foreground" Value="#FFF8EC" />
-                            </Trigger>
-                            <Trigger Property="IsSubmenuOpen" Value="True">
-                                <Setter TargetName="ItemChrome" Property="Background" Value="#541112" />
-                                <Setter Property="Foreground" Value="{StaticResource GoldBrush}" />
-                            </Trigger>
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter Property="Foreground" Value="{StaticResource TextDisabledBrush}" />
-                                <Setter TargetName="ItemChrome" Property="Opacity" Value="0.62" />
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <Style x:Key="BattleMapSeparatorStyle" TargetType="Separator">
-            <Setter Property="Margin" Value="8,3" />
-            <Setter Property="Height" Value="1" />
-            <Setter Property="Background" Value="#5553433A" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Separator">
-                        <Border Height="1" Background="{TemplateBinding Background}" />
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="MapViewStyles.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
     </UserControl.Resources>
 
     <Grid Background="#B0050505">
@@ -181,6 +48,16 @@
                         Margin="8,0,12,0"
                         Orientation="Horizontal"
                         VerticalAlignment="Center">
+                <Button x:Name="ForceCompleteQuestButton"
+                        Style="{StaticResource PrimaryButtonStyle}"
+                        MinHeight="32"
+                        Margin="3,0,4,0"
+                        Padding="12,4"
+                        FontSize="13"
+                        Content="{local:Text QuestCompletion_Button}"
+                        ToolTip="{local:Text QuestCompletion_Tooltip}"
+                        IsEnabled="False"
+                        Click="ForceCompleteQuestButton_Click" />
                 <Button x:Name="ForceTownButton"
                         Style="{StaticResource PrimaryButtonStyle}"
                         MinWidth="118"
@@ -253,7 +130,8 @@
                     <StackPanel Width="520"
                                 HorizontalAlignment="Center"
                                 VerticalAlignment="Center">
-                        <TextBlock HorizontalAlignment="Center"
+                        <TextBlock x:Name="EmptyStateTitleTextBlock"
+                                   HorizontalAlignment="Center"
                                    FontFamily="{local:Font Heading}"
                                    FontSize="28"
                                    FontWeight="Bold"

@@ -96,6 +96,10 @@ public sealed record BattleMapSnapshot(
 {
     public string RaidIdentity { get; init; } = string.Empty;
 
+    public bool IsWaveBattle { get; init; }
+
+    public bool IsTutorialRaid { get; init; }
+
     public int RoomCount => Areas.Count(area => area.Kind == BattleMapAreaKind.Room);
 
     public int CorridorCount => Areas.Count(area => area.Kind == BattleMapAreaKind.Corridor);

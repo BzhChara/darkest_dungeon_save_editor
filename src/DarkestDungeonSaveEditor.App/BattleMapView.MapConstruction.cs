@@ -13,19 +13,35 @@ public partial class BattleMapView : UserControl
 {
     private void RenderSnapshot(BattleMapSnapshot snapshot, bool fitToView)
     {
-        BuildSnapshotMap(snapshot);
+        if (snapshot.IsTutorialRaid || snapshot.IsWaveBattle)
+        {
+            // Detach every map edit target. Only wave raids retain force-town recovery.
+            var titleKey = snapshot.IsTutorialRaid ? "BattleMapView_Tutorial_Title" : "BattleMapView_WaveBattle_Title";
+            var messageKey = snapshot.IsTutorialRaid ? "BattleMapView_Tutorial_Message" : "BattleMapView_WaveBattle_Message";
+            ShowUnavailableState(messageKey, titleKey);
+            LocalizedUi.Set(EmptyStateTitleTextBlock, TextBlock.TextProperty, () => EditorText.Get(titleKey));
+            LocalizedUi.Set(MapSelectionTextBlock, TextBlock.TextProperty, () => string.Empty);
+            _encounterCatalog = null;
+            _roomAttachmentCatalog = null;
+        }
+        else
+        {
+            BuildSnapshotMap(snapshot);
+            ShowMapSurface();
+            LocalizedUi.Set(MapSelectionTextBlock, TextBlock.TextProperty, () => EditorText.Format("BattleMapView_MapConstruction_003", snapshot.RoomCount, snapshot.CorridorCount) +
+                EditorText.Format("BattleMapView_MapConstruction_004", _cells.Count));
+        }
         _selectedCell = null;
         CancelScheduledRefreshRetry();
         _currentSnapshot = snapshot;
-        ShowMapSurface();
+        ForceTownButton.IsEnabled = !_isApplyingEdit && !snapshot.IsTutorialRaid;
+        ForceCompleteQuestButton.IsEnabled = !_isApplyingEdit && CanCompleteQuest();
         UpdateMapBadge();
         LocalizedUi.Set(MapTitleTextBlock, TextBlock.TextProperty, () => EditorText.Format("BattleMapView_MapConstruction_002", _profileId ?? EditorText.Get("BattleMapView_MapConstruction_001"), FormatDungeon(snapshot.DungeonId), snapshot.Difficulty));
-        LocalizedUi.Set(MapSelectionTextBlock, TextBlock.TextProperty, () => EditorText.Format("BattleMapView_MapConstruction_003", snapshot.RoomCount, snapshot.CorridorCount) +
-            EditorText.Format("BattleMapView_MapConstruction_004", _cells.Count));
         LocalizedUi.Set(LiveStatusTextBlock, TextBlock.TextProperty, () => EditorText.Format("BattleMapView_LiveRefresh_008", snapshot.ReadAtUtc.ToLocalTime()));
         SnapshotRefreshed?.Invoke(snapshot);
 
-        if (fitToView)
+        if (fitToView && !snapshot.IsWaveBattle && !snapshot.IsTutorialRaid)
         {
             _fitToView = true;
             _ = Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(FitMapToViewport));

@@ -12,6 +12,8 @@ The editor supports English and Simplified Chinese. Use the compact **Language**
 
 ## Download and run
 
+The bilingual project website is maintained in [`docs/index.html`](docs/index.html) and [`docs/en/index.html`](docs/en/index.html). See [GitHub Pages and Google Search Console setup](docs/github-pages.md) for local preview, publication, and ownership verification.
+
 Download a **Windows x64 ZIP** from [GitHub Releases](https://github.com/BzhChara/darkest_dungeon_save_editor/releases), extract all files, and run `DarkestDungeonSaveEditor.App.exe`. Keep the included `zh-CN` resource directory. The .NET 8 runtime is included. Starting with the `v0.1.0-beta.3` source and packages, the editor defaults to the native C# codec and **does not require Java for normal use**. Older `beta.1`/`beta.2` packages require Java 8 or newer on `PATH`.
 
 See [Installation and first use](docs/release-installation.md) for requirements, checksum verification, backups and updates. This is a prerelease: keep a separate save backup and check the selected profile before editing. The **Source code** archives on GitHub require building the project.

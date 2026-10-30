@@ -64,5 +64,6 @@ public partial class MainWindow
         UpdateCatalogMode();
         UpdateInventoryIdentityWarning();
         BattleMapPanel.RefreshLanguage();
+        QuestBoardPanel.RefreshLanguage();
     }
 }

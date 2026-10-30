@@ -5022,4 +5022,423 @@ Backup directory:
   <data xml:space="preserve" name="TrinketCatalog_MissingBuffs">
     <value>required Buffs not found: {0}</value>
   </data>
+  <data name="QuestBoard_Tab" xml:space="preserve">
+    <value>QUEST BOARD</value>
+  </data>
+  <data name="QuestBoard_PreviewLabel" xml:space="preserve">
+    <value>Sample board · No save changes</value>
+  </data>
+  <data name="QuestBoard_WindowTitle" xml:space="preserve">
+    <value>Quest board — UI preview</value>
+  </data>
+  <data name="QuestBoard_Expand" xml:space="preserve">
+    <value>Full map</value>
+  </data>
+  <data name="QuestBoard_Collapse" xml:space="preserve">
+    <value>Return</value>
+  </data>
+  <data name="QuestBoard_Add" xml:space="preserve">
+    <value>Create quest</value>
+  </data>
+  <data name="QuestBoard_Replace" xml:space="preserve">
+    <value>Replace quest</value>
+  </data>
+  <data name="QuestBoard_Delete" xml:space="preserve">
+    <value>Delete quest</value>
+  </data>
+  <data name="QuestBoard_Cancel" xml:space="preserve">
+    <value>Cancel</value>
+  </data>
+  <data name="QuestBoard_Confirm" xml:space="preserve">
+    <value>Show on preview board</value>
+  </data>
+  <data name="QuestBoard_SelectTask" xml:space="preserve">
+    <value>Select a quest</value>
+  </data>
+  <data name="QuestBoard_TaskType" xml:space="preserve">
+    <value>Quest</value>
+  </data>
+  <data name="QuestBoard_Difficulty" xml:space="preserve">
+    <value>Difficulty</value>
+  </data>
+  <data name="QuestBoard_Length" xml:space="preserve">
+    <value>Length</value>
+  </data>
+  <data name="QuestBoard_Objective" xml:space="preserve">
+    <value>Objective</value>
+  </data>
+  <data name="QuestBoard_Rewards" xml:space="preserve">
+    <value>Rewards</value>
+  </data>
+  <data name="QuestBoard_SampleRewards" xml:space="preserve">
+    <value>2 Resolve XP</value>
+  </data>
+  <data name="QuestBoard_InteractionHint" xml:space="preserve">
+    <value>Click to inspect · Right-click to edit · Wheel to zoom · Right-drag to pan</value>
+  </data>
+  <data name="QuestBoard_MissingArt" xml:space="preserve">
+    <value>Choose the Darkest Dungeon game directory to display the original map and quest icons.</value>
+  </data>
+  <data name="QuestBoard_RegionHint" xml:space="preserve">
+    <value>{0} · Right-click to create a quest</value>
+  </data>
+  <data name="QuestBoard_RegionChoice" xml:space="preserve">
+    <value>Select a region at this map position</value>
+  </data>
+  <data name="QuestBoard_AddInRegion" xml:space="preserve">
+    <value>Create a quest · {0}</value>
+  </data>
+  <data name="QuestBoard_ReplaceInRegion" xml:space="preserve">
+    <value>Replace a quest · {0}</value>
+  </data>
+  <data name="QuestBoard_Added" xml:space="preserve">
+    <value>Added to the preview: {0}. No save changes.</value>
+  </data>
+  <data name="QuestBoard_Replaced" xml:space="preserve">
+    <value>Replaced in the preview: {0}. No save changes.</value>
+  </data>
+  <data name="QuestBoard_Deleted" xml:space="preserve">
+    <value>Removed from the preview: {0}. No save changes.</value>
+  </data>
+  <data name="QuestBoard_Region_crypts" xml:space="preserve">
+    <value>Ruins</value>
+  </data>
+  <data name="QuestBoard_Region_weald" xml:space="preserve">
+    <value>Weald</value>
+  </data>
+  <data name="QuestBoard_Region_warrens" xml:space="preserve">
+    <value>Warrens</value>
+  </data>
+  <data name="QuestBoard_Region_cove" xml:space="preserve">
+    <value>Cove</value>
+  </data>
+  <data name="QuestBoard_Region_darkestdungeon" xml:space="preserve">
+    <value>Darkest Dungeon</value>
+  </data>
+  <data name="QuestBoard_Region_town" xml:space="preserve">
+    <value>Hamlet</value>
+  </data>
+  <data name="QuestBoard_Region_courtyard" xml:space="preserve">
+    <value>Courtyard</value>
+  </data>
+  <data name="QuestBoard_Region_farm" xml:space="preserve">
+    <value>Farmstead</value>
+  </data>
+  <data name="QuestBoard_Kind_explore" xml:space="preserve">
+    <value>Scout</value>
+  </data>
+  <data name="QuestBoard_Kind_cleanse" xml:space="preserve">
+    <value>Cleanse</value>
+  </data>
+  <data name="QuestBoard_Kind_gather" xml:space="preserve">
+    <value>Gather</value>
+  </data>
+  <data name="QuestBoard_Kind_inventory_activate" xml:space="preserve">
+    <value>Activate</value>
+  </data>
+  <data name="QuestBoard_Kind_kill_boss" xml:space="preserve">
+    <value>Defeat the boss</value>
+  </data>
+  <data name="QuestBoard_Kind_recovery" xml:space="preserve">
+    <value>Recover lost trinkets</value>
+  </data>
+  <data name="QuestBoard_Kind_darkest" xml:space="preserve">
+    <value>We Are the Flame</value>
+  </data>
+  <data name="QuestBoard_Kind_invasion" xml:space="preserve">
+    <value>Wolves at the Door</value>
+  </data>
+  <data name="QuestBoard_Kind_courtyard" xml:space="preserve">
+    <value>Defeat the Baron</value>
+  </data>
+  <data name="QuestBoard_Kind_wave" xml:space="preserve">
+    <value>Farmstead expedition</value>
+  </data>
+  <data name="QuestBoard_Difficulty_1" xml:space="preserve">
+    <value>Apprentice · 1</value>
+  </data>
+  <data name="QuestBoard_Difficulty_3" xml:space="preserve">
+    <value>Veteran · 3</value>
+  </data>
+  <data name="QuestBoard_Difficulty_5" xml:space="preserve">
+    <value>Champion · 5</value>
+  </data>
+  <data name="QuestBoard_Difficulty_6" xml:space="preserve">
+    <value>Darkest · 6</value>
+  </data>
+  <data name="QuestBoard_Length_1" xml:space="preserve">
+    <value>Short</value>
+  </data>
+  <data name="QuestBoard_Length_2" xml:space="preserve">
+    <value>Medium</value>
+  </data>
+  <data name="QuestBoard_Length_3" xml:space="preserve">
+    <value>Long</value>
+  </data>
+  <data name="QuestBoard_Length_5" xml:space="preserve">
+    <value>Epic</value>
+  </data>
+  <data name="QuestBoard_Goal_explore" xml:space="preserve">
+    <value>Explore 90% of rooms.</value>
+  </data>
+  <data name="QuestBoard_Goal_cleanse" xml:space="preserve">
+    <value>Complete 100% of room battles.</value>
+  </data>
+  <data name="QuestBoard_Goal_gather" xml:space="preserve">
+    <value>Collect the required quest items.</value>
+  </data>
+  <data name="QuestBoard_Goal_inventory_activate" xml:space="preserve">
+    <value>Activate the quest objectives using the required items.</value>
+  </data>
+  <data name="QuestBoard_Goal_kill_boss" xml:space="preserve">
+    <value>Find and defeat the region's boss.</value>
+  </data>
+  <data name="QuestBoard_Goal_recovery" xml:space="preserve">
+    <value>Confront the Shrieker and recover lost trinkets.</value>
+  </data>
+  <data name="QuestBoard_Goal_darkest" xml:space="preserve">
+    <value>Defeat the Shuffling Horror.</value>
+  </data>
+  <data name="QuestBoard_Goal_invasion" xml:space="preserve">
+    <value>Defend the Hamlet against the brigands.</value>
+  </data>
+  <data name="QuestBoard_Goal_courtyard" xml:space="preserve">
+    <value>Reach the Baron and defeat him.</value>
+  </data>
+  <data name="QuestBoard_Goal_wave" xml:space="preserve">
+    <value>Survive the Farmstead waves.</value>
+  </data>
+  <data name="QuestBoard_Title" xml:space="preserve">
+    <value>No quest board to display</value>
+  </data>
+  <data name="QuestBoard_LoadFirst" xml:space="preserve">
+    <value>Load the current profile and wait for synchronization. Town profiles show the quest board; raid profiles show the battle map.</value>
+  </data>
+  <data name="QuestBoard_TrinketAccuracyStone" xml:space="preserve">
+    <value>Accuracy Stone</value>
+  </data>
+  <data name="QuestBoard_TrinketToughRing" xml:space="preserve">
+    <value>Tough Ring</value>
+  </data>
+  <data name="QuestBoard_TrinketSpeedStone" xml:space="preserve">
+    <value>Speed Stone</value>
+  </data>
+  <data name="QuestBoard_TrinketStunningSatchel" xml:space="preserve">
+    <value>Stunning Satchel</value>
+  </data>
+  <data name="QuestBoard_EstateMap" xml:space="preserve">
+    <value>Estate Map</value>
+  </data>
+  <data name="QuestBoard_CategoryExplore" xml:space="preserve">
+    <value>Exploration</value>
+  </data>
+  <data name="QuestBoard_CategoryCleanse" xml:space="preserve">
+    <value>Room battles</value>
+  </data>
+  <data name="QuestBoard_CategoryGather" xml:space="preserve">
+    <value>Gathering</value>
+  </data>
+  <data name="QuestBoard_CategoryInventoryActivate" xml:space="preserve">
+    <value>Use quest items</value>
+  </data>
+  <data name="QuestBoard_CategoryActivate" xml:space="preserve">
+    <value>Direct interaction</value>
+  </data>
+  <data name="QuestBoard_CategoryKillBoss" xml:space="preserve">
+    <value>Boss objectives</value>
+  </data>
+  <data name="QuestBoard_CategoryWave" xml:space="preserve">
+    <value>Wave battles</value>
+  </data>
+  <data name="QuestBoard_Count" xml:space="preserve">
+    <value>Showing {0} / {1} quests</value>
+  </data>
+  <data name="QuestBoard_SelectionHint" xml:space="preserve">
+    <value>Select a quest to place on the preview board.</value>
+  </data>
+  <data name="QuestBoard_Description_explore" xml:space="preserve">
+    <value>Scout the region and chart its unexplored passages.</value>
+  </data>
+  <data name="QuestBoard_Description_cleanse" xml:space="preserve">
+    <value>Clear the region's rooms of the enemies that infest them.</value>
+  </data>
+  <data name="QuestBoard_Description_gather" xml:space="preserve">
+    <value>Search the region for the supplies needed by the Hamlet.</value>
+  </data>
+  <data name="QuestBoard_Description_inventory_activate" xml:space="preserve">
+    <value>Bring the required supplies and use them at the quest's objectives.</value>
+  </data>
+  <data name="QuestBoard_Description_kill_boss" xml:space="preserve">
+    <value>Hunt down the powerful enemy lurking in this region.</value>
+  </data>
+  <data name="QuestBoard_Description_recovery" xml:space="preserve">
+    <value>The Shrieker has hoarded your lost trinkets. Confront it and reclaim them.</value>
+  </data>
+  <data name="QuestBoard_Description_darkest" xml:space="preserve">
+    <value>Enter the Darkest Dungeon and face the Shuffling Horror.</value>
+  </data>
+  <data name="QuestBoard_Description_invasion" xml:space="preserve">
+    <value>Brigands are attacking the Hamlet. Stop their leader before the town falls.</value>
+  </data>
+  <data name="QuestBoard_Description_courtyard" xml:space="preserve">
+    <value>Venture into the Courtyard and hunt down the Baron.</value>
+  </data>
+  <data name="QuestBoard_Description_wave" xml:space="preserve">
+    <value>Face the Farmstead's relentless waves of enemies.</value>
+  </data>
+  <data name="QuestBoard_Length_4" xml:space="preserve"><value>Exhausting</value></data>
+  <data name="QuestBoard_Kind_darkest_beacons" xml:space="preserve"><value>Lighting the Way</value></data>
+  <data name="QuestBoard_Goal_darkest_beacons" xml:space="preserve"><value>Activate the three beacons with quest items.</value></data>
+  <data name="QuestBoard_Description_darkest_beacons" xml:space="preserve"><value>Enter the Darkest Dungeon and light its beacons.</value></data>
+  <data name="QuestBoard_Kind_darkest_portal" xml:space="preserve"><value>Belly of the Beast</value></data>
+  <data name="QuestBoard_Goal_darkest_portal" xml:space="preserve"><value>Find and activate the portal.</value></data>
+  <data name="QuestBoard_Description_darkest_portal" xml:space="preserve"><value>Find a path through the Darkest Dungeon to its portal.</value></data>
+  <data name="QuestBoard_Kind_courtyard_intro" xml:space="preserve"><value>Burn the hives</value></data>
+  <data name="QuestBoard_Goal_courtyard_intro" xml:space="preserve"><value>Use quest items to burn the three hives.</value></data>
+  <data name="QuestBoard_Description_courtyard_intro" xml:space="preserve"><value>Enter the Courtyard and destroy its hives.</value></data>
+  <data name="QuestBoard_ReadOnlyLabel" xml:space="preserve"><value>Current quests: {0} · Read only</value></data>
+  <data name="QuestBoard_ReadOnly" xml:space="preserve"><value>The current quest board is read only.</value></data>
+  <data name="QuestBoard_NoBoard" xml:space="preserve"><value>This profile has no quest board to display.</value></data>
+  <data name="QuestBoard_Unpositioned" xml:space="preserve"><value>Quests with no available map position</value></data>
+  <data name="QuestBoard_DifficultyOther" xml:space="preserve"><value>Difficulty {0}</value></data>
+  <data name="QuestBoard_LengthOther" xml:space="preserve"><value>Length {0}</value></data>
+  <data name="QuestBoard_DefinitionChanged" xml:space="preserve">
+    <value>Quest definitions changed. Reload the profile and try again.</value>
+  </data>
+  <data name="QuestBoard_SaveChanged" xml:space="preserve">
+    <value>The save changed. Synchronize the profile and try again.</value>
+  </data>
+  <data name="QuestBoard_Duplicate" xml:space="preserve">
+    <value>Quest '{0}' is already on the board. Replace or delete its existing entry first.</value>
+  </data>
+  <data name="QuestBoard_MissingType" xml:space="preserve">
+    <value>Quest type cannot be resolved: {0}.</value>
+  </data>
+  <data name="QuestBoard_MissingDungeon" xml:space="preserve">
+    <value>Quest region cannot be resolved: {0}.</value>
+  </data>
+  <data name="QuestBoard_MissingGoal" xml:space="preserve">
+    <value>Quest objective cannot be resolved: {0}.</value>
+  </data>
+  <data name="QuestBoard_MissingRarity" xml:space="preserve">
+    <value>Quest reward rarity cannot be resolved: {0}.</value>
+  </data>
+  <data name="QuestBoard_MissingTrinket" xml:space="preserve">
+    <value>Quest reward trinket cannot be resolved: {0}.</value>
+  </data>
+  <data name="QuestBoard_NoGoals" xml:space="preserve">
+    <value>This quest has no objective that the game can load.</value>
+  </data>
+  <data name="QuestBoard_TaskCount" xml:space="preserve">
+    <value>Quest board · {0} quests</value>
+  </data>
+  <data name="QuestBoard_PreviewEdit" xml:space="preserve">
+    <value>Preview quest changes</value>
+  </data>
+  <data name="QuestBoard_WriteConfirmation" xml:space="preserve">
+    <value>Apply this change to the save? A backup will be created before writing.</value>
+  </data>
+  <data name="QuestBoard_Backup" xml:space="preserve">
+    <value>Backup: {0}</value>
+  </data>
+  <data name="QuestBoard_EditFailed" xml:space="preserve">
+    <value>Quest board edit did not complete: {0}</value>
+  </data>
+  <data name="QuestBoard_CreateSummary" xml:space="preserve">
+    <value>Add quest: {0}.</value>
+  </data>
+  <data name="QuestBoard_ReplaceSummary" xml:space="preserve">
+    <value>Replace quest: {0} → {1}.</value>
+  </data>
+  <data name="QuestBoard_DeleteSummary" xml:space="preserve">
+    <value>Delete quest: {0}.</value>
+  </data>
+  <data name="BattleMapView_Tutorial_Title" xml:space="preserve">
+    <value>Complete the tutorial first</value>
+  </data>
+  <data name="BattleMapView_Tutorial_Message" xml:space="preserve">
+    <value>Map editing, force completion, and force return to town are unavailable during the Old Road tutorial.</value>
+  </data>
+  <data name="BattleMapView_WaveBattle_Title" xml:space="preserve">
+    <value>Wave battles are not supported</value>
+  </data>
+  <data name="BattleMapView_WaveBattle_Message" xml:space="preserve">
+    <value>This expedition uses wave battles, such as the Farmstead. Map editing is unavailable. You can still use “Force return to town”.</value>
+  </data>
+  <data name="QuestCompletion_Button" xml:space="preserve">
+    <value>Force complete quest</value>
+  </data>
+  <data name="QuestCompletion_Tooltip" xml:space="preserve">
+    <value>Complete the current expedition objectives. Return and settle rewards in the game.</value>
+  </data>
+  <data name="QuestCompletion_Summary" xml:space="preserve">
+    <value>Quest: {0}
+Objectives: {1}; battle locations to clear: {2}; quest items to add: {3}.</value>
+  </data>
+  <data name="QuestCompletion_Moved" xml:space="preserve">
+    <value>Move the party to the room required by the objective.</value>
+  </data>
+  <data name="QuestCompletion_Confirm" xml:space="preserve">
+    <value>Clear-battle objectives delete remaining required battles together with their attached treasure and curios. Skipped combat and interactions grant no loot. The editor keeps the current expedition; reopen it in the game to return and settle the quest. Apply these changes?</value>
+  </data>
+  <data name="QuestCompletion_Definitions" xml:space="preserve">
+    <value>Quest objective definitions could not be read reliably: {0}</value>
+  </data>
+  <data name="QuestCompletion_Wave" xml:space="preserve">
+    <value>Wave expeditions cannot be force completed. Force return to town remains available.</value>
+  </data>
+  <data name="QuestCompletion_NoGoals" xml:space="preserve">
+    <value>The current expedition has no objective to complete.</value>
+  </data>
+  <data name="QuestCompletion_MissingGoal" xml:space="preserve">
+    <value>The active definition for objective &#x27;{0}&#x27; could not be found.</value>
+  </data>
+  <data name="QuestCompletion_FixedBattle" xml:space="preserve">
+    <value>Objective &#x27;{0}&#x27; requires a fixed battle count that resets on reload. Deleting battles cannot complete it; no changes were written.</value>
+  </data>
+  <data name="QuestCompletion_Unsupported" xml:space="preserve">
+    <value>Objective &#x27;{0}&#x27; uses an unsupported completion type: {1}. No changes were written.</value>
+  </data>
+  <data name="QuestCompletion_Item" xml:space="preserve">
+    <value>The quest item &#x27;{0}&#x27; has no reliable writable definition in the active content.</value>
+  </data>
+  <data name="QuestCompletion_Storage" xml:space="preserve">
+    <value>The current expedition inventory capacity could not be determined.</value>
+  </data>
+  <data name="QuestCompletion_RoomConflict" xml:space="preserve">
+    <value>The objectives require different current rooms and cannot all be completed together.</value>
+  </data>
+  <data name="QuestCompletion_Room" xml:space="preserve">
+    <value>The required room &#x27;{0}&#x27; could not be located on this map.</value>
+  </data>
+  <data name="QuestCompletion_Changed" xml:space="preserve">
+    <value>The save or active expedition changed. Reload the profile and try again.</value>
+  </data>
+  <data name="QuestCompletion_Already" xml:space="preserve">
+    <value>The supported objective states already meet their requirements. No changes are needed.</value>
+  </data>
+  <data name="QuestCompletion_RecoveryFailed" xml:space="preserve">
+    <value>Quest completion failed and automatic recovery was incomplete. Inspect the backup: {0}.</value>
+  </data>
+  <data name="QuestCompletion_Restored" xml:space="preserve">
+    <value>Quest completion failed; replaced files were restored. Backup: {0}.</value>
+  </data>
+  <data name="QuestCompletion_Preparing" xml:space="preserve">
+    <value>Preparing quest completion preview…</value>
+  </data>
+  <data name="QuestCompletion_Cancelled" xml:space="preserve">
+    <value>Quest completion cancelled. No changes were written.</value>
+  </data>
+  <data name="QuestCompletion_Log" xml:space="preserve">
+    <value>Wrote completed expedition objectives for {0}. Backup: {1}.</value>
+  </data>
+  <data name="QuestCompletion_Done" xml:space="preserve">
+    <value>Objective changes applied. Reopen the expedition in the game to return and settle the quest.</value>
+  </data>
+  <data name="QuestCompletion_Failed" xml:space="preserve">
+    <value>Could not complete quest objectives</value>
+  </data>
+  <data name="QuestCompletion_RefreshFailed" xml:space="preserve">
+    <value>Objective changes were written, but refreshing the display failed. Reload the profile.</value>
+  </data>
 </root>

@@ -3,8 +3,8 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:DarkestDungeonSaveEditor.App"
         Title="{local:Text MainWindow_001}"
-        Width="1440"
-        Height="900"
+        Width="1460"
+        Height="920"
         MinWidth="1120"
         MinHeight="720"
         Icon="Assets/save-editor.ico"
@@ -481,8 +481,11 @@
                                     </DataGrid.Columns>
                             </DataGrid>
                         </TabItem>
-                        <TabItem Header="{local:Text MainWindow_042}">
-                            <local:BattleMapView x:Name="BattleMapPanel" />
+                        <TabItem x:Name="BattleTab" Header="{local:Text MainWindow_042}">
+                            <Grid>
+                                <local:BattleMapView x:Name="BattleMapPanel" />
+                                <local:QuestBoardPreview x:Name="QuestBoardPanel" Visibility="Collapsed" />
+                            </Grid>
                         </TabItem>
                     </TabControl>
 

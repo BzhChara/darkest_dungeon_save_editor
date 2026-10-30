@@ -39,7 +39,7 @@ internal sealed partial class TownEventInitializer
     }
 
     private void AddPlotQuest(IReadOnlyDictionary<string, JsonObject> saves, JsonObject definition,
-        List<string> changes, List<string> warnings)
+        List<string> changes, List<string> warnings, bool checkNaturalEligibility = true)
     {
         var id = Text(definition, "id");
         var board = JsonSupport.RequireObject(Root(saves, "quest"), "quests");
@@ -50,7 +50,7 @@ internal sealed partial class TownEventInitializer
             warnings.Add(warning);
             return;
         }
-        var unavailable = PlotQuestUnavailableReason(saves, definition);
+        var unavailable = checkNaturalEligibility ? PlotQuestUnavailableReason(saves, definition) : string.Empty;
         if (unavailable.Length > 0)
         {
             var warning = EditorText.Format("TownEvent_QuestNotEligible", id, unavailable);

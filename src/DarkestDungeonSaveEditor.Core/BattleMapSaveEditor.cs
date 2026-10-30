@@ -508,11 +508,13 @@ internal static partial class BattleMapSaveEditor
     internal static void ValidateStationaryRaidState(JsonObject raidDocument)
     {
         var root = JsonSupport.RequireObject(raidDocument, "base_root");
+        if (IsTutorialRaid(root))
+            throw new InvalidOperationException(EditorText.Get("BattleMapView_Tutorial_Message"));
         if (ReadRequiredBool(root, "inbattle"))
         {
             throw new InvalidOperationException(EditorText.Get("BattleMapSaveEditor_037"));
         }
-        if (HasPayload(root["battle"]) || HasPayload(root["wave_logic"]))
+        if (HasPayload(root["battle"]) || IsWaveRaid(root))
         {
             throw new InvalidOperationException(
                 EditorText.Get("BattleMapSaveEditor_038"));
@@ -552,6 +554,15 @@ internal static partial class BattleMapSaveEditor
         _ = ReadRequiredBool(party, "IsMovingLeft()");
         _ = ReadRequiredInt(party, "retreat_room");
     }
+
+    internal static bool IsWaveRaid(JsonObject root) =>
+        (root["raid_instance"] is JsonObject instance && JsonSupport.ReadString(instance, "type") == "wave") ||
+        HasPayload(root["wave_logic"]);
+
+    // scripts/starting_save/persist.raid.json identifies the Old Road as "tutorial".
+    // The first Ruins plot (plot_tutorial_crypts) is a separate, ordinary expedition.
+    internal static bool IsTutorialRaid(JsonObject root) =>
+        root["raid_instance"] is JsonObject instance && JsonSupport.ReadString(instance, "id") == "tutorial";
 
     private static bool HasPayload(JsonNode? node) => node switch
     {

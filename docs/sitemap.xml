@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
+  <url>
+    <loc>https://bzhchara.github.io/darkest_dungeon_save_editor/</loc>
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://bzhchara.github.io/darkest_dungeon_save_editor/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://bzhchara.github.io/darkest_dungeon_save_editor/en/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://bzhchara.github.io/darkest_dungeon_save_editor/" />
+  </url>
+  <url>
+    <loc>https://bzhchara.github.io/darkest_dungeon_save_editor/en/</loc>
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://bzhchara.github.io/darkest_dungeon_save_editor/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://bzhchara.github.io/darkest_dungeon_save_editor/en/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://bzhchara.github.io/darkest_dungeon_save_editor/" />
+  </url>
+</urlset>

@@ -335,6 +335,16 @@ public partial class MainWindow : Window
                     _quantitySaveContext = snapshot.QuantityItems.SaveContext;
                     _allItems = snapshot.QuantityItems.Items;
                     _raidInventoryStorage = snapshot.QuantityItems.RaidStorage;
+                    QuestBoardPanel.SetSnapshot(snapshot.QuestBoard);
+                    QuestBoardPanel.SetEditCatalog(snapshot.QuestBoardCatalog);
+                    if (snapshot.QuestBoard is { } board && (contentChanged || changedFiles.Contains("persist.quest.json")))
+                    {
+                        var boardDiagnostics = new CatalogDiagnosticBatch();
+                        boardDiagnostics.Add(EditorText.Get("QuestBoard_Title"), board.Issues);
+                        if (snapshot.QuestBoardCatalog is { } questCatalog)
+                            boardDiagnostics.Add(EditorText.Get("QuestBoard_Title"), questCatalog.Issues);
+                        CrashDiagnostics.RecordCatalogDiagnostics(boardDiagnostics);
+                    }
                     if (trinkets is not null && heroes is not null)
                     {
                         _allTrinkets = trinkets.Trinkets;

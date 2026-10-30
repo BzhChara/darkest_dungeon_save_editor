@@ -265,7 +265,9 @@ public sealed class BattleMapSnapshotReader(DsonSaveCodec codec)
             issues,
             DateTime.UtcNow)
         {
-            RaidIdentity = EditorBattleHistory.RaidIdentity(mapDocument, raidDocument)
+            RaidIdentity = EditorBattleHistory.RaidIdentity(mapDocument, raidDocument),
+            IsWaveBattle = BattleMapSaveEditor.IsWaveRaid(raidRoot),
+            IsTutorialRaid = BattleMapSaveEditor.IsTutorialRaid(raidRoot)
         };
     }
 

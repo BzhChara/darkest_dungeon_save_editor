@@ -11,6 +11,8 @@ public sealed record ProfileCatalogSnapshot(
     DateTime ReadAtUtc)
 {
     public string ContentFingerprint { get; init; } = string.Empty;
+    public QuestBoardSnapshot? QuestBoard { get; init; }
+    public QuestBoardEditCatalog? QuestBoardCatalog { get; init; }
 }
 
 /// <summary>One read-only, stable disk snapshot shared by the catalog pages.</summary>
@@ -154,6 +156,19 @@ public sealed class ProfileCatalogSnapshotReader
                         ? QuantityItemCatalog.LoadRaid(content, root, before[quantityFile]!)
                         : QuantityItemCatalog.Load(content, root, before[quantityFile]!);
             }
+            QuestBoardSnapshot? questBoard = null;
+            QuestBoardEditCatalog? questBoardCatalog = null;
+            if (scene == QuantityItemSaveContext.Town && before["persist.quest.json"] is { } questHash)
+            {
+                questBoard = !contentChanged && _lastSnapshot?.QuestBoard is { } previousBoard &&
+                    previousBoard.SourceSha256 == questHash && _lastSnapshot.FileHashes["persist.progression.json"] == before["persist.progression.json"] ? previousBoard :
+                    QuestBoardSnapshotReader.Read(content, JsonSupport.ReadObject(await DecodeCopyAsync(workspace,
+                        "persist.quest.json", before, cancellationToken, profile).ConfigureAwait(false)), questHash,
+                        before["persist.progression.json"] is null ? null : JsonSupport.ReadObject(await DecodeCopyAsync(workspace,
+                            "persist.progression.json", before, cancellationToken, profile).ConfigureAwait(false)));
+                questBoardCatalog = !contentChanged && _lastSnapshot?.QuestBoardCatalog is { } cachedBoardCatalog
+                    ? cachedBoardCatalog : QuestBoardEditCatalog.Load(content);
+            }
             cancellationToken.ThrowIfCancellationRequested();
             if (!HashesEqual(before, CaptureHashes(profile)))
             {
@@ -171,7 +186,9 @@ public sealed class ProfileCatalogSnapshotReader
             _slot = nextSlot;
             return _lastSnapshot = new(content, key, quantities, before, DateTime.UtcNow)
             {
-                ContentFingerprint = contentFingerprint
+                ContentFingerprint = contentFingerprint,
+                QuestBoard = questBoard,
+                QuestBoardCatalog = questBoardCatalog
             };
         }
         finally

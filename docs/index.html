@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>暗黑地牢存档编辑器 | Darkest Dungeon Save Editor</title>
+  <meta name="description" content="免费的开源暗黑地牢存档编辑器，支持 Windows、中英文界面、DLC 与 Mod。管理物品和饰品、创建英雄候选、调整战斗地图，预览修改并在写入前备份。">
+  <meta name="theme-color" content="#151414">
+  <link rel="canonical" href="https://bzhchara.github.io/darkest_dungeon_save_editor/">
+  <link rel="alternate" hreflang="zh-CN" href="https://bzhchara.github.io/darkest_dungeon_save_editor/">
+  <link rel="alternate" hreflang="en" href="https://bzhchara.github.io/darkest_dungeon_save_editor/en/">
+  <link rel="alternate" hreflang="x-default" href="https://bzhchara.github.io/darkest_dungeon_save_editor/">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Darkest Dungeon Save Editor">
+  <meta property="og:title" content="暗黑地牢存档编辑器">
+  <meta property="og:description" content="为下一次远征，做好准备。免费的开源 Windows 存档编辑器，支持中英文、DLC 与 Mod。">
+  <meta property="og:url" content="https://bzhchara.github.io/darkest_dungeon_save_editor/">
+  <meta property="og:locale" content="zh_CN">
+  <meta property="og:locale:alternate" content="en_US">
+  <meta property="og:image" content="https://bzhchara.github.io/darkest_dungeon_save_editor/assets/save-editor-icon.png">
+  <meta property="og:image:alt" content="黑色书本与红色羽毛笔组成的存档编辑器图标">
+  <meta name="twitter:card" content="summary">
+  <link rel="icon" href="assets/save-editor.ico" sizes="any">
+  <link rel="stylesheet" href="assets/site.css">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "Darkest Dungeon Save Editor",
+    "alternateName": "暗黑地牢存档编辑器",
+    "description": "支持中英文、DLC 与 Mod 的开源 Windows 离线存档编辑器。",
+    "url": "https://bzhchara.github.io/darkest_dungeon_save_editor/",
+    "downloadUrl": "https://github.com/BzhChara/darkest_dungeon_save_editor/releases",
+    "sameAs": "https://github.com/BzhChara/darkest_dungeon_save_editor",
+    "image": "https://bzhchara.github.io/darkest_dungeon_save_editor/assets/save-editor-icon.png",
+    "applicationCategory": "UtilitiesApplication",
+    "operatingSystem": "Windows 10/11 x64",
+    "inLanguage": ["zh-CN", "en"],
+    "isAccessibleForFree": true,
+    "license": "https://www.gnu.org/licenses/gpl-3.0.html",
+    "author": {"@type": "Person", "name": "BzhChara"}
+  }
+  </script>
+</head>
+<body>
+  <a class="skip-link" href="#main">跳转到正文</a>
+  <header class="site-header wrap">
+    <a class="brand" href="index.html" aria-label="暗黑地牢存档编辑器首页">
+      <img src="assets/save-editor-icon.png" width="44" height="44" alt="">
+      <span>DD SAVE EDITOR</span>
+    </a>
+    <nav aria-label="主导航">
+      <a class="section-link" href="#features">功能</a>
+      <a class="section-link" href="#start">开始使用</a>
+      <a class="repository-link" href="https://github.com/BzhChara/darkest_dungeon_save_editor">GitHub</a>
+      <a class="language-link" href="en/index.html" lang="en" hreflang="en">English <span aria-hidden="true">↗</span></a>
+    </nav>
+  </header>
+
+  <main id="main">
+    <section class="hero wrap" aria-labelledby="hero-title">
+      <div class="hero-copy">
+        <h1 id="hero-title">暗黑地牢<br>存档编辑器</h1>
+        <p class="product-name" lang="en">Darkest Dungeon Save Editor</p>
+        <p class="hero-lead">为下一次远征，做好准备。</p>
+        <p class="hero-description">管理物品与饰品、创建英雄候选、调整战斗地图。为你的本地存档提供清晰的预览与备份。</p>
+        <div class="actions">
+          <a class="button button-primary" href="https://github.com/BzhChara/darkest_dungeon_save_editor/releases">下载 Windows 版 <span aria-hidden="true">↗</span></a>
+          <a class="button button-secondary" href="https://github.com/BzhChara/darkest_dungeon_save_editor">查看源代码 <span aria-hidden="true">↗</span></a>
+        </div>
+        <p class="platforms">Windows 10/11 x64 <span aria-hidden="true">·</span> 简体中文 / English <span aria-hidden="true">·</span> GPL-3.0-or-later</p>
+      </div>
+      <div class="hero-art">
+        <img src="assets/save-editor-icon.png" width="1280" height="1280" alt="黑色皮革书本、红色羽毛笔与蜡封组成的编辑器图标" fetchpriority="high">
+      </div>
+    </section>
+
+    <div class="principles wrap" aria-label="编辑方式">
+      <div><h2>离线编辑</h2><p>在本机读取与编辑《暗黑地牢》存档。</p></div>
+      <div><h2>先预览，再写入</h2><p>确认修改后，备份存档并执行写入。</p></div>
+      <div><h2>支持 DLC 与 Mod</h2><p>以当前存档实际启用的内容为准。</p></div>
+    </div>
+
+    <section class="features wrap" id="features" aria-labelledby="features-title">
+      <div class="section-intro">
+        <h2 id="features-title">把准备工作，<br>留在城镇。</h2>
+        <p>围绕真实存档与当前启用的内容，处理每一次修改。</p>
+        <a class="text-link" href="https://github.com/BzhChara/darkest_dungeon_save_editor#readme">完整功能与限制 <span aria-hidden="true">↗</span></a>
+      </div>
+      <div class="feature-list">
+        <article><h3>物品与饰品</h3><p>调整城镇资源、背包物品与饰品数量，按当前存档与内容规则生成预览。</p></article>
+        <article><h3>英雄与怪癖</h3><p>创建英雄候选，选择等级、皮肤与怪癖，查看装备与技能解锁结果。</p></article>
+        <article><h3>战斗地图</h3><p>查看远征地图，调整支持的房间、走廊与遭遇内容。剧情地图与脚本遭遇等存在支持限制。</p></article>
+        <article><h3>DLC 与 Mod</h3><p>读取当前存档启用的内容，并提供可选的 MO2 兼容方案。具体安装要求请查看对应版本的发布说明。</p></article>
+      </div>
+    </section>
+
+    <section class="start-band" id="start" aria-labelledby="start-title">
+      <div class="wrap">
+        <div class="section-heading">
+          <h2 id="start-title">三步，开始下一次远征。</h2>
+          <a class="text-link" href="https://github.com/BzhChara/darkest_dungeon_save_editor/blob/master/docs/release-installation.md">安装说明 <span aria-hidden="true">↗</span></a>
+        </div>
+        <ol class="steps">
+          <li><h3>下载并解压</h3><p>从 GitHub 下载 Windows x64 ZIP，完整解压后运行 <code>DarkestDungeonSaveEditor.App.exe</code>。</p></li>
+          <li><h3>备份并载入</h3><p>关闭游戏并保留独立备份，在编辑器中选择游戏路径与目标存档，再载入当前存档。</p></li>
+          <li><h3>预览后确认</h3><p>查看修改预览，确认目标与结果。应用时编辑器会先备份存档，再执行写入。</p></li>
+        </ol>
+        <p class="release-note">当前发布为测试版本。Windows 包已包含 .NET 运行时，正常使用无需 Java；请保留解压后的全部文件。</p>
+      </div>
+    </section>
+
+    <section class="closing wrap" aria-labelledby="download-title">
+      <h2 id="download-title">准备好重返庄园了吗？</h2>
+      <a class="button button-primary" href="https://github.com/BzhChara/darkest_dungeon_save_editor/releases">前往 GitHub 下载 <span aria-hidden="true">↗</span></a>
+    </section>
+  </main>
+
+  <footer class="site-footer wrap">
+    <div class="footer-row">
+      <p class="footer-brand">DD SAVE EDITOR <span aria-hidden="true">/</span> BzhChara</p>
+      <nav aria-label="项目链接">
+        <a href="https://github.com/BzhChara/darkest_dungeon_save_editor">源代码</a>
+        <a href="https://github.com/BzhChara/darkest_dungeon_save_editor/issues">问题反馈</a>
+        <a href="https://github.com/BzhChara/darkest_dungeon_save_editor/blob/master/LICENSE">GPL-3.0-or-later</a>
+      </nav>
+    </div>
+    <p class="disclaimer">独立开源项目，与 Red Hook Studios 无隶属关系。Darkest Dungeon 及相关游戏内容归其各自权利人所有。</p>
+  </footer>
+</body>
+</html>

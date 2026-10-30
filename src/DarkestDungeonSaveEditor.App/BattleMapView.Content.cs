@@ -9,7 +9,7 @@ public partial class BattleMapView : UserControl
     private MenuItem CreateRegionalContentItem(
         PrototypeMapCell target,
         string label,
-        BattleMenuIcon icon,
+        MapMenuIcon icon,
         BattleRoomAttachmentKind kind)
     {
         var catalog = GetCurrentRoomAttachmentCatalog();
@@ -45,7 +45,7 @@ public partial class BattleMapView : UserControl
     private MenuItem CreateContentPickerItem(
         PrototypeMapCell target,
         string label,
-        BattleMenuIcon icon,
+        MapMenuIcon icon,
         IReadOnlyCollection<BattleRoomAttachmentDefinition> candidates)
     {
         if (candidates.Count == 0)

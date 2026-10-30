@@ -110,7 +110,7 @@ public partial class BattleMapView : UserControl
                     return null;
                 }
 
-                if (activeContent is not null)
+                if (activeContent is not null && !snapshot.IsWaveBattle && !snapshot.IsTutorialRaid)
                 {
                     try
                     {
@@ -240,7 +240,7 @@ public partial class BattleMapView : UserControl
         ZoomInButton.IsEnabled = true;
         ResetZoomButton.IsEnabled = true;
         FitMapButton.IsEnabled = true;
-        ForceTownButton.IsEnabled = _currentSnapshot is not null;
+        ForceTownButton.IsEnabled = _currentSnapshot is { IsTutorialRaid: false };
     }
 
     private void ShowUnavailableState(string messageKey, string liveStatusKey, params object[] messageArguments)
@@ -253,6 +253,7 @@ public partial class BattleMapView : UserControl
         MapCanvas.Children.Clear();
         MapCanvas.Visibility = Visibility.Collapsed;
         EmptyStatePanel.Visibility = Visibility.Visible;
+        LocalizedUi.Set(EmptyStateTitleTextBlock, TextBlock.TextProperty, () => EditorText.Get("BattleMapView_008"));
         LocalizedUi.Set(EmptyStateTextBlock, TextBlock.TextProperty, () => EditorText.Format(messageKey, messageArguments));
         PrototypeBadge.Visibility = Visibility.Collapsed;
         ZoomOutButton.IsEnabled = false;
@@ -260,6 +261,7 @@ public partial class BattleMapView : UserControl
         ResetZoomButton.IsEnabled = false;
         FitMapButton.IsEnabled = false;
         ForceTownButton.IsEnabled = false;
+        ForceCompleteQuestButton.IsEnabled = false;
         LocalizedUi.Set(MapTitleTextBlock, TextBlock.TextProperty, () => EditorText.Get("BattleMapView_ProfileLifecycle_025"));
         LocalizedUi.Set(MapSelectionTextBlock, TextBlock.TextProperty, () => EditorText.Get("BattleMapView_ProfileLifecycle_026"));
         LocalizedUi.Set(LiveStatusTextBlock, TextBlock.TextProperty, () => EditorText.Get(liveStatusKey));

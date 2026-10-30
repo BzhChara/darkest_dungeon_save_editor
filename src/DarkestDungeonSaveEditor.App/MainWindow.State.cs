@@ -71,6 +71,7 @@ public partial class MainWindow : Window
             PreviewButton.IsEnabled = false;
         }
         UpdateInitialQuirkSelectionSummary();
+        UpdateEnabledState();
     }
 
     private void InvalidatePreparedEdit()
@@ -162,6 +163,8 @@ public partial class MainWindow : Window
         CatalogTabs.IsEnabled = !busy;
         SearchTextBox.IsEnabled = !busy && !isBattleTab;
         BattleMapPanel.IsEnabled = !busy && _syncReady && !_gameRunning;
+        QuestBoardPanel.IsEnabled = BattleMapPanel.IsEnabled && _catalogProfileDirectory is not null;
+        UpdateQuestBoardMode();
         ShowUnusedItemsCheckBox.IsEnabled = !busy &&
             CatalogTabs.SelectedIndex == 0 && _allItems.Count > 0;
         CopiesTextBox.IsEnabled = !busy && !_gameRunning && CatalogTabs.SelectedIndex is 0 or 1;

@@ -78,10 +78,15 @@ public partial class BattleMapView : UserControl
 
     private async Task NotifySaveEditBusyAsync(bool busy)
     {
-        if (SaveEditBusyChanged is not { } handlers) return;
-        foreach (Func<bool, Task> handler in handlers.GetInvocationList())
-            await handler(busy);
+        ForceCompleteQuestButton.IsEnabled = false;
+        if (SaveEditBusyChanged is { } handlers)
+            foreach (Func<bool, Task> handler in handlers.GetInvocationList())
+                await handler(busy);
+        ForceCompleteQuestButton.IsEnabled = !busy && CanCompleteQuest();
     }
+
+    private bool CanCompleteQuest() => _currentSnapshot is { IsWaveBattle: false, IsTutorialRaid: false, InBattle: false } &&
+        _profile is not null && _codec is not null && _activeContentSnapshot is not null;
 
     public BattleMapSnapshot? CurrentSnapshot => _currentSnapshot;
 

@@ -6,6 +6,9 @@ Repository-local test output belongs under `artifacts/`, including the shared `a
 
 The suite is split by responsibility:
 
+- `QuestCompletionContractTests.cs`: `--quest-completion` covers offline objective completion, native/Mod objective excerpts, battle deletion, Boss counters, actual gathered items, tutorial rejection, nested raid paths, C# DSON round trips, guarded multi-file writes/recovery, stale inputs, and WPF action availability through synchronization. Explicit synthetic combinations test transactions, not natural mission generation. `--wave-battle` also verifies that wave expeditions cannot use this action. In-game reload and settlement acceptance is separate; see [Quest completion](../../docs/quest-completion.md).
+- `TutorialBattleContractTests.cs`: `--tutorial-battle` verifies the Old Road notice, blocked map/completion/force-town operations, language switching, profile synchronization and clearing, while keeping the first Ruins mission editable. Identifiers come from the native starting save; reduced topology is a rejection fixture, not an in-game tutorial recreation.
+
 - `TownEventContractTests.cs` and `TownEventBoundaryContracts.cs`: all 31 native effect types, replacement without week/history growth, pending-offer cleanup, preservation of delivered results, composite events, native saved identities, revival HP, quest prerequisites, DSON round trips, stale-preview guards and per-file failure recovery (`--town-events`, also included in the full suite).
 - `TownEventNativeResourceContracts.cs`: optional installed base/DLC event initialization against synthetic private saves (`--town-events-native <game-directory>`). It reads game resources without touching real profiles; passing is not a claim of in-game playtesting.
 

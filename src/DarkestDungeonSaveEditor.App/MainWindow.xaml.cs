@@ -81,6 +81,9 @@ public partial class MainWindow : Window
         BattleMapPanel.SaveEditBusyChanged += BattleMapPanel_SaveEditBusyChanged;
         BattleMapPanel.ProfileBrowseChecking += BattleMapPanel_ProfileBrowseChecking;
         BattleMapPanel.ProfileEditChecking += BattleMapPanel_ProfileEditChecking;
+        QuestBoardPanel.ProfileBrowseChecking += BattleMapPanel_ProfileBrowseChecking;
+        QuestBoardPanel.PreviewActionApplied += QuestBoardPanel_PreviewActionApplied;
+        QuestBoardPanel.SaveEditRequested += QuestBoardPanel_SaveEditRequested;
         UpdateCatalogMode();
         StartGameProcessMonitoring();
     }
@@ -120,7 +123,11 @@ public partial class MainWindow : Window
         BattleMapPanel.SaveEditBusyChanged -= BattleMapPanel_SaveEditBusyChanged;
         BattleMapPanel.ProfileBrowseChecking -= BattleMapPanel_ProfileBrowseChecking;
         BattleMapPanel.ProfileEditChecking -= BattleMapPanel_ProfileEditChecking;
+        QuestBoardPanel.ProfileBrowseChecking -= BattleMapPanel_ProfileBrowseChecking;
+        QuestBoardPanel.PreviewActionApplied -= QuestBoardPanel_PreviewActionApplied;
+        QuestBoardPanel.SaveEditRequested -= QuestBoardPanel_SaveEditRequested;
         BattleMapPanel.ClearProfile();
+        QuestBoardPanel.DismissTransientUi();
         base.OnClosed(e);
     }
 

@@ -9,6 +9,36 @@ try
         await ContractSuite.RunManagedBridgeOnlyAsync(Path.GetFullPath(args[0]));
         return;
     }
+    if (args.Length == 2 && args[1] == "--tutorial-battle")
+    {
+        await ContractSuite.RunTutorialBattleOnlyAsync(Path.GetFullPath(args[0]));
+        return;
+    }
+    if (args.Length == 2 && args[1] == "--quest-completion")
+    {
+        await ContractSuite.RunQuestCompletionOnlyAsync(Path.GetFullPath(args[0]));
+        return;
+    }
+    if (args.Length == 2 && args[1] == "--wave-battle")
+    {
+        await ContractSuite.RunWaveBattleOnlyAsync(Path.GetFullPath(args[0]));
+        return;
+    }
+    if (args.Length is 2 or 3 && args[1] == "--quest-board-edits")
+    {
+        await ContractSuite.RunQuestBoardEditsAsync(Path.GetFullPath(args[0]), args.Length == 3 ? Path.GetFullPath(args[2]) : null);
+        return;
+    }
+    if (args.Length is 2 or 3 && args[1] == "--quest-board-data")
+    {
+        await ContractSuite.RunQuestBoardDataAsync(Path.GetFullPath(args[0]), args.Length == 3 ? Path.GetFullPath(args[2]) : null);
+        return;
+    }
+    if (args.Length is 2 or 3 && args[1] == "--quest-board-preview")
+    {
+        await ContractSuite.RunQuestBoardPreviewAsync(Path.GetFullPath(args[0]), args.Length == 3 ? Path.GetFullPath(args[2]) : null);
+        return;
+    }
     if (args.Length == 3 && args[1] == "--town-events-native")
     {
         await ContractSuite.RunTownEventsNativeAsync(Path.GetFullPath(args[0]), Path.GetFullPath(args[2]));

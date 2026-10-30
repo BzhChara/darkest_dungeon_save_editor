@@ -66,6 +66,17 @@ public partial class BattleMapView : UserControl
                 !snapshot.RaidSha256.Equals(profileSnapshot.FileHashes["persist.raid.json"], StringComparison.OrdinalIgnoreCase))
                 throw new IOException(EditorText.Get("BattleMapView_ProfileSync_002"));
 
+            if (snapshot.IsWaveBattle || snapshot.IsTutorialRaid)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (generation != _profileGeneration) return;
+                _activeContentSnapshot = content;
+                _encounterCatalog = null;
+                _roomAttachmentCatalog = null;
+                RenderSnapshot(snapshot, fitToView: false);
+                return;
+            }
+
             var encounters = _encounterCatalog;
             if (contentChanged || encounters is null || encounters.DungeonId != snapshot.DungeonId ||
                 encounters.Difficulty != snapshot.Difficulty)

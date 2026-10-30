@@ -9,7 +9,7 @@ public partial class BattleMapView : UserControl
     private async void ForceTownButton_Click(object sender, RoutedEventArgs e)
     {
         if (!CanBrowseProfile()) return;
-        if (_currentSnapshot is null ||
+        if (_currentSnapshot is null or { IsTutorialRaid: true } ||
             _profile is null ||
             _forceTownSaveService is null ||
             _isApplyingEdit)
@@ -106,7 +106,7 @@ public partial class BattleMapView : UserControl
                 MapCanvas.IsHitTestVisible = true;
                 if (generation == _profileGeneration)
                 {
-                    ForceTownButton.IsEnabled = _currentSnapshot is not null;
+                    ForceTownButton.IsEnabled = _currentSnapshot is { IsTutorialRaid: false };
                     StartProfileMonitoring();
                 }
             }

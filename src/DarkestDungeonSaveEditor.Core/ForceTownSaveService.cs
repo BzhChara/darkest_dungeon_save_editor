@@ -100,6 +100,8 @@ public sealed class ForceTownSaveService
         {
             throw new InvalidOperationException(EditorText.Get("ForceTownSaveService_004"));
         }
+        if (previousRaidDungeon == "tutorial" || expectedSnapshot.IsTutorialRaid)
+            throw new InvalidOperationException(EditorText.Get("BattleMapView_Tutorial_Message"));
 
         baseRoot["inraid"] = false;
         baseRoot["raiddungeon"] = "none";

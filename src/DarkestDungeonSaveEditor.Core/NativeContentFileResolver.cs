@@ -94,7 +94,7 @@ internal static class NativeContentFileResolver
         List<string> issues)
         => ResolveOpenRequests(sources, requests, contentLabel, issues).Values.ToArray();
 
-    private static IReadOnlyDictionary<string, EffectiveContentFile> ResolveOpenRequests(
+    internal static IReadOnlyDictionary<string, EffectiveContentFile> ResolveOpenRequests(
         IReadOnlyList<ActiveContentSource> sources,
         IEnumerable<string> requests,
         string contentLabel,

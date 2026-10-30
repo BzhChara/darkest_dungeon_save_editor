@@ -34,7 +34,8 @@ internal static partial class ContractSuite
             appSourceDirectory,
             "BattleMapView.xaml");
         var battleMapXaml = LoadLocalizedContractXaml(battleMapXamlPath);
-        var battleMapXamlText = File.ReadAllText(battleMapXamlPath);
+        var battleMapXamlText = File.ReadAllText(battleMapXamlPath) + Environment.NewLine +
+            File.ReadAllText(Path.Combine(appSourceDirectory, "MapViewStyles.xaml"));
         var battleMapCode = string.Join(
             Environment.NewLine,
             Directory.EnumerateFiles(
@@ -42,7 +43,8 @@ internal static partial class ContractSuite
                     "BattleMapView*.cs",
                     SearchOption.TopDirectoryOnly)
                 .OrderBy(path => path, StringComparer.Ordinal)
-                .Select(File.ReadAllText));
+                .Select(File.ReadAllText)) + Environment.NewLine +
+            File.ReadAllText(Path.Combine(appSourceDirectory, "MapMenuIcons.cs"));
         var liveRefreshCode = File.ReadAllText(Path.Combine(appSourceDirectory, "BattleMapView.LiveRefresh.cs"));
         foreach (var handler in new[] { "BattleMapView.Commands.cs", "BattleMapView.ForceTown.cs" })
         {
@@ -702,8 +704,9 @@ internal static partial class ContractSuite
                 .All(tabItem => tabItem.Elements(presentationNamespace + "DataGrid").Count() == 1 &&
                                 !tabItem.Elements(presentationNamespace + "Border").Any()) &&
             mainWindowXaml.Descendants(presentationNamespace + "TabItem").Skip(4).Single()
-                .Elements().Single().Name.LocalName == "BattleMapView",
-            "The four catalogs plus battle workspace must share the full width equally, keep their headers centered, and avoid wrapping the catalog grids in nested borders.");
+                .Elements(presentationNamespace + "Grid").Single().Elements().Select(element => element.Name.LocalName)
+                .SequenceEqual(new[] { "BattleMapView", "QuestBoardPreview" }),
+            "The four catalogs plus the town/raid workspace must share the full width equally, keep their headers centered, and avoid wrapping the catalog grids in nested borders.");
         var catalogTabHeaders = mainWindowXaml
             .Descendants(presentationNamespace + "TabItem")
             .Select(tab => tab.Attribute("Header")?.Value)
@@ -972,8 +975,8 @@ internal static partial class ContractSuite
                 forceTownFinally,
                 @"await NotifySaveEditBusyAsync\(false\);[\s\S]*finally[\s\S]*_isApplyingEdit = false;\s*MapCanvas.IsHitTestVisible = true;") &&
             !forceTownFinally.Contains("if (!committed)", StringComparison.Ordinal) &&
-            forceTownFinally.Contains("ForceTownButton.IsEnabled = _currentSnapshot is not null;", StringComparison.Ordinal),
-            "Force-town completion must await owner synchronization and then unconditionally release its input lock, including failure; the button must follow current snapshot availability.");
+            forceTownFinally.Contains("ForceTownButton.IsEnabled = _currentSnapshot is { IsTutorialRaid: false };", StringComparison.Ordinal),
+            "Force-town completion must await owner synchronization and then unconditionally release its input lock, including failure; the button must follow current snapshot availability and exclude the tutorial.");
         var battleMapLifecycleCode = File.ReadAllText(Path.Combine(
             appSourceDirectory, "BattleMapView.ProfileLifecycle.cs"));
         var showMapSurfaceCode = battleMapLifecycleCode[

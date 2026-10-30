@@ -28,13 +28,13 @@ public partial class BattleMapView : UserControl
         {
             var changeRoot = CreateMenuItem(
                 hasPersistedContent ? EditorText.Get("BattleMapView_Commands_001") : EditorText.Get("BattleMapView_Commands_002"),
-                hasPersistedContent ? BattleMenuIcon.Replace : BattleMenuIcon.Add);
+                hasPersistedContent ? MapMenuIcon.Replace : MapMenuIcon.Add);
             PopulateContentChoices(changeRoot, cell);
             contextMenu.Items.Add(changeRoot);
 
             if (CanEditBattleAttachment(cell))
             {
-                var attachmentRoot = CreateMenuItem(EditorText.Get("BattleMapView_Commands_003"), BattleMenuIcon.Attachment);
+                var attachmentRoot = CreateMenuItem(EditorText.Get("BattleMapView_Commands_003"), MapMenuIcon.Attachment);
                 PopulateBattleAttachmentChoices(attachmentRoot, cell);
                 contextMenu.Items.Add(attachmentRoot);
             }
@@ -43,7 +43,7 @@ public partial class BattleMapView : UserControl
             {
                 contextMenu.Items.Add(CreateAsyncActionMenuItem(
                     EditorText.Get("BattleMapView_Commands_004"),
-                    BattleMenuIcon.Remove,
+                    MapMenuIcon.Remove,
                     () => DeleteContentAsync(cell)));
             }
 
@@ -54,7 +54,7 @@ public partial class BattleMapView : UserControl
         }
         var moveItem = CreateAsyncActionMenuItem(
             EditorText.Get("BattleMapView_Commands_005"),
-            BattleMenuIcon.MoveParty,
+            MapMenuIcon.MoveParty,
             () => MovePartyAsync(cell));
         moveItem.IsEnabled = !cell.HasParty && !_isApplyingEdit;
         contextMenu.Items.Add(moveItem);
@@ -105,7 +105,7 @@ public partial class BattleMapView : UserControl
 
     private void PopulateContentChoices(MenuItem root, PrototypeMapCell cell)
     {
-        var battleMenu = CreateMenuItem(EditorText.Get("BattleMapView_CellVisuals_013"), BattleMenuIcon.Battle);
+        var battleMenu = CreateMenuItem(EditorText.Get("BattleMapView_CellVisuals_013"), MapMenuIcon.Battle);
         var isFinalRoom = _currentSnapshot is not null &&
                           string.Equals(
                               cell.SourceAreaId,
@@ -116,12 +116,12 @@ public partial class BattleMapView : UserControl
             battleMenu.Items.Add(CreateEncounterPickerItem(
                 cell,
                 EditorText.Get("BattleEncounterSelectionDialog_014"),
-                BattleMenuIcon.Battle,
+                MapMenuIcon.Battle,
                 BattleEncounterClassification.Ordinary));
             battleMenu.Items.Add(CreateEncounterPickerItem(
                 cell,
                 EditorText.Get("BattleMapView_Commands_006"),
-                BattleMenuIcon.Boss,
+                MapMenuIcon.Boss,
                 BattleEncounterClassification.RoamingBoss,
                 BattleEncounterClassification.RoamingEncounter,
                 BattleEncounterClassification.ConditionalOrAdditional));
@@ -132,7 +132,7 @@ public partial class BattleMapView : UserControl
             battleMenu.Items.Add(CreateEncounterPickerItem(
                 cell,
                 EditorText.Get("BattleEncounterSelectionDialog_005"),
-                BattleMenuIcon.Boss,
+                MapMenuIcon.Boss,
                 BattleEncounterClassification.FixedBoss));
         }
         root.Items.Add(battleMenu);
@@ -143,17 +143,17 @@ public partial class BattleMapView : UserControl
         }
 
         var propCatalog = GetCurrentRoomAttachmentCatalog();
-        root.Items.Insert(0, CreateContentPickerItem(cell, EditorText.Get("BattleMapView_CellVisuals_012"), BattleMenuIcon.Curio,
+        root.Items.Insert(0, CreateContentPickerItem(cell, EditorText.Get("BattleMapView_CellVisuals_012"), MapMenuIcon.Curio,
             cell.Kind == PrototypeCellKind.Room ? propCatalog?.Curios ?? [] : propCatalog?.HallCurios ?? []));
         if (cell.Kind == PrototypeCellKind.Room)
         {
-            root.Items.Add(CreateContentPickerItem(cell, EditorText.Get("BattleMapView_Commands_007"), BattleMenuIcon.Treasure, propCatalog?.Treasures ?? []));
+            root.Items.Add(CreateContentPickerItem(cell, EditorText.Get("BattleMapView_Commands_007"), MapMenuIcon.Treasure, propCatalog?.Treasures ?? []));
         }
         else
         {
-            root.Items.Add(CreateRegionalContentItem(cell, EditorText.Get("BattleMapView_CellVisuals_014"), BattleMenuIcon.Trap,
+            root.Items.Add(CreateRegionalContentItem(cell, EditorText.Get("BattleMapView_CellVisuals_014"), MapMenuIcon.Trap,
                 BattleRoomAttachmentKind.Trap));
-            root.Items.Add(CreateRegionalContentItem(cell, EditorText.Get("BattleMapView_CellVisuals_017"), BattleMenuIcon.Obstacle,
+            root.Items.Add(CreateRegionalContentItem(cell, EditorText.Get("BattleMapView_CellVisuals_017"), MapMenuIcon.Obstacle,
                 BattleRoomAttachmentKind.Obstacle));
         }
     }
@@ -182,8 +182,8 @@ public partial class BattleMapView : UserControl
         var catalog = GetCurrentRoomAttachmentCatalog();
         var curios = catalog?.Curios ?? [];
         var treasures = catalog?.Treasures ?? [];
-        root.Items.Add(CreateBattleAttachmentPickerItem(cell, EditorText.Get("BattleMapView_CellVisuals_012"), BattleMenuIcon.Curio, curios));
-        root.Items.Add(CreateBattleAttachmentPickerItem(cell, EditorText.Get("BattleMapView_Commands_007"), BattleMenuIcon.Treasure, treasures));
+        root.Items.Add(CreateBattleAttachmentPickerItem(cell, EditorText.Get("BattleMapView_CellVisuals_012"), MapMenuIcon.Curio, curios));
+        root.Items.Add(CreateBattleAttachmentPickerItem(cell, EditorText.Get("BattleMapView_Commands_007"), MapMenuIcon.Treasure, treasures));
         if (cell.RawContent is
             (int)BattleMapTileContent.GuardedCurio or
             (int)BattleMapTileContent.GuardedTreasure)
@@ -194,7 +194,7 @@ public partial class BattleMapView : UserControl
             });
             root.Items.Add(CreateAsyncActionMenuItem(
                 EditorText.Get("BattleMapView_Commands_008"),
-                BattleMenuIcon.Remove,
+                MapMenuIcon.Remove,
                 () => RemoveBattleAttachmentAsync(cell)));
         }
     }
@@ -202,7 +202,7 @@ public partial class BattleMapView : UserControl
     private MenuItem CreateBattleAttachmentPickerItem(
         PrototypeMapCell cell,
         string label,
-        BattleMenuIcon icon,
+        MapMenuIcon icon,
         IReadOnlyCollection<BattleRoomAttachmentDefinition> candidates)
     {
         if (candidates.Count == 0)
@@ -261,7 +261,7 @@ public partial class BattleMapView : UserControl
     private MenuItem CreateEncounterPickerItem(
         PrototypeMapCell cell,
         string label,
-        BattleMenuIcon icon,
+        MapMenuIcon icon,
         params BattleEncounterClassification[] classifications)
     {
         var candidates = GetEncounterPickerCandidates(cell, classifications);
@@ -473,7 +473,7 @@ public partial class BattleMapView : UserControl
         }
     }
 
-    private MenuItem CreateMenuItem(string header, BattleMenuIcon icon)
+    private MenuItem CreateMenuItem(string header, MapMenuIcon icon)
     {
         return new MenuItem
         {
@@ -483,7 +483,7 @@ public partial class BattleMapView : UserControl
         };
     }
 
-    private MenuItem CreateAsyncActionMenuItem(string header, BattleMenuIcon icon, Func<Task> action)
+    private MenuItem CreateAsyncActionMenuItem(string header, MapMenuIcon icon, Func<Task> action)
     {
         var menuItem = CreateMenuItem(header, icon);
         menuItem.Click += async (_, _) =>

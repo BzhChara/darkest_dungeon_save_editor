@@ -5022,4 +5022,423 @@
   <data xml:space="preserve" name="TrinketCatalog_MissingBuffs">
     <value>未找到依赖 Buff：{0}</value>
   </data>
+  <data name="QuestBoard_Tab" xml:space="preserve">
+    <value>任务板 / QUESTS</value>
+  </data>
+  <data name="QuestBoard_PreviewLabel" xml:space="preserve">
+    <value>示例任务 · 不写入存档</value>
+  </data>
+  <data name="QuestBoard_WindowTitle" xml:space="preserve">
+    <value>任务板 — 界面预览</value>
+  </data>
+  <data name="QuestBoard_Expand" xml:space="preserve">
+    <value>全图</value>
+  </data>
+  <data name="QuestBoard_Collapse" xml:space="preserve">
+    <value>返回</value>
+  </data>
+  <data name="QuestBoard_Add" xml:space="preserve">
+    <value>新建任务</value>
+  </data>
+  <data name="QuestBoard_Replace" xml:space="preserve">
+    <value>替换任务</value>
+  </data>
+  <data name="QuestBoard_Delete" xml:space="preserve">
+    <value>删除任务</value>
+  </data>
+  <data name="QuestBoard_Cancel" xml:space="preserve">
+    <value>取消</value>
+  </data>
+  <data name="QuestBoard_Confirm" xml:space="preserve">
+    <value>放入预览任务板</value>
+  </data>
+  <data name="QuestBoard_SelectTask" xml:space="preserve">
+    <value>选择任务</value>
+  </data>
+  <data name="QuestBoard_TaskType" xml:space="preserve">
+    <value>任务</value>
+  </data>
+  <data name="QuestBoard_Difficulty" xml:space="preserve">
+    <value>难度</value>
+  </data>
+  <data name="QuestBoard_Length" xml:space="preserve">
+    <value>长度</value>
+  </data>
+  <data name="QuestBoard_Objective" xml:space="preserve">
+    <value>任务目标</value>
+  </data>
+  <data name="QuestBoard_Rewards" xml:space="preserve">
+    <value>奖励</value>
+  </data>
+  <data name="QuestBoard_SampleRewards" xml:space="preserve">
+    <value>2 决心经验</value>
+  </data>
+  <data name="QuestBoard_InteractionHint" xml:space="preserve">
+    <value>单击查看 · 右键编辑 · 滚轮缩放 · 右键拖动地图</value>
+  </data>
+  <data name="QuestBoard_MissingArt" xml:space="preserve">
+    <value>请选择暗黑地牢游戏目录，以显示游戏地图和任务图标。</value>
+  </data>
+  <data name="QuestBoard_RegionHint" xml:space="preserve">
+    <value>{0} · 右键新建任务</value>
+  </data>
+  <data name="QuestBoard_RegionChoice" xml:space="preserve">
+    <value>切换此地图位置的地区</value>
+  </data>
+  <data name="QuestBoard_AddInRegion" xml:space="preserve">
+    <value>新建任务 · {0}</value>
+  </data>
+  <data name="QuestBoard_ReplaceInRegion" xml:space="preserve">
+    <value>替换任务 · {0}</value>
+  </data>
+  <data name="QuestBoard_Added" xml:space="preserve">
+    <value>已在预览中添加：{0}。未修改存档。</value>
+  </data>
+  <data name="QuestBoard_Replaced" xml:space="preserve">
+    <value>已在预览中替换：{0}。未修改存档。</value>
+  </data>
+  <data name="QuestBoard_Deleted" xml:space="preserve">
+    <value>已从预览中删除：{0}。未修改存档。</value>
+  </data>
+  <data name="QuestBoard_Region_crypts" xml:space="preserve">
+    <value>遗迹</value>
+  </data>
+  <data name="QuestBoard_Region_weald" xml:space="preserve">
+    <value>荒野</value>
+  </data>
+  <data name="QuestBoard_Region_warrens" xml:space="preserve">
+    <value>兽窟</value>
+  </data>
+  <data name="QuestBoard_Region_cove" xml:space="preserve">
+    <value>海湾</value>
+  </data>
+  <data name="QuestBoard_Region_darkestdungeon" xml:space="preserve">
+    <value>极暗地牢</value>
+  </data>
+  <data name="QuestBoard_Region_town" xml:space="preserve">
+    <value>小镇</value>
+  </data>
+  <data name="QuestBoard_Region_courtyard" xml:space="preserve">
+    <value>庭院</value>
+  </data>
+  <data name="QuestBoard_Region_farm" xml:space="preserve">
+    <value>农庄</value>
+  </data>
+  <data name="QuestBoard_Kind_explore" xml:space="preserve">
+    <value>探索</value>
+  </data>
+  <data name="QuestBoard_Kind_cleanse" xml:space="preserve">
+    <value>肃清</value>
+  </data>
+  <data name="QuestBoard_Kind_gather" xml:space="preserve">
+    <value>收集</value>
+  </data>
+  <data name="QuestBoard_Kind_inventory_activate" xml:space="preserve">
+    <value>激活</value>
+  </data>
+  <data name="QuestBoard_Kind_kill_boss" xml:space="preserve">
+    <value>击败首领</value>
+  </data>
+  <data name="QuestBoard_Kind_recovery" xml:space="preserve">
+    <value>找回丢失的饰品</value>
+  </data>
+  <data name="QuestBoard_Kind_darkest" xml:space="preserve">
+    <value>我们就是火焰</value>
+  </data>
+  <data name="QuestBoard_Kind_invasion" xml:space="preserve">
+    <value>狼群叩门</value>
+  </data>
+  <data name="QuestBoard_Kind_courtyard" xml:space="preserve">
+    <value>击败男爵</value>
+  </data>
+  <data name="QuestBoard_Kind_wave" xml:space="preserve">
+    <value>农庄远征</value>
+  </data>
+  <data name="QuestBoard_Difficulty_1" xml:space="preserve">
+    <value>学徒 · 1</value>
+  </data>
+  <data name="QuestBoard_Difficulty_3" xml:space="preserve">
+    <value>老兵 · 3</value>
+  </data>
+  <data name="QuestBoard_Difficulty_5" xml:space="preserve">
+    <value>冠军 · 5</value>
+  </data>
+  <data name="QuestBoard_Difficulty_6" xml:space="preserve">
+    <value>极暗 · 6</value>
+  </data>
+  <data name="QuestBoard_Length_1" xml:space="preserve">
+    <value>短途</value>
+  </data>
+  <data name="QuestBoard_Length_2" xml:space="preserve">
+    <value>中途</value>
+  </data>
+  <data name="QuestBoard_Length_3" xml:space="preserve">
+    <value>长途</value>
+  </data>
+  <data name="QuestBoard_Length_5" xml:space="preserve">
+    <value>史诗</value>
+  </data>
+  <data name="QuestBoard_Goal_explore" xml:space="preserve">
+    <value>探索 90% 的房间。</value>
+  </data>
+  <data name="QuestBoard_Goal_cleanse" xml:space="preserve">
+    <value>完成所有房间战斗。</value>
+  </data>
+  <data name="QuestBoard_Goal_gather" xml:space="preserve">
+    <value>收集任务所需物品。</value>
+  </data>
+  <data name="QuestBoard_Goal_inventory_activate" xml:space="preserve">
+    <value>使用所需物品激活任务目标。</value>
+  </data>
+  <data name="QuestBoard_Goal_kill_boss" xml:space="preserve">
+    <value>找到并击败该地区的首领。</value>
+  </data>
+  <data name="QuestBoard_Goal_recovery" xml:space="preserve">
+    <value>迎战尖叫魔，找回丢失的饰品。</value>
+  </data>
+  <data name="QuestBoard_Goal_darkest" xml:space="preserve">
+    <value>击败蹒跚的惊骇。</value>
+  </data>
+  <data name="QuestBoard_Goal_invasion" xml:space="preserve">
+    <value>抵御土匪，保卫小镇。</value>
+  </data>
+  <data name="QuestBoard_Goal_courtyard" xml:space="preserve">
+    <value>找到并击败男爵。</value>
+  </data>
+  <data name="QuestBoard_Goal_wave" xml:space="preserve">
+    <value>在农庄的波次战斗中生存。</value>
+  </data>
+  <data name="QuestBoard_Title" xml:space="preserve">
+    <value>当前没有可显示的任务板</value>
+  </data>
+  <data name="QuestBoard_LoadFirst" xml:space="preserve">
+    <value>载入当前档案并完成同步后，小镇状态显示任务板，副本状态显示战斗地图。</value>
+  </data>
+  <data name="QuestBoard_TrinketAccuracyStone" xml:space="preserve">
+    <value>命中魔石</value>
+  </data>
+  <data name="QuestBoard_TrinketToughRing" xml:space="preserve">
+    <value>坚韧戒指</value>
+  </data>
+  <data name="QuestBoard_TrinketSpeedStone" xml:space="preserve">
+    <value>速度魔石</value>
+  </data>
+  <data name="QuestBoard_TrinketStunningSatchel" xml:space="preserve">
+    <value>眩晕背包</value>
+  </data>
+  <data name="QuestBoard_EstateMap" xml:space="preserve">
+    <value>领地地图</value>
+  </data>
+  <data name="QuestBoard_CategoryExplore" xml:space="preserve">
+    <value>探索</value>
+  </data>
+  <data name="QuestBoard_CategoryCleanse" xml:space="preserve">
+    <value>肃清</value>
+  </data>
+  <data name="QuestBoard_CategoryGather" xml:space="preserve">
+    <value>收集</value>
+  </data>
+  <data name="QuestBoard_CategoryInventoryActivate" xml:space="preserve">
+    <value>使用任务物品</value>
+  </data>
+  <data name="QuestBoard_CategoryActivate" xml:space="preserve">
+    <value>直接交互</value>
+  </data>
+  <data name="QuestBoard_CategoryKillBoss" xml:space="preserve">
+    <value>首领目标</value>
+  </data>
+  <data name="QuestBoard_CategoryWave" xml:space="preserve">
+    <value>波次战斗</value>
+  </data>
+  <data name="QuestBoard_Count" xml:space="preserve">
+    <value>显示 {0} / {1} 个任务</value>
+  </data>
+  <data name="QuestBoard_SelectionHint" xml:space="preserve">
+    <value>选择要放入预览任务板的任务。</value>
+  </data>
+  <data name="QuestBoard_Description_explore" xml:space="preserve">
+    <value>探索这片区域，查明未知房间与通路。</value>
+  </data>
+  <data name="QuestBoard_Description_cleanse" xml:space="preserve">
+    <value>清剿盘踞在这片区域各个房间里的敌人。</value>
+  </data>
+  <data name="QuestBoard_Description_gather" xml:space="preserve">
+    <value>搜寻这片区域，收集小镇需要的物资。</value>
+  </data>
+  <data name="QuestBoard_Description_inventory_activate" xml:space="preserve">
+    <value>携带所需物资，找到并激活任务目标。</value>
+  </data>
+  <data name="QuestBoard_Description_kill_boss" xml:space="preserve">
+    <value>深入这片区域，消灭潜藏其中的强敌。</value>
+  </data>
+  <data name="QuestBoard_Description_recovery" xml:space="preserve">
+    <value>尖叫魔囤积着遗失的饰品。迎战它，将失物夺回。</value>
+  </data>
+  <data name="QuestBoard_Description_darkest" xml:space="preserve">
+    <value>深入极暗地牢，迎战蹒跚的惊骇。</value>
+  </data>
+  <data name="QuestBoard_Description_invasion" xml:space="preserve">
+    <value>土匪正在袭击小镇。击败他们的首领，保卫领地。</value>
+  </data>
+  <data name="QuestBoard_Description_courtyard" xml:space="preserve">
+    <value>进入庭院，追踪并击败男爵。</value>
+  </data>
+  <data name="QuestBoard_Description_wave" xml:space="preserve">
+    <value>迎战农庄接连不断涌来的敌人。</value>
+  </data>
+  <data name="QuestBoard_Length_4" xml:space="preserve"><value>精疲力竭</value></data>
+  <data name="QuestBoard_Kind_darkest_beacons" xml:space="preserve"><value>照亮前路</value></data>
+  <data name="QuestBoard_Goal_darkest_beacons" xml:space="preserve"><value>使用任务物品激活三座信标。</value></data>
+  <data name="QuestBoard_Description_darkest_beacons" xml:space="preserve"><value>深入极暗地牢，点亮其中的信标。</value></data>
+  <data name="QuestBoard_Kind_darkest_portal" xml:space="preserve"><value>巨怪之胃</value></data>
+  <data name="QuestBoard_Goal_darkest_portal" xml:space="preserve"><value>找到并激活传送门。</value></data>
+  <data name="QuestBoard_Description_darkest_portal" xml:space="preserve"><value>穿过极暗地牢，寻找通往传送门的道路。</value></data>
+  <data name="QuestBoard_Kind_courtyard_intro" xml:space="preserve"><value>焚烧虫巢</value></data>
+  <data name="QuestBoard_Goal_courtyard_intro" xml:space="preserve"><value>使用任务物品焚烧三个虫巢。</value></data>
+  <data name="QuestBoard_Description_courtyard_intro" xml:space="preserve"><value>进入庭院，摧毁盘踞其中的虫巢。</value></data>
+  <data name="QuestBoard_ReadOnlyLabel" xml:space="preserve"><value>当前任务：{0} · 只读</value></data>
+  <data name="QuestBoard_ReadOnly" xml:space="preserve"><value>当前任务板仅供查看。</value></data>
+  <data name="QuestBoard_NoBoard" xml:space="preserve"><value>当前存档没有可显示的任务板。</value></data>
+  <data name="QuestBoard_Unpositioned" xml:space="preserve"><value>没有可用地图位置的任务</value></data>
+  <data name="QuestBoard_DifficultyOther" xml:space="preserve"><value>难度 {0}</value></data>
+  <data name="QuestBoard_LengthOther" xml:space="preserve"><value>长度 {0}</value></data>
+  <data name="QuestBoard_DefinitionChanged" xml:space="preserve">
+    <value>任务定义已变化，请重新载入存档后再操作。</value>
+  </data>
+  <data name="QuestBoard_SaveChanged" xml:space="preserve">
+    <value>存档已变化，请同步后重新操作。</value>
+  </data>
+  <data name="QuestBoard_Duplicate" xml:space="preserve">
+    <value>任务“{0}”已在任务板上，请替换或删除已有任务。</value>
+  </data>
+  <data name="QuestBoard_MissingType" xml:space="preserve">
+    <value>无法解析任务类型：{0}。</value>
+  </data>
+  <data name="QuestBoard_MissingDungeon" xml:space="preserve">
+    <value>无法解析任务地区：{0}。</value>
+  </data>
+  <data name="QuestBoard_MissingGoal" xml:space="preserve">
+    <value>无法解析任务目标：{0}。</value>
+  </data>
+  <data name="QuestBoard_MissingRarity" xml:space="preserve">
+    <value>无法解析任务奖励稀有度：{0}。</value>
+  </data>
+  <data name="QuestBoard_MissingTrinket" xml:space="preserve">
+    <value>无法解析任务奖励饰品：{0}。</value>
+  </data>
+  <data name="QuestBoard_NoGoals" xml:space="preserve">
+    <value>该任务没有游戏能够载入的任务目标。</value>
+  </data>
+  <data name="QuestBoard_TaskCount" xml:space="preserve">
+    <value>任务板 · {0} 个任务</value>
+  </data>
+  <data name="QuestBoard_PreviewEdit" xml:space="preserve">
+    <value>生成任务安全预览</value>
+  </data>
+  <data name="QuestBoard_WriteConfirmation" xml:space="preserve">
+    <value>确认将这次修改应用到存档？写入前会自动创建备份。</value>
+  </data>
+  <data name="QuestBoard_Backup" xml:space="preserve">
+    <value>备份：{0}</value>
+  </data>
+  <data name="QuestBoard_EditFailed" xml:space="preserve">
+    <value>任务板修改未完成：{0}</value>
+  </data>
+  <data name="QuestBoard_CreateSummary" xml:space="preserve">
+    <value>新建任务：{0}。</value>
+  </data>
+  <data name="QuestBoard_ReplaceSummary" xml:space="preserve">
+    <value>替换任务：{0} → {1}。</value>
+  </data>
+  <data name="QuestBoard_DeleteSummary" xml:space="preserve">
+    <value>删除任务：{0}。</value>
+  </data>
+  <data name="BattleMapView_Tutorial_Title" xml:space="preserve">
+    <value>请先完成新手教程</value>
+  </data>
+  <data name="BattleMapView_Tutorial_Message" xml:space="preserve">
+    <value>老路教程期间不支持地图编辑、强制完成任务和强制返回小镇。</value>
+  </data>
+  <data name="BattleMapView_WaveBattle_Title" xml:space="preserve">
+    <value>暂不支持波次战斗</value>
+  </data>
+  <data name="BattleMapView_WaveBattle_Message" xml:space="preserve">
+    <value>当前副本采用波次战斗（如农庄），无法编辑副本地图。仍可使用“强制返回城镇”。</value>
+  </data>
+  <data name="QuestCompletion_Button" xml:space="preserve">
+    <value>强制完成任务</value>
+  </data>
+  <data name="QuestCompletion_Tooltip" xml:space="preserve">
+    <value>强制满足当前副本的任务目标，再由游戏返回和结算。</value>
+  </data>
+  <data name="QuestCompletion_Summary" xml:space="preserve">
+    <value>任务：{0}
+目标 {1} 项；清除战斗位置 {2} 处；补充任务物品 {3} 个。</value>
+  </data>
+  <data name="QuestCompletion_Moved" xml:space="preserve">
+    <value>将队伍移至目标要求的房间。</value>
+  </data>
+  <data name="QuestCompletion_Confirm" xml:space="preserve">
+    <value>清战斗目标会删除剩余相关战斗及其关联的宝箱、机关，不补发跳过战斗或互动的掉落。编辑器保留当前副本，请重新进入游戏返回并结算任务。确认应用这些修改？</value>
+  </data>
+  <data name="QuestCompletion_Definitions" xml:space="preserve">
+    <value>无法可靠读取任务目标定义：{0}</value>
+  </data>
+  <data name="QuestCompletion_Wave" xml:space="preserve">
+    <value>波次副本不支持强制完成任务，仍可强制返回小镇。</value>
+  </data>
+  <data name="QuestCompletion_NoGoals" xml:space="preserve">
+    <value>当前副本没有可完成的任务目标。</value>
+  </data>
+  <data name="QuestCompletion_MissingGoal" xml:space="preserve">
+    <value>找不到任务目标“{0}”的生效定义。</value>
+  </data>
+  <data name="QuestCompletion_FixedBattle" xml:space="preserve">
+    <value>目标“{0}”要求固定战斗次数，读档时计数会重置，删除战斗无法完成它；未写入修改。</value>
+  </data>
+  <data name="QuestCompletion_Unsupported" xml:space="preserve">
+    <value>目标“{0}”的完成类型暂不支持：{1}。未写入修改。</value>
+  </data>
+  <data name="QuestCompletion_Item" xml:space="preserve">
+    <value>当前内容中无法确认任务物品“{0}”的可写入定义。</value>
+  </data>
+  <data name="QuestCompletion_Storage" xml:space="preserve">
+    <value>无法确定当前副本背包容量。</value>
+  </data>
+  <data name="QuestCompletion_RoomConflict" xml:space="preserve">
+    <value>任务目标要求队伍位于不同房间，无法同时完成。</value>
+  </data>
+  <data name="QuestCompletion_Room" xml:space="preserve">
+    <value>当前地图中无法定位目标房间“{0}”。</value>
+  </data>
+  <data name="QuestCompletion_Changed" xml:space="preserve">
+    <value>存档或当前副本已变化，请重新载入档案后再试。</value>
+  </data>
+  <data name="QuestCompletion_Already" xml:space="preserve">
+    <value>支持的任务目标状态已满足要求，无需修改。</value>
+  </data>
+  <data name="QuestCompletion_RecoveryFailed" xml:space="preserve">
+    <value>任务目标写入失败，自动恢复未完成。请检查备份：{0}。</value>
+  </data>
+  <data name="QuestCompletion_Restored" xml:space="preserve">
+    <value>任务目标写入失败，已恢复替换的文件。备份：{0}。</value>
+  </data>
+  <data name="QuestCompletion_Preparing" xml:space="preserve">
+    <value>正在生成任务完成预览……</value>
+  </data>
+  <data name="QuestCompletion_Cancelled" xml:space="preserve">
+    <value>已取消强制完成任务，未写入修改。</value>
+  </data>
+  <data name="QuestCompletion_Log" xml:space="preserve">
+    <value>已为 {0} 写入任务完成条件。备份：{1}。</value>
+  </data>
+  <data name="QuestCompletion_Done" xml:space="preserve">
+    <value>已写入任务完成条件，请重新进入游戏返回并结算任务。</value>
+  </data>
+  <data name="QuestCompletion_Failed" xml:space="preserve">
+    <value>未能写入任务完成条件</value>
+  </data>
+  <data name="QuestCompletion_RefreshFailed" xml:space="preserve">
+    <value>任务完成条件已写入，但界面刷新失败，请重新载入档案。</value>
+  </data>
 </root>

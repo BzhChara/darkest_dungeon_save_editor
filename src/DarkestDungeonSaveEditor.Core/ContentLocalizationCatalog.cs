@@ -63,6 +63,8 @@ internal sealed class ContentLocalizationCatalog
 
     public BilingualContentName GetTownEventDescription(string id) => Get(TownEventDescriptionPrefix + id);
 
+    internal BilingualContentName GetQuestText(string key) => Get(key);
+
     internal static IReadOnlyList<string> GetTownEventKeys(string id) =>
         [TownEventTitlePrefix + id, TownEventDescriptionPrefix + id];
 
@@ -307,7 +309,9 @@ internal sealed class ContentLocalizationCatalog
         key.StartsWith(MonsterNamePrefix, StringComparison.OrdinalIgnoreCase) ||
         key.StartsWith(CurioTitlePrefix, StringComparison.OrdinalIgnoreCase) ||
         key.StartsWith(TownEventTitlePrefix, StringComparison.OrdinalIgnoreCase) ||
-        key.StartsWith(TownEventDescriptionPrefix, StringComparison.OrdinalIgnoreCase);
+        key.StartsWith(TownEventDescriptionPrefix, StringComparison.OrdinalIgnoreCase) ||
+        key.StartsWith("town_quest_", StringComparison.Ordinal) ||
+        key.StartsWith("dungeon_name_", StringComparison.Ordinal);
 
     private static IReadOnlyList<string> EnumerateLocalizationFiles(
         ActiveContentSource source,
