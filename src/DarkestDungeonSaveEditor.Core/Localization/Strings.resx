@@ -3611,16 +3611,12 @@ Backup directory:
     <value>The Bridge or retained expedition changed after interrupted cleanup. Current state was preserved and recovery deferred; inspect the backup: {0}</value>
     <comment>src/DarkestDungeonSaveEditor.Core/ManagedBattleEncounterBridgeService.MaintenanceRecovery.cs</comment>
   </data>
-  <data xml:space="preserve" name="ManagedBattleEncounterBridgeService_001">
-    <value>A legacy managed Bridge was detected. Clean up its files and map references first; a second Bridge will not be generated.</value>
-    <comment>src/DarkestDungeonSaveEditor.Core/ManagedBattleEncounterBridgeService.cs</comment>
-  </data>
   <data xml:space="preserve" name="ManagedBattleEncounterBridgeService_002">
     <value>The enabled managed Bridge is outside this profile's dedicated location: {0}.</value>
     <comment>src/DarkestDungeonSaveEditor.Core/ManagedBattleEncounterBridgeService.cs</comment>
   </data>
   <data xml:space="preserve" name="ManagedBattleEncounterBridgeService_003">
-    <value> Clean up legacy or other-profile Bridge enablement entries and map references first. A second Bridge will not be generated.</value>
+    <value> Check this Bridge's location, profile ownership and saved references before editing battles.</value>
     <comment>src/DarkestDungeonSaveEditor.Core/ManagedBattleEncounterBridgeService.cs</comment>
   </data>
   <data xml:space="preserve" name="ManagedBattleEncounterBridgeService_004">
@@ -3736,7 +3732,7 @@ Backup directory:
     <comment>src/DarkestDungeonSaveEditor.Core/ManagedBattleEncounterBridgeService.cs</comment>
   </data>
   <data xml:space="preserve" name="ManagedBattleEncounterBridgeService_032">
-    <value>The existing Bridge belongs to another profile or has an incompatible version and will not be overwritten.</value>
+    <value>The existing Bridge's identity or version does not match this profile and will not be overwritten.</value>
     <comment>src/DarkestDungeonSaveEditor.Core/ManagedBattleEncounterBridgeService.cs</comment>
   </data>
   <data xml:space="preserve" name="ManagedBattleEncounterBridgeService_033">
@@ -4941,9 +4937,6 @@ Backup directory:
   </data>
   <data name="SaveEditService_Trinkets_Unverified" xml:space="preserve">
     <value>Trinket '{0}' is read-only because its effective definition or dependencies could not be verified. See the catalog warnings in the load log for the specific cause, resolve it, then reload the profile.</value>
-  </data>
-  <data name="ManagedBattleEncounterBridgeService_LegacyTitle" xml:space="preserve">
-    <value>This Bridge uses an old title with fullwidth parentheses and must be cleaned up and recreated before editing battles: {0}. Its files and save references have not been migrated.</value>
   </data>
   <data name="HeroClassCatalog_BuffHashOverride" xml:space="preserve">
     <value>Buff IDs share native hash {0}: {1}. Following native load order, the last complete definition '{2}' from '{3}' is effective. All references to this hash use that definition.</value>

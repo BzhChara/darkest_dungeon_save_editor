@@ -1,8 +1,21 @@
 using System.Xml.Linq;
-using System.Text.Json;
 
 internal static partial class ContractSuite
 {
+    public static async Task RunManagedBridgeOnlyAsync(string repositoryRoot)
+    {
+        var root = Path.Combine(repositoryRoot, "artifacts", "managed-bridge-contracts", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var codec = DsonSaveCodec.CreateNative();
+        await RunBridgeTitleContractsAsync(root, codec);
+        await RunForeignBridgeContractsAsync(root, codec);
+        await RunDedicatedBridgeContractsAsync(root, codec, repositoryRoot);
+        await RunBridgeClassificationContractsAsync(root, codec);
+        await RunEncounterMaintenanceContractsAsync(root, codec);
+        VerifyEditorLocalizationResources(repositoryRoot, root);
+        Console.WriteLine($"Artifacts: {root}");
+    }
+
     private static async Task RunBridgeTitleContractsAsync(string runRoot, DsonSaveCodec codec)
     {
         var root = Path.Combine(runRoot, "bridge-title");
@@ -13,6 +26,16 @@ internal static partial class ContractSuite
         WriteMultiMash(game, "dungeons/ruins/ruins.2.mash.darkest", "hall: .chance 1 .types valid\n");
         CreateBattleMonsterDefinitions(game, ["native", "valid"]);
         var profile = WriteBattleSafetyProfile(Path.Combine(root, "profile"));
+        // An inactive directory left by the retired naming scheme is not an
+        // active provider and must not control creation of the current package.
+        var oldHash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+            System.Text.Encoding.UTF8.GetBytes($"{profile.SteamUserId}/{profile.ProfileId}"))).ToLowerInvariant()[..12];
+        var inactivePackage = Path.Combine(mods, $"DDSE_Managed_Encounter_Bridge_{oldHash}");
+        Directory.CreateDirectory(inactivePackage);
+        var inactiveProject = Path.Combine(inactivePackage, "project.xml");
+        File.WriteAllText(inactiveProject,
+            $"<project><Title>DDSE Managed Encounter Bridge - {profile.ProfileId}-{oldHash}</Title></project>");
+        var inactiveProjectHash = ComputeSha256(inactiveProject);
         var locations = new SaveEditorLocations(root, Path.Combine(root, "workspaces"), Path.Combine(root, "backups"));
         var service = new ManagedBattleEncounterBridgeService(codec, locations, () => false);
         var snapshot = await new BattleMapSnapshotReader(codec).LoadAsync(profile.ProfileDirectory);
@@ -34,6 +57,25 @@ internal static partial class ContractSuite
                ManagedBattleEncounterBridgeService.IsManagedBridgeSource(
                    new ActiveContentSource("fixture", installed.ProjectTitle, "local", Path.Combine(root, "missing-package"), 1)),
             "New Bridge display XML, ownership manifest, saved Mod identity and source recognition must all use ASCII parentheses.");
+        Assert(ComputeSha256(inactiveProject) == inactiveProjectHash &&
+               installed.ActiveContent.Sources.All(source => source.Directory != inactivePackage),
+            "An inactive retired-name directory must remain untouched and must not prevent current Bridge creation.");
+        foreach (var unsupportedTitle in new[]
+                 {
+                     "DDSE_Managed_Encounter_Bridge（profile - contract-user）",
+                     $"DDSE Managed Encounter Bridge - {profile.ProfileId}-{oldHash}"
+                 })
+        {
+            Assert(!ManagedBattleEncounterBridgeService.IsManagedBridgeSource(
+                    new ActiveContentSource("fixture", unsupportedTitle, "local", Path.Combine(root, "missing-package"), 1)),
+                "Retired display names alone must not be treated as current managed Bridge aliases.");
+        }
+        var reused = await service.EnsureEncounterAsync(profile, snapshot, installed.ActiveContent,
+            installed.Catalog, installed.Catalog.BridgeEncounters.Single(row => row.OriginDungeonId == "ruins" && row.MashType == 0),
+            game, null, mods);
+        Assert(!reused.EncounterWasAdded && !reused.ProfileConfigurationChanged &&
+               reused.MashIndex == installed.MashIndex && reused.PackageDirectory == installed.PackageDirectory,
+            "A current Bridge must be reused without duplicating its row or saved Mod entry.");
 
         // Model an existing package with an ASCII folder but the old display/save title.
         const string oldTitle = "DDSE_Managed_Encounter_Bridge（profile - contract-user）";
@@ -53,64 +95,59 @@ internal static partial class ContractSuite
         var ensureError = await CaptureSaveFailureAsync(() => service.EnsureEncounterAsync(
             profile, snapshot, content, catalog, encounter, game, null, mods));
         var maintenanceError = await CaptureSaveFailureAsync(() => service.ReconcileAsync(content, game, mods));
-        var expectedMessage = EditorText.Format("ManagedBattleEncounterBridgeService_LegacyTitle", oldTitle);
+        var expectedMessage = EditorText.Get("ManagedBattleEncounterBridgeService_032");
         var afterPaths = Directory.EnumerateFiles(installed.PackageDirectory, "*", SearchOption.AllDirectories)
             .Concat(Directory.EnumerateFiles(profile.ProfileDirectory, "*", SearchOption.AllDirectories)).ToHashSet();
         Assert(ensureError is InvalidDataException && ensureError.Message == expectedMessage &&
                maintenanceError is InvalidDataException && maintenanceError.Message == expectedMessage &&
                before.Keys.ToHashSet().SetEquals(afterPaths) && before.All(pair => ComputeSha256(pair.Key) == pair.Value),
-            "Old fullwidth titles must produce an explicit rebuild error in creation and maintenance, without migrating, deleting or changing any package/save bytes.");
-        Console.WriteLine("PASS: ASCII Bridge display/save identity and explicit old-title rejection without package or save mutation.");
+            "A mismatched manifest title must use the ordinary identity guard in creation and maintenance without changing any package/save bytes.");
+        Console.WriteLine("PASS: current Bridge identity/reuse, inactive directory isolation, retired alias removal and generic identity guards.");
     }
 
-    private static async Task RunInheritedLegacyBridgeContractsAsync(string runRoot, DsonSaveCodec codec)
+    private static async Task RunForeignBridgeContractsAsync(string runRoot, DsonSaveCodec codec)
     {
-        var root = Path.Combine(runRoot, "inherited-legacy-bridge");
+        var root = Path.Combine(runRoot, "foreign-bridge");
         var game = Path.Combine(root, "game");
         var mods = Path.Combine(game, "mods");
-        var oldPackage = Path.Combine(mods, "renamed-old-package");
-        const string oldTitle = "DDSE Managed Encounter Bridge - profile_other-oldowner";
+        Directory.CreateDirectory(mods);
         const string relativePath = "dungeons/cove/cove.2.mash.darkest";
         WriteMultiMash(game, relativePath, "hall: .chance 1 .types native\nroom: .chance 1 .types native\n");
         WriteMultiMash(game, "dungeons/ruins/ruins.2.mash.darkest", "hall: .chance 1 .types valid\n");
-        var oldMash = WriteMultiMash(oldPackage, relativePath,
-            "hall: .chance 1 .types native\nroom: .chance 1 .types native\nhall: .chance 0 .types historical\n");
-        CreateBattleMonsterDefinitions(game, ["native", "valid", "historical"]);
-        File.WriteAllText(Path.Combine(oldPackage, "project.xml"), $"<project><Title>{oldTitle}</Title></project>");
-        File.WriteAllText(Path.Combine(oldPackage, "modfiles.txt"), $"{relativePath} {new FileInfo(oldMash).Length}\n");
-        File.WriteAllText(Path.Combine(oldPackage, ManagedBattleEncounterBridgeService.ManifestFileName),
-            JsonSerializer.Serialize(new
-            {
-                Version = 3, ProjectTitle = oldTitle, ProfileId = "profile_other", SteamUserId = "old-owner",
-                Tables = new[] { new { DungeonId = "cove", Difficulty = 2, RelativeMashPath = relativePath,
-                    GeneratedMashSha256 = ComputeSha256(oldMash), ContentFingerprint = "old-sources",
-                    Entries = new[] { new { MashType = 0, MashIndex = 1, MonsterIds = new[] { "historical" } } } } }
-            }));
+        CreateBattleMonsterDefinitions(game, ["native", "valid"]);
+        var locations = new SaveEditorLocations(root, Path.Combine(root, "workspaces"), Path.Combine(root, "backups"));
+        var service = new ManagedBattleEncounterBridgeService(codec, locations, () => false);
+        var owner = WriteBattleSafetyProfile(Path.Combine(root, "profile_other")) with { SteamUserId = "other-user" };
+        var ownerSnapshot = await new BattleMapSnapshotReader(codec).LoadAsync(owner.ProfileDirectory);
+        var ownerContent = await ActiveContentResolver.ResolveAsync(owner, game, null, mods, codec, locations.WorkspaceDirectory);
+        var ownerCatalog = BattleEncounterCatalog.Load(ownerContent, ownerSnapshot);
+        var foreign = await service.EnsureEncounterAsync(owner, ownerSnapshot, ownerContent, ownerCatalog,
+            ownerCatalog.BridgeEncounters.Single(row => row.OriginDungeonId == "ruins" && row.MashType == 0), game, null, mods);
+        var foreignHashes = Directory.EnumerateFiles(foreign.PackageDirectory, "*", SearchOption.AllDirectories)
+            .ToDictionary(path => path, ComputeSha256);
         var profile = WriteBattleSafetyProfile(Path.Combine(root, "profile_inherited"));
         var gamePath = Path.Combine(profile.ProfileDirectory, "persist.game.json");
         var configuration = JsonNode.Parse(File.ReadAllText(gamePath))!;
         configuration["base_root"]!["applied_ugcs_1_0"] = new JsonObject
         {
-            ["0"] = new JsonObject { ["name"] = oldTitle, ["source"] = "mod_local_source" }
+            ["0"] = new JsonObject { ["name"] = foreign.ProjectTitle, ["source"] = "mod_local_source" }
         };
         File.WriteAllText(gamePath, configuration.ToJsonString());
         var mapPath = Path.Combine(profile.ProfileDirectory, "persist.map.json");
         var gameHash = ComputeSha256(gamePath);
         var mapHash = ComputeSha256(mapPath);
-        var oldHash = ComputeSha256(oldMash);
         var snapshot = await new BattleMapSnapshotReader(codec).LoadAsync(profile.ProfileDirectory);
-        var locations = new SaveEditorLocations(root, Path.Combine(root, "workspaces"), Path.Combine(root, "backups"));
         var content = await ActiveContentResolver.ResolveAsync(profile, game, null, mods, codec, locations.WorkspaceDirectory);
         var catalog = BattleEncounterCatalog.Load(content, snapshot);
         var source = catalog.BridgeEncounters.Single(row => row.OriginDungeonId == "ruins" && row.MashType == 0);
-        var service = new ManagedBattleEncounterBridgeService(codec, locations, () => false);
         var error = await CaptureSaveFailureAsync(() => service.EnsureEncounterAsync(profile, snapshot, content, catalog,
             source, game, null, mods));
         Assert(error is InvalidOperationException && error.Message.Contains("启用的托管 Bridge", StringComparison.Ordinal) &&
-               ComputeSha256(gamePath) == gameHash && ComputeSha256(mapPath) == mapHash && ComputeSha256(oldMash) == oldHash &&
+               ComputeSha256(gamePath) == gameHash && ComputeSha256(mapPath) == mapHash &&
+               foreignHashes.All(pair => ComputeSha256(pair.Key) == pair.Value) &&
                !Directory.Exists(Path.Combine(mods, ManagedBattleEncounterBridgeService.GetPackageDirectoryName(profile))),
-            "An inherited foreign-owner v3 carrier at a noncanonical folder must block creation before a new index can depend on its copied rows.");
-        Console.WriteLine("PASS: inherited or relocated legacy Bridge rejection before package/save writes.");
+            "An enabled current Bridge belonging to another profile must block creation before any package/save writes.");
+        Console.WriteLine("PASS: current foreign-profile Bridge rejection before package/save writes.");
     }
 
     private static async Task RunDedicatedBridgeContractsAsync(string runRoot, DsonSaveCodec codec, string repositoryRoot)
@@ -267,7 +304,7 @@ internal static partial class ContractSuite
         var legacyHash = ComputeSha256(installed.ManifestPath);
         var versionError = await CaptureSaveFailureAsync(() => service.EnsureEncounterAsync(profile, snapshot,
             content, catalog, valid, game, null, mods));
-        Assert(versionError is InvalidDataException && versionError.Message.Contains("版本不兼容", StringComparison.Ordinal) &&
+        Assert(versionError is InvalidDataException && versionError.Message == EditorText.Get("ManagedBattleEncounterBridgeService_032") &&
                ComputeSha256(installed.ManifestPath) == legacyHash && ComputeSha256(dedicatedPath) == mashHash &&
                ComputeSha256(gamePath) == gameHash && ComputeSha256(mapPath) == mapHash,
             "An old copied-file manifest requires explicit cleanup and must not be silently mixed with version-4 dedicated files.");

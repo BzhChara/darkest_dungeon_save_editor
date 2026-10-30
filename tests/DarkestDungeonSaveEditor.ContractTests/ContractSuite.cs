@@ -73,7 +73,7 @@ internal static partial class ContractSuite
             await RunNativeCatalogReadingContractsAsync(runRoot, codec);
             RunSaveReplacementContracts(runRoot);
             await RunEncounterMaintenanceContractsAsync(runRoot, codec);
-            await RunInheritedLegacyBridgeContractsAsync(runRoot, codec);
+            await RunForeignBridgeContractsAsync(runRoot, codec);
             await RunBattleMapWriteSafetyContractsAsync(runRoot, codec);
             await RunBattleMapContractsAsync(runRoot, codec);
             await RunBridgeClassificationContractsAsync(runRoot, codec);

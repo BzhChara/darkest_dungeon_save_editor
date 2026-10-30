@@ -3611,16 +3611,12 @@
     <value>Bridge 或保留副本在清理中断后已变化，已保留当前状态并暂缓恢复；请检查备份：{0}</value>
     <comment>src/DarkestDungeonSaveEditor.Core/ManagedBattleEncounterBridgeService.MaintenanceRecovery.cs</comment>
   </data>
-  <data xml:space="preserve" name="ManagedBattleEncounterBridgeService_001">
-    <value>检测到旧版托管 Bridge。请先完成旧文件清理和地图引用处理，本次不会生成第二份 Bridge。</value>
-    <comment>src/DarkestDungeonSaveEditor.Core/ManagedBattleEncounterBridgeService.cs</comment>
-  </data>
   <data xml:space="preserve" name="ManagedBattleEncounterBridgeService_002">
     <value>当前启用的托管 Bridge 不在本档案的专用位置：{0}。</value>
     <comment>src/DarkestDungeonSaveEditor.Core/ManagedBattleEncounterBridgeService.cs</comment>
   </data>
   <data xml:space="preserve" name="ManagedBattleEncounterBridgeService_003">
-    <value>请先清理旧版或其他档案的 Bridge 启用项及地图引用，本次不会生成第二份 Bridge。</value>
+    <value>请先核对这个 Bridge 的目录、档案归属和存档引用，再编辑战斗。</value>
     <comment>src/DarkestDungeonSaveEditor.Core/ManagedBattleEncounterBridgeService.cs</comment>
   </data>
   <data xml:space="preserve" name="ManagedBattleEncounterBridgeService_004">
@@ -3736,7 +3732,7 @@
     <comment>src/DarkestDungeonSaveEditor.Core/ManagedBattleEncounterBridgeService.cs</comment>
   </data>
   <data xml:space="preserve" name="ManagedBattleEncounterBridgeService_032">
-    <value>现有托管 Encounter Bridge 不属于当前档案或版本不兼容，程序不会覆盖它。</value>
+    <value>现有 Bridge 的身份或版本与当前档案不匹配，不会覆盖。</value>
     <comment>src/DarkestDungeonSaveEditor.Core/ManagedBattleEncounterBridgeService.cs</comment>
   </data>
   <data xml:space="preserve" name="ManagedBattleEncounterBridgeService_033">
@@ -4941,9 +4937,6 @@
   </data>
   <data name="SaveEditService_Trinkets_Unverified" xml:space="preserve">
     <value>饰品「{0}」暂时只读：无法确认其实际生效的定义或依赖。请查看载入日志中的目录警告，处理具体原因后重新载入存档。</value>
-  </data>
-  <data name="ManagedBattleEncounterBridgeService_LegacyTitle" xml:space="preserve">
-    <value>这个 Bridge 仍使用中文括号旧标题，请先清理并重新生成后再编辑战斗：{0}。原文件和存档引用未自动迁移。</value>
   </data>
   <data name="HeroClassCatalog_BuffHashOverride" xml:space="preserve">
     <value>以下 Buff ID 共用原生哈希 {0}：{1}。已按游戏读取顺序采用最后一份完整定义「{2}」，来源「{3}」。所有引用该哈希的 Buff 均使用此定义。</value>

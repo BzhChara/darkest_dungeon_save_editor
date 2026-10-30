@@ -92,10 +92,6 @@ public sealed partial class ManagedBattleEncounterBridgeService
         var projectTitle = GetProjectTitle(profile);
         var packageDirectory = Path.Combine(installRoot, GetPackageDirectoryName(profile));
         ValidateManagedPackagePath(installRoot, packageDirectory);
-        var oldPackageDirectory = Path.Combine(installRoot,
-            $"DDSE_Managed_Encounter_Bridge_{ShortHash($"{profile.SteamUserId}/{profile.ProfileId}")}");
-        if (Directory.Exists(oldPackageDirectory))
-            throw new InvalidOperationException(EditorText.Get("ManagedBattleEncounterBridgeService_001"));
         foreach (var source in activeContent.Sources.Where(IsManagedBridgeSource))
         {
             if (!Path.GetFullPath(source.Directory).Equals(packageDirectory, StringComparison.OrdinalIgnoreCase))
@@ -397,10 +393,6 @@ public sealed partial class ManagedBattleEncounterBridgeService
     {
         ArgumentNullException.ThrowIfNull(source);
         return source.DisplayName.StartsWith(ProjectTitlePrefix + "(", StringComparison.Ordinal) ||
-               source.DisplayName.StartsWith(ProjectTitlePrefix + "（", StringComparison.Ordinal) ||
-               source.DisplayName.StartsWith(
-                   "DDSE Managed Encounter Bridge - ",
-                   StringComparison.OrdinalIgnoreCase) ||
                File.Exists(Path.Combine(source.Directory, ManifestFileName));
     }
 
@@ -536,10 +528,7 @@ public sealed partial class ManagedBattleEncounterBridgeService
             .OrderBy(entry => entry.Order)
             .Select(entry => entry.Value)
             .Where(entry =>
-                !JsonSupport.ReadString(entry, "name").Equals(projectTitle, StringComparison.OrdinalIgnoreCase) &&
-                !JsonSupport.ReadString(entry, "name").Equals(
-                    $"DDSE Managed Encounter Bridge - {SanitizeSegment(profile.ProfileId, 24)}-{ShortHash($"{profile.SteamUserId}/{profile.ProfileId}")}",
-                    StringComparison.OrdinalIgnoreCase))
+                !JsonSupport.ReadString(entry, "name").Equals(projectTitle, StringComparison.OrdinalIgnoreCase))
             .ToArray();
         var updatedApplied = new JsonObject
         {
@@ -757,15 +746,6 @@ public sealed partial class ManagedBattleEncounterBridgeService
         SaveProfile profile,
         string projectTitle)
     {
-        // The title is also the saved Mod identity. Old packages must be rebuilt
-        // explicitly; changing their XML title alone would leave save references stale.
-        if (manifest.Version == ManifestVersion &&
-            string.Equals(manifest.ProfileId, profile.ProfileId, StringComparison.Ordinal) &&
-            string.Equals(manifest.SteamUserId, profile.SteamUserId, StringComparison.Ordinal) &&
-            string.Equals(manifest.ProjectTitle,
-                $"{ProjectTitlePrefix}（{profile.ProfileId} - {profile.SteamUserId}）", StringComparison.Ordinal))
-            throw new InvalidDataException(EditorText.Format(
-                "ManagedBattleEncounterBridgeService_LegacyTitle", manifest.ProjectTitle));
         if (manifest.Version != ManifestVersion ||
             !string.Equals(manifest.ProjectTitle, projectTitle, StringComparison.Ordinal) ||
             !string.Equals(manifest.ProfileId, profile.ProfileId, StringComparison.Ordinal) ||
@@ -1086,10 +1066,6 @@ public sealed partial class ManagedBattleEncounterBridgeService
         }
         return normalized.Length <= maximumLength ? normalized : normalized[..maximumLength];
     }
-
-    private static string ShortHash(string value) =>
-        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value)))
-            .ToLowerInvariant()[..12];
 
     private static string ComputeSha256(string path)
     {
