@@ -10,8 +10,7 @@ public sealed partial class ManagedBattleEncounterBridgeService
         var recovered = false;
         var journalRoot = Path.Combine(_locations.BackupDirectory, SanitizeSegment(profile.SteamUserId, 48), SanitizeSegment(profile.ProfileId, 48));
         if (!Directory.Exists(journalRoot)) return false;
-        var installRoot = Path.GetFullPath(string.IsNullOrWhiteSpace(localModDirectory) ||
-            File.Exists(Path.Combine(localModDirectory, "project.xml")) ? Path.Combine(gameDirectory, "mods") : localModDirectory);
+        var installRoot = LocalModDirectory.Resolve(gameDirectory, localModDirectory, required: true)!;
         var package = Path.Combine(installRoot, GetPackageDirectoryName(profile));
         foreach (var backup in Directory.EnumerateDirectories(journalRoot).Order(StringComparer.Ordinal))
         {

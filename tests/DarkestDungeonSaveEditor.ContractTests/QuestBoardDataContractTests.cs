@@ -257,10 +257,10 @@ internal static partial class ContractSuite
             await SaveQuest(questDocument);
             var profile = SteamDiscovery.OpenProfile(f.ProfileRoot);
             var content = await ActiveContentResolver.ResolveAsync(profile, f.GameRoot, f.WorkshopRoot,
-                f.AdditionalLocalModDirectory, f.Codec, f.RunRoot);
+                f.LocalModDirectory, f.Codec, f.RunRoot);
             var quantities = await QuantityItemCatalog.LoadAsync(content, f.Codec);
             var reader = new ProfileCatalogSnapshotReader(content, quantities, f.Codec, f.GameRoot,
-                f.WorkshopRoot, f.AdditionalLocalModDirectory, f.RunRoot);
+                f.WorkshopRoot, f.LocalModDirectory, f.RunRoot);
             var first = await reader.ReadAsync();
             Assert(first.QuestBoard?.Quests.Count == 3, "Initial town synchronization must decode the real quest board.");
             var second = await reader.ReadAsync();

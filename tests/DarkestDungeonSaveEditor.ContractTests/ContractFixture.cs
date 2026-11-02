@@ -4,7 +4,7 @@ internal static partial class ContractSuite
         string RunRoot,
         string GameRoot,
         string WorkshopRoot,
-        string AdditionalLocalModDirectory,
+        string LocalModDirectory,
         string AmbiguousDirectLocalModRoot,
         string ActiveWorkshopRoot,
         string ActiveWorkshopDistrictRoot,
@@ -71,8 +71,8 @@ internal static partial class ContractSuite
         var disabledWorkshopRoot = Path.Combine(workshopRoot, "222");
         var localModRoot = Path.Combine(gameRoot, "mods", "LocalTestMod");
         var localBackupRoot = Path.Combine(localModRoot, "project-backup");
-        var additionalLocalModDirectory = Path.Combine(runRoot, "external-local-mods");
-        var externalLocalModRoot = Path.Combine(additionalLocalModDirectory, "ExternalTestMod");
+        var localModDirectory = Path.Combine(gameRoot, "mods");
+        var externalLocalModRoot = Path.Combine(localModDirectory, "ExternalTestMod");
         var externalLocalLocalizationRoot = Path.Combine(externalLocalModRoot, "localization");
         var ambiguousDirectLocalModRoot = Path.Combine(runRoot, "ambiguous-direct-local-mod");
         var baseHeroRoot = Path.Combine(gameRoot, "heroes", "base_hero");
@@ -1915,7 +1915,7 @@ internal static partial class ContractSuite
             runRoot,
             gameRoot,
             workshopRoot,
-            additionalLocalModDirectory,
+            localModDirectory,
             ambiguousDirectLocalModRoot,
             activeWorkshopRoot,
             activeWorkshopDistrictRoot,

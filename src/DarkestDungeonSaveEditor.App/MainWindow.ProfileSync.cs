@@ -340,9 +340,9 @@ public partial class MainWindow : Window
                     if (snapshot.QuestBoard is { } board && (contentChanged || changedFiles.Contains("persist.quest.json")))
                     {
                         var boardDiagnostics = new CatalogDiagnosticBatch();
-                        boardDiagnostics.Add(EditorText.Get("QuestBoard_Title"), board.Issues);
+                        boardDiagnostics.Add(EditorText.Get("QuestBoard_WindowTitle"), board.Issues);
                         if (snapshot.QuestBoardCatalog is { } questCatalog)
-                            boardDiagnostics.Add(EditorText.Get("QuestBoard_Title"), questCatalog.Issues);
+                            boardDiagnostics.Add(EditorText.Get("QuestBoard_WindowTitle"), questCatalog.Issues);
                         CrashDiagnostics.RecordCatalogDiagnostics(boardDiagnostics);
                     }
                     if (trinkets is not null && heroes is not null)

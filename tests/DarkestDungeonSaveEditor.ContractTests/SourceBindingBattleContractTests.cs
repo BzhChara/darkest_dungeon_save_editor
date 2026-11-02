@@ -53,7 +53,7 @@ internal static partial class ContractSuite
             WriteMultiMash(mod, "project.xml", "<project><Title>Binding Provider</Title></project>");
             WriteFixtureManifest(mod);
             var locations = new SaveEditorLocations(root, Path.Combine(root, "work"), Path.Combine(root, "backups"));
-            var content = await ActiveContentResolver.ResolveAsync(profile, game, null, null, codec, locations.WorkspaceDirectory);
+            var content = await ActiveContentResolver.ResolveAsync(profile, game, null, Path.Combine(game, "mods"), codec, locations.WorkspaceDirectory);
             var snapshot = await new BattleMapSnapshotReader(codec).LoadAsync(profile.ProfileDirectory);
             var catalog = BattleEncounterCatalog.Load(content, snapshot);
             var selected = catalog.DirectEncounters.Single(x => x.MashType == 0 && x.MashIndex == 0);
@@ -80,8 +80,8 @@ internal static partial class ContractSuite
             if (scenario == "remap-before-prepare")
             {
                 Mutate();
-                var fresh = await ActiveContentResolver.ResolveAsync(profile, game, null, null, codec, locations.WorkspaceDirectory);
-                var maintenance = await new ManagedBattleEncounterBridgeService(codec, locations).ReconcileAsync(fresh, game, null);
+                var fresh = await ActiveContentResolver.ResolveAsync(profile, game, null, Path.Combine(game, "mods"), codec, locations.WorkspaceDirectory);
+                var maintenance = await new ManagedBattleEncounterBridgeService(codec, locations).ReconcileAsync(fresh, game, Path.Combine(game, "mods"));
                 Assert(!maintenance.Changed && !maintenance.Deferred, "The fresh mapping has no history requiring maintenance.");
             }
             Exception? error = null;
@@ -113,13 +113,13 @@ internal static partial class ContractSuite
         var profile = new SaveProfile("hero_binding", f.ProfileRoot, f.EstatePath, "contract", DateTime.UtcNow);
         var source = Path.Combine(f.LocalModRoot, "project.xml");
         var xml = File.ReadAllText(source);
-        var replacement = Path.Combine(f.AdditionalLocalModDirectory, "binding-replacement", "project.xml");
+        var replacement = Path.Combine(f.LocalModDirectory, "binding-replacement", "project.xml");
         var originals = new[] { f.TownSavePath, f.RosterSavePath, f.UpgradesSavePath }.ToDictionary(p => p, File.ReadAllBytes);
         foreach (var scenario in new[] { "unchanged", "description", "rename-before-preview", "rename-after-preview", "remap-after-preview", "duplicate-after-preview" })
         {
             try
             {
-                var content = await ActiveContentResolver.ResolveAsync(profile, f.GameRoot, f.WorkshopRoot, f.AdditionalLocalModDirectory, f.Codec, root);
+                var content = await ActiveContentResolver.ResolveAsync(profile, f.GameRoot, f.WorkshopRoot, f.LocalModDirectory, f.Codec, root);
                 var catalog = HeroClassCatalog.Load(content);
                 var hero = StagecoachHeroCandidateFactory.Generate(catalog, catalog.HeroClasses.Single(h => h.Id == "local_hero"), 1729);
                 var service = new SaveEditService(f.Codec, new(root, Path.Combine(root, scenario), Path.Combine(root, "backups")));

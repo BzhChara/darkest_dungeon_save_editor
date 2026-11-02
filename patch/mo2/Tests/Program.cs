@@ -412,6 +412,27 @@ try
             Throws<OperationCanceledException>(() => Mo2Compatibility.Prepare(f.Config, f.Game, f.Workshop, cancellation.Token));
             Assert(!Directory.Exists(f.Cache), "no cache created");
         }),
+        ("virtual merge source needs no ordinary Mod directories", f =>
+        {
+            f.Mod("A"); f.List("+A"); f.File("A", "inventory/test.darkest", "one"); f.Manifest(("inventory/test.darkest", "one"));
+            Fixture.Write(Path.Combine(f.Game, "mods/Other/project.xml"), "<project><Title>Other</Title></project>");
+            var appConfig = Path.Combine(AppContext.BaseDirectory, "mo2-compat.json");
+            Assert(!System.IO.File.Exists(appConfig), "test directory has no user config");
+            System.IO.File.Copy(f.Config, appConfig);
+            try
+            {
+                var content = f.Resolve("{\"0\":{\"name\":\"merge mod\",\"source\":\"mod_local_source\"}}",
+                    includeLocalDirectory: false, includeWorkshopDirectory: false);
+                ActiveContentResolver.RequireResolvedModSources(content);
+                Assert(content.Sources.Count == 2 && content.Sources[1].Id == "local:merge mod" &&
+                    content.Resolution!.LocalModDirectory is null && content.Resolution.WorkshopDirectory is null,
+                    "MO2 config resolves the virtual source without implicit ordinary roots");
+                ActiveContentResolver.ValidateSourceBindings(content.Resolution, content.Sources);
+                Throws<InvalidOperationException>(() => f.Resolve("{\"0\":{\"name\":\"Other\",\"source\":\"mod_local_source\"},\"1\":{\"name\":\"merge mod\",\"source\":\"mod_local_source\"}}",
+                    includeLocalDirectory: false, includeWorkshopDirectory: false), "Other");
+            }
+            finally { System.IO.File.Delete(appConfig); }
+        }),
         ("resolver preserves saved Mod slot and rejects stale preview bindings", f =>
         {
             f.Mod("A"); f.List("+A"); f.File("A", "inventory/test.darkest", "one"); f.Manifest(("inventory/test.darkest", "one"));
@@ -558,11 +579,13 @@ internal sealed class Fixture
     internal string Prepare() => Mo2Compatibility.Prepare(Config, Game, Workshop);
     internal ActiveContentSnapshot Content(string directory) => new(new("test", Root, "", "", DateTime.UtcNow), "base",
         [new("base", "base", "base", Game, 0), new("local:merge mod", "merge mod", "local", directory, 1000)], [], "", "", 1, "");
-    internal ActiveContentSnapshot Resolve(string applied)
+    internal ActiveContentSnapshot Resolve(string applied, bool includeLocalDirectory = true, bool includeWorkshopDirectory = true)
     {
         var decoded = Path.Combine(Root, "decoded-game.json");
         Write(decoded, "{\"base_root\":{\"applied_ugcs_1_0\":" + applied + "}}");
-        return ActiveContentResolver.ResolveDecoded(new("test", Root, "", "", DateTime.UtcNow), Game, Workshop, null, Root, decoded, "test");
+        return ActiveContentResolver.ResolveDecoded(new("test", Root, "", "", DateTime.UtcNow), Game,
+            includeWorkshopDirectory ? Workshop : null,
+            includeLocalDirectory ? Path.Combine(Game, "mods") : null, Root, decoded, "test");
     }
     internal static void Write(string path, string text)
     { Directory.CreateDirectory(Path.GetDirectoryName(path)!); System.IO.File.WriteAllText(path, text, new UTF8Encoding(false)); }

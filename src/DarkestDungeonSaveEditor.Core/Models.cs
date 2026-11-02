@@ -64,7 +64,7 @@ public sealed record ActiveContentSnapshot(
 public sealed record ActiveContentResolution(
     string GameDirectory,
     string? WorkshopDirectory,
-    string? AdditionalLocalModDirectory,
+    string? LocalModDirectory,
     string ConfigurationJson);
 
 public sealed record HeroGenerationDefinition(

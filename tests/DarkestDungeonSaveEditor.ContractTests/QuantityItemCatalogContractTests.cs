@@ -17,7 +17,7 @@ internal static partial class ContractSuite
         string gameRoot,
         string workshopRoot,
         string ambiguousDirectLocalModRoot,
-        string additionalLocalModDirectory,
+        string localModDirectory,
         string estatePath,
         string decodedGameSeedPath,
         string activeWorkshopDistrictRoot)
@@ -795,24 +795,21 @@ internal static partial class ContractSuite
             codec,
             Path.Combine(runRoot, "default-local-workspaces"));
         Assert(
-            defaultLocalContent.Sources.Any(source => source.Id == "local:Local Test Mod") &&
-            defaultLocalContent.Sources.All(source => source.Id != "local:External Test Mod") &&
+            defaultLocalContent.Sources.All(source => source.Kind != "local") &&
             defaultLocalContent.Issues.Any(issue => issue.Contains("External Test Mod", StringComparison.Ordinal)),
-            "The compatible resolver overload should keep scanning default local roots and report an external Mod when no extra root is selected.");
+            "Omitting the local directory must leave enabled local Mods unresolved instead of scanning implicit roots.");
 
-        var ambiguousLocalContent = await ActiveContentResolver.ResolveAsync(
+        var invalidLocalRoot = await CaptureSaveFailureAsync(() => ActiveContentResolver.ResolveAsync(
             profile,
             gameRoot,
             workshopRoot,
             ambiguousDirectLocalModRoot,
             codec,
-            Path.Combine(runRoot, "ambiguous-local-workspaces"));
+            Path.Combine(runRoot, "ambiguous-local-workspaces")));
         Assert(
-            ambiguousLocalContent.Sources.All(source => source.Id != "local:Local Test Mod") &&
-            ambiguousLocalContent.Issues.Any(issue =>
-                issue.Contains("Local Test Mod", StringComparison.Ordinal) &&
-                issue.Contains("ambiguous", StringComparison.OrdinalIgnoreCase)),
-            "Selecting a single Mod project directory must detect a duplicate project title across local roots and refuse to guess.");
+            invalidLocalRoot is InvalidOperationException && invalidLocalRoot.Message ==
+                EditorText.Format("LocalModDirectory_WrongRoot", Path.Combine(gameRoot, "mods")),
+            "A single Mod project directory must be rejected instead of added to the game's provider search.");
 
         var radiantProfileRoot = Path.Combine(runRoot, "profile_radiant");
         Directory.CreateDirectory(radiantProfileRoot);
@@ -835,7 +832,7 @@ internal static partial class ContractSuite
             radiantProfile,
             gameRoot,
             workshopRoot,
-            additionalLocalModDirectory,
+            localModDirectory,
             codec,
             Path.Combine(runRoot, "radiant-workspaces"));
         Assert(

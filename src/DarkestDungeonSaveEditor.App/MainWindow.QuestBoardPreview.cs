@@ -37,7 +37,7 @@ public partial class MainWindow
             var prepared = await Task.Run(() => service.PrepareQuestBoardEditAsync(content.Profile, request, content));
             var summary = FormatQuestBoardEdit(prepared.Preview);
             if (!ThemedDialog.Confirm(this, summary + Environment.NewLine + Environment.NewLine +
-                    EditorText.Get("QuestBoard_WriteConfirmation"), EditorText.Get("QuestBoard_Title"))) return;
+                    EditorText.Get("QuestBoard_WriteConfirmation"), EditorText.Get("QuestBoard_WindowTitle"))) return;
             var result = await Task.Run(() => service.CommitAsync(prepared));
             committed = true;
             backupDirectory = result.BackupDirectory;
@@ -50,7 +50,7 @@ public partial class MainWindow
             AppendStatusSafely(EditorText.Format("QuestBoard_EditFailed", error.Message), "QuestBoard: failed edit", DiagnosticLogLevel.Error);
             ThemedDialog.ShowMessage(this, error.Message + (backupDirectory is null ? string.Empty :
                 Environment.NewLine + EditorText.Format("QuestBoard_Backup", backupDirectory)),
-                EditorText.Get("QuestBoard_Title"), ThemedDialogKind.Error);
+                EditorText.Get("QuestBoard_WindowTitle"), ThemedDialogKind.Error);
         }
         finally { await CompleteProfileEditAsync(); }
     }

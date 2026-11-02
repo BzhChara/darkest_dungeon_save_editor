@@ -30,7 +30,7 @@ internal static partial class ContractSuite
         Assert(
             catalogWithEmptyDlc.Trinkets.Count == activeCatalog.Trinkets.Count,
             "An enabled DLC source without a trinkets directory should be ignored without failing the catalog.");
-        Assert(activeCatalog.Trinkets.Count == 15, "Active catalog should contain base, stateful fixtures, enabled DLC package/feature, active Workshop, default/extra local Mods, provenance probes, and one resolved native-hash selection row.");
+        Assert(activeCatalog.Trinkets.Count == 15, "Active catalog should contain base, stateful fixtures, enabled DLC package/feature, active Workshop, selected local Mods, provenance probes, and one resolved native-hash selection row.");
         var activeWorkshopTrinket = activeCatalog.Trinkets.Single(item => item.Id == "active_workshop_trinket");
         Assert(
             activeWorkshopTrinket.LocalizedName == new BilingualContentName("编译工坊饰品", "Compiled Workshop Trinket"),
@@ -40,7 +40,7 @@ internal static partial class ContractSuite
         Assert(
             externalLocalTrinket.Source == "local:External Test Mod" &&
             externalLocalTrinket.LocalizedName == new BilingualContentName("外部契约饰品", "External Contract Trinket"),
-            "The selected extra local Mod directory should feed content and bilingual localization catalogs.");
+            "The selected local Mod directory should feed content and bilingual localization catalogs.");
         Assert(activeCatalog.Trinkets.Any(item => item.Id == "dlc_shared_trinket"), "Enabled DLC package root trinket is missing.");
         Assert(activeCatalog.Trinkets.Any(item => item.Id == "enabled_dlc_trinket"), "Enabled DLC feature trinket is missing.");
         Assert(activeCatalog.Trinkets.All(item => item.Id != "disabled_dlc_trinket"), "A disabled DLC feature trinket must not be scanned.");

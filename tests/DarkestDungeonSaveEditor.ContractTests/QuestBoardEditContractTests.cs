@@ -222,7 +222,8 @@ internal static partial class ContractSuite
         var codec = DsonSaveCodec.CreateNative();
         var profile = SteamDiscovery.OpenProfile(directory);
         var content = await ActiveContentResolver.ResolveAsync(profile, @"E:\Steam\steamapps\common\DarkestDungeon",
-            @"E:\Steam\steamapps\workshop\content\262060", codec, Path.Combine(root, "resolve"));
+            @"E:\Steam\steamapps\workshop\content\262060", @"E:\Steam\steamapps\common\DarkestDungeon\mods",
+            codec, Path.Combine(root, "resolve"));
         var saves = new Dictionary<string, JsonObject>();
         foreach (var path in Directory.GetFiles(directory, "persist*.json"))
         {

@@ -205,9 +205,13 @@ public partial class MainWindow : Window
 
     private static string RequireDirectory(string value, string label)
     {
-        if (string.IsNullOrWhiteSpace(value) || !Directory.Exists(value.Trim()))
+        if (string.IsNullOrWhiteSpace(value))
         {
-            throw new DirectoryNotFoundException(EditorText.Format("MainWindow_Presentation_023", label, value));
+            throw new DirectoryNotFoundException(EditorText.Format("Directory_Required", label));
+        }
+        if (!Directory.Exists(value.Trim()))
+        {
+            throw new DirectoryNotFoundException(EditorText.Format("MainWindow_Presentation_023", label, value.Trim()));
         }
 
         return Path.GetFullPath(value.Trim());

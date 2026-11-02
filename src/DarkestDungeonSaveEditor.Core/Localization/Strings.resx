@@ -1280,7 +1280,7 @@ Right-click to open the action menu</value>
     <comment>src/DarkestDungeonSaveEditor.App/MainWindow.Discovery.cs</comment>
   </data>
   <data xml:space="preserve" name="MainWindow_Discovery_011">
-    <value>Select a local Mod root or a single Mod directory</value>
+    <value>Select the mods directory inside the selected game installation</value>
     <comment>src/DarkestDungeonSaveEditor.App/MainWindow.Discovery.cs</comment>
   </data>
   <data xml:space="preserve" name="MainWindow_Discovery_012">
@@ -4720,19 +4720,19 @@ Backup directory:
     <comment>src/DarkestDungeonSaveEditor.App/MainWindow.xaml</comment>
   </data>
   <data xml:space="preserve" name="MainWindow_014">
-    <value>Empty on startup; auto-discovery fills the default Steam library path, which can still be changed manually</value>
+    <value>Required when the save enables Workshop Mods. Auto-discovery fills the Steam library path.</value>
     <comment>src/DarkestDungeonSaveEditor.App/MainWindow.xaml</comment>
   </data>
   <data xml:space="preserve" name="MainWindow_015">
-    <value>Extra local Mod directory (optional)</value>
+    <value>Local Mod directory</value>
     <comment>src/DarkestDungeonSaveEditor.App/MainWindow.xaml</comment>
   </data>
   <data xml:space="preserve" name="MainWindow_016">
-    <value>Empty on startup; auto-discovery fills the game's mods directory. You can choose another root or a single Mod directory containing project.xml.</value>
+    <value>Required. Select this game's mods directory, or click automatic discovery to fill it.</value>
     <comment>src/DarkestDungeonSaveEditor.App/MainWindow.xaml</comment>
   </data>
   <data xml:space="preserve" name="MainWindow_017">
-    <value>The default mods directory is always scanned. Add another location here.</value>
+    <value>The selected game's mods directory. It may contain no Mods.</value>
     <comment>src/DarkestDungeonSaveEditor.App/MainWindow.xaml</comment>
   </data>
   <data xml:space="preserve" name="MainWindow_018">
@@ -5029,7 +5029,7 @@ Backup directory:
     <value>Sample board · No save changes</value>
   </data>
   <data name="QuestBoard_WindowTitle" xml:space="preserve">
-    <value>Quest board — UI preview</value>
+    <value>Quest board</value>
   </data>
   <data name="QuestBoard_Expand" xml:space="preserve">
     <value>Full map</value>
@@ -5440,5 +5440,26 @@ Objectives: {1}; battle locations to clear: {2}; quest items to add: {3}.</value
   </data>
   <data name="QuestCompletion_RefreshFailed" xml:space="preserve">
     <value>Objective changes were written, but refreshing the display failed. Reload the profile.</value>
+  </data>
+  <data name="LocalModDirectory_WrongRoot" xml:space="preserve">
+    <value>The local Mod directory must be: {0}</value>
+  </data>
+  <data name="LocalModDirectory_Required" xml:space="preserve">
+    <value>Please fill in "Local Mod directory", or click "Discover".</value>
+  </data>
+  <data name="LocalModDirectory_NotDirectory" xml:space="preserve">
+    <value>The local Mod path points to a file, not a folder: {0}</value>
+  </data>
+  <data name="Directory_Required" xml:space="preserve">
+    <value>Please fill in "{0}", or click "Discover".</value>
+  </data>
+  <data name="ProfileDirectory_Label" xml:space="preserve">
+    <value>Save profile directory</value>
+  </data>
+  <data name="ProfileDirectory_MissingEstate" xml:space="preserve">
+    <value>The selected directory does not contain persist.estate.json. Select the individual profile_* save folder.</value>
+  </data>
+  <data name="CatalogLogDiagnostics_UnavailableLocalDirectory" xml:space="preserve">
+    <value>The save enables local Mod '{0}', but the local Mod directory is not configured or is unavailable. Select this game's mods directory, then reload the profile.</value>
   </data>
 </root>

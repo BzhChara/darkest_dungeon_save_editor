@@ -79,7 +79,7 @@ internal static partial class ContractSuite
         {
             ((TextBox)Get("GameDirectoryTextBox")!).Text = f.GameRoot;
             ((TextBox)Get("WorkshopDirectoryTextBox")!).Text = f.WorkshopRoot;
-            ((TextBox)Get("LocalModDirectoryTextBox")!).Text = f.AdditionalLocalModDirectory;
+            ((TextBox)Get("LocalModDirectoryTextBox")!).Text = f.LocalModDirectory;
             ((TextBox)Get("ProfileDirectoryTextBox")!).Text = f.ProfileRoot;
             await ((Task)Call("LoadCatalogAsync", new object?[] { null })!).WaitAsync(TimeSpan.FromSeconds(90));
             Assert((bool)Get("_syncReady")! &&

@@ -42,6 +42,16 @@ internal static partial class ContractSuite
         var content = await ActiveContentResolver.ResolveAsync(profile, game, null, mods, codec, locations.WorkspaceDirectory);
         var catalog = BattleEncounterCatalog.Load(content, snapshot);
         var encounter = catalog.BridgeEncounters.Single(row => row.OriginDungeonId == "ruins" && row.MashType == 0);
+        var beforeBridge = ComputeSha256(Path.Combine(profile.ProfileDirectory, "persist.game.json"));
+        foreach (var invalidRoot in new string?[] { null, inactivePackage, Path.Combine(root, "external-mods") })
+        {
+            Exception? failure = null;
+            try { await service.EnsureEncounterAsync(profile, snapshot, content, catalog, encounter, game, null, invalidRoot); }
+            catch (InvalidOperationException error) { failure = error; }
+            Assert(failure?.Message == (invalidRoot is null ? EditorText.Get("LocalModDirectory_Required") : EditorText.Format("LocalModDirectory_WrongRoot", mods)) &&
+                ComputeSha256(Path.Combine(profile.ProfileDirectory, "persist.game.json")) == beforeBridge,
+                "Bridge creation must require the game's configured mods root, with no fallback and no save writes on failure.");
+        }
         var installed = await service.EnsureEncounterAsync(profile, snapshot, content, catalog, encounter, game, null, mods);
         var projectPath = Path.Combine(installed.PackageDirectory, "project.xml");
         var project = XDocument.Load(projectPath);

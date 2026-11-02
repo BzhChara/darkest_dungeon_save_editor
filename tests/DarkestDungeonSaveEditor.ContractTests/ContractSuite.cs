@@ -15,7 +15,7 @@ internal static partial class ContractSuite
         VerifyEditorLocalizationResources(repositoryRoot, runRoot);
         var gameRoot = fixture.GameRoot;
         var workshopRoot = fixture.WorkshopRoot;
-        var additionalLocalModDirectory = fixture.AdditionalLocalModDirectory;
+        var localModDirectory = fixture.LocalModDirectory;
         var ambiguousDirectLocalModRoot = fixture.AmbiguousDirectLocalModRoot;
         var activeWorkshopRoot = fixture.ActiveWorkshopRoot;
         var activeWorkshopDistrictRoot = fixture.ActiveWorkshopDistrictRoot;
@@ -108,7 +108,7 @@ internal static partial class ContractSuite
             profile,
             gameRoot,
             workshopRoot,
-            additionalLocalModDirectory,
+            localModDirectory,
             codec,
             locations.WorkspaceDirectory);
         var activeModSources = activeContent.Sources
@@ -117,10 +117,10 @@ internal static partial class ContractSuite
         Assert(activeContent.AppliedModCount == 4, "Expected four applied Mod records, including one missing Workshop item.");
         Assert(activeModSources.Length == 3, "Expected two resolved local Mods and one resolved Workshop Mod.");
         Assert(activeModSources[0].Id == "local:Local Test Mod", "Applied Mod keys should be sorted numerically.");
-        Assert(activeModSources[1].Id == "local:External Test Mod", "The selected extra local Mod root should participate in numeric applied order.");
+        Assert(activeModSources[1].Id == "local:External Test Mod", "The selected local Mod root should participate in numeric applied order.");
         Assert(
             activeModSources[1].Directory.Equals(Path.GetFullPath(externalLocalModRoot), StringComparison.OrdinalIgnoreCase),
-            "The enabled external local Mod should resolve from the selected additional directory.");
+            "The second enabled local Mod should resolve from the selected mods directory.");
         Assert(activeModSources[2].Id == "workshop:111", "Workshop load order should follow the numeric applied key.");
         Assert(activeContent.Issues.Any(issue => issue.Contains("333", StringComparison.Ordinal)), "Missing enabled Workshop content should be reported.");
         Assert(activeContent.Sources.Any(source => source.Id == "dlc-package:feature_pack"), "An enabled DLC feature should activate its package root content.");
@@ -171,7 +171,7 @@ internal static partial class ContractSuite
             gameRoot,
             workshopRoot,
             ambiguousDirectLocalModRoot,
-            additionalLocalModDirectory,
+            localModDirectory,
             estatePath,
             decodedGameSeedPath,
             activeWorkshopDistrictRoot);
@@ -187,7 +187,7 @@ internal static partial class ContractSuite
         // HP/generation/save contracts below need a complete, resolver-backed set.
         WriteMultiMash(workshopRoot, "333/modfiles.txt", string.Empty);
         activeContent = await ActiveContentResolver.ResolveAsync(profile, gameRoot, workshopRoot,
-            additionalLocalModDirectory, codec, locations.WorkspaceDirectory);
+            localModDirectory, codec, locations.WorkspaceDirectory);
         await RunHeroContractsAsync(
             activeContent,
             trinketState.ActiveCatalog,

@@ -16,7 +16,7 @@ internal static partial class ContractSuite
         await fixture.Codec.EncodeAsync(fixture.DecodedGameSeedPath, fixture.GameSavePath, originalBinaryPath: null);
         var profile = new SaveProfile("profile_7", fixture.ProfileRoot, fixture.EstatePath, "contract-user", DateTime.UtcNow);
         var content = await ActiveContentResolver.ResolveAsync(profile, fixture.GameRoot, fixture.WorkshopRoot,
-            fixture.AdditionalLocalModDirectory, fixture.Codec, Path.Combine(fixture.RunRoot, "workspace"));
+            fixture.LocalModDirectory, fixture.Codec, Path.Combine(fixture.RunRoot, "workspace"));
         var hero = HeroClassCatalog.Load(content).HeroClasses.Single(row => row.Id == "local_hero");
         await VerifyInventoryIdentitiesAsync(content, fixture.RunRoot, fixture.Codec);
         VerifyHeroNativeSemantics(content, hero, fixture.RunRoot);

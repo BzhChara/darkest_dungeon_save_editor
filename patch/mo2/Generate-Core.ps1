@@ -37,12 +37,12 @@ $prepareMerge = @'
 '@
 $text = $text.Replace($returnAnchor, $prepareMerge + "`n" + $returnAnchor)
 $signature = @'
-        string gameDirectory, string? workshopDirectory, string? normalizedAdditionalLocalModDirectory,
+        string gameDirectory, string? workshopDirectory, string? normalizedLocalModDirectory,
         CancellationToken cancellationToken)
 '@
 $validation = @'
         var current = ResolveSources(configuration, resolution.GameDirectory, resolution.WorkshopDirectory,
-            resolution.AdditionalLocalModDirectory, cancellationToken);
+            resolution.LocalModDirectory, cancellationToken);
 '@
 foreach ($required in @($signature, $validation)) {
     if (($text.Split([string[]]@($required), [StringSplitOptions]::None)).Length -ne 2) {

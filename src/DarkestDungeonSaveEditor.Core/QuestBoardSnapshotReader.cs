@@ -91,6 +91,7 @@ public static partial class QuestBoardSnapshotReader
                 new(string.Join("\n", objectives.Select(text => text.Chinese)),
                     string.Join("\n", objectives.Select(text => text.English))), rewards)
             {
+                Category = ReadCategory(type, goalIds, goals),
                 Firewood = camping[key].Count,
                 HasRandomCamping = camping[key].IsRandom,
                 LocalizedCampingTooltip = localization.GetQuestText(CampingKey(camping[key])),

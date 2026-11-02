@@ -313,12 +313,13 @@ public partial class QuestBoardPreview : UserControl
             var root = Item(EditorText.Get(label), icon);
             var choices = EditChoices(regionId);
             root.IsEnabled = choices.Length > 0 && (_fixtureMode || SaveEditRequested is not null);
-            foreach (var nativeType in _fixtureMode
-                         ? new[] { "explore", "cleanse", "gather", "inventory_activate", "activate", "kill_boss", "wave" }
-                         : choices.Select(choice => choice.NativeType).Distinct())
+            var groups = _fixtureMode
+                ? Enum.GetValues<QuestBoardCategory>().Select(category => (Category: (QuestBoardCategory?)category, Type: string.Empty))
+                : choices.Select(choice => (choice.Category, Type: choice.Category is null ? choice.NativeType : string.Empty)).Distinct()
+                    .OrderBy(group => group.Category is { } category ? (int)category : int.MaxValue).ThenBy(group => group.Type);
+            foreach (var (category, nativeType) in groups)
             {
-                var category = QuestBoardPreviewData.NativeCategory(nativeType);
-                var count = choices.Count(choice => choice.NativeType == nativeType);
+                var count = choices.Count(choice => MatchesCategory(choice, category, nativeType));
                 var child = Item((category is { } known ? QuestBoardPreviewData.CategoryName(known) : nativeType) + $" ({count})", category switch
                 {
                     QuestBoardCategory.Cleanse or QuestBoardCategory.Wave => MapMenuIcon.Battle,
@@ -332,7 +333,7 @@ public partial class QuestBoardPreview : UserControl
                 child.Click += async (_, e) =>
                 {
                     e.Handled = true;
-                    if (CanInteract()) await OpenPickerAsync(regionId, nativeType, replacing);
+                    if (CanInteract()) await OpenPickerAsync(regionId, category, nativeType, replacing);
                 };
                 root.Items.Add(child);
             }
@@ -419,17 +420,19 @@ public partial class QuestBoardPreview : UserControl
         _menu = null;
     }
 
-    private async Task OpenPickerAsync(string regionId, string nativeType, Guid? replacing)
+    private static bool MatchesCategory(QuestBoardChoice choice, QuestBoardCategory? category, string nativeType) =>
+        category is not null ? choice.Category == category : choice.Category is null && choice.NativeType == nativeType;
+
+    private async Task OpenPickerAsync(string regionId, QuestBoardCategory? category, string nativeType, Guid? replacing)
     {
         if (!CanInteract()) return;
-        var choices = EditChoices(regionId).Where(choice => choice.NativeType == nativeType).ToArray();
+        var choices = EditChoices(regionId).Where(choice => MatchesCategory(choice, category, nativeType)).ToArray();
         if (choices.Length == 0) return;
         var snapshot = _snapshot;
         CloseMenu();
         var previous = _samples.FirstOrDefault(x => x.Key == replacing);
         var regionName = _regions.FirstOrDefault(item => item.Id == regionId)?.Name ??
             EditorText.ContentName(_editCatalog?.Regions.FirstOrDefault(item => item.Id == regionId)?.LocalizedName ?? BilingualContentName.Empty, regionId);
-        var category = QuestBoardPreviewData.NativeCategory(nativeType);
         var dialog = new QuestBoardPreviewDialog(regionName,
             category is { } known ? QuestBoardPreviewData.CategoryName(known) : nativeType,
             choices, previous?.Choice, _assets, _fixtureMode)

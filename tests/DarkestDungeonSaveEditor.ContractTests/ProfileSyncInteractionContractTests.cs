@@ -67,7 +67,7 @@ internal static partial class ContractSuite
             .GetValue(Get("_catalogSnapshotReader"))!;
         var profile = new SaveProfile("sync_ui", f.ProfileRoot, f.EstatePath, "contract", DateTime.UtcNow);
         var content = await ActiveContentResolver.ResolveAsync(profile, f.GameRoot, f.WorkshopRoot,
-            f.AdditionalLocalModDirectory, f.Codec, f.RunRoot);
+            f.LocalModDirectory, f.Codec, f.RunRoot);
         var items = await QuantityItemCatalog.LoadAsync(content, f.Codec);
         var fingerprint = ProfileCatalogContentFingerprint.Capture(content.Sources);
         var locations = new SaveEditorLocations(f.RunRoot, Path.Combine(f.RunRoot, "ui-work"), Path.Combine(f.RunRoot, "ui-backups"));
@@ -77,7 +77,7 @@ internal static partial class ContractSuite
         var gate = (SemaphoreSlim?)null;
         try
         {
-            await (Task)Call("StartProfileSyncAsync", content, items, f.Codec, f.GameRoot, f.WorkshopRoot, f.AdditionalLocalModDirectory, fingerprint, locations)!;
+            await (Task)Call("StartProfileSyncAsync", content, items, f.Codec, f.GameRoot, f.WorkshopRoot, f.LocalModDirectory, fingerprint, locations)!;
             await Settled();
             ((DispatcherTimer)Get("_gameProcessPoll")!).Stop();
             var service = new SaveEditService(f.Codec, new(f.RunRoot, Path.Combine(f.RunRoot, "ui-work"), Path.Combine(f.RunRoot, "ui-backups")));
@@ -304,7 +304,7 @@ internal static partial class ContractSuite
             var latestItems = await QuantityItemCatalog.LoadAsync(latest, f.Codec);
             Call("StopProfileSync");
             var restart = (Task)Call("StartProfileSyncAsync", latest, latestItems, f.Codec, f.GameRoot, f.WorkshopRoot,
-                f.AdditionalLocalModDirectory, ProfileCatalogContentFingerprint.Capture(latest.Sources), locations)!;
+                f.LocalModDirectory, ProfileCatalogContentFingerprint.Capture(latest.Sources), locations)!;
             gate.Release(); gate = null; await restart; await Settled();
             Assert(Flag("_syncReady") && !Flag("_syncApplying"), "Cancelled older generations must not lock a newly loaded profile.");
             Console.WriteLine("PASS: WPF partial-save recovery and cancellation discard old checks without leaving controls locked.");

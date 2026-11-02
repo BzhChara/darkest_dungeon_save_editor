@@ -65,13 +65,13 @@ internal static partial class ContractSuite
             ((TextBox)Get("GameDirectoryTextBox")!).Text = f.GameRoot;
             var profile = new SaveProfile("operation_sync", f.ProfileRoot, f.EstatePath, "contract", DateTime.UtcNow);
             var content = await ActiveContentResolver.ResolveAsync(profile, f.GameRoot, f.WorkshopRoot,
-                f.AdditionalLocalModDirectory, f.Codec, f.RunRoot);
+                f.LocalModDirectory, f.Codec, f.RunRoot);
             var items = await QuantityItemCatalog.LoadAsync(content, f.Codec);
             Set("_activeContentSnapshot", content);
             Set("_allItems", items.Items);
             Set("_quantitySaveContext", items.SaveContext);
             await (Task)Call("StartProfileSyncAsync", content, items, f.Codec, f.GameRoot, f.WorkshopRoot,
-                f.AdditionalLocalModDirectory, ProfileCatalogContentFingerprint.Capture(content.Sources), locations)!;
+                f.LocalModDirectory, ProfileCatalogContentFingerprint.Capture(content.Sources), locations)!;
             var gold = items.Items.Single(item => item.DisplayId == "gold");
             void SetGold(int amount) => File.WriteAllText(f.EstatePath,
                 QuantityItemSaveEditor.SetAmount(estate, gold, amount).UpdatedRoot.ToJsonString());

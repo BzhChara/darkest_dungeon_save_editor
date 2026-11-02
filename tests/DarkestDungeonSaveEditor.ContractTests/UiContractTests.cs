@@ -201,7 +201,7 @@ internal static partial class ContractSuite
             mainWindowXaml.Descendants(presentationNamespace + "TextBox")
                 .Any(element => element.Attribute(
                     System.Xml.Linq.XName.Get("Name", "http://schemas.microsoft.com/winfx/2006/xaml"))?.Value == "LocalModDirectoryTextBox"),
-            "MainWindow must expose an optional additional local Mod directory selector.");
+            "MainWindow must expose a local Mod directory selector.");
         var pathTextBoxNames = new[]
         {
     "GameDirectoryTextBox",
@@ -729,7 +729,7 @@ internal static partial class ContractSuite
                 StringComparison.Ordinal);
         Assert(
             catalogTabHeaders.SequenceEqual(
-                new[] { "物品  /  ITEMS", "饰品  /  TRINKETS", "事件 / EVENTS", "人物  /  HEROES", "战斗  /  BATTLE" },
+                new[] { "物品", "饰品", "事件", "人物", "战斗" },
                 StringComparer.Ordinal) &&
             mainWindowCode.Contains("QuantityItemCatalog.LoadAsync(activeContent, codec)", StringComparison.Ordinal) &&
             showUnusedItemsCheckBox.Attribute("Checked")?.Value == "ShowUnusedItemsCheckBox_Changed" &&

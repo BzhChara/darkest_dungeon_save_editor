@@ -230,7 +230,7 @@ internal static partial class ContractSuite
         var gameJson = JsonNode.Parse("""{"base_root":{"game_mode":"base","inraid":false,"raiddungeon":"none","applied_ugcs_1_0":{"0":{"name":"Higher priority Mod","source":"mod_local_source"}}}}""")!.AsObject();
         await codec.EncodeAsync(WriteMultiMash(root, "enabled.json", gameJson.ToJsonString()),
             Path.Combine(f.Content.Profile.ProfileDirectory, "persist.game.json"), null);
-        var content = await ActiveContentResolver.ResolveAsync(f.Content.Profile, game, null, codec, Path.Combine(root, "enabled"));
+        var content = await ActiveContentResolver.ResolveAsync(f.Content.Profile, game, null, Path.Combine(game, "mods"), codec, Path.Combine(root, "enabled"));
         ActiveContentResolver.RequireResolvedModSources(content);
         foreach (var samePath in new[] { false, true })
         {

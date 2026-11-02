@@ -141,10 +141,17 @@ internal static partial class ContractSuite
             var before = scenario != "after";
             var root = Path.Combine(runRoot, "bridge-replacement-" + scenario);
             var profile = WriteBattleSafetyProfile(Path.Combine(root, "profile"));
-            var localMods = Path.Combine(root, "mods");
+            var scenarioGame = Path.Combine(root, "game");
+            foreach (var input in Directory.EnumerateFiles(gameRoot, "*", SearchOption.AllDirectories))
+            {
+                var output = Path.Combine(scenarioGame, Path.GetRelativePath(gameRoot, input));
+                Directory.CreateDirectory(Path.GetDirectoryName(output)!);
+                File.Copy(input, output);
+            }
+            var localMods = Path.Combine(scenarioGame, "mods");
             Directory.CreateDirectory(localMods);
             var locations = new SaveEditorLocations(root, Path.Combine(root, "workspaces"), Path.Combine(root, "backups"));
-            var content = await ActiveContentResolver.ResolveAsync(profile, gameRoot, null, localMods, codec, locations.WorkspaceDirectory);
+            var content = await ActiveContentResolver.ResolveAsync(profile, scenarioGame, null, localMods, codec, locations.WorkspaceDirectory);
             var snapshot = await new BattleMapSnapshotReader(codec).LoadAsync(profile.ProfileDirectory);
             var catalog = BattleEncounterCatalog.Load(content, snapshot);
             var source = catalog.BridgeEncounters.Single(row => row.OriginDungeonId == "ruins" && row.MonsterIds.SequenceEqual(["ordinary_probe"]));
@@ -165,7 +172,7 @@ internal static partial class ContractSuite
                 AfterGameReplace = before ? null : update
             };
             var error = await CaptureSaveFailureAsync(() => service.EnsureEncounterAsync(profile, snapshot,
-                content, catalog, source, gameRoot, null, localMods,
+                content, catalog, source, scenarioGame, null, localMods,
                 placementTarget: new BattleMapPlacementTarget("coAB", "tile1")));
             Assert(injected && error is AggregateException && File.ReadAllBytes(gamePath).SequenceEqual(externalBytes) &&
                    Directory.EnumerateDirectories(localMods).Any() && ComputeSha256(snapshot.MapSavePath).Equals(snapshot.MapSha256, StringComparison.OrdinalIgnoreCase),

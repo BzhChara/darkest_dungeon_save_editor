@@ -55,9 +55,9 @@ internal static partial class ContractSuite
         }
 
         // Ordinary parse warnings and a deduplicated source are not missing Mods.
-        WriteMultiMash(f.AdditionalLocalModDirectory, "disabled-invalid/project.xml", "<project>");
+        WriteMultiMash(f.LocalModDirectory, "disabled-invalid/project.xml", "<project>");
         applied["20"] = ModLoadEntry("Local Test Mod");
-        var complete = Resolve(f.WorkshopRoot, f.AdditionalLocalModDirectory);
+        var complete = Resolve(f.WorkshopRoot, f.LocalModDirectory);
         Assert(complete.Issues.Any(issue => issue.StartsWith("Failed to read local Mod project", StringComparison.Ordinal)) &&
             complete.Issues.Any(issue => issue.StartsWith("Enabled content directory appears more than once", StringComparison.Ordinal)),
             "The guard fixture must exercise unrelated discovery warnings and duplicate resolved entries.");
@@ -68,7 +68,7 @@ internal static partial class ContractSuite
         applied["30"] = ModLoadEntry("Missing Local A");
         applied["31"] = ModLoadEntry("Missing Local B");
         applied["32"] = ModLoadEntry("999999", "Steam");
-        var missing = Resolve(f.WorkshopRoot, f.AdditionalLocalModDirectory);
+        var missing = Resolve(f.WorkshopRoot, f.LocalModDirectory);
         var previousCulture = EditorText.Culture;
         try
         {
@@ -87,17 +87,20 @@ internal static partial class ContractSuite
         Console.WriteLine("PASS: missing local/Workshop Mods are listed together in English and Chinese before loading.");
         applied.Remove("30"); applied.Remove("31"); applied.Remove("32");
 
-        var unavailable = ModLoadFailure(Resolve(null, f.AdditionalLocalModDirectory));
+        var unavailable = ModLoadFailure(Resolve(null, f.LocalModDirectory));
         Assert(unavailable.Contains(EditorText.Format("CatalogLogDiagnostics_UnavailableWorkshopDirectory", "111")),
             "An unset Workshop root must identify the saved Workshop ID.");
-        var ambiguous = ModLoadFailure(Resolve(f.WorkshopRoot, f.AmbiguousDirectLocalModRoot));
-        Assert(ambiguous.Contains("Local Test Mod") && ambiguous.Contains(f.AmbiguousDirectLocalModRoot),
+        var duplicateProject = Path.Combine(f.LocalModDirectory, "guard-duplicate", "project.xml");
+        WriteMultiMash(f.LocalModDirectory, "guard-duplicate/project.xml", "<project><Title>Local Test Mod</Title></project>");
+        var ambiguous = ModLoadFailure(Resolve(f.WorkshopRoot, f.LocalModDirectory));
+        Assert(ambiguous.Contains("Local Test Mod") && ambiguous.Contains(Path.GetDirectoryName(duplicateProject)!),
             "Ambiguous enabled local projects must report the title and conflicting paths.");
+        File.Delete(duplicateProject);
         applied["30"] = ModLoadEntry("Unknown Source Mod", "unsupported");
         applied["31"] = ModLoadEntry("not-numeric", "Steam");
         applied["bad-key"] = ModLoadEntry("Malformed Mod");
         applied["32"] = new JsonObject { ["name"] = "Incomplete Mod" };
-        var invalid = ModLoadFailure(Resolve(f.WorkshopRoot, f.AdditionalLocalModDirectory));
+        var invalid = ModLoadFailure(Resolve(f.WorkshopRoot, f.LocalModDirectory));
         Assert(invalid.Contains("Unknown Source Mod") && invalid.Contains("not-numeric") &&
             invalid.Contains(EditorText.Format("ActiveContentResolver_InvalidModRecord", "bad-key")) &&
             invalid.Contains(EditorText.Format("ActiveContentResolver_InvalidModRecord", "32")),
@@ -112,7 +115,7 @@ internal static partial class ContractSuite
         var applied = game["base_root"]!["applied_ugcs_1_0"]!.AsObject();
         applied["30"] = ModLoadEntry("Missing Local A");
         applied["31"] = ModLoadEntry("999999", "Steam");
-        var pendingProject = WriteMultiMash(f.AdditionalLocalModDirectory, "pending-manifest/project.xml",
+        var pendingProject = WriteMultiMash(f.LocalModDirectory, "pending-manifest/project.xml",
             "<project><Title>Pending Manifest Mod</Title></project>");
         applied["32"] = ModLoadEntry("Pending Manifest Mod");
         await WriteModLoadGameAsync(f, game);
@@ -147,8 +150,67 @@ internal static partial class ContractSuite
             ((DispatcherTimer)Get("_gameProcessPoll")!).Stop();
             ((TextBox)Get("GameDirectoryTextBox")!).Text = f.GameRoot;
             ((TextBox)Get("WorkshopDirectoryTextBox")!).Text = f.WorkshopRoot;
-            ((TextBox)Get("LocalModDirectoryTextBox")!).Text = f.AdditionalLocalModDirectory;
             ((TextBox)Get("ProfileDirectoryTextBox")!).Text = f.ProfileRoot;
+            Assert(string.IsNullOrEmpty(((TextBox)Get("LocalModDirectoryTextBox")!).Text),
+                "Starting the editor or setting the game path must not silently fill the local Mod path.");
+            var emptyProfile = Path.Combine(f.RunRoot, "empty-profile");
+            Directory.CreateDirectory(emptyProfile);
+            var missingGame = Path.Combine(f.RunRoot, "missing-game");
+            var missingProfile = Path.Combine(f.RunRoot, "missing-profile");
+            var previousCulture = EditorText.Culture;
+            try
+            {
+                foreach (var language in new[] { "en", "zh-CN" })
+                {
+                    EditorText.Initialize(language, CultureInfo.GetCultureInfo(language));
+                    var chinese = language == "zh-CN";
+                    var cases = new (string Field, string Value, string Message)[]
+                    {
+                        ("GameDirectoryTextBox", "", chinese ? "请填写游戏目录，或点击“自动发现”。" : "Please fill in \"Game directory\", or click \"Discover\"."),
+                        ("GameDirectoryTextBox", "  ", chinese ? "请填写游戏目录，或点击“自动发现”。" : "Please fill in \"Game directory\", or click \"Discover\"."),
+                        ("LocalModDirectoryTextBox", "", chinese ? "请填写本地 Mod 目录，或点击“自动发现”。" : "Please fill in \"Local Mod directory\", or click \"Discover\"."),
+                        ("LocalModDirectoryTextBox", "  ", chinese ? "请填写本地 Mod 目录，或点击“自动发现”。" : "Please fill in \"Local Mod directory\", or click \"Discover\"."),
+                        ("ProfileDirectoryTextBox", "", chinese ? "请填写存档目录，或点击“自动发现”。" : "Please fill in \"Save profile directory\", or click \"Discover\"."),
+                        ("ProfileDirectoryTextBox", "  ", chinese ? "请填写存档目录，或点击“自动发现”。" : "Please fill in \"Save profile directory\", or click \"Discover\"."),
+                        ("GameDirectoryTextBox", missingGame, chinese ? $"游戏目录不存在：{missingGame}" : $"Game directory does not exist: {missingGame}"),
+                        ("ProfileDirectoryTextBox", missingProfile, chinese ? $"存档目录不存在：{missingProfile}" : $"Save profile directory does not exist: {missingProfile}"),
+                        ("LocalModDirectoryTextBox", f.RunRoot, chinese ? $"本地 Mod 目录应为：{f.LocalModDirectory}" : $"The local Mod directory must be: {f.LocalModDirectory}"),
+                        ("ProfileDirectoryTextBox", emptyProfile, chinese ? "所选目录中未找到 persist.estate.json，请选择具体的 profile_* 存档文件夹。" : "The selected directory does not contain persist.estate.json. Select the individual profile_* save folder.")
+                    };
+                    foreach (var test in cases)
+                    {
+                        ((TextBox)Get("GameDirectoryTextBox")!).Text = f.GameRoot;
+                        ((TextBox)Get("LocalModDirectoryTextBox")!).Text = f.LocalModDirectory;
+                        ((TextBox)Get("ProfileDirectoryTextBox")!).Text = f.ProfileRoot;
+                        ((TextBox)Get(test.Field)!).Text = test.Value;
+                        log.Clear();
+                        using (File.Open(resource, FileMode.Open, FileAccess.Read, FileShare.None)) await Load();
+                        Assert(log.Text.Contains(EditorText.Format("MainWindow_CatalogLoading_032", test.Message)) &&
+                            !Flag("_catalogLoading") && !Flag("_syncReady") && !Enabled("PreviewButton") &&
+                            !Enabled("ApplyButton") && !Enabled("BattleMapPanel") && Enabled("PathInputsBorder") &&
+                            Get("_activeContentSnapshot") is null && !File.Exists(manifest) &&
+                            ProfileCatalogSnapshotReader.HashesEqual(before,
+                                ProfileCatalogSnapshotReader.CaptureHashes(SteamDiscovery.OpenProfile(f.ProfileRoot))),
+                            $"Directory preflight must report {language}/{test.Field} clearly before scans or writes, and allow correction. " + log.Text);
+                    }
+                }
+            }
+            finally { EditorText.Initialize(previousCulture.Name, previousCulture); }
+            Console.WriteLine("PASS: WPF directory validation distinguishes blank, missing, wrong-root and incomplete-profile inputs in both languages without scanning or changing saves.");
+            ((TextBox)Get("GameDirectoryTextBox")!).Text = f.GameRoot;
+            ((TextBox)Get("LocalModDirectoryTextBox")!).Text = string.Empty;
+            ((TextBox)Get("ProfileDirectoryTextBox")!).Text = f.ProfileRoot;
+            log.Clear();
+            using (File.Open(resource, FileMode.Open, FileAccess.Read, FileShare.None)) await Load();
+            Assert(!Flag("_catalogLoading") && !Flag("_syncReady") && !Enabled("PreviewButton") &&
+                !Enabled("ApplyButton") && !Enabled("BattleMapPanel") && Enabled("PathInputsBorder") &&
+                log.Text.Contains(EditorText.Get("LocalModDirectory_Required")) &&
+                Get("_activeContentSnapshot") is null && !File.Exists(manifest) &&
+                ProfileCatalogSnapshotReader.HashesEqual(before,
+                    ProfileCatalogSnapshotReader.CaptureHashes(SteamDiscovery.OpenProfile(f.ProfileRoot))),
+                "A blank required local path must fail before scanning, preserve saves and allow correction. " + log.Text);
+            log.Clear();
+            ((TextBox)Get("LocalModDirectoryTextBox")!).Text = f.LocalModDirectory;
             // If content hashing/scanning runs before the guard, the locked resource
             // or absent official manifest generator will fail for a different reason.
             using (File.Open(resource, FileMode.Open, FileAccess.Read, FileShare.None)) await Load();
@@ -192,6 +254,17 @@ internal static partial class ContractSuite
             Assert(Flag("_syncReady") && Get("_lastSyncError") is null && Enabled("BattleMapPanel"),
                 "Corrected sources must recover through explicit reload without restarting. " + log.Text);
             Console.WriteLine("PASS: failed reload clears old catalogs; corrected Mods restore normal loading and editing.");
+
+            var vanillaGame = JsonNode.Parse(File.ReadAllText(f.DecodedGameSeedPath))!.AsObject();
+            vanillaGame["base_root"]!["applied_ugcs_1_0"] = new JsonObject();
+            await WriteModLoadGameAsync(f, vanillaGame);
+            ((TextBox)Get("WorkshopDirectoryTextBox")!).Text = string.Empty;
+            log.Clear();
+            await Load();
+            Assert(Flag("_syncReady") && Get("_activeContentSnapshot") is ActiveContentSnapshot vanillaContent &&
+                vanillaContent.Sources.All(source => source.Kind is not ("local" or "workshop")),
+                "A profile without enabled Mods must load with an explicit local root and blank Workshop field. " + log.Text);
+            Console.WriteLine("PASS: local path is required before scanning; a vanilla profile needs no Workshop directory.");
         }
         finally
         {

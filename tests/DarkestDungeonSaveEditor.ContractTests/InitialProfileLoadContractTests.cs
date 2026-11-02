@@ -36,7 +36,7 @@ internal static partial class ContractSuite
             var log = (TextBox)Get("StatusTextBox")!;
             ((TextBox)Get("GameDirectoryTextBox")!).Text = f.GameRoot;
             ((TextBox)Get("WorkshopDirectoryTextBox")!).Text = f.WorkshopRoot;
-            ((TextBox)Get("LocalModDirectoryTextBox")!).Text = f.AdditionalLocalModDirectory;
+            ((TextBox)Get("LocalModDirectoryTextBox")!).Text = f.LocalModDirectory;
             ((TextBox)Get("ProfileDirectoryTextBox")!).Text = f.ProfileRoot;
 
             SemaphoreSlim? heldGate = null;

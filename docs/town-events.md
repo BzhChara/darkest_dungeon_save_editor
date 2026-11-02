@@ -1,6 +1,6 @@
 # Current town event editing
 
-This feature is in the unreleased source. It replaces an existing current event in town, or adds an event when none is active. Neither operation advances a week or edits buildings directly. Hero generation is also restricted to town.
+Available from beta.6, this feature replaces an existing current event in town, or adds an event when none is active. Neither operation advances a week or edits buildings directly. Hero generation is also restricted to town.
 
 ## Replacement policy
 

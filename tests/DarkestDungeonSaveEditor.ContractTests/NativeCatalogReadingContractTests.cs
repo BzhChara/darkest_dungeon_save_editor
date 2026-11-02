@@ -33,7 +33,7 @@ internal static partial class ContractSuite
             $"{kind}: .chance 1 .types foreign_A\n{kind}: .chance 1 .types foreign_a\n")));
         var locations = new SaveEditorLocations(root, Path.Combine(root, "workspaces"), Path.Combine(root, "backups"));
         WriteFixtureManifest(mod);
-        var content = await ActiveContentResolver.ResolveAsync(profile, game, null, codec, locations.WorkspaceDirectory);
+        var content = await ActiveContentResolver.ResolveAsync(profile, game, null, Path.Combine(game, "mods"), codec, locations.WorkspaceDirectory);
         var reader = new BattleMapSnapshotReader(codec);
         var snapshot = await reader.LoadAsync(profile.ProfileDirectory);
         var catalog = BattleEncounterCatalog.Load(content, snapshot);
@@ -62,7 +62,7 @@ internal static partial class ContractSuite
             catalog = BattleEncounterCatalog.Load(content, snapshot);
             var source = catalog.BridgeEncounters.Single(row => row.OriginDungeonId == "ruins" &&
                 row.MashType == type && row.MonsterIds.SequenceEqual(["foreign_A"]));
-            var installed = await bridge.EnsureEncounterAsync(profile, snapshot, content, catalog, source, game, null, null);
+            var installed = await bridge.EnsureEncounterAsync(profile, snapshot, content, catalog, source, game, null, Path.Combine(game, "mods"));
             Assert(installed.MashIndex == 3, "Every Bridge type must append after all three native slots, including the wrong-case missing row.");
             content = installed.ActiveContent;
             snapshot = await reader.LoadAsync(profile.ProfileDirectory);
@@ -76,14 +76,14 @@ internal static partial class ContractSuite
                     "The corrected global Bridge index must survive DSON write and reload.");
             }
         }
-        Assert(!(await bridge.ReconcileAsync(content, game, null)).Changed,
+        Assert(!(await bridge.ReconcileAsync(content, game, Path.Combine(game, "mods"))).Changed,
             "An unrelated missing-case native row must not invalidate correctly numbered editor battles.");
 
         // Two separate sources can define IDs differing only in case even on Windows.
         WriteMultiMash(mod, "monsters/large/large_a/large_a.info.darkest", "display: .size 1\n");
         WriteMultiMash(mod, "monsters/foreign/foreign_a/foreign_a.info.darkest", "display: .size 1\n");
         WriteFixtureManifest(mod);
-        content = await ActiveContentResolver.ResolveAsync(profile, game, null, codec, locations.WorkspaceDirectory);
+        content = await ActiveContentResolver.ResolveAsync(profile, game, null, Path.Combine(game, "mods"), codec, locations.WorkspaceDirectory);
         catalog = BattleEncounterCatalog.Load(content, snapshot);
         var sizes = BattleEncounterCatalog.ReadMaintenanceMonsterSizes(content.Sources);
         Assert(sizes["large_A"] == 3 && sizes["large_a"] == 1 &&
@@ -92,11 +92,11 @@ internal static partial class ContractSuite
             "A lowercase Mod manifest key cannot answer the uppercase actor's request; it retains the Base size and Boss tag.");
         var lowerSource = catalog.BridgeEncounters.Single(row => row.OriginDungeonId == "ruins" && row.MashType == 0 &&
             row.MonsterIds.SequenceEqual(["foreign_a"]));
-        var lower = await bridge.EnsureEncounterAsync(profile, snapshot, content, catalog, lowerSource, game, null, null);
+        var lower = await bridge.EnsureEncounterAsync(profile, snapshot, content, catalog, lowerSource, game, null, Path.Combine(game, "mods"));
         Assert(lower.EncounterWasAdded && lower.MashIndex == 4,
             "A case-distinct Bridge formation must get its own global index instead of reusing foreign_A.");
         File.Delete(foreignDefinition);
-        var cleanup = await bridge.ReconcileAsync(lower.ActiveContent, game, null);
+        var cleanup = await bridge.ReconcileAsync(lower.ActiveContent, game, Path.Combine(game, "mods"));
         Assert(cleanup.Changed && !cleanup.Deferred && cleanup.RemovedCombinations == 3 &&
                cleanup.ReindexedCombinations == 1 && cleanup.ClearedBattles == 3,
             "A surviving lowercase definition must not conceal a removed uppercase dependency; maintenance must prune it and clear recorded direct/Bridge battles.");

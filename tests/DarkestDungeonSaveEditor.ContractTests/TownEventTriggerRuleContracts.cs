@@ -57,7 +57,7 @@ internal static partial class ContractSuite
         var codec = DsonSaveCodec.CreateNative();
         await codec.EncodeAsync(WriteMultiMash(root, "enabled-game.json", gameSave.ToJsonString()),
             Path.Combine(f.Content.Profile.ProfileDirectory, "persist.game.json"), null);
-        var content = await ActiveContentResolver.ResolveAsync(f.Content.Profile, game, null, codec, Path.Combine(root, "mod-resolve"));
+        var content = await ActiveContentResolver.ResolveAsync(f.Content.Profile, game, null, Path.Combine(game, "mods"), codec, Path.Combine(root, "mod-resolve"));
         var catalog = TownEventCatalog.Load(content);
         var effective = catalog.Events.Single(item => item.Id == "Az");
         var rules = effective.TriggerRules;

@@ -1163,7 +1163,7 @@ internal static partial class ContractSuite
             Path.Combine(managedProfileRoot, "persist.estate.json"),
             "contract-user",
             DateTime.UtcNow);
-        var managedLocalModRoot = Path.Combine(runRoot, "managed-encounter-local-mods");
+        var managedLocalModRoot = Path.Combine(encounterGameRoot, "mods");
         Directory.CreateDirectory(managedLocalModRoot);
         var existingManagedModA = Path.Combine(managedLocalModRoot, "existing-a");
         var existingManagedModB = Path.Combine(managedLocalModRoot, "existing-b");

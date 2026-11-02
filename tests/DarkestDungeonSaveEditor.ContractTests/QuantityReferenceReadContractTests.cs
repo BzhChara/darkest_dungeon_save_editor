@@ -125,9 +125,9 @@ internal static partial class ContractSuite
         foreach (var name in new[] { "roster", "town", "upgrades" }) WriteMultiMash(profileRoot, $"persist.{name}.json", "{\"base_root\":{}}");
         var profile = new SaveProfile("reference-sync", profileRoot, Path.Combine(profileRoot, "persist.estate.json"), "contract", DateTime.UtcNow);
         var originalHashes = ProfileCatalogSnapshotReader.CaptureHashes(profile);
-        var content = await ActiveContentResolver.ResolveAsync(profile, gameRoot, null, codec, root);
+        var content = await ActiveContentResolver.ResolveAsync(profile, gameRoot, null, Path.Combine(gameRoot, "mods"), codec, root);
         var initial = await QuantityItemCatalog.LoadAsync(content, codec);
-        var reader = new ProfileCatalogSnapshotReader(content, initial, codec, gameRoot, null, null, root);
+        var reader = new ProfileCatalogSnapshotReader(content, initial, codec, gameRoot, null, Path.Combine(gameRoot, "mods"), root);
         var healthy = await reader.ReadAsync();
         Assert(healthy.QuantityItems.Items.Single().IsHiddenByDefault, "Healthy empty first event must suppress later cost reference.");
         var original = File.ReadAllBytes(first);

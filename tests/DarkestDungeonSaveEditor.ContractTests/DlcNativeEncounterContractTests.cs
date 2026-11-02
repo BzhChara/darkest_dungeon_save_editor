@@ -44,7 +44,7 @@ internal static partial class ContractSuite
         var sourceHashes = Directory.EnumerateFiles(game, "*.mash.darkest", SearchOption.AllDirectories).ToDictionary(path => path, ComputeSha256);
         var locations = new SaveEditorLocations(root, Path.Combine(root, "workspaces"), Path.Combine(root, "backups"));
         var snapshot = await new BattleMapSnapshotReader(codec).LoadAsync(profile.ProfileDirectory);
-        var content = await ActiveContentResolver.ResolveAsync(profile, game, null, codec, locations.WorkspaceDirectory);
+        var content = await ActiveContentResolver.ResolveAsync(profile, game, null, Path.Combine(game, "mods"), codec, locations.WorkspaceDirectory);
         var catalog = BattleEncounterCatalog.Load(content, snapshot);
         var halls = catalog.Encounters.Where(row => row.MashType == 0 && row.MashIndex is not null).OrderBy(row => row.MashIndex).ToArray();
         Assert(halls.Select(row => row.MonsterIds.Single()).SequenceEqual(
@@ -86,7 +86,7 @@ internal static partial class ContractSuite
                 Assert(package.ExpectedMashIndex == 6, "Probe Bridge must count native retained rows rather than authored lines.");
             }
             var old = catalog.Encounters.Where(row => row.MashIndex is not null).ToArray();
-            result = await service.EnsureEncounterAsync(profile, snapshot, content, catalog, source, game, null, null);
+            result = await service.EnsureEncounterAsync(profile, snapshot, content, catalog, source, game, null, Path.Combine(game, "mods"));
             var manifest = JsonNode.Parse(File.ReadAllText(result.ManifestPath))!;
             var entry = manifest["Tables"]!.AsArray().SelectMany(table => table!["Entries"]!.AsArray())
                 .Single(e => e!["MashType"]!.GetValue<int>() == type)!;
@@ -112,12 +112,12 @@ internal static partial class ContractSuite
         foreach (var dungeon in new[] { "ruins", "farm", "cove" })
         {
             await SetNativeTestDungeonAsync(profile, codec, root, dungeon);
-            content = await ActiveContentResolver.ResolveAsync(profile, game, null, codec, locations.WorkspaceDirectory);
+            content = await ActiveContentResolver.ResolveAsync(profile, game, null, Path.Combine(game, "mods"), codec, locations.WorkspaceDirectory);
             snapshot = await new BattleMapSnapshotReader(codec).LoadAsync(profile.ProfileDirectory);
             catalog = BattleEncounterCatalog.Load(content, snapshot);
             var source = catalog.BridgeEncounters.First(row => row.MashType == 0 &&
                 row.MonsterIds.SequenceEqual(dungeon == "cove" ? ["foreign_hall"] : new[] { "root_hall" }));
-            var reuse = await service.EnsureEncounterAsync(profile, snapshot, content, catalog, source, game, null, null);
+            var reuse = await service.EnsureEncounterAsync(profile, snapshot, content, catalog, source, game, null, Path.Combine(game, "mods"));
             Assert(reuse.MashIndex == (dungeon == "cove" ? 6 : 1) && reuse.EncounterWasAdded == (dungeon != "cove"),
                 "The same formation has a destination-scoped index; returning to a prior region must reuse its retained entry.");
             if (dungeon == "farm")

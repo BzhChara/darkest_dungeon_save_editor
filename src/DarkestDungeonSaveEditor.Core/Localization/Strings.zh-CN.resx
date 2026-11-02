@@ -1148,11 +1148,11 @@
     <comment>src/DarkestDungeonSaveEditor.App/MainWindow.CatalogLoading.cs</comment>
   </data>
   <data xml:space="preserve" name="MainWindow_CatalogLoading_011">
-    <value>副本背包  /  RAID ITEMS</value>
+    <value>副本背包</value>
     <comment>src/DarkestDungeonSaveEditor.App/MainWindow.CatalogLoading.cs</comment>
   </data>
   <data xml:space="preserve" name="MainWindow_CatalogLoading_012">
-    <value>小镇物品  /  ESTATE ITEMS</value>
+    <value>小镇物品</value>
     <comment>src/DarkestDungeonSaveEditor.App/MainWindow.CatalogLoading.cs</comment>
   </data>
   <data xml:space="preserve" name="MainWindow_CatalogLoading_013">
@@ -1280,7 +1280,7 @@
     <comment>src/DarkestDungeonSaveEditor.App/MainWindow.Discovery.cs</comment>
   </data>
   <data xml:space="preserve" name="MainWindow_Discovery_011">
-    <value>选择本地 Mod 根目录或单个 Mod 目录</value>
+    <value>选择当前游戏目录下的 mods 文件夹</value>
     <comment>src/DarkestDungeonSaveEditor.App/MainWindow.Discovery.cs</comment>
   </data>
   <data xml:space="preserve" name="MainWindow_Discovery_012">
@@ -1820,7 +1820,7 @@
     <comment>src/DarkestDungeonSaveEditor.App/MainWindow.RowModels.cs</comment>
   </data>
   <data xml:space="preserve" name="MainWindow_State_001">
-    <value>物品  /  ITEMS</value>
+    <value>物品</value>
     <comment>src/DarkestDungeonSaveEditor.App/MainWindow.State.cs</comment>
   </data>
   <data xml:space="preserve" name="MainWindow_State_002">
@@ -4720,19 +4720,19 @@
     <comment>src/DarkestDungeonSaveEditor.App/MainWindow.xaml</comment>
   </data>
   <data xml:space="preserve" name="MainWindow_014">
-    <value>启动时保持为空；点击自动发现后按 Steam 库默认路径填写，之后仍可手动修改</value>
+    <value>存档启用创意工坊 Mod 时需要；点击自动发现后按 Steam 库默认路径填写。</value>
     <comment>src/DarkestDungeonSaveEditor.App/MainWindow.xaml</comment>
   </data>
   <data xml:space="preserve" name="MainWindow_015">
-    <value>额外本地 Mod 目录（可选）</value>
+    <value>本地 Mod 目录</value>
     <comment>src/DarkestDungeonSaveEditor.App/MainWindow.xaml</comment>
   </data>
   <data xml:space="preserve" name="MainWindow_016">
-    <value>启动时保持为空；点击自动发现后填写游戏目录下的 mods，也可改选其他根目录或含 project.xml 的单个 Mod 目录</value>
+    <value>必填。请选择当前游戏的 mods 文件夹，也可点击自动发现填写。</value>
     <comment>src/DarkestDungeonSaveEditor.App/MainWindow.xaml</comment>
   </data>
   <data xml:space="preserve" name="MainWindow_017">
-    <value>默认 mods 目录仍会扫描；这里可补充其他位置。</value>
+    <value>当前游戏的 mods 文件夹，里面可以没有 Mod。</value>
     <comment>src/DarkestDungeonSaveEditor.App/MainWindow.xaml</comment>
   </data>
   <data xml:space="preserve" name="MainWindow_018">
@@ -4796,7 +4796,7 @@
     <comment>src/DarkestDungeonSaveEditor.App/MainWindow.xaml</comment>
   </data>
   <data xml:space="preserve" name="MainWindow_033">
-    <value>饰品  /  TRINKETS</value>
+    <value>饰品</value>
     <comment>src/DarkestDungeonSaveEditor.App/MainWindow.xaml</comment>
   </data>
   <data xml:space="preserve" name="MainWindow_034">
@@ -4812,7 +4812,7 @@
     <comment>src/DarkestDungeonSaveEditor.App/MainWindow.xaml</comment>
   </data>
   <data xml:space="preserve" name="MainWindow_037">
-    <value>人物  /  HEROES</value>
+    <value>人物</value>
     <comment>src/DarkestDungeonSaveEditor.App/MainWindow.xaml</comment>
   </data>
   <data xml:space="preserve" name="MainWindow_038">
@@ -4832,7 +4832,7 @@
     <comment>src/DarkestDungeonSaveEditor.App/MainWindow.xaml</comment>
   </data>
   <data xml:space="preserve" name="MainWindow_042">
-    <value>战斗  /  BATTLE</value>
+    <value>战斗</value>
     <comment>src/DarkestDungeonSaveEditor.App/MainWindow.xaml</comment>
   </data>
   <data xml:space="preserve" name="MainWindow_043">
@@ -4956,7 +4956,7 @@
   <data name="TownOnlyOperation" xml:space="preserve">
     <value>此操作仅限小镇环境。请先返回小镇并重新载入存档。</value>
   </data>
-  <data name="TownEvent_Tab" xml:space="preserve"><value>事件 / EVENTS</value></data>
+  <data name="TownEvent_Tab" xml:space="preserve"><value>事件</value></data>
   <data name="TownEvent_Id" xml:space="preserve"><value>事件 ID</value></data>
   <data name="TownEvent_Preview" xml:space="preserve"><value>生成事件安全预览</value></data>
   <data name="TownEvent_RequirementsLabel" xml:space="preserve"><value>触发条件：</value></data>
@@ -5023,13 +5023,13 @@
     <value>未找到依赖 Buff：{0}</value>
   </data>
   <data name="QuestBoard_Tab" xml:space="preserve">
-    <value>任务板 / QUESTS</value>
+    <value>任务板</value>
   </data>
   <data name="QuestBoard_PreviewLabel" xml:space="preserve">
     <value>示例任务 · 不写入存档</value>
   </data>
   <data name="QuestBoard_WindowTitle" xml:space="preserve">
-    <value>任务板 — 界面预览</value>
+    <value>任务板</value>
   </data>
   <data name="QuestBoard_Expand" xml:space="preserve">
     <value>全图</value>
@@ -5440,5 +5440,26 @@
   </data>
   <data name="QuestCompletion_RefreshFailed" xml:space="preserve">
     <value>任务完成条件已写入，但界面刷新失败，请重新载入档案。</value>
+  </data>
+  <data name="LocalModDirectory_WrongRoot" xml:space="preserve">
+    <value>本地 Mod 目录应为：{0}</value>
+  </data>
+  <data name="LocalModDirectory_Required" xml:space="preserve">
+    <value>请填写本地 Mod 目录，或点击“自动发现”。</value>
+  </data>
+  <data name="LocalModDirectory_NotDirectory" xml:space="preserve">
+    <value>本地 Mod 路径指向文件而非文件夹：{0}</value>
+  </data>
+  <data name="Directory_Required" xml:space="preserve">
+    <value>请填写{0}，或点击“自动发现”。</value>
+  </data>
+  <data name="ProfileDirectory_Label" xml:space="preserve">
+    <value>存档目录</value>
+  </data>
+  <data name="ProfileDirectory_MissingEstate" xml:space="preserve">
+    <value>所选目录中未找到 persist.estate.json，请选择具体的 profile_* 存档文件夹。</value>
+  </data>
+  <data name="CatalogLogDiagnostics_UnavailableLocalDirectory" xml:space="preserve">
+    <value>存档启用了本地 Mod「{0}」，但本地 Mod 目录未设置或不可用。请选择当前游戏的 mods 文件夹，然后重新载入存档。</value>
   </data>
 </root>

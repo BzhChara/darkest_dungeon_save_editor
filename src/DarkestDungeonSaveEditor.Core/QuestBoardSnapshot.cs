@@ -21,6 +21,7 @@ public sealed record QuestBoardQuest(string SaveKey, string Id, string Type, str
     BilingualContentName LocalizedName, BilingualContentName LocalizedDescription,
     BilingualContentName LocalizedObjective, IReadOnlyList<QuestBoardReward> Rewards)
 {
+    public QuestBoardCategory? Category { get; init; }
     public int Firewood { get; init; }
     public bool HasRandomCamping { get; init; }
     public BilingualContentName LocalizedCampingTooltip { get; init; } = BilingualContentName.Empty;

@@ -13,10 +13,10 @@ internal static partial class ContractSuite
         var profile = new SaveProfile("profile_8", profileRoot, Path.Combine(profileRoot, "persist.estate.json"),
             "contract", DateTime.UtcNow);
         var content = await ActiveContentResolver.ResolveAsync(profile, fixture.GameRoot, fixture.WorkshopRoot,
-            fixture.AdditionalLocalModDirectory, fixture.Codec, root);
+            fixture.LocalModDirectory, fixture.Codec, root);
         var initial = await QuantityItemCatalog.LoadAsync(content, fixture.Codec);
         var reader = new ProfileCatalogSnapshotReader(content, initial, fixture.Codec,
-            fixture.GameRoot, fixture.WorkshopRoot, fixture.AdditionalLocalModDirectory, root);
+            fixture.GameRoot, fixture.WorkshopRoot, fixture.LocalModDirectory, root);
         var first = await reader.ReadAsync();
         Assert(first.Content.SourceGameSha256 == content.SourceGameSha256 &&
             first.FileHashes["persist.game.json"] == content.SourceGameSha256,

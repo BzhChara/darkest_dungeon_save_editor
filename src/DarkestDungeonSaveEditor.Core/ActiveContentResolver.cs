@@ -20,7 +20,7 @@ public static class ActiveContentResolver
             profile,
             gameDirectory,
             workshopDirectory,
-            additionalLocalModDirectory: null,
+            localModDirectory: null,
             codec,
             workspaceRoot,
             cancellationToken);
@@ -30,7 +30,7 @@ public static class ActiveContentResolver
         SaveProfile profile,
         string gameDirectory,
         string? workshopDirectory,
-        string? additionalLocalModDirectory,
+        string? localModDirectory,
         DsonSaveCodec codec,
         string? workspaceRoot = null,
         CancellationToken cancellationToken = default)
@@ -43,15 +43,7 @@ public static class ActiveContentResolver
             throw new DirectoryNotFoundException($"Game directory was not found: {gameDirectory}");
         }
 
-        var normalizedAdditionalLocalModDirectory = string.IsNullOrWhiteSpace(additionalLocalModDirectory)
-            ? null
-            : Path.GetFullPath(additionalLocalModDirectory);
-        if (normalizedAdditionalLocalModDirectory is not null &&
-            !Directory.Exists(normalizedAdditionalLocalModDirectory))
-        {
-            throw new DirectoryNotFoundException(
-                $"Additional local Mod directory was not found: {normalizedAdditionalLocalModDirectory}");
-        }
+        var normalizedLocalModDirectory = LocalModDirectory.Resolve(gameDirectory, localModDirectory);
 
         var gameSavePath = Path.GetFullPath(Path.Combine(profile.ProfileDirectory, "persist.game.json"));
         if (!File.Exists(gameSavePath))
@@ -81,33 +73,32 @@ public static class ActiveContentResolver
 
         await codec.DecodeAsync(sourceCopyPath, decodedGamePath, cancellationToken).ConfigureAwait(false);
         return ResolveDecoded(profile, gameDirectory, workshopDirectory,
-            normalizedAdditionalLocalModDirectory, workspace, decodedGamePath, originalHash, cancellationToken);
+            normalizedLocalModDirectory, workspace, decodedGamePath, originalHash, cancellationToken);
     }
 
     public static ActiveContentSnapshot ResolveDecoded(
         SaveProfile profile,
         string gameDirectory,
         string? workshopDirectory,
-        string? additionalLocalModDirectory,
+        string? localModDirectory,
         string workspace,
         string decodedGamePath,
         string originalHash,
         CancellationToken cancellationToken = default)
     {
         gameDirectory = Path.GetFullPath(gameDirectory);
-        var normalizedAdditionalLocalModDirectory = string.IsNullOrWhiteSpace(additionalLocalModDirectory)
-            ? null : Path.GetFullPath(additionalLocalModDirectory);
+        var normalizedLocalModDirectory = LocalModDirectory.Resolve(gameDirectory, localModDirectory);
         var root = JsonSupport.ReadObject(decodedGamePath);
         profile = RaidSaveLocation.FromGame(profile.ProfileDirectory, root).Bind(profile);
         var baseRoot = JsonSupport.RequireObject(root, "base_root");
         var resolved = ResolveSources(baseRoot, gameDirectory, workshopDirectory,
-            normalizedAdditionalLocalModDirectory, cancellationToken);
+            normalizedLocalModDirectory, cancellationToken);
         return new ActiveContentSnapshot(profile, resolved.GameMode, resolved.Sources, resolved.Issues,
             workspace, decodedGamePath, resolved.AppliedModCount, originalHash)
         {
             Resolution = new(gameDirectory,
                 string.IsNullOrWhiteSpace(workshopDirectory) ? null : Path.GetFullPath(workshopDirectory),
-                normalizedAdditionalLocalModDirectory, ProfileContentConfiguration.Capture(root).ToJsonString())
+                normalizedLocalModDirectory, ProfileContentConfiguration.Capture(root).ToJsonString())
         };
     }
 
@@ -125,7 +116,7 @@ public static class ActiveContentResolver
         if (resolution is null) return;
         var configuration = JsonNode.Parse(resolution.ConfigurationJson)!.AsObject();
         var current = ResolveSources(configuration, resolution.GameDirectory, resolution.WorkshopDirectory,
-            resolution.AdditionalLocalModDirectory, cancellationToken);
+            resolution.LocalModDirectory, cancellationToken);
         issues = current.Issues;
         if (current.Sources.Count != expectedSources.Count ||
             current.Sources.Where((source, index) => !SameBinding(source, expectedSources[index])).Any() ||
@@ -168,7 +159,7 @@ public static class ActiveContentResolver
 
     private static (string GameMode, IReadOnlyList<ActiveContentSource> Sources,
         IReadOnlyList<string> Issues, int AppliedModCount) ResolveSources(JsonObject baseRoot,
-        string gameDirectory, string? workshopDirectory, string? normalizedAdditionalLocalModDirectory,
+        string gameDirectory, string? workshopDirectory, string? normalizedLocalModDirectory,
         CancellationToken cancellationToken)
     {
         var gameMode = JsonSupport.ReadString(baseRoot, "game_mode");
@@ -197,8 +188,7 @@ public static class ActiveContentResolver
         var applied = baseRoot["applied_ugcs_1_0"] as JsonObject;
         var appliedEntries = ReadAppliedEntries(applied, issues);
         var localSources = DiscoverLocalModSources(
-            gameDirectory,
-            normalizedAdditionalLocalModDirectory,
+            LocalModDirectory.Resolve(gameDirectory, normalizedLocalModDirectory),
             issues);
         var normalizedWorkshopDirectory = string.IsNullOrWhiteSpace(workshopDirectory)
             ? null
@@ -239,7 +229,9 @@ public static class ActiveContentResolver
                 id = $"local:{entry.Name}";
                 if (!localSources.TryGetValue(entry.Name, out var candidates) || candidates.Count == 0)
                 {
-                    issues.Add($"Enabled local Mod could not be mapped by project title: {entry.Name}");
+                    issues.Add(normalizedLocalModDirectory is null || !Directory.Exists(normalizedLocalModDirectory)
+                        ? $"Enabled local Mod '{entry.Name}' cannot be resolved because the local Mod directory is unavailable."
+                        : $"Enabled local Mod could not be mapped by project title: {entry.Name}");
                     continue;
                 }
 
@@ -489,20 +481,11 @@ public static class ActiveContentResolver
     }
 
     private static Dictionary<string, IReadOnlyList<string>> DiscoverLocalModSources(
-        string gameDirectory,
-        string? additionalLocalModDirectory,
+        string? localModDirectory,
         List<string> issues)
     {
         var candidates = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
-        var searchRoots = new[]
-            {
-                Path.Combine(gameDirectory, "mods"),
-                Path.Combine(gameDirectory, "dlc"),
-                additionalLocalModDirectory
-            }
-            .Where(path => !string.IsNullOrWhiteSpace(path))
-            .Select(path => Path.GetFullPath(path!))
-            .Distinct(StringComparer.OrdinalIgnoreCase);
+        var searchRoots = localModDirectory is null ? Array.Empty<string>() : new[] { localModDirectory };
         var enumerationOptions = new EnumerationOptions
         {
             RecurseSubdirectories = true,

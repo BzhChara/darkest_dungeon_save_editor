@@ -1,6 +1,6 @@
 # Optional MO2 compatibility package
 
-This is a replacement-component package for **DarkestDungeonSaveEditor 0.1.0-beta.5**. It is not an editor plugin. The ordinary editor source and distribution do not include this adapter. The package contains `DarkestDungeonSaveEditor.Core.dll`, its Chinese resource assembly, an example configuration, and source code. It includes the same native C# codec as the matching editor; normal use does not require Java. The editor's explicit `--codec=java` reference option remains available.
+This is a replacement-component package for **DarkestDungeonSaveEditor 0.1.0-beta.6**. It is not an editor plugin. The ordinary editor source and distribution do not include this adapter. The package contains `DarkestDungeonSaveEditor.Core.dll`, its Chinese resource assembly, an example configuration, and source code. It includes the same native C# codec as the matching editor; normal use does not require Java. The editor's explicit `--codec=java` reference option remains available.
 
 ## Supported setup
 
@@ -19,7 +19,9 @@ This adapter targets **`game_support_DarkestDungeon_20261016_004446`**, tested w
 3. Copy `payload/mo2-compat.example.json` next to the editor executable and rename it to `mo2-compat.json`.
 4. Set the three absolute paths to your actual MO2 **profile**, **mods**, and **overwrite** directories. For a portable installation these are commonly `MO2/profiles/Default`, `MO2/mods`, and `MO2/overwrite`. For a global instance or custom paths, use the actual instance directories shown by MO2. The adapter uses the configured profile; it does not automatically follow the profile selected in MO2.
 5. In MO2, select that same profile and launch the game through MO2. The supported game module automatically refreshes `overwrite/modfiles.txt` and merged files during launch; no manual generation is needed. Save with `merge mod` enabled if necessary. Fully close the game before editing.
-6. Start the editor normally, set the game and Workshop directories as usual, select the save, and load it. You do not need to start this compatibility editor through MO2.
+6. Start the editor normally, set the game and its local `mods` directory (or click automatic discovery), select the save, and load it. Set a Workshop directory if the native save separately enables Workshop items. You do not need to start this compatibility editor through MO2.
+
+The editor's **Local Mod directory** field is the selected game's `mods` folder, not MO2's `mods` or `overwrite` directory. Clicking automatic discovery fills this required field; the editor does not fill it on startup. The compatibility package reads MO2 providers from `mo2-compat.json` independently. The editor still requires the game-local path for maintenance and Encounter Bridge installation, including for a save that enables only the virtual `merge mod`. Workshop paths are needed only for Workshop entries enabled separately in the native save.
 
 Example configuration (JSON requires doubled backslashes):
 
@@ -71,7 +73,7 @@ From this repository, with Windows, PowerShell 7.1+, Git, and a .NET SDK support
 pwsh -NoProfile -File patch/mo2/Build.ps1
 ```
 
-The script builds both Core variants, runs compatibility contracts and public API/version checks, then writes a new `DarkestDungeonSaveEditor-0.1.0-beta.5-MO2-patch.zip` and `SHA256SUMS.txt` under `patch/mo2/artifacts`. It does not overwrite a previous package. `build-info.json` identifies the supported mapper and compatibility revision. The compatibility Core links ordinary Core sources and injects source-resolution and source-validation hooks into a generated resolver under `obj`; unexpected upstream hook changes fail the build.
+The script builds both Core variants, runs compatibility contracts and public API/version checks, then writes a new `DarkestDungeonSaveEditor-0.1.0-beta.6-MO2-patch.zip` and `SHA256SUMS.txt` under `patch/mo2/artifacts`. It does not overwrite a previous package. `build-info.json` identifies the supported mapper and compatibility revision. The compatibility Core links ordinary Core sources and injects source-resolution and source-validation hooks into a generated resolver under `obj`; unexpected upstream hook changes fail the build.
 
 When pairing the patch with a packaged editor, add `-EditorDirectory <extracted-editor-directory>`. The script checks that package's Core version and public API and records its exact SHA-256 as `ordinaryCoreSha256` in `build-info.json`. Without this argument it compares against the local ordinary Core build.
 
@@ -111,6 +113,8 @@ The current source uses `DDSE_Managed_Encounter_Bridge(<profile> - <Steam user>)
 The beta.5 replacement Core also includes the ordinary editor's native hash-identity fixes, two-billion wallet limit, and effective-definition source labels. MO2 group headings ending in `_separator` no longer shift virtual file indices. The 2026-10-20 build passed all 31 compatibility contracts; these are isolated adapter checks, not a new live-game validation of every MO2 setup.
 
 Loading and synchronization now stop when a Mod enabled in the save cannot be resolved, listing the missing local Mod titles or Workshop IDs before manifest preparation or resource scanning. The MO2 adapter performs this check before materializing its merged source. It checks the save's enabled Mod list; it does not require every entry in MO2's `modlist.txt` to appear individually in the save.
+
+The beta.6 package includes the matching editor's town-event, quest-board and expedition-objective services. The resolver hook now carries the explicitly selected game-local `mods` path through ordinary-source validation and Bridge maintenance; MO2 providers still come from the separate JSON configuration. The supported mapper has not changed. These shared features do not imply that every Mod script or MO2 configuration has been tested in game.
 
 ## License
 

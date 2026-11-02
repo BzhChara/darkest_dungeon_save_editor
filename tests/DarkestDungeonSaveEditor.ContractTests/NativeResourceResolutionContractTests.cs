@@ -57,7 +57,7 @@ internal static partial class ContractSuite
         File.WriteAllLines(Path.Combine(mod, "modfiles.txt"), Directory.EnumerateFiles(mod, "*", SearchOption.AllDirectories)
             .Select(path => Path.GetRelativePath(mod, path).Replace('\\', '/'))
             .Where(path => path != "monsters/ghost/ghost_A/ghost_A.info.darkest"));
-        var content = await ActiveContentResolver.ResolveAsync(profile, game, null, codec, Path.Combine(root, "workspace"));
+        var content = await ActiveContentResolver.ResolveAsync(profile, game, null, Path.Combine(game, "mods"), codec, Path.Combine(root, "workspace"));
         VerifyNativeDirectoryDiscovery(root, content);
         await VerifyNativeHashCollisionsAsync(root, content, codec);
         var items = QuantityItemCatalog.LoadDefinitions(content, QuantityItemSaveContext.Raid);

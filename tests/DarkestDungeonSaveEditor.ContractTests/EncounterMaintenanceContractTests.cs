@@ -327,6 +327,20 @@ internal static partial class ContractSuite
                     bridgeBefore!.All(pair => ComputeSha256(pair.Key) == pair.Value), "Failure after map and package replacement must roll both back.");
                 bridge.AfterMaintenanceReplace = null;
             }
+            if (scenario == "direct-only")
+            {
+                Assert(!Directory.EnumerateFileSystemEntries(mods).Any(), "The direct-only fixture has an empty mods folder.");
+                foreach (var inspectOnly in new[] { true, false })
+                {
+                    var missingRoot = await CaptureSaveFailureAsync(() => bridge.ReconcileAsync(content, game, null, inspectOnly: inspectOnly));
+                    Assert(missingRoot is InvalidOperationException && missingRoot.Message ==
+                        EditorText.Get("LocalModDirectory_Required") && ComputeSha256(mapPath) == beforeMap,
+                        "An omitted required root must reject direct maintenance instead of silently accepting stale indexes.");
+                }
+                var inspection = await bridge.ReconcileAsync(content, game, mods, inspectOnly: true);
+                Assert(inspection.RequiresWrite && !inspection.Changed && ComputeSha256(mapPath) == beforeMap,
+                    "An explicitly selected empty mods folder must still inspect invalid direct encounter bindings.");
+            }
             var cleaned = await bridge.ReconcileAsync(content, game, mods);
             Assert(cleaned.Changed && !cleaned.Deferred && cleaned.ClearedBattles == (scenario == "new-raid" ? 0 : installed is null ? 1 : 2),
                 "Any confirmed invalidation clears all and only still-matching placements in the same raid, including direct local placements.");
@@ -366,7 +380,7 @@ internal static partial class ContractSuite
             Assert(File.Exists(Path.Combine(cleaned.BackupDirectory!, Path.GetRelativePath(profile.ProfileDirectory, profile.MapSavePath))) &&
                 File.Exists(Path.Combine(cleaned.BackupDirectory!, "commit-result.json")), "Successful cleanup must retain a complete profile backup and completion record.");
             Assert(!(await bridge.ReconcileAsync(content, game, mods)).Changed, "A completed cleanup retires old placements and must not repeat on the next poll.");
-            if (scenario is "interrupted" or "truncated-marker" or "incomplete-marker" or "external")
+            if (scenario is "interrupted" or "truncated-marker" or "incomplete-marker" or "external" or "direct-only")
             {
                 var marker = Path.Combine(cleaned.BackupDirectory!, "commit-result.json");
                 if (scenario is "truncated-marker" or "incomplete-marker")

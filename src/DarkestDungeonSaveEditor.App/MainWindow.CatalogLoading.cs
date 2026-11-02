@@ -49,22 +49,21 @@ public partial class MainWindow : Window
             var workshopDirectory = string.IsNullOrWhiteSpace(WorkshopDirectoryTextBox.Text)
                 ? null
                 : Path.GetFullPath(WorkshopDirectoryTextBox.Text.Trim());
-            var additionalLocalModDirectory = string.IsNullOrWhiteSpace(LocalModDirectoryTextBox.Text)
-                ? null
-                : RequireDirectory(LocalModDirectoryTextBox.Text, EditorText.Get("MainWindow_CatalogLoading_002"));
-            var profile = SteamDiscovery.OpenProfile(ProfileDirectoryTextBox.Text.Trim());
+            if (string.IsNullOrWhiteSpace(LocalModDirectoryTextBox.Text))
+                throw new InvalidOperationException(EditorText.Get("LocalModDirectory_Required"));
+            var localModDirectory = Path.GetFullPath(LocalModDirectoryTextBox.Text.Trim());
+            var profileDirectory = RequireDirectory(ProfileDirectoryTextBox.Text, EditorText.Get("ProfileDirectory_Label"));
+            var profile = SteamDiscovery.OpenProfile(profileDirectory);
             var codec = _codecSession.Codec;
             AppendStatus(
                 EditorText.Get("MainWindow_CatalogLoading_003") +
-                (additionalLocalModDirectory is null
-                    ? string.Empty
-                    : EditorText.Format("MainWindow_CatalogLoading_004", additionalLocalModDirectory)));
+                EditorText.Format("MainWindow_CatalogLoading_004", localModDirectory));
             CrashDiagnostics.SetStage("LoadCatalog: resolving active content");
             var activeContent = await ActiveContentResolver.ResolveAsync(
                 profile,
                 gameDirectory,
                 workshopDirectory,
-                additionalLocalModDirectory,
+                localModDirectory,
                 codec, workspaceRoot: locations?.WorkspaceDirectory, cancellationToken: loadCancellation.Token);
             if (generation != _catalogGeneration) return;
             ActiveContentResolver.RequireResolvedModSources(activeContent);
@@ -126,7 +125,7 @@ public partial class MainWindow : Window
                     gameDirectory,
                     activeContent,
                     workshopDirectory,
-                    additionalLocalModDirectory,
+                    localModDirectory,
                     diagnosticBatch: diagnosticBatch);
             }
             catch (Exception mapException)
@@ -189,7 +188,7 @@ public partial class MainWindow : Window
 
             CrashDiagnostics.SetStage("LoadCatalog: waiting for initial profile sync");
             await StartProfileSyncAsync(activeContent, quantityItems, codec, gameDirectory,
-                workshopDirectory, additionalLocalModDirectory, contentFingerprint, locations);
+                workshopDirectory, localModDirectory, contentFingerprint, locations);
             CrashDiagnostics.SetStage("LoadCatalog: initial profile sync completed");
             AppendStatus(EditorText.Get("MainWindow_CatalogLoading_031"));
         }

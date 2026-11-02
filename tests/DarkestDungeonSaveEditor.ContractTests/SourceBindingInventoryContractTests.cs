@@ -11,9 +11,9 @@ internal static partial class ContractSuite
     {
         var run = Path.Combine(runRoot, workflow, scenario);
         var game = Path.Combine(run, "game");
-        var extra = Path.Combine(run, "extra-mods");
-        Directory.CreateDirectory(extra);
-        var mod = Path.Combine(scenario.StartsWith("remap") ? extra : Path.Combine(game, "mods"), "provider");
+        var localMods = Path.Combine(game, "mods");
+        Directory.CreateDirectory(localMods);
+        var mod = Path.Combine(localMods, "provider");
         var profilePath = Path.Combine(run, "profile_29");
         Directory.CreateDirectory(profilePath);
         BindingWriteResources(game, 2);
@@ -30,7 +30,7 @@ internal static partial class ContractSuite
         await codec.EncodeAsync(raidSeed, raidPath, null);
         var profile = new SaveProfile("profile_29", profilePath, estatePath, "audit", DateTime.UtcNow);
         var locations = new SaveEditorLocations(run, Path.Combine(run, "work"), Path.Combine(run, "backups"));
-        var active = await ActiveContentResolver.ResolveAsync(profile, game, null, extra, codec, locations.WorkspaceDirectory);
+        var active = await ActiveContentResolver.ResolveAsync(profile, game, null, localMods, codec, locations.WorkspaceDirectory);
         var fingerprintBefore = ProfileCatalogContentFingerprint.Capture(active.Sources);
         var quantity = QuantityItemCatalog.LoadRaid(active, BindingRead(raidSeed)).Items.Single(x => x.ItemId == "audit_item");
         var trinkets = TrinketCatalog.Load(active);
@@ -75,7 +75,7 @@ internal static partial class ContractSuite
             committed = itemEdit is not null ? await service.CommitAsync(itemEdit) : await service.CommitAsync(trinketEdit!);
         }
         catch (Exception e) { error = e.GetType().Name + ": " + e.Message; }
-        var fresh = await ActiveContentResolver.ResolveAsync(profile, game, null, extra, codec, locations.WorkspaceDirectory);
+        var fresh = await ActiveContentResolver.ResolveAsync(profile, game, null, localMods, codec, locations.WorkspaceDirectory);
         var freshItem = QuantityItemCatalog.LoadRaid(fresh, BindingRead(raidSeed)).Items.Single(x => x.ItemId == "audit_item");
         var freshTrinket = TrinketCatalog.Load(fresh).Trinkets.Single(x => x.Id == "audit_trinket");
         var target = workflow == "raid-item" ? raidPath : estatePath;

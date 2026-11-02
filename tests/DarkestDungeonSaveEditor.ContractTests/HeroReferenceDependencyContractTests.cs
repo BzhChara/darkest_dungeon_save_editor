@@ -190,7 +190,7 @@ internal static partial class ContractSuite
                 "0":{"name":"Unavailable Buff Provider","source":"mod_local_source"}}}}
             """);
         var service = await SeedReferenceHeroProfileAsync(root, f.Content.Profile, codec);
-        var content = await ActiveContentResolver.ResolveAsync(f.Content.Profile, game, null, codec, Path.Combine(root, "resolve"));
+        var content = await ActiveContentResolver.ResolveAsync(f.Content.Profile, game, null, Path.Combine(game, "mods"), codec, Path.Combine(root, "resolve"));
         var catalog = HeroClassCatalog.Load(content);
         AssertQuirkRuleRejected(catalog, ["other"], "Buff");
         var hypothetical = content with { Sources = content.Sources };

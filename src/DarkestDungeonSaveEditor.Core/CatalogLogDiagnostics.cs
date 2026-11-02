@@ -141,6 +141,11 @@ public static partial class CatalogLogDiagnostics
         const string missingWorkshop = "Enabled Workshop item is not installed: ";
         const string workshopPrefix = "Enabled Workshop item '";
         const string unavailableWorkshop = "' cannot be resolved because the Workshop directory is unavailable.";
+        const string localPrefix = "Enabled local Mod '";
+        const string unavailableLocal = "' cannot be resolved because the local Mod directory is unavailable.";
+        if (raw.StartsWith(localPrefix, StringComparison.Ordinal) && raw.EndsWith(unavailableLocal, StringComparison.Ordinal))
+            return EditorText.Format("CatalogLogDiagnostics_UnavailableLocalDirectory",
+                Clean(raw[localPrefix.Length..^unavailableLocal.Length]));
         if (raw.StartsWith(missingLocal, StringComparison.Ordinal))
             return EditorText.Format("CatalogLogDiagnostics_MissingLocalMod", Clean(raw[missingLocal.Length..]));
         if (raw.StartsWith(ambiguousLocal, StringComparison.Ordinal))

@@ -38,6 +38,8 @@ public sealed partial class ManagedBattleEncounterBridgeService
         await _maintenanceGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
+            // Missing editor configuration must not report successful maintenance.
+            localModDirectory = LocalModDirectory.Resolve(gameDirectory, localModDirectory, required: true);
             ActiveContentResolver.ValidateSourceBindings(content.Resolution, content.Sources, cancellationToken);
             var recovery = await RecoverInterruptedMaintenanceAsync(content.Profile, gameDirectory,
                 localModDirectory, cancellationToken, inspectOnly).ConfigureAwait(false);
@@ -76,8 +78,7 @@ public sealed partial class ManagedBattleEncounterBridgeService
         if (unresolved is not null)
             throw new InvalidOperationException(EditorText.Get("ManagedBattleEncounterBridgeService_Maintenance_005") + unresolved);
         var title = GetProjectTitle(profile);
-        var installRoot = Path.GetFullPath(string.IsNullOrWhiteSpace(localModDirectory) ||
-            File.Exists(Path.Combine(localModDirectory, "project.xml")) ? Path.Combine(gameDirectory, "mods") : localModDirectory);
+        var installRoot = LocalModDirectory.Resolve(gameDirectory, localModDirectory, required: true)!;
         var package = Path.Combine(installRoot, GetPackageDirectoryName(profile));
         ValidateManagedPackagePath(installRoot, package);
         var manifestPath = Path.Combine(package, ManifestFileName);

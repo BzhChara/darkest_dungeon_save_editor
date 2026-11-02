@@ -4,8 +4,8 @@ namespace DarkestDungeonSaveEditor.App;
 
 // Presentation fixtures only, with categories and level/length combinations checked against
 // quest.generation.json and quest.plot_quests.json. They are not loaded save entries.
-// Group by the native quest.type; progression/event/repeatability are separate flags.
-internal enum QuestBoardCategory { Explore, Cleanse, Gather, InventoryActivate, Activate, KillBoss, Wave }
+// Real quest categories come from effective goal definitions; fixture categories
+// use their native types. Progression/event/repeatability remain separate flags.
 
 internal sealed record QuestBoardRegion(string Id, double X, double Y)
 {
@@ -35,24 +35,15 @@ internal sealed record QuestBoardChoice(string Kind, int Difficulty = 1, int Len
     public string? TemplateKey { get; init; }
     public string UnavailableReason { get; init; } = string.Empty;
     public string Id => SavedQuest?.Id ?? PlotId ?? $"generated_{Kind}_{Difficulty}_{Length}";
-    public string NativeType => Kind switch
+    public string NativeType => SavedQuest?.Type ?? Kind switch
     {
         "darkest" or "courtyard" or "invasion" or "recovery" => "kill_boss",
         "darkest_beacons" or "courtyard_intro" => "inventory_activate",
         "darkest_portal" => "activate",
         _ => Kind
     };
-    public QuestBoardCategory Category => NativeType switch
-    {
-        "explore" => QuestBoardCategory.Explore,
-        "cleanse" => QuestBoardCategory.Cleanse,
-        "gather" => QuestBoardCategory.Gather,
-        "inventory_activate" => QuestBoardCategory.InventoryActivate,
-        "activate" => QuestBoardCategory.Activate,
-        "kill_boss" => QuestBoardCategory.KillBoss,
-        "wave" => QuestBoardCategory.Wave,
-        _ => throw new ArgumentOutOfRangeException(nameof(Kind))
-    };
+    public QuestBoardCategory? Category => SavedQuest?.Category ?? QuestBoardCategories.FromNativeType(NativeType);
+    public override string ToString() => Name;
     public string Name => SavedQuest?.Name ?? Kind switch
     {
         "explore" => EditorText.Get("QuestBoard_Kind_explore"),
@@ -120,13 +111,6 @@ internal sealed record QuestBoardSample(Guid Key, string RegionId, QuestBoardCho
 
 internal static class QuestBoardPreviewData
 {
-    internal static QuestBoardCategory? NativeCategory(string type) => type switch
-    {
-        "explore" => QuestBoardCategory.Explore, "cleanse" => QuestBoardCategory.Cleanse,
-        "gather" => QuestBoardCategory.Gather, "inventory_activate" => QuestBoardCategory.InventoryActivate,
-        "activate" => QuestBoardCategory.Activate, "kill_boss" => QuestBoardCategory.KillBoss,
-        "wave" => QuestBoardCategory.Wave, _ => null
-    };
     // Native quest-map anchors, in the 1920 x 1080 background's coordinate space.
     internal static IReadOnlyList<QuestBoardRegion> Regions { get; } =
     [

@@ -45,7 +45,7 @@ internal static partial class ContractSuite
                 var codec = DsonSaveCodec.CreateNative();
                 await codec.EncodeAsync(WriteMultiMash(f.Root, "enabled-mod-game.json", gameSave.ToJsonString()),
                     Path.Combine(content.Profile.ProfileDirectory, "persist.game.json"), null);
-                content = await ActiveContentResolver.ResolveAsync(content.Profile, game, workshop, codec, Path.Combine(f.Root, "mod-resolve"));
+                content = await ActiveContentResolver.ResolveAsync(content.Profile, game, workshop, Path.Combine(game, "mods"), codec, Path.Combine(f.Root, "mod-resolve"));
                 Assert(content.Sources.Any(source => source.Kind == sourceKind && source.Directory == modRoot),
                     sourceKind + ": the enabled fixture Mod must be resolved from the profile.");
             }

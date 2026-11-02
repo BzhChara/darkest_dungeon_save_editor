@@ -15,6 +15,9 @@ public partial class QuestBoardPreviewDialog : Window
         public string Name => Choice.Name;
         public string Difficulty => QuestBoardPreviewData.Difficulty(Choice.Difficulty);
         public string Length => QuestBoardPreviewData.Length(Choice.Length);
+        // WPF's item automation peer uses ToString for the accessible name.
+        // Do not expand every computed property through record.PrintMembers.
+        public override string ToString() => Name;
     }
 
     private readonly Row[] _rows;

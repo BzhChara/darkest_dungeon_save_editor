@@ -243,6 +243,7 @@ internal static partial class ContractSuite
             WriteMultiMash(game, "inventory/a.inventory.system_configs.darkest", "inventory_system_config: .type trinket_storage .max_slots 100\n");
             WriteDependencyEntries(game, DependencyFirstPath, DependencyTrinket(2, field, "Az"));
             WriteDependencyEntries(game, DependencyLastPath, DependencyTrinket(7, "buffs"));
+            Directory.CreateDirectory(Path.Combine(game, "mods"));
             if (scenario is "ambiguous-title" or "resolved")
                 foreach (var folder in scenario == "ambiguous-title" ? new[] { "a", "b" } : new[] { "a" })
                 {
@@ -272,7 +273,7 @@ internal static partial class ContractSuite
                     { ["name"] = "456", ["source"] = "Steam" };
             }
             WriteMultiMash(f.Content.Profile.ProfileDirectory, "persist.game.json", gameDoc.ToJsonString());
-            var content = await ActiveContentResolver.ResolveAsync(f.Content.Profile, game, workshop, codec, Path.Combine(root, "resolve"));
+            var content = await ActiveContentResolver.ResolveAsync(f.Content.Profile, game, workshop, Path.Combine(game, "mods"), codec, Path.Combine(root, "resolve"));
             var catalog = TrinketCatalog.Load(content);
             var item = catalog.Trinkets.Single();
             var resolved = scenario == "resolved";
@@ -296,7 +297,7 @@ internal static partial class ContractSuite
                 finally { File.WriteAllBytes(project, projectBytes); }
                 Assert(ComputeSha256(content.Profile.EstateSavePath) == beforeRemoval,
                     "A Mod disappearing after load must be named at preview and commit without changing the save.");
-                var restored = await ActiveContentResolver.ResolveAsync(f.Content.Profile, game, workshop, codec, Path.Combine(root, "restored"));
+                var restored = await ActiveContentResolver.ResolveAsync(f.Content.Profile, game, workshop, Path.Combine(game, "mods"), codec, Path.Combine(root, "restored"));
                 var restoredCatalog = TrinketCatalog.Load(restored);
                 Assert(!restoredCatalog.Trinkets.Single().HasProviderConflict, "Restoring the source and reloading must remove the read-only restriction.");
                 await f.Service.CommitAsync(await f.Service.PrepareTrinketEditAsync(restored.Profile, restoredCatalog.Trinkets.Single(), 1, restoredCatalog.Storage, restored));

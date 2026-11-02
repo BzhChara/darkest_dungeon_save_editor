@@ -158,7 +158,7 @@ public static partial class SteamDiscovery
         var estate = Path.Combine(profileDirectory, "persist.estate.json");
         if (!File.Exists(estate))
         {
-            throw new FileNotFoundException("The selected directory does not contain persist.estate.json.", estate);
+            throw new FileNotFoundException(EditorText.Get("ProfileDirectory_MissingEstate"), estate);
         }
 
         var profileId = Path.GetFileName(profileDirectory);

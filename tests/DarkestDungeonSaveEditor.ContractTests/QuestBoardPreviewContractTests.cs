@@ -83,10 +83,10 @@ internal static partial class ContractSuite
                         Assert(((ScaleTransform)board.FindName("MapScale")).ScaleX == 0.5 &&
                                Math.Abs(defaultBounds.Width - 960) < 0.001 && Math.Abs(defaultBounds.Height - 540) < 0.001 &&
                                Math.Abs(contentBounds.Left - (defaultViewport.ActualWidth - contentBounds.Right)) < 0.001 &&
-                               Math.Abs(contentBounds.Top - (defaultViewport.ActualHeight - contentBounds.Bottom)) < 0.001 &&
+                               Math.Abs(defaultSurface.TransformToAncestor(defaultViewport).Transform(new Point(0, 487)).Y - defaultViewport.ActualHeight / 2) < 0.001 &&
                                defaultBounds.Left < 0 && defaultBounds.Top < 0 && defaultViewport.ClipToBounds &&
                                !((Button)board.FindName("ZoomOutButton")).IsEnabled,
-                            "Both default and minimum windows must center the region/quest content at 50%, clipping background overflow.");
+                            "Both default and minimum windows must center content horizontally at 50%, retain the fixed town vertical reference, and clip background overflow.");
                         if (size == defaultWindowSize)
                         {
                             Assert(contentBounds.Left >= 8 && contentBounds.Top >= 8 &&
@@ -210,8 +210,8 @@ internal static partial class ContractSuite
                     var fittedContent = QuestBoardContentBounds(board, viewport);
                     Assert(initialMarkerScale == 0.5 && fittedBounds.Left < 0 && fittedBounds.Top < 0 &&
                            Math.Abs(fittedContent.Left - (viewport.ActualWidth - fittedContent.Right)) < 0.001 &&
-                           Math.Abs(fittedContent.Top - (viewport.ActualHeight - fittedContent.Bottom)) < 0.001,
-                        "Embedded Fit must center the region/quest content at 50%, not shrink to show the whole background.");
+                           Math.Abs(surface.TransformToAncestor(viewport).Transform(new Point(0, 487)).Y - viewport.ActualHeight / 2) < 0.001,
+                        "Embedded Fit must restore horizontal content centering and the fixed town vertical reference at 50%.");
                     var detailBounds = detailCanvas.TransformToAncestor(boardBody).TransformBounds(new Rect(detailCanvas.RenderSize));
                     Assert(!((Button)board.FindName("ZoomOutButton")).IsEnabled, "Fit must be the minimum scale.");
                     ((Button)board.FindName("ZoomInButton")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
@@ -261,8 +261,8 @@ internal static partial class ContractSuite
                     Assert(markerScale.ScaleX == beforeShrink && markerScale.ScaleX == 0.5 &&
                            !((Button)board.FindName("ZoomOutButton")).IsEnabled &&
                            Math.Abs(resizedBounds.Left - (viewport.ActualWidth - resizedBounds.Right)) < 0.001 &&
-                           Math.Abs(resizedBounds.Top - (viewport.ActualHeight - resizedBounds.Bottom)) < 0.001,
-                        "Shrinking the embedded viewport after an ineffective drag must recenter the content at the same 50% scale.");
+                           Math.Abs(surface.TransformToAncestor(viewport).Transform(new Point(0, 487)).Y - viewport.ActualHeight / 2) < 0.001,
+                        "Shrinking the embedded viewport after an ineffective drag must retain horizontal centering and the fixed town vertical reference at 50%.");
 
                     var initialCount = board.Samples.Count;
                     Exception? callbackFailure = null;
@@ -542,7 +542,7 @@ internal static partial class ContractSuite
             }
             return Task.CompletedTask;
         });
-        Console.WriteLine("PASS: Independent native details, 50% content-centered crop, visible region titles, balanced content margins, whole-image full view, bounded zoom/pan, profile gates and language.");
+        Console.WriteLine("PASS: Independent native details, 50% horizontally centered crop with fixed vertical reference, visible region titles, whole-image full view, bounded zoom/pan, profile gates and language.");
         Console.WriteLine($"Artifacts: {runRoot}");
     }
 

@@ -50,7 +50,7 @@ internal static partial class ContractSuite
         WriteMultiMash(f.GameRoot, "shared/quirk/ui_selection.quirk_library.json", new JsonObject { ["quirks"] = quirks }.ToJsonString());
         var profile = new SaveProfile("quirk_ui", f.ProfileRoot, f.EstatePath, "contract-user", DateTime.UtcNow);
         var content = await ActiveContentResolver.ResolveAsync(profile, f.GameRoot, f.WorkshopRoot,
-            f.AdditionalLocalModDirectory, f.Codec, root);
+            f.LocalModDirectory, f.Codec, root);
         var incomplete = HeroClassCatalog.Load(content);
         Assert(incomplete.InitialQuirks.Single(q => q.Id == "ui_flat_gain").WriteStatus == HeroInitialQuirkWriteStatus.Unverified,
             "The general fixture's enabled but missing Workshop 333 must not certify Buff attributes.");
@@ -58,7 +58,7 @@ internal static partial class ContractSuite
         // source with a real empty manifest before testing HP compensation.
         WriteMultiMash(f.WorkshopRoot, "333/modfiles.txt", string.Empty);
         content = await ActiveContentResolver.ResolveAsync(profile, f.GameRoot, f.WorkshopRoot,
-            f.AdditionalLocalModDirectory, f.Codec, root);
+            f.LocalModDirectory, f.Codec, root);
         Console.WriteLine("PASS: unknown enabled provider blocks HP attributes; resolving its empty manifest restores the WPF selection fixture.");
         var catalog = HeroClassCatalog.Load(content);
         var hero = catalog.HeroClasses.Single(h => h.Id == "local_hero");

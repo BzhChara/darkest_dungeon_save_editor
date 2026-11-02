@@ -815,13 +815,7 @@ public sealed partial class ManagedBattleEncounterBridgeService
         string gameDirectory,
         string? configuredLocalModDirectory)
     {
-        var defaultRoot = Path.GetFullPath(Path.Combine(gameDirectory, "mods"));
-        var candidate = configuredLocalModDirectory;
-        if (candidate is not null && File.Exists(Path.Combine(candidate, "project.xml")))
-        {
-            candidate = null;
-        }
-        var root = Path.GetFullPath(candidate ?? defaultRoot);
+        var root = LocalModDirectory.Resolve(gameDirectory, configuredLocalModDirectory, required: true)!;
         if (File.Exists(root))
         {
             throw new IOException(EditorText.Format("ManagedBattleEncounterBridgeService_038", root));

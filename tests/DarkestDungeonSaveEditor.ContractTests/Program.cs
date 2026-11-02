@@ -4,6 +4,11 @@ try
     // The localization group switches both cultures explicitly and restores this baseline.
     DarkestDungeonSaveEditor.Core.EditorText.Initialize("zh-CN", System.Globalization.CultureInfo.CurrentUICulture);
     if (await ContractSuite.TryRunCodecProcessProbeAsync(args)) return;
+    if (args.Length == 2 && args[1] == "--mod-directories")
+    {
+        await ContractSuite.RunModDirectoriesOnlyAsync(Path.GetFullPath(args[0]));
+        return;
+    }
     if (args.Length == 2 && args[1] == "--managed-bridge")
     {
         await ContractSuite.RunManagedBridgeOnlyAsync(Path.GetFullPath(args[0]));
@@ -22,6 +27,11 @@ try
     if (args.Length == 2 && args[1] == "--wave-battle")
     {
         await ContractSuite.RunWaveBattleOnlyAsync(Path.GetFullPath(args[0]));
+        return;
+    }
+    if (args.Length is 2 or 3 && args[1] == "--quest-board-categories")
+    {
+        await ContractSuite.RunQuestBoardCategoriesAsync(Path.GetFullPath(args[0]), args.Length == 3 ? Path.GetFullPath(args[2]) : null);
         return;
     }
     if (args.Length is 2 or 3 && args[1] == "--quest-board-edits")
