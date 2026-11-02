@@ -4996,7 +4996,7 @@
   <data name="TownEvent_RevivalConditionalHp" xml:space="preserve"><value>死亡候选带有无法在原战斗之外计算的条件生命值效果。</value></data>
   <data name="TownEvent_QuestCreated" xml:space="preserve"><value>新增事件任务：{0}。</value></data>
   <data name="TownEvent_QuestAlreadyPresent" xml:space="preserve"><value>任务已存在，保留原样：{0}。</value></data>
-  <data name="TownEvent_QuestNotEligible" xml:space="preserve"><value>未生成任务 {0}：{1}。</value></data>
+  <data name="TownEvent_QuestEligibilityBypassed" xml:space="preserve"><value>仍生成任务 {0}（绕过自然生成限制）：{1}。</value></data>
   <data name="TownEvent_QuestDisabled" xml:space="preserve"><value>该任务在定义中被禁用</value></data>
   <data name="TownEvent_QuestProgressionReserved" xml:space="preserve"><value>本次操作已为区域 {0} 生成了另一个进度任务</value></data>
   <data name="TownEvent_QuestCompletedNonRepeatable" xml:space="preserve"><value>任务已完成且不可重复</value></data>

@@ -30,7 +30,8 @@ internal static partial class ContractSuite
             {
                 EditorText.Initialize(culture, previousSystemCulture);
                 var chinese = culture == "zh-CN";
-                (Dictionary<string, JsonObject> Saves, TownEventMutationPreview Preview, JsonObject OldQuest) Apply(
+                (Dictionary<string, JsonObject> Saves, TownEventMutationPreview Preview, JsonObject OldQuest,
+                    JsonObject OldProgression, JsonObject OldEstate) Apply(
                     Action<JsonObject>? configure = null, Action<Dictionary<string, JsonObject>>? arrange = null,
                     bool secondProgression = false)
                 {
@@ -47,6 +48,8 @@ internal static partial class ContractSuite
                     var saves = f.Saves.ToDictionary(pair => pair.Key, pair => pair.Value.DeepClone().AsObject());
                     arrange?.Invoke(saves);
                     var oldQuest = saves["persist.quest.json"].DeepClone().AsObject();
+                    var oldProgression = saves["persist.progression.json"].DeepClone().AsObject();
+                    var oldEstate = saves["persist.estate.json"].DeepClone().AsObject();
                     var eventDefinition = secondProgression ? selected with
                     {
                         Effects = [new("plot_quest", "next_plot", 1), new("plot_quest", "event_plot", 1)]
@@ -55,19 +58,29 @@ internal static partial class ContractSuite
                     Assert(Root(saves, "town_event")["current_result_event_id"]!.GetValue<int>() == selected.NativeId &&
                         Root(saves, "campaign_log")["total_weeks"]!.GetValue<int>() == 5,
                         "A quest diagnostic must not prevent event replacement or advance the week.");
-                    return (saves, preview, oldQuest);
+                    return (saves, preview, oldQuest, oldProgression, oldEstate);
                 }
-                string Skipped(string id, string reason) => chinese ? $"未生成任务 {id}：{reason}。" : $"Quest {id} was not added: {reason}.";
+                string Bypassed(string id, string reason) => chinese
+                    ? $"仍生成任务 {id}（绕过自然生成限制）：{reason}。"
+                    : $"Generate quest {id} despite its natural generation restriction: {reason}.";
                 void Check(string zh, string en, Action<JsonObject>? configure = null,
                     Action<Dictionary<string, JsonObject>>? arrange = null)
                 {
                     var result = Apply(configure, arrange);
-                    Assert(result.Preview.Changes.Single() == Skipped("event_plot", chinese ? zh : en),
-                        culture + ": the skipped quest must identify its exact cause and dependency values: " + en);
-                    Assert(result.Preview.Warnings.SequenceEqual(result.Preview.Changes),
-                        "A skipped quest must also reach the warning area without removing its complete report.");
-                    Assert(JsonNode.DeepEquals(result.OldQuest, result.Saves["persist.quest.json"]),
-                        "Explaining an ineligible quest must preserve the existing board and retention inventory.");
+                    var warning = Bypassed("event_plot", chinese ? zh : en);
+                    Assert(result.Preview.Warnings.SequenceEqual([warning]) && result.Preview.Changes.SequenceEqual(
+                        [warning, chinese ? "新增事件任务：event_plot。" : "New event quest: event_plot."]),
+                        culture + ": manual generation must explain the exact bypassed condition: " + en);
+                    var quest = result.Saves["persist.quest.json"].DeepClone().AsObject();
+                    var board = quest["base_root"]!["quests"]!.AsObject();
+                    var added = board.Single(pair => pair.Value?["id"]?.GetValue<string>() == "event_plot");
+                    Assert(added.Value!["goal_ids"]![0]!.GetValue<string>() == "kill_event" &&
+                        added.Value["completion_reward"] is JsonObject, "Bypassed quests must still initialize their goals and rewards.");
+                    board.Remove(added.Key);
+                    Assert(JsonNode.DeepEquals(result.OldQuest, quest) &&
+                        JsonNode.DeepEquals(result.OldProgression, result.Saves["persist.progression.json"]) &&
+                        JsonNode.DeepEquals(result.OldEstate, result.Saves["persist.estate.json"]),
+                        "Manual generation preserves existing quests, retained items, completion history and estate resources.");
                 }
 
                 Check("该任务在定义中被禁用", "the quest is disabled in its definition", d => d["is_enabled"] = false);
@@ -109,12 +122,11 @@ internal static partial class ContractSuite
                         """));
 
                 var progression = Apply(d => d["is_progression"] = true, secondProgression: true);
-                Assert(Root(progression.Saves, "quest")["quests"]!.AsObject().Count == 2 &&
-                    progression.Preview.Warnings.SequenceEqual(progression.Preview.Changes.Skip(1)) &&
-                    progression.Preview.Changes.Last() == Skipped("next_plot", chinese
+                Assert(Root(progression.Saves, "quest")["quests"]!.AsObject().Count == 3 &&
+                    progression.Preview.Warnings.Single() == Bypassed("next_plot", chinese
                         ? "本次操作已为区域 weald 生成了另一个进度任务"
                         : "another progression quest has already been added for weald during this operation"),
-                    "The per-dungeon progression limit must explain which region was reserved without changing definition order.");
+                    "The per-dungeon natural limit becomes a warning without changing definition order or dropping an explicit quest.");
                 var existing = Apply(arrange: s => Root(s, "quest")["quests"]!["1"] = new JsonObject { ["id"] = "event_plot" });
                 Assert(existing.Preview.Changes.Single() == (chinese ? "任务已存在，保留原样：event_plot。" : "Quest already exists and is preserved: event_plot.") &&
                     existing.Preview.Warnings.SequenceEqual(existing.Preview.Changes) &&
@@ -135,7 +147,7 @@ internal static partial class ContractSuite
                 CheckAllowed(d => d["estate_inventory_dependency"] = JsonNode.Parse("""
                     {"consume_on_attempt":true,"items_definition":{"items":{"0":{"id":"keep","type":"estate","amount":8}}}}
                     """));
-                Console.WriteLine("PASS: " + culture + " quest skip reasons, dependency details, preserved boards and unchanged eligible generation.");
+                Console.WriteLine("PASS: " + culture + " manual event quests bypass natural predicates with exact warnings, preserve history/resources and deduplicate existing quests.");
             }
         }
         finally
@@ -143,5 +155,71 @@ internal static partial class ContractSuite
             File.WriteAllText(path, template.ToJsonString());
             EditorText.Initialize(previousCulture.Name, previousSystemCulture);
         }
+    }
+
+    private static async Task VerifyManualEventQuestTransactionsAsync(string root)
+    {
+        // Policy fixtures cover completed and locked plots through the real
+        // binary preview/commit path; they are not claimed installed Mod cases.
+        foreach (var scenario in new[] { "completed", "prerequisite", "invalid-reward", "malformed-reward" })
+        {
+            var run = Path.Combine(root, scenario);
+            var f = await BuildTownEventFixtureAsync(run);
+            var profile = f.Content.Profile;
+            var codec = DsonSaveCodec.CreateNative();
+            var plotPath = Path.Combine(f.Content.Resolution!.GameDirectory, "campaign/quest/event.quest.plot_quests.json");
+            var document = JsonNode.Parse(File.ReadAllText(plotPath))!.AsObject();
+            var definition = document["plot_quests"]![0]!.AsObject();
+            if (scenario == "prerequisite") definition["plot_quest_dependency"] = "unfinished_plot";
+            else
+            {
+                var progression = f.Saves["persist.progression.json"].DeepClone().AsObject();
+                progression["base_root"]!["completed_plot_quests_data"]!["0"] = new JsonObject
+                    { ["plot_quest_id"] = unchecked((int)HashLoc2Key("event_plot")) };
+                await codec.EncodeAsync(WriteMultiMash(run, "input/progression.json", progression.ToJsonString()),
+                    Path.Combine(profile.ProfileDirectory, "persist.progression.json"), null);
+            }
+            if (scenario == "invalid-reward")
+                definition["quest"]!["completion_reward"]!["items_definition"]!["items"]!["0"] = new JsonObject
+                    { ["id"] = "missing_event_reward", ["type"] = "trinket", ["amount"] = 1 };
+            if (scenario == "malformed-reward")
+                definition["quest"]!["completion_reward"] = "malformed";
+            File.WriteAllText(plotPath, document.ToJsonString());
+            var selected = TownEventCatalog.Load(f.Content).Events.Single(row => row.Id == "test_plot_quest");
+            var before = f.Saves.Keys.ToDictionary(name => name, name => ComputeSha256(Path.Combine(profile.ProfileDirectory, name)));
+            if (scenario is "invalid-reward" or "malformed-reward")
+            {
+                InvalidDataException? failure = null;
+                try { await f.Service.PrepareTownEventEditAsync(profile, selected, f.Content); }
+                catch (InvalidDataException error) { failure = error; }
+                var expected = scenario == "invalid-reward"
+                    ? $"Unresolved event trinket identity: {unchecked((int)HashLoc2Key("missing_event_reward"))}."
+                    : "Invalid completion reward for quest: event_plot.";
+                Assert(failure?.Message == expected,
+                    "Bypassing completion must still reject a quest whose reward cannot be initialized.");
+                Assert(before.All(pair => ComputeSha256(Path.Combine(profile.ProfileDirectory, pair.Key)) == pair.Value),
+                    "Rejected initialization must leave every binary profile file untouched.");
+                continue;
+            }
+            var prepared = await f.Service.PrepareTownEventEditAsync(profile, selected, f.Content);
+            Assert(prepared.Preview.Warnings.Count == 1 &&
+                before.All(pair => ComputeSha256(Path.Combine(profile.ProfileDirectory, pair.Key)) == pair.Value),
+                "A bypassed quest must appear in the preview warning without modifying the live test profile.");
+            var result = await f.Service.CommitAsync(prepared);
+            var decodedQuest = Path.Combine(run, "written-quest.json");
+            await codec.DecodeAsync(Path.Combine(profile.ProfileDirectory, "persist.quest.json"), decodedQuest);
+            var quest = JsonNode.Parse(File.ReadAllText(decodedQuest))!["base_root"]!;
+            Assert(quest["quests"]!.AsObject().Count == 2 && quest["quests"]!["1"]!["id"]!.GetValue<string>() == "event_plot" &&
+                JsonNode.DeepEquals(quest["quests"]!["0"], f.Saves["persist.quest.json"]["base_root"]!["quests"]!["0"]),
+                "The binary commit appends the requested plot and preserves the existing board entry.");
+            Assert(ComputeSha256(Path.Combine(profile.ProfileDirectory, "persist.progression.json")) == before["persist.progression.json"] &&
+                before.All(pair => ComputeSha256(Path.Combine(result.BackupDirectory, pair.Key)) == pair.Value),
+                "Quest generation preserves completed-plot history and creates an exact pre-write backup.");
+            var decodedLog = Path.Combine(run, "written-log.json");
+            await codec.DecodeAsync(Path.Combine(profile.ProfileDirectory, "persist.campaign_log.json"), decodedLog);
+            Assert(JsonNode.Parse(File.ReadAllText(decodedLog))!["base_root"]!["total_weeks"]!.GetValue<int>() == 5,
+                "A committed manual event quest does not advance the week.");
+        }
+        Console.WriteLine("PASS: completed and prerequisite-locked event quests commit through DSON with backups; invalid rewards still reject without writes.");
     }
 }

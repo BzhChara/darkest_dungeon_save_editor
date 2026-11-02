@@ -209,6 +209,7 @@ internal static partial class ContractSuite
         await VerifyEventBoundariesAsync(Path.Combine(root, "boundaries"));
         await VerifyEventQuestDependenciesAsync(Path.Combine(root, "quest-dependencies"));
         await VerifyEventQuestReasonsAsync(Path.Combine(root, "quest-reasons"));
+        await VerifyManualEventQuestTransactionsAsync(Path.Combine(root, "manual-quest-transactions"));
         await VerifyEventQuestGenerationScopeAsync(Path.Combine(root, "quest-generation-scope"));
         await VerifyEventTrinketDefinitionSelectionAsync(Path.Combine(root, "trinket-definitions"));
         await VerifyOrdinaryEventRecruitRoutingAsync(Path.Combine(root, "ordinary-routing"));

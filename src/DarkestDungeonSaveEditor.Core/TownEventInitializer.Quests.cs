@@ -29,9 +29,8 @@ internal sealed partial class TownEventInitializer
 
     private void ReserveExistingRecoveryQuests(IReadOnlyDictionary<string, JsonObject> saves)
     {
-        // A mid-week replacement keeps the existing board. Do not append a
-        // second recovery quest for the same dungeon or rewrite its rewards.
-        // A crow quest with an ordinary trinket reward does not reserve this slot.
+        // Preserve the board and report when manual generation bypasses the
+        // native recovery slot limit. An ordinary trinket reward is not a recovery.
         foreach (var quest in Objects(Root(saves, "quest")["quests"]))
             if (Objects(quest["completion_reward"]?["trinket_retention_ids"]?["items"])
                 .Any(item => JsonSupport.ReadInt(item, "amount") > 0))
@@ -39,7 +38,7 @@ internal sealed partial class TownEventInitializer
     }
 
     private void AddPlotQuest(IReadOnlyDictionary<string, JsonObject> saves, JsonObject definition,
-        List<string> changes, List<string> warnings, bool checkNaturalEligibility = true)
+        List<string> changes, List<string> warnings, bool reportNaturalEligibility = true)
     {
         var id = Text(definition, "id");
         var board = JsonSupport.RequireObject(Root(saves, "quest"), "quests");
@@ -50,13 +49,14 @@ internal sealed partial class TownEventInitializer
             warnings.Add(warning);
             return;
         }
-        var unavailable = checkNaturalEligibility ? PlotQuestUnavailableReason(saves, definition) : string.Empty;
+        // Both entry points are explicit manual edits. Natural generation
+        // predicates are advisory; identity and initialization guards still apply.
+        var unavailable = reportNaturalEligibility ? PlotQuestUnavailableReason(saves, definition) : string.Empty;
         if (unavailable.Length > 0)
         {
-            var warning = EditorText.Format("TownEvent_QuestNotEligible", id, unavailable);
+            var warning = EditorText.Format("TownEvent_QuestEligibilityBypassed", id, unavailable);
             changes.Add(warning);
             warnings.Add(warning);
-            return;
         }
         var template = definition["quest"] as JsonObject ?? throw new InvalidDataException($"Missing quest template: {id}.");
         var quest = new JsonObject
@@ -80,7 +80,13 @@ internal sealed partial class TownEventInitializer
             ["is_from_town_event"] = false
         };
         var owned = CountOwnedTrinkets(saves);
-        var reward = BuildQuestReward(template["completion_reward"] as JsonObject ?? new JsonObject(), owned);
+        var rewardTemplate = template["completion_reward"] switch
+        {
+            null => new JsonObject(),
+            JsonObject value => value,
+            _ => throw new InvalidDataException($"Invalid completion reward for quest: {id}.")
+        };
+        var reward = BuildQuestReward(rewardTemplate, owned);
         var items = JsonSupport.RequireObject(reward, "items_definition", "items");
         foreach (var additional in Objects(definition["additional_trinket_completion_rewards"]))
         {

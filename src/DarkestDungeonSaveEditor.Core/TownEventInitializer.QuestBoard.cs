@@ -4,7 +4,7 @@ using System.Text.Json.Nodes;
 namespace DarkestDungeonSaveEditor.Core;
 
 // The board and events use the same quest constructor and inventory-instance rules.
-// Only the board's explicit manual operation bypasses natural eligibility.
+// Both manual paths bypass natural eligibility; events also report bypassed conditions.
 internal sealed partial class TownEventInitializer
 {
     private sealed record BoardTemplate(string Key, JsonObject Definition, bool Generated);
@@ -68,7 +68,7 @@ internal sealed partial class TownEventInitializer
         if (Objects(board).Any(quest => Hash(Text(quest, "id")) == Hash(id)))
             throw new InvalidOperationException(EditorText.Format("QuestBoard_Duplicate", id));
         var slot = NextKey(board);
-        AddPlotQuest(saves, definition, [], [], checkNaturalEligibility: false);
+        AddPlotQuest(saves, definition, [], [], reportNaturalEligibility: false);
         return board[slot]?.AsObject() ?? throw new InvalidDataException("Quest initialization produced no entry.");
     }
 

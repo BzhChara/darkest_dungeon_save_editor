@@ -4996,7 +4996,7 @@ Backup directory:
   <data name="TownEvent_RevivalConditionalHp" xml:space="preserve"><value>A dead candidate has a conditional HP effect that cannot be evaluated outside its original combat.</value></data>
   <data name="TownEvent_QuestCreated" xml:space="preserve"><value>New event quest: {0}.</value></data>
   <data name="TownEvent_QuestAlreadyPresent" xml:space="preserve"><value>Quest already exists and is preserved: {0}.</value></data>
-  <data name="TownEvent_QuestNotEligible" xml:space="preserve"><value>Quest {0} was not added: {1}.</value></data>
+  <data name="TownEvent_QuestEligibilityBypassed" xml:space="preserve"><value>Generate quest {0} despite its natural generation restriction: {1}.</value></data>
   <data name="TownEvent_QuestDisabled" xml:space="preserve"><value>the quest is disabled in its definition</value></data>
   <data name="TownEvent_QuestProgressionReserved" xml:space="preserve"><value>another progression quest has already been added for {0} during this operation</value></data>
   <data name="TownEvent_QuestCompletedNonRepeatable" xml:space="preserve"><value>the quest is already completed and cannot be repeated</value></data>

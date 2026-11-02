@@ -146,14 +146,20 @@ internal static partial class ContractSuite
 
         var composite = Saves("very_rare", 8, 8);
         Board(composite)["2"] = alreadyGenerated.DeepClone();
-        var compositeBoard = Board(composite).DeepClone();
-        TownEventSaveEditor.ReplaceCurrent(composite, theft with
+        var compositeBoard = Board(composite).DeepClone().AsObject();
+        var compositePreview = TownEventSaveEditor.ReplaceCurrent(composite, theft with
         {
             Effects = [new TownEventEffect("trinket_retention_add_from_storage", "", 8),
                 new TownEventEffect("plot_quest", "plot_trinket_retention_2", 1)]
         }, new TownEventInitializer(f.Content, 9).Initialize);
-        Assert(JsonNode.DeepEquals(compositeBoard, Board(composite)) && Pool(composite).Count == 16,
-            "An explicit plot effect still respects the existing recovery quest's dungeon reservation.");
+        var addedRecovery = Board(composite)["3"]!;
+        Assert(Board(composite).Count == compositeBoard.Count + 1 &&
+            compositeBoard.All(pair => JsonNode.DeepEquals(pair.Value, Board(composite)[pair.Key])) &&
+            Pool(composite).Count == 16 && addedRecovery["id"]!.GetValue<string>() == "plot_trinket_retention_2" &&
+            addedRecovery["completion_reward"]!["trinket_retention_ids"]!["items"]!.AsObject().Count == 8 &&
+            compositePreview.Warnings.SequenceEqual([EditorText.Format("TownEvent_QuestEligibilityBypassed", "plot_trinket_retention_2",
+                EditorText.Format("TownEvent_QuestRecoveryReserved", addedRecovery["dungeon"]!.GetValue<string>()))]),
+            "An explicit distinct recovery plot may bypass the native dungeon slot with a warning, preserving old rewards and the loss pool.");
         Console.WriteLine("PASS: theft without automatic recovery quests, explicit event plots, preserved quests/losses and unchanged weeks.");
     }
 }

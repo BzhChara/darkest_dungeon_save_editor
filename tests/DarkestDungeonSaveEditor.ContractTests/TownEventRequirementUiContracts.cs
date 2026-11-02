@@ -126,10 +126,10 @@ internal static partial class ContractSuite
         TownEventDefinition[] definitions = [new("preview_notice", [], "base", "", false), new("other_notice", [], "base", "", false)];
         var normal = EditorText.Format("TownEvent_QuestCreated", "new_plot");
         var existing = EditorText.Format("TownEvent_QuestAlreadyPresent", "existing_plot");
-        var skipped = EditorText.Format("TownEvent_QuestNotEligible", "locked_plot",
+        var bypassed = EditorText.Format("TownEvent_QuestEligibilityBypassed", "locked_plot",
             EditorText.Format("TownEvent_QuestDependencyIncomplete", "previous_plot"));
-        var preview = new TownEventMutationPreview(17, definitions[0].Id, 13, 2, 1, [normal, existing, skipped])
-            { Warnings = [existing, skipped] };
+        var preview = new TownEventMutationPreview(17, definitions[0].Id, 13, 2, 1, [normal, existing, bypassed])
+            { Warnings = [existing, bypassed] };
         var profile = new SaveProfile("profile", runRoot, Path.Combine(runRoot, "unused.estate.json"), "ui", DateTime.UtcNow);
         void Show(TownEventMutationPreview value)
         {
@@ -149,9 +149,9 @@ internal static partial class ContractSuite
             var heading = EditorText.Format("TownEvent_Replacement", "17", definitions[0].Id, 13);
             var full = (string)type.GetMethod("FormatTownEventPreview", flags)!.Invoke(window, [preview])!;
             Assert(summary.Text == heading + Environment.NewLine + normal &&
-                warning.Text == existing + Environment.NewLine + skipped && warning.Visibility == Visibility.Visible &&
+                warning.Text == existing + Environment.NewLine + bypassed && warning.Visibility == Visibility.Visible &&
                 Grid.GetRow(warning) == 1 && Grid.GetColumnSpan(warning) == 3 && warning.TextWrapping == TextWrapping.Wrap &&
-                full == string.Join(Environment.NewLine, heading, normal, existing, skipped),
+                full == string.Join(Environment.NewLine, heading, normal, existing, bypassed),
                 "Normal event changes belong beside the buttons; only exceptional quest notices belong below them, while the full report keeps every reason.");
             RenderContractWindow(window, new Size(1120, 720), Path.Combine(runRoot, $"event-preview-warnings-{EditorText.Culture.Name}.png"));
 

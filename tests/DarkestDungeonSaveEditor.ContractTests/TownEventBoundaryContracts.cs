@@ -166,17 +166,19 @@ internal static partial class ContractSuite
         definition["highest_hero_resolve_level_dependency"] = 2;
         Assert(Count(Apply(saves => saves["persist.roster.json"]["base_root"]!["highest_resolve_xp"] = 20)) == 2,
             "The saved highest resolve XP satisfies a plot dependency even when current heroes have lower XP.");
-        Assert(Count(Apply(saves => saves["persist.roster.json"]["base_root"]!["highest_resolve_xp"] = 10)) == 1,
-            "The plot remains unavailable when the saved highest resolve XP is below its dependency.");
+        Assert(Count(Apply(saves => saves["persist.roster.json"]["base_root"]!["highest_resolve_xp"] = 10)) == 2,
+            "Manual event quests may bypass the saved highest resolve XP dependency.");
         definition.Remove("highest_hero_resolve_level_dependency");
         definition["infestation_sequence_element_dependency"] = "before";
         void Infestation(Dictionary<string, JsonObject> saves, string id) => saves["persist.progression.json"]["base_root"]!["infestation"] =
             new JsonObject { ["sequence_element_id"] = unchecked((int)HashLoc2Key(id)) };
-        Assert(Count(Apply(saves => Infestation(saves, "before"))) == 1 && Count(Apply(saves => Infestation(saves, "after"))) == 2,
-            "Infestation dependencies require strictly later sequence progress.");
+        Assert(Count(Apply(saves => Infestation(saves, "before"))) == 2 && Count(Apply(saves => Infestation(saves, "after"))) == 2,
+            "Manual event quests may bypass natural infestation progression requirements.");
         definition.Remove("infestation_sequence_element_dependency");
         definition["estate_inventory_dependency"] = JsonNode.Parse("""{"consume_on_attempt":false,"items_definition":{"items":{"0":{"id":"keep","type":"estate","amount":8}}}}""");
-        Assert(Count(Apply()) == 1, "Missing estate inventory blocks quest generation without consuming items.");
+        var missingInventory = Apply();
+        Assert(Count(missingInventory) == 2 && JsonNode.DeepEquals(missingInventory["persist.estate.json"], f.Saves["persist.estate.json"]),
+            "Missing estate inventory does not block manual generation or consume items.");
         definition["estate_inventory_dependency"]!["items_definition"]!["items"]!["0"]!["amount"] = 7;
         var inventoryResult = Apply();
         Assert(Count(inventoryResult) == 2 && JsonNode.DeepEquals(inventoryResult["persist.estate.json"], f.Saves["persist.estate.json"]),
@@ -188,7 +190,8 @@ internal static partial class ContractSuite
             new JsonObject { ["items"] = new JsonObject(ids.Select((id, index) =>
                 KeyValuePair.Create<string, JsonNode?>(index.ToString(System.Globalization.CultureInfo.InvariantCulture),
                     new JsonObject { ["id"] = id, ["type"] = "trinket", ["amount"] = 1 }))) };
-        Assert(Count(Apply(saves => Retained(saves, "old_owned", "protected"))) == 1, "Enough low-rarity trinkets alone cannot satisfy the rarity predicate.");
+        Assert(Count(Apply(saves => Retained(saves, "old_owned", "protected"))) == 2,
+            "Manual recovery quests may bypass the native lost-trinket rarity threshold.");
         var retention = Apply(saves =>
         {
             Retained(saves, "old_owned", "quest_prize");
@@ -210,7 +213,7 @@ internal static partial class ContractSuite
         Directory.CreateDirectory(roundtrip);
         var restored = await RoundtripDirectoryQueryAsync(roundtrip, "quest", retention["persist.quest.json"], DsonSaveCodec.CreateNative());
         Assert(JsonNode.DeepEquals(retention["persist.quest.json"], restored), "Recovery rewards and top-level retained items both use native inventory objects through DSON roundtrip.");
-        Console.WriteLine("PASS: plot quest infestation/inventory/rarity predicates and retained reward DSON shape.");
+        Console.WriteLine("PASS: manual plot quest dependency bypass, preserved resources and retained reward DSON shape.");
     }
 
     private static async Task VerifyOrdinaryEventRecruitRoutingAsync(string root)
