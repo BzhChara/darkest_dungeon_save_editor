@@ -28,6 +28,17 @@ public static class ProfileCatalogContentFingerprint
         var issues = new List<string>();
         using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
         void Add(string value) => hash.AppendData(Encoding.UTF8.GetBytes(value + "\n"));
+        void AddFile(string path)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!File.Exists(path))
+            {
+                Add($"{Path.GetFullPath(path)}|missing");
+                return;
+            }
+            using var stream = File.OpenRead(path);
+            Add($"{Path.GetFullPath(path)}|{Convert.ToHexString(SHA256.HashData(stream))}");
+        }
         foreach (var source in sources)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -39,16 +50,7 @@ public static class ProfileCatalogContentFingerprint
                 .Concat(new[] { "modfiles.txt", "project.xml", ManagedBattleEncounterBridgeService.ManifestFileName }
                     .Select(name => Path.Combine(source.Directory, name)).Where(File.Exists));
             foreach (var path in paths.Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.Ordinal))
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                if (!File.Exists(path))
-                {
-                    Add($"{Path.GetFullPath(path)}|missing");
-                    continue;
-                }
-                using var stream = File.OpenRead(path);
-                Add($"{Path.GetFullPath(path)}|{Convert.ToHexString(SHA256.HashData(stream))}");
-            }
+                AddFile(path);
             // The native skin list depends on directories, including empty
             // physical directories and virtual ones built from manifest entries.
             foreach (var path in HeroSkinDirectoryDiscovery.Enumerate(source, prefixes, issues))

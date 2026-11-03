@@ -4,6 +4,16 @@ try
     // The localization group switches both cultures explicitly and restores this baseline.
     DarkestDungeonSaveEditor.Core.EditorText.Initialize("zh-CN", System.Globalization.CultureInfo.CurrentUICulture);
     if (await ContractSuite.TryRunCodecProcessProbeAsync(args)) return;
+    if (args.Length == 3 && args[1] == "--ui-resources")
+    {
+        await ContractSuite.RunUiResourcesAsync(Path.GetFullPath(args[0]), Path.GetFullPath(args[2]));
+        return;
+    }
+    if (args.Length == 2 && args[1] == "--battle-map-viewport")
+    {
+        await ContractSuite.RunBattleMapViewportOnlyAsync(Path.GetFullPath(args[0]));
+        return;
+    }
     if (args.Length == 2 && args[1] == "--mod-directories")
     {
         await ContractSuite.RunModDirectoriesOnlyAsync(Path.GetFullPath(args[0]));
@@ -37,6 +47,11 @@ try
     if (args.Length is 2 or 3 && args[1] == "--quest-board-edits")
     {
         await ContractSuite.RunQuestBoardEditsAsync(Path.GetFullPath(args[0]), args.Length == 3 ? Path.GetFullPath(args[2]) : null);
+        return;
+    }
+    if (args.Length == 4 && args[1] == "--quest-board-layout")
+    {
+        await ContractSuite.RunQuestBoardLayoutAsync(Path.GetFullPath(args[0]), Path.GetFullPath(args[2]), Path.GetFullPath(args[3]));
         return;
     }
     if (args.Length is 2 or 3 && args[1] == "--quest-board-data")

@@ -4556,15 +4556,7 @@ Backup directory:
     <comment>src/DarkestDungeonSaveEditor.App/BattleMapView.xaml</comment>
   </data>
   <data xml:space="preserve" name="BattleMapView_005">
-    <value>Reset to 100% and center</value>
-    <comment>src/DarkestDungeonSaveEditor.App/BattleMapView.xaml</comment>
-  </data>
-  <data xml:space="preserve" name="BattleMapView_006">
-    <value>Fit</value>
-    <comment>src/DarkestDungeonSaveEditor.App/BattleMapView.xaml</comment>
-  </data>
-  <data xml:space="preserve" name="BattleMapView_007">
-    <value>Show the entire map</value>
+    <value>Restore the fitted default view (100%) and center</value>
     <comment>src/DarkestDungeonSaveEditor.App/BattleMapView.xaml</comment>
   </data>
   <data xml:space="preserve" name="BattleMapView_008">
@@ -5083,7 +5075,10 @@ Backup directory:
     <value>{0} · Right-click to create a quest</value>
   </data>
   <data name="QuestBoard_RegionChoice" xml:space="preserve">
-    <value>Select a region at this map position</value>
+    <value>Select a region at this map position; right-click to create a quest in the selected region</value>
+  </data>
+  <data name="QuestBoard_ResetZoom" xml:space="preserve">
+    <value>Restore the default size (100%) and center</value>
   </data>
   <data name="QuestBoard_AddInRegion" xml:space="preserve">
     <value>Create a quest · {0}</value>

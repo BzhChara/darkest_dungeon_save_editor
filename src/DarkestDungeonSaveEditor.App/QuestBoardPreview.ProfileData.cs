@@ -34,6 +34,7 @@ public partial class QuestBoardPreview
     {
         _fixtureMode = true;
         _snapshot = null;
+        _assets.Layout = new();
         _samples = QuestBoardPreviewData.Samples();
         _regions = QuestBoardPreviewData.Regions;
         _selected = _samples[0].Key;
@@ -48,6 +49,7 @@ public partial class QuestBoardPreview
         if (!string.Equals(previousProfile, snapshot?.ProfileDirectory, StringComparison.OrdinalIgnoreCase)) _regionChoices.Clear();
         _fixtureMode = false;
         _snapshot = snapshot;
+        _assets.Layout = snapshot?.Layout ?? new();
         if (snapshot is null) _editCatalog = null;
         UpdateResolvedImages();
         _regions = snapshot?.Regions.Select(region => new QuestBoardRegion(region.Id, region.X, region.Y)

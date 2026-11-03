@@ -3,21 +3,23 @@ using DarkestDungeonSaveEditor.Core.Dson;
 
 internal static partial class ContractSuite
 {
-    private static bool UseNativeCodec;
+    private static bool UseNativeCodec = true;
 
     public static async Task RunNativeAllAsync(string repositoryRoot)
     {
+        var previousCodec = UseNativeCodec;
         UseNativeCodec = true;
         try { await RunAsync(repositoryRoot); }
-        finally { UseNativeCodec = false; }
+        finally { UseNativeCodec = previousCodec; }
     }
 
     public static async Task RunNativeEquipmentOnlyAsync(string repositoryRoot)
     {
         var root = Path.Combine(repositoryRoot, "artifacts", "native-equipment-contracts", Guid.NewGuid().ToString("N"));
+        var previousCodec = UseNativeCodec;
         UseNativeCodec = true;
         try { await VerifyEquipmentProgressionGuardsAsync(root, DsonSaveCodec.CreateNative()); }
-        finally { UseNativeCodec = false; }
+        finally { UseNativeCodec = previousCodec; }
         Console.WriteLine($"Artifacts: {root}");
     }
 

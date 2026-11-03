@@ -4556,15 +4556,7 @@
     <comment>src/DarkestDungeonSaveEditor.App/BattleMapView.xaml</comment>
   </data>
   <data xml:space="preserve" name="BattleMapView_005">
-    <value>恢复 100% 并居中</value>
-    <comment>src/DarkestDungeonSaveEditor.App/BattleMapView.xaml</comment>
-  </data>
-  <data xml:space="preserve" name="BattleMapView_006">
-    <value>适应窗口</value>
-    <comment>src/DarkestDungeonSaveEditor.App/BattleMapView.xaml</comment>
-  </data>
-  <data xml:space="preserve" name="BattleMapView_007">
-    <value>显示完整地图</value>
+    <value>恢复默认适配大小（100%）并居中</value>
     <comment>src/DarkestDungeonSaveEditor.App/BattleMapView.xaml</comment>
   </data>
   <data xml:space="preserve" name="BattleMapView_008">
@@ -5083,7 +5075,10 @@
     <value>{0} · 右键新建任务</value>
   </data>
   <data name="QuestBoard_RegionChoice" xml:space="preserve">
-    <value>切换此地图位置的地区</value>
+    <value>切换此地图位置的地区；右键为所选地区新建任务</value>
+  </data>
+  <data name="QuestBoard_ResetZoom" xml:space="preserve">
+    <value>恢复默认大小（100%）并居中</value>
   </data>
   <data name="QuestBoard_AddInRegion" xml:space="preserve">
     <value>新建任务 · {0}</value>

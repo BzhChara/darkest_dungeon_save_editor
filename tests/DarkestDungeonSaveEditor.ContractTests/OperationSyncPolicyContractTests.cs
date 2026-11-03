@@ -10,6 +10,7 @@ internal static partial class ContractSuite
 {
     public static async Task RunOperationSyncOnlyAsync(string repositoryRoot)
     {
+        var previousCodec = UseNativeCodec;
         UseNativeCodec = true;
         try
         {
@@ -18,7 +19,7 @@ internal static partial class ContractSuite
             await RunWpfContractsAsync(() => VerifyOperationSyncPolicyAsync(fixture));
             Console.WriteLine($"Artifacts: {fixture.RunRoot}");
         }
-        finally { UseNativeCodec = false; }
+        finally { UseNativeCodec = previousCodec; }
     }
 
     private static async Task VerifyOperationSyncPolicyAsync(ContractFixture f)
@@ -72,6 +73,23 @@ internal static partial class ContractSuite
             Set("_quantitySaveContext", items.SaveContext);
             await (Task)Call("StartProfileSyncAsync", content, items, f.Codec, f.GameRoot, f.WorkshopRoot,
                 f.LocalModDirectory, ProfileCatalogContentFingerprint.Capture(content.Sources), locations)!;
+            var mapArtPath = Path.Combine(f.GameRoot, "panels/icons_map/room_empty.png");
+            var mapArtBefore = Get("_catalogBattleMapArtworkFingerprint");
+            var itemsBeforeArt = Get("_allItems");
+            var reader = (ProfileCatalogSnapshotReader)Get("_catalogSnapshotReader")!;
+            WriteBoardTestImage(mapArtPath, 32, 32, 96);
+            var artSnapshot = await reader.ReadAsync(refreshContent: true);
+            // Disabled artwork-only experiment:
+            // Assert(!(bool)Call("NeedsBattleMaintenance", artSnapshot)! && !(bool)Call("IsPublishedSnapshot", artSnapshot)!,
+            //     "Artwork-only publication must leave battle maintenance idle.");
+            Assert((bool)Call("NeedsBattleMaintenance", artSnapshot)! && !(bool)Call("IsPublishedSnapshot", artSnapshot)!,
+                "Image changes must follow the same publication and maintenance inspection policy as other content changes.");
+            Assert(await (Task<bool>)Call("CheckProfileBeforeOperationAsync")! && Flag("_syncReady") &&
+                   !Equals(mapArtBefore, Get("_catalogBattleMapArtworkFingerprint")) && !ReferenceEquals(itemsBeforeArt, Get("_allItems")),
+                "The actual pre-operation check must publish map art through the common content rebuild.");
+            // Disabled artwork-only experiment: ReferenceEquals(itemsBeforeArt, Get("_allItems"))
+            File.Delete(mapArtPath);
+            Assert(await (Task<bool>)Call("CheckProfileBeforeOperationAsync")!, "Removing map art must also settle through the normal check.");
             var gold = items.Items.Single(item => item.DisplayId == "gold");
             void SetGold(int amount) => File.WriteAllText(f.EstatePath,
                 QuantityItemSaveEditor.SetAmount(estate, gold, amount).UpdatedRoot.ToJsonString());
@@ -102,7 +120,14 @@ internal static partial class ContractSuite
             var deadline = DateTime.UtcNow.AddSeconds(60);
             while (Get("_preparedQuantityItemEdit") is null && DateTime.UtcNow < deadline)
             {
-                if (!Flag("_checkingProfileOperation") && (int)Get("_busyDepth")! == 0) break;
+                if (!Flag("_checkingProfileOperation") && (int)Get("_busyDepth")! == 0)
+                {
+                    // The async-void button handler resumes after its awaited
+                    // check clears the flag. Drain that queued continuation before
+                    // deciding the whole preview operation has already finished.
+                    await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
+                    if (!Flag("_checkingProfileOperation") && (int)Get("_busyDepth")! == 0) break;
+                }
                 await Task.Delay(15);
             }
             Assert(Get("_preparedQuantityItemEdit") is PreparedQuantityItemEdit actualPreview && actualPreview.Preview.ExistingAmount == 4400,

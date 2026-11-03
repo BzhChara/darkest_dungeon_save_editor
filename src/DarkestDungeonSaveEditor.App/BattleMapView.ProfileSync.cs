@@ -42,6 +42,17 @@ public partial class BattleMapView : UserControl
             if (generation != _profileGeneration) return;
             var content = profileSnapshot.Content;
             _profile = content.Profile;
+            // Artwork-only refresh experiment (disabled):
+            // if (contentChanged || _mapArtworkFingerprint != profileSnapshot.BattleMapArtworkFingerprint)
+            // The shared content policy now includes artwork changes. The empty
+            // stamp still initializes this view on its first shared publication.
+            if (contentChanged || _mapArtworkFingerprint is null)
+            {
+                CloseActiveContextMenu();
+                ConfigureOriginalMapAssets(_gameDirectory, content, profileSnapshot.BattleMapImagePaths);
+                _mapArtworkFingerprint = profileSnapshot.BattleMapArtworkFingerprint;
+                foreach (var cell in _cells) RefreshCellVisual(cell);
+            }
             if (profileSnapshot.QuantityItems.SaveContext == QuantityItemSaveContext.Town)
             {
                 _activeContentSnapshot = content;

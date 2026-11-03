@@ -69,7 +69,7 @@ internal static partial class ContractSuite
                        Named<TextBlock>("EmptyStateTitleTextBlock").Text == EditorText.Get("BattleMapView_Tutorial_Title") &&
                        Named<TextBlock>("EmptyStateTextBlock").Text == EditorText.Get("BattleMapView_Tutorial_Message") &&
                        !Named<Button>("ForceTownButton").IsEnabled && !Named<Button>("ForceCompleteQuestButton").IsEnabled &&
-                       !Named<Button>("FitMapButton").IsEnabled && !Named<Button>("ZoomInButton").IsEnabled &&
+                       !Named<Button>("ResetZoomButton").IsEnabled && !Named<Button>("ZoomInButton").IsEnabled &&
                        ((IList)Field("_cells")!).Count == 0 && Field("_selectedCell") is null &&
                        Field("_encounterCatalog") is null && Field("_roomAttachmentCatalog") is null,
                     "Tutorial UI must display the notice, detach map targets and disable editing/recovery controls.");
@@ -92,7 +92,7 @@ internal static partial class ContractSuite
                 Save();
                 await view.LoadProfileAsync(profile, codec, gameDirectory: null);
                 Assert(view.CurrentSnapshot is { IsTutorialRaid: false } && Named<Canvas>("MapCanvas").Visibility == Visibility.Visible &&
-                       Named<Button>("ForceTownButton").IsEnabled && Named<Button>("FitMapButton").IsEnabled,
+                       Named<Button>("ForceTownButton").IsEnabled && Named<Button>("ResetZoomButton").IsEnabled,
                     "The first Ruins mission must retain the ordinary map and recovery action.");
                 typeof(BattleMapView).GetField("_selectedCell", flags)!.SetValue(view, ((IList)Field("_cells")!)[0]);
                 instance["id"] = "tutorial";

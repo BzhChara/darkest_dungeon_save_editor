@@ -11,6 +11,9 @@ public sealed record ProfileCatalogSnapshot(
     DateTime ReadAtUtc)
 {
     public string ContentFingerprint { get; init; } = string.Empty;
+    public string QuestBoardArtworkFingerprint { get; init; } = string.Empty;
+    public string BattleMapArtworkFingerprint { get; init; } = string.Empty;
+    public IReadOnlyDictionary<string, string> BattleMapImagePaths { get; init; } = new Dictionary<string, string>();
     public QuestBoardSnapshot? QuestBoard { get; init; }
     public QuestBoardEditCatalog? QuestBoardCatalog { get; init; }
 }
@@ -105,10 +108,14 @@ public sealed class ProfileCatalogSnapshotReader
                 SourceGameSha256 = before["persist.game.json"]!
             };
             var scene = QuantityItemSaveScene.Read(content).Context;
-            // Save notifications normally need only the cached definitions and new
-            // amounts. A new scene needs fresh definitions before its cache is built.
+            // Save-only quantity refreshes retain their definitions. Rebuilding a
+            // town board also opens artwork, so check content before accepting any
+            // newly discovered resource changes into that shared snapshot.
+            var boardSaveChanged = scene == QuantityItemSaveContext.Town && _lastSnapshot is not null &&
+                new[] { "persist.quest.json", "persist.progression.json" }
+                    .Any(name => before[name] != _lastSnapshot.FileHashes[name]);
             var checkContent = refreshContent || _lastSnapshot is null ||
-                key != _configurationKey || !_quantityCache.ContainsKey(scene);
+                key != _configurationKey || !_quantityCache.ContainsKey(scene) || boardSaveChanged;
             content = checkContent
                 ? ActiveContentResolver.ResolveDecoded(profile, _gameDirectory, _workshopDirectory,
                     _localModDirectory, workspace, gamePath, before["persist.game.json"]!, cancellationToken)
@@ -117,7 +124,20 @@ public sealed class ProfileCatalogSnapshotReader
             var contentFingerprint = checkContent
                 ? ProfileCatalogContentFingerprint.Capture(content.Sources, cancellationToken)
                 : _contentFingerprint;
-            var contentChanged = _lastSnapshot is null || key != _configurationKey || contentFingerprint != _contentFingerprint;
+            var definitionsChanged = _lastSnapshot is null || key != _configurationKey || contentFingerprint != _contentFingerprint;
+            var artworkChanged = checkContent && !definitionsChanged && _lastSnapshot is not null &&
+                QuestBoardArtwork.Capture(content.Sources, _lastSnapshot.QuestBoard, _lastSnapshot.QuestBoardCatalog, cancellationToken)
+                    != _lastSnapshot.QuestBoardArtworkFingerprint;
+            var mapImages = checkContent ? BattleMapArtwork.Resolve(content.Sources, []) : _lastSnapshot!.BattleMapImagePaths;
+            var mapArtworkFingerprint = checkContent ? BattleMapArtwork.CaptureResolved(mapImages, cancellationToken)
+                : _lastSnapshot!.BattleMapArtworkFingerprint;
+            var mapArtworkChanged = _lastSnapshot is null || mapArtworkFingerprint != _lastSnapshot.BattleMapArtworkFingerprint;
+            // Artwork-only refresh experiment (2026-11-03), intentionally disabled.
+            // Preserve these alternatives for future performance work; the shipped
+            // policy treats every detected resource change as a full content refresh.
+            // var contentChanged = definitionsChanged;
+            // if (!contentChanged && !artworkChanged && !mapArtworkChanged && _lastSnapshot is not null && HashesEqual(before, _lastSnapshot.FileHashes))
+            var contentChanged = definitionsChanged || artworkChanged || mapArtworkChanged;
             if (!contentChanged && _lastSnapshot is not null && HashesEqual(before, _lastSnapshot.FileHashes))
             {
                 if (!HashesEqual(before, CaptureHashes(profile)))
@@ -139,6 +159,42 @@ public sealed class ProfileCatalogSnapshotReader
                 var decodedContext = await DecodeCopyAsync(workspace, name, before, cancellationToken).ConfigureAwait(false);
                 _ = JsonSupport.RequireObject(JsonSupport.ReadObject(decodedContext), "base_root");
             }
+            QuestBoardSnapshot? questBoard = null;
+            QuestBoardEditCatalog? questBoardCatalog = null;
+            if (scene == QuantityItemSaveContext.Town && before["persist.quest.json"] is { } questHash)
+            {
+                // Disabled experiment: also exclude artworkChanged here while
+                // retaining unrelated definitions through definitionsChanged only.
+                // questBoard = !contentChanged && !artworkChanged && _lastSnapshot?.QuestBoard is { } previousBoard &&
+                questBoard = !contentChanged && _lastSnapshot?.QuestBoard is { } previousBoard &&
+                    previousBoard.SourceSha256 == questHash && _lastSnapshot.FileHashes["persist.progression.json"] == before["persist.progression.json"] ? previousBoard :
+                    QuestBoardSnapshotReader.Read(content, JsonSupport.ReadObject(await DecodeCopyAsync(workspace,
+                        "persist.quest.json", before, cancellationToken, profile).ConfigureAwait(false)), questHash,
+                        before["persist.progression.json"] is null ? null : JsonSupport.ReadObject(await DecodeCopyAsync(workspace,
+                            "persist.progression.json", before, cancellationToken, profile).ConfigureAwait(false)));
+                questBoardCatalog = !contentChanged && _lastSnapshot?.QuestBoardCatalog is { } cachedBoardCatalog
+                    ? cachedBoardCatalog : QuestBoardEditCatalog.Load(content);
+            }
+            var artworkRebuilt = _lastSnapshot is null || !ReferenceEquals(questBoard, _lastSnapshot.QuestBoard) ||
+                !ReferenceEquals(questBoardCatalog, _lastSnapshot.QuestBoardCatalog);
+            if (artworkRebuilt && questBoard is not null)
+                (questBoard, questBoardCatalog) = QuestBoardArtwork.Refresh(content.Sources, questBoard, questBoardCatalog);
+            var artworkFingerprint = artworkRebuilt
+                ? QuestBoardArtwork.CaptureResolved(questBoard, questBoardCatalog, cancellationToken)
+                : _lastSnapshot!.QuestBoardArtworkFingerprint;
+            // A board rebuild can discover new image requests or a replacement
+            // after the initial check. Do not publish that stamp while retaining
+            // quantity/picker definitions under the disabled artwork-only policy.
+            if (!contentChanged && artworkRebuilt && artworkFingerprint != _lastSnapshot!.QuestBoardArtworkFingerprint)
+            {
+                contentChanged = true;
+                if (questBoard is not null)
+                {
+                    questBoardCatalog = QuestBoardEditCatalog.Load(content);
+                    (questBoard, questBoardCatalog) = QuestBoardArtwork.Refresh(content.Sources, questBoard, questBoardCatalog);
+                    artworkFingerprint = QuestBoardArtwork.CaptureResolved(questBoard, questBoardCatalog, cancellationToken);
+                }
+            }
             var cache = contentChanged ? new Dictionary<QuantityItemSaveContext, QuantityItemCatalogResult>()
                 : new Dictionary<QuantityItemSaveContext, QuantityItemCatalogResult>(_quantityCache);
             QuantityItemCatalogResult quantities;
@@ -156,25 +212,16 @@ public sealed class ProfileCatalogSnapshotReader
                         ? QuantityItemCatalog.LoadRaid(content, root, before[quantityFile]!)
                         : QuantityItemCatalog.Load(content, root, before[quantityFile]!);
             }
-            QuestBoardSnapshot? questBoard = null;
-            QuestBoardEditCatalog? questBoardCatalog = null;
-            if (scene == QuantityItemSaveContext.Town && before["persist.quest.json"] is { } questHash)
-            {
-                questBoard = !contentChanged && _lastSnapshot?.QuestBoard is { } previousBoard &&
-                    previousBoard.SourceSha256 == questHash && _lastSnapshot.FileHashes["persist.progression.json"] == before["persist.progression.json"] ? previousBoard :
-                    QuestBoardSnapshotReader.Read(content, JsonSupport.ReadObject(await DecodeCopyAsync(workspace,
-                        "persist.quest.json", before, cancellationToken, profile).ConfigureAwait(false)), questHash,
-                        before["persist.progression.json"] is null ? null : JsonSupport.ReadObject(await DecodeCopyAsync(workspace,
-                            "persist.progression.json", before, cancellationToken, profile).ConfigureAwait(false)));
-                questBoardCatalog = !contentChanged && _lastSnapshot?.QuestBoardCatalog is { } cachedBoardCatalog
-                    ? cachedBoardCatalog : QuestBoardEditCatalog.Load(content);
-            }
             cancellationToken.ThrowIfCancellationRequested();
             if (!HashesEqual(before, CaptureHashes(profile)))
             {
                 throw new IOException(EditorText.Get("MainWindow_ProfileSync_006"));
             }
             if (contentChanged && contentFingerprint != ProfileCatalogContentFingerprint.Capture(content.Sources, cancellationToken))
+                throw new IOException(EditorText.Get("MainWindow_ProfileSync_007"));
+            if (artworkRebuilt && artworkFingerprint != QuestBoardArtwork.Capture(content.Sources, questBoard, questBoardCatalog, cancellationToken))
+                throw new IOException(EditorText.Get("MainWindow_ProfileSync_007"));
+            if (checkContent && mapArtworkFingerprint != BattleMapArtwork.Capture(content.Sources, cancellationToken))
                 throw new IOException(EditorText.Get("MainWindow_ProfileSync_007"));
             if (checkContent)
                 ActiveContentResolver.ValidateSourceBindings(content.Resolution, content.Sources, cancellationToken);
@@ -187,6 +234,9 @@ public sealed class ProfileCatalogSnapshotReader
             return _lastSnapshot = new(content, key, quantities, before, DateTime.UtcNow)
             {
                 ContentFingerprint = contentFingerprint,
+                QuestBoardArtworkFingerprint = artworkFingerprint,
+                BattleMapArtworkFingerprint = mapArtworkFingerprint,
+                BattleMapImagePaths = mapImages,
                 QuestBoard = questBoard,
                 QuestBoardCatalog = questBoardCatalog
             };

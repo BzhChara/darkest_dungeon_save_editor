@@ -9,9 +9,10 @@ internal static partial class ContractSuite
 {
     public static async Task RunMissingModLoadOnlyAsync(string repositoryRoot)
     {
+        var previousCodec = UseNativeCodec;
         UseNativeCodec = true;
         try { await RunMissingModLoadContractsAsync(repositoryRoot); }
-        finally { UseNativeCodec = false; }
+        finally { UseNativeCodec = previousCodec; }
     }
 
     private static async Task RunMissingModLoadContractsAsync(string repositoryRoot)

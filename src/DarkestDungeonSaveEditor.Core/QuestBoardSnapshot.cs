@@ -35,4 +35,7 @@ public sealed record QuestBoardQuest(string SaveKey, string Id, string Type, str
 
 public sealed record QuestBoardSnapshot(string ProfileDirectory, string SourceSha256,
     IReadOnlyList<QuestBoardQuest> Quests, IReadOnlyList<QuestBoardRegionSnapshot> Regions,
-    IReadOnlyDictionary<string, string> ImagePaths, IReadOnlyList<string> Issues);
+    IReadOnlyDictionary<string, string> ImagePaths, IReadOnlyList<string> Issues)
+{
+    public QuestBoardLayout Layout { get; init; } = new();
+}

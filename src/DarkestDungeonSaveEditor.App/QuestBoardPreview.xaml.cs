@@ -121,41 +121,37 @@ public partial class QuestBoardPreview : UserControl
                 alternatives.FirstOrDefault(item => item.Id == _regionChoices.GetValueOrDefault(position.Key)) ??
                 alternatives.FirstOrDefault(item => _samples.Any(sample => sample.RegionId == item.Id)) ?? alternatives[0];
             _regionChoices[position.Key] = region.Id;
-            var panel = new Canvas { Width = 320, Height = 150, Background = Brushes.Transparent, Tag = region.Id };
+            // The region is a layout container, not an invisible input surface.
+            // Only headers and quest buttons intercept the viewport's global menu.
+            var panel = new Canvas { Tag = region.Id };
             Canvas.SetLeft(panel, region.X);
             Canvas.SetTop(panel, region.Y);
             AddRegionHeader(panel, region, alternatives);
-            panel.MouseRightButtonUp += (_, e) =>
-            {
-                ShowMenu(region.Id, null, panel);
-                e.Handled = true;
-            };
             var entries = _samples.Where(x => x.RegionId == region.Id).ToArray();
             var columns = region.QuestsPerRow;
-            panel.Width = Math.Max(320, columns * 76);
-            panel.Height = Math.Max(150, 58 + Math.Ceiling(entries.Length / (double)columns) * 76);
             for (var index = 0; index < entries.Length; index++)
             {
                 var entry = entries[index];
-                var content = new Grid { Width = 76, Height = 76 };
+                var bounds = _assets.QuestIconBounds(entry.Choice);
+                var content = new Grid { Width = bounds.Width, Height = bounds.Height };
                 if (entry.Key == _selected)
                 {
-                    // Native renders the full texture at (-94,-94) from the icon
-                    // center and chooses a new rotation on each selection.
                     var image = _assets.QuestImage("quest_select_selected.png");
-                    var selected = QuestBoardPreviewAssets.Picture(image, image?.Width ?? 192, image?.Height ?? 192);
+                    var dimensions = QuestBoardPreviewAssets.PixelSize(image, 192, 192);
+                    var selected = QuestBoardPreviewAssets.Picture(image, dimensions.Width, dimensions.Height);
                     selected.RenderTransform = new RotateTransform(_selectionAngle, selected.Width / 2, selected.Height / 2);
-                    Canvas.SetLeft(selected, 38 - 94);
-                    Canvas.SetTop(selected, 38 - 94);
-                    var background = new Canvas { Width = 76, Height = 76, IsHitTestVisible = false, Tag = "QuestSelection" };
+                    Canvas.SetLeft(selected, _assets.Layout.SelectionOffset.X - bounds.Left);
+                    Canvas.SetTop(selected, _assets.Layout.SelectionOffset.Y - bounds.Top);
+                    var background = new Canvas { Width = bounds.Width, Height = bounds.Height, IsHitTestVisible = false, Tag = "QuestSelection" };
                     background.Children.Add(selected);
                     content.Children.Add(background);
                 }
-                content.Children.Add(_assets.QuestIcon(entry.Choice, 76));
-                var button = new Button
+                content.Children.Add(_assets.QuestIcon(entry.Choice));
+                var button = new QuestBoardTaskButton
                 {
                     Style = (Style)FindResource("BoardMapButton"), Content = content, Tag = entry.Key,
-                    ToolTip = FormatSample(entry), Width = 76, Height = 76
+                    ToolTip = FormatSample(entry), Width = bounds.Width, Height = bounds.Height,
+                    ContainsArtwork = _assets.QuestHitTest(entry.Choice)
                 };
                 System.Windows.Automation.AutomationProperties.SetName(button, FormatSample(entry));
                 button.Click += (_, _) => SelectSample(entry.Key);
@@ -165,8 +161,9 @@ public partial class QuestBoardPreview : UserControl
                     ShowMenu(region.Id, entry.Key, MapViewport);
                     e.Handled = true;
                 };
-                Canvas.SetLeft(button, index % columns * 76);
-                Canvas.SetTop(button, 58 + index / columns * 76);
+                var center = _assets.Layout.QuestCenter(index, columns);
+                Canvas.SetLeft(button, center.X + bounds.Left);
+                Canvas.SetTop(button, center.Y + bounds.Top);
                 panel.Children.Add(button);
             }
             MapCanvas.Children.Add(panel);
@@ -263,40 +260,7 @@ public partial class QuestBoardPreview : UserControl
             System.Windows.Automation.AutomationProperties.SetName(slot, trinket.Name);
             RewardPanel.Children.Add(slot);
         }
-        // The native inventory lays out four 80 x 160 slots per row; center shorter rows.
         SizeRewardPanel();
-    }
-
-    private void SizeRewardPanel()
-    {
-        RewardPanel.Width = Math.Min(4, RewardPanel.Children.Count) * 80;
-        RewardPanel.Height = Math.Max(0, Math.Ceiling(RewardPanel.Children.Count / 4d) * 160 - 16);
-    }
-
-    private Canvas CreateRewardSlot(string iconPath, string? amount = null, string? rarity = null)
-    {
-        var slot = new Canvas { Width = 80, Height = 160, Background = Brushes.Transparent, Tag = iconPath };
-        void AddImage(string path)
-        {
-            var icon = QuestBoardPreviewAssets.Picture(_assets.Image(path), 72, 144);
-            Canvas.SetLeft(icon, 4);
-            slot.Children.Add(icon);
-        }
-        if (rarity is not null) AddImage($"panels/icons_equip/trinket/rarity_{rarity}.png");
-        AddImage(iconPath);
-        if (amount is not null)
-        {
-            var text = new TextBlock
-            {
-                Text = amount, FontFamily = EditorTypography.Heading, FontSize = 22, FontWeight = FontWeights.Bold,
-                Foreground = (Brush)FindResource("GoldBrush"),
-                Effect = new System.Windows.Media.Effects.DropShadowEffect { Color = Colors.Black, BlurRadius = 2, ShadowDepth = 1 }
-            };
-            Canvas.SetLeft(text, 14);
-            Canvas.SetTop(text, 4);
-            slot.Children.Add(text);
-        }
-        return slot;
     }
 
     internal ContextMenu CreateTaskMenu(string regionId, Guid? key)
@@ -380,23 +344,25 @@ public partial class QuestBoardPreview : UserControl
             Header = EditorText.Get("QuestBoard_Add"), Style = (Style)FindResource("BattleMapMenuItemStyle"),
             Icon = MapMenuIcons.Create(MapMenuIcon.Add, file => _assets.Image("panels/icons_map/" + file))
         };
-        foreach (var region in _editCatalog?.Regions ?? [])
+        var regions = _fixtureMode ? _regions.Select(region => (region.Id, region.Name)) :
+            (_editCatalog?.Regions ?? []).Select(region => (region.Id, region.Name));
+        foreach (var region in regions)
         {
             if (!EditChoices(region.Id).Any()) continue;
             var regional = CreateTaskMenu(region.Id, null);
             var categories = (MenuItem)regional.Items[0];
             regional.Items.Clear();
-            categories.Header = EditorText.ContentName(region.LocalizedName, region.Id);
+            categories.Header = region.Name;
             root.Items.Add(categories);
         }
-        root.IsEnabled = root.Items.Count > 0 && SaveEditRequested is not null;
+        root.IsEnabled = root.Items.Count > 0 && (_fixtureMode || SaveEditRequested is not null);
         menu.Items.Add(root);
         return menu;
     }
 
     private void Viewport_ShowRegionMenu(object sender, MouseButtonEventArgs e)
     {
-        if (!CanInteract() || _fixtureMode) return;
+        if (!CanInteract()) return;
         CloseMenu();
         _menu = CreateRegionMenu();
         _menu.PlacementTarget = MapViewport;

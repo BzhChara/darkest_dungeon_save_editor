@@ -8,10 +8,23 @@ namespace DarkestDungeonSaveEditor.App;
 
 public partial class QuestBoardPreview
 {
-    // Keep the current town framing: native content runs from the Darkest
-    // Dungeon header at Y=90 to the town's first quest row ending at Y=884.
-    // Region choices and quest counts must not move this vertical reference.
-    private const double EmbeddedVerticalCenter = 487;
+    // Frame the effective layout rather than a fixed vanilla coordinate. Include
+    // every alternative at shared positions and one row per region, so selecting
+    // a quest or switching town/sewer cannot move the vertical reference.
+    private double EmbeddedVerticalCenter
+    {
+        get
+        {
+            var regions = _regions.Where(region => region.HasLayout).ToArray();
+            if (regions.Length == 0) return MapSurface.Height / 2;
+            var layout = _assets.Layout;
+            var marker = QuestBoardPreviewAssets.PixelSize(_assets.QuestImage("quest_select_length_generated_1.png"), 96, 96);
+            var top = regions.Min(region => region.Y + Math.Min(layout.BackgroundOffset.Y, layout.NameOffset.Y));
+            var bottom = regions.Max(region => region.Y + Math.Max(layout.NameOffset.Y + 38,
+                layout.QuestStart.Y + layout.LengthIconOffset.Y + marker.Height / 2));
+            return (top + bottom) / 2;
+        }
+    }
 
     private enum MapViewMode { Default, Fit, Manual }
     private MapViewMode _viewMode = MapViewMode.Default;
@@ -38,7 +51,7 @@ public partial class QuestBoardPreview
         MapViewport.ActualHeight / MapSurface.Height);
 
     // Only the full-map window can fit below 50%. The embedded view keeps its
-    // centered crop as the minimum, including Fit and wheel/button zoom-out.
+    // centered crop as the minimum, including reset and wheel/button zoom-out.
     private double MinimumScale => _expandedWindow is null ? Math.Max(0.5, WholeMapScale) : WholeMapScale;
 
     private Rect MapContentBounds()
@@ -93,7 +106,7 @@ public partial class QuestBoardPreview
 
     private void UpdateZoomControls()
     {
-        ZoomText.Text = $"{MapScale.ScaleX:P0}";
+        ZoomText.Text = MinimumScale > 0 ? $"{MapScale.ScaleX / MinimumScale:P0}" : "100%";
         ZoomOutButton.IsEnabled = MapScale.ScaleX > MinimumScale + 0.000001;
         ZoomInButton.IsEnabled = MapScale.ScaleX < Math.Max(2.4, MinimumScale) - 0.000001;
     }
@@ -132,14 +145,13 @@ public partial class QuestBoardPreview
 
     private void ZoomOut_Click(object sender, RoutedEventArgs e) => Zoom(1 / 1.15);
     private void ZoomIn_Click(object sender, RoutedEventArgs e) => Zoom(1.15);
-    private void ResetZoom_Click(object sender, RoutedEventArgs e) =>
-        SetZoom(1, new Point(MapViewport.ActualWidth / 2, MapViewport.ActualHeight / 2));
-    private void Zoom(double factor) => SetZoom(MapScale.ScaleX * factor, new Point(MapViewport.ActualWidth / 2, MapViewport.ActualHeight / 2));
-    private void Fit_Click(object sender, RoutedEventArgs e)
+    private void ResetZoom_Click(object sender, RoutedEventArgs e)
     {
         if (!CanInteract()) return;
+        CloseMenu();
         FitBoard();
     }
+    private void Zoom(double factor) => SetZoom(MapScale.ScaleX * factor, new Point(MapViewport.ActualWidth / 2, MapViewport.ActualHeight / 2));
     private void Viewport_MouseWheel(object sender, MouseWheelEventArgs e)
     {
         SetZoom(MapScale.ScaleX * (e.Delta > 0 ? 1.12 : 1 / 1.12), e.GetPosition(MapViewport));
@@ -196,8 +208,7 @@ public partial class QuestBoardPreview
     private void SetExpandedDetails(bool expanded)
     {
         EstateMapHeader.Visibility = expanded ? Visibility.Visible : Visibility.Collapsed;
-        DetailsViewport.Height = expanded ? 750 : 610;
-        Canvas.SetTop(DetailsCanvas, expanded ? 0 : -140);
+        SizeRewardPanel();
         RewardsScroll.ScrollToTop();
     }
 

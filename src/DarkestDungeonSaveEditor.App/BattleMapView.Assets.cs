@@ -11,7 +11,11 @@ namespace DarkestDungeonSaveEditor.App;
 
 public partial class BattleMapView : UserControl
 {
-    private void ConfigureOriginalMapAssets(string? gameDirectory)
+    private IReadOnlyDictionary<string, string>? _resolvedMapImages;
+    private string? _mapArtworkFingerprint;
+
+    private void ConfigureOriginalMapAssets(string? gameDirectory, ActiveContentSnapshot? content = null,
+        IReadOnlyDictionary<string, string>? resolvedImages = null)
     {
         string? normalizedDirectory = null;
         if (!string.IsNullOrWhiteSpace(gameDirectory))
@@ -26,10 +30,29 @@ public partial class BattleMapView : UserControl
             }
         }
 
-        if (!string.Equals(_gameDirectory, normalizedDirectory, StringComparison.OrdinalIgnoreCase))
+        _gameDirectory = normalizedDirectory;
+        _mapAssetCache.Clear();
+        _mapArtworkFingerprint = null;
+        _resolvedMapImages = null;
+        if (resolvedImages is not null)
+            _resolvedMapImages = resolvedImages;
+        else if (content is not null)
         {
-            _gameDirectory = normalizedDirectory;
-            _mapAssetCache.Clear();
+            // Batch manifest lookup once per load/content refresh, never during hit
+            // testing or menu construction. Replacements may keep the same path.
+            _resolvedMapImages = new Dictionary<string, string>();
+            try
+            {
+                var issues = new List<string>();
+                _resolvedMapImages = BattleMapArtwork.Resolve(content, issues);
+                if (issues.Count > 0)
+                    CrashDiagnostics.RecordStatus(string.Join(Environment.NewLine, issues), DiagnosticLogLevel.Warning);
+            }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+            {
+                // An unresolved overlay must not silently display lower-priority art.
+                CrashDiagnostics.RecordException("BattleMap: artwork", error, content.Profile.ProfileId);
+            }
         }
 
         var panel = TryLoadGameImage(MapPanelAsset);
@@ -84,7 +107,10 @@ public partial class BattleMapView : UserControl
 
     private ImageSource? TryLoadGameImage(string relativePath)
     {
-        if (string.IsNullOrWhiteSpace(_gameDirectory))
+        relativePath = relativePath.Replace('\\', '/');
+        var path = _resolvedMapImages is not null ? _resolvedMapImages.GetValueOrDefault(relativePath) :
+            string.IsNullOrWhiteSpace(_gameDirectory) ? null : Path.Combine(_gameDirectory, relativePath);
+        if (path is null)
         {
             return null;
         }
@@ -101,7 +127,7 @@ public partial class BattleMapView : UserControl
             image.BeginInit();
             image.CacheOption = BitmapCacheOption.OnLoad;
             image.CreateOptions = BitmapCreateOptions.IgnoreImageCache;
-            image.UriSource = new Uri(Path.Combine(_gameDirectory, relativePath), UriKind.Absolute);
+            image.UriSource = new Uri(path, UriKind.Absolute);
             image.EndInit();
             image.Freeze();
             source = image;

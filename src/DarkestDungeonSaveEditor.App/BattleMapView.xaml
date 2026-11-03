@@ -93,12 +93,6 @@
                         Content="100%"
                         ToolTip="{local:Text BattleMapView_005}"
                         Click="ResetZoomButton_Click" />
-                <Button x:Name="FitMapButton"
-                        Style="{StaticResource MapToolbarButtonStyle}"
-                        MinWidth="82"
-                        Content="{local:Text BattleMapView_006}"
-                        ToolTip="{local:Text BattleMapView_007}"
-                        Click="FitMapButton_Click" />
             </StackPanel>
         </Grid>
 

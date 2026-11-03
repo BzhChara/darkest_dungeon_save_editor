@@ -11,16 +11,15 @@ internal static partial class ContractSuite
         Directory.CreateDirectory(root);
         var (snapshot, document) = RunQuestBoardReaderContracts(root);
         RunQuestBoardCampingContracts(root);
-        await RunQuestBoardSnapshotRefreshAsync(repositoryRoot, document);
-        await RunWpfContractsAsync(() =>
+        await RunWpfContractsAsync(async () =>
         {
+            await RunQuestBoardSnapshotRefreshAsync(repositoryRoot, document);
             RunQuestBoardRealUiContracts(root, snapshot, "fixture");
             if (nativeSnapshotPath is not null)
             {
                 var native = JsonSerializer.Deserialize<QuestBoardSnapshot>(File.ReadAllText(nativeSnapshotPath))!;
                 RunQuestBoardRealUiContracts(root, native, "native");
             }
-            return Task.CompletedTask;
         });
         Console.WriteLine("PASS: Saved quest fields/rewards, active metadata/art, language, read-only UI and snapshot refresh.");
         Console.WriteLine("Artifacts: " + root);
@@ -283,6 +282,7 @@ internal static partial class ContractSuite
             """);
             var resourceRefresh = await reader.ReadAsync(refreshContent: true);
             Assert(!ReferenceEquals(resourceRefresh.QuestBoard, refreshed.QuestBoard), "Definition changes must invalidate board metadata.");
+            await RunQuestBoardArtworkRefreshAsync(f, reader);
             // Removing only the synthetic file exercises unavailable-board handling without touching user data.
             File.Delete(questPath);
             Assert((await reader.ReadAsync()).QuestBoard is null, "A missing quest file must not retain another board.");
@@ -340,8 +340,8 @@ internal static partial class ContractSuite
                             "Empty regions must have a readable, clickable heading.");
                         heading.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                     }
-                    Assert(panel.Background is not null && panel.Width > 0 && panel.Height > 0,
-                        "Empty regions must retain their right-click surface.");
+                    Assert(panel.Background is null,
+                        "A region container must not intercept background clicks or cover adjacent quest buttons.");
                     Assert(board.SelectedKey is null && ((WrapPanel)board.FindName("RewardPanel")).Children.Count == 0,
                         "Selecting an empty region must clear the previous quest details.");
                     var emptyMenu = board.CreateTaskMenu(region.Id, null);
@@ -368,7 +368,7 @@ internal static partial class ContractSuite
                         var blood = ((Grid)marker.Content).Children.OfType<Canvas>().Single(part => Equals(part.Tag, "QuestSelection"));
                         var image = blood.Children.OfType<Image>().Single();
                         Assert(image.Source is not null && image.Width == image.Source.Width && image.Height == image.Source.Height &&
-                               image.Width == 192 && Canvas.GetLeft(image) == -56 && Canvas.GetTop(image) == -56 &&
+                               image.Width == 192 && Canvas.GetLeft(image) == -46 && Canvas.GetTop(image) == -46 &&
                                image.RenderTransform is System.Windows.Media.RotateTransform { Angle: >= 0 and < 360 },
                             "Selection uses the full native splatter texture and rotation, centered behind the task icon.");
                     }
@@ -435,16 +435,30 @@ internal static partial class ContractSuite
         double Top(FrameworkElement element) => element.TransformToAncestor(viewport).Transform(new Point()).Y;
         double HeaderTop() => Top(canvas.Children.OfType<Canvas>().Single(panel => Equals(panel.Tag, "crypts"))
             .Children.OfType<Button>().Single(button => button.Tag is not Guid));
+        // A single selector entry tests routing only; no quest is generated or written.
+        var sewerChoice = snapshot.Quests[0] with { Dungeon = "vmt_sewer" };
+        board.SetEditCatalog(new([new("sewer-ui-routing", sewerChoice, "")], snapshot.ImagePaths, []) { Regions = snapshot.Regions });
         foreach (var mode in new[] { "default", "fit", "manual" })
         {
             Select("town");
-            if (mode == "fit") ((Button)board.FindName("FitButton")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            if (mode == "fit") ((Button)board.FindName("ResetZoomButton")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             if (mode == "manual") ((Button)board.FindName("ZoomInButton")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             FlushLanguageBindings();
             var before = (Offset: offset.Y, Scale: scale.ScaleY, Backdrop: Top(backdrop), Header: HeaderTop());
             Select("vmt_sewer");
             Assert((offset.Y, scale.ScaleY, Top(backdrop), HeaderTop()) == before,
                 $"{mode}: switching from town to sewer must not move the map vertically or change its scale.");
+            var selector = canvas.Children.OfType<Canvas>().Single(panel => Equals(panel.Tag, "vmt_sewer"))
+                .Children.OfType<ComboBox>().Single();
+            var rightClick = new System.Windows.Input.MouseButtonEventArgs(System.Windows.Input.Mouse.PrimaryDevice, 0,
+                System.Windows.Input.MouseButton.Right) { RoutedEvent = UIElement.MouseRightButtonUpEvent };
+            selector.RaiseEvent(rightClick);
+            var menu = (ContextMenu)typeof(QuestBoardPreview).GetField("_menu", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(board)!;
+            var create = (MenuItem)menu.Items[0];
+            Assert(rightClick.Handled && menu.Items.Count == 1 && create.Items.Count == 1 &&
+                   Equals(((MenuItem)create.Items[0]).Tag, sewerChoice.Category),
+                "Right-clicking a shared-position dropdown must use the selected region, without falling through to the global menu.");
+            menu.IsOpen = false;
             board.RefreshLanguage();
             FlushLanguageBindings();
             Assert(offset.Y == before.Offset, "Refreshing labels must keep the same vertical reference.");
@@ -459,6 +473,7 @@ internal static partial class ContractSuite
                     Path.Combine(root, "native-town-stable.png"));
             Console.WriteLine($"{label}/{mode}: town/sewer map Y={offset.Y:F2}, scale={scale.ScaleY:P0}; unchanged.");
         }
-        ((Button)board.FindName("FitButton")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        board.SetEditCatalog(null);
+        ((Button)board.FindName("ResetZoomButton")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
     }
 }

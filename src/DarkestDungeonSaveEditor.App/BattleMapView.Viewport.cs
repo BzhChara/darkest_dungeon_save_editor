@@ -14,10 +14,7 @@ public partial class BattleMapView : UserControl
     private void BattleMapView_Loaded(object sender, RoutedEventArgs e)
     {
         StartProfileMonitoring();
-        if (_isRaidAvailable)
-        {
-            FitMapToViewport();
-        }
+        RefreshViewport();
         if (!UsesSharedProfileMonitor && _profileDirectory is not null)
         {
             _ = RefreshLiveSnapshotAsync(_profileGeneration);
@@ -26,9 +23,23 @@ public partial class BattleMapView : UserControl
 
     private void BattleMapView_SizeChanged(object sender, SizeChangedEventArgs e)
     {
-        if (_isRaidAvailable && _fitToView)
+        RefreshViewport();
+    }
+
+    private void RefreshViewport()
+    {
+        if (!_isRaidAvailable)
+        {
+            return;
+        }
+        if (_fitToView)
         {
             FitMapToViewport();
+        }
+        else
+        {
+            // Resizing changes the 100% reference, not a manually chosen view.
+            UpdateZoomText();
         }
     }
 
@@ -120,12 +131,7 @@ public partial class BattleMapView : UserControl
             return;
         }
 
-        _fitToView = false;
-        CenterMapAtScale(1);
-    }
-
-    private void FitMapButton_Click(object sender, RoutedEventArgs e)
-    {
+        CloseActiveContextMenu();
         _fitToView = true;
         FitMapToViewport();
     }
@@ -167,9 +173,22 @@ public partial class BattleMapView : UserControl
             return;
         }
 
-        var horizontalScale = (MapViewport.ActualWidth - 56) / MapCanvas.Width;
-        var verticalScale = (MapViewport.ActualHeight - 56) / MapCanvas.Height;
-        CenterMapAtScale(Math.Clamp(Math.Min(horizontalScale, verticalScale), MinimumZoom, 1.25));
+        CenterMapAtScale(DefaultZoom);
+    }
+
+    private double DefaultZoom
+    {
+        get
+        {
+            if (MapViewport.ActualWidth <= 0 || MapViewport.ActualHeight <= 0)
+            {
+                return 1;
+            }
+            // Keep the existing fit size and margins; only its displayed unit changes.
+            var horizontalScale = (MapViewport.ActualWidth - 56) / MapCanvas.Width;
+            var verticalScale = (MapViewport.ActualHeight - 56) / MapCanvas.Height;
+            return Math.Clamp(Math.Min(horizontalScale, verticalScale), MinimumZoom, 1.25);
+        }
     }
 
     private void CenterMapAtScale(double scale)
@@ -184,7 +203,7 @@ public partial class BattleMapView : UserControl
 
     private void UpdateZoomText()
     {
-        ZoomTextBlock.Text = $"{MapScaleTransform.ScaleX * 100:0}%";
+        ZoomTextBlock.Text = $"{MapScaleTransform.ScaleX / DefaultZoom * 100:0}%";
     }
 
 }

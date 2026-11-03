@@ -83,7 +83,7 @@ internal static partial class ContractSuite
                         Assert(((ScaleTransform)board.FindName("MapScale")).ScaleX == 0.5 &&
                                Math.Abs(defaultBounds.Width - 960) < 0.001 && Math.Abs(defaultBounds.Height - 540) < 0.001 &&
                                Math.Abs(contentBounds.Left - (defaultViewport.ActualWidth - contentBounds.Right)) < 0.001 &&
-                               Math.Abs(defaultSurface.TransformToAncestor(defaultViewport).Transform(new Point(0, 487)).Y - defaultViewport.ActualHeight / 2) < 0.001 &&
+                               Math.Abs(defaultSurface.TransformToAncestor(defaultViewport).Transform(new Point(0, 490)).Y - defaultViewport.ActualHeight / 2) < 0.001 &&
                                defaultBounds.Left < 0 && defaultBounds.Top < 0 && defaultViewport.ClipToBounds &&
                                !((Button)board.FindName("ZoomOutButton")).IsEnabled,
                             "Both default and minimum windows must center content horizontally at 50%, retain the fixed town vertical reference, and clip background overflow.");
@@ -202,7 +202,7 @@ internal static partial class ContractSuite
                     FlushLanguageBindings();
                     Assert(markerScale.ScaleX == 0.5 && new Point(mapOffset.X, mapOffset.Y) == defaultOffset,
                         "Returning from full map must restore the centered 50% default view.");
-                    ((Button)board.FindName("FitButton")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                    ((Button)board.FindName("ResetZoomButton")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                     FlushLanguageBindings();
                     var initialMarkerScale = markerScale.ScaleX;
                     var initialBackdropWidth = backdrop.TransformToAncestor(viewport).TransformBounds(new Rect(backdrop.RenderSize)).Width;
@@ -210,8 +210,8 @@ internal static partial class ContractSuite
                     var fittedContent = QuestBoardContentBounds(board, viewport);
                     Assert(initialMarkerScale == 0.5 && fittedBounds.Left < 0 && fittedBounds.Top < 0 &&
                            Math.Abs(fittedContent.Left - (viewport.ActualWidth - fittedContent.Right)) < 0.001 &&
-                           Math.Abs(surface.TransformToAncestor(viewport).Transform(new Point(0, 487)).Y - viewport.ActualHeight / 2) < 0.001,
-                        "Embedded Fit must restore horizontal content centering and the fixed town vertical reference at 50%.");
+                           Math.Abs(surface.TransformToAncestor(viewport).Transform(new Point(0, 490)).Y - viewport.ActualHeight / 2) < 0.001,
+                        "100% must restore horizontal content centering and the fixed town vertical reference at half native size.");
                     var detailBounds = detailCanvas.TransformToAncestor(boardBody).TransformBounds(new Rect(detailCanvas.RenderSize));
                     Assert(!((Button)board.FindName("ZoomOutButton")).IsEnabled, "Fit must be the minimum scale.");
                     ((Button)board.FindName("ZoomInButton")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
@@ -238,7 +238,8 @@ internal static partial class ContractSuite
                     }
                     CheckPanLimits(fittedBounds);
                     ((Button)board.FindName("ResetZoomButton")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-                    Assert(markerScale.ScaleX == 1, "100% must reset the shared map scale.");
+                    Assert(markerScale.ScaleX == initialMarkerScale && ((TextBlock)board.FindName("ZoomText")).Text == "100%",
+                        "100% must restore the default/minimum view, not the original image's unscaled size.");
                     CheckPanLimits(fittedBounds);
                     typeof(QuestBoardPreview).GetMethod("SetZoom", flags)!.Invoke(board, [0.001, new Point(0, 0)]);
                     Assert(Math.Abs(markerScale.ScaleX - initialMarkerScale) < 0.000001,
@@ -246,7 +247,7 @@ internal static partial class ContractSuite
                     CheckPanLimits(fittedBounds);
                     Assert(surface.TransformToAncestor(viewport).TransformBounds(new Rect(surface.RenderSize)) == fittedBounds,
                         "At minimum scale, dragging must not move the board at all.");
-                    ((Button)board.FindName("FitButton")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                    ((Button)board.FindName("ResetZoomButton")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
 
                     // Exercise the same drag transition as the mouse handler, then shrink the viewport.
                     RenderContractWindow(window, new Size(1440, 900), Path.Combine(runRoot, $"before-fit-drag-{language}.png"));
@@ -261,7 +262,7 @@ internal static partial class ContractSuite
                     Assert(markerScale.ScaleX == beforeShrink && markerScale.ScaleX == 0.5 &&
                            !((Button)board.FindName("ZoomOutButton")).IsEnabled &&
                            Math.Abs(resizedBounds.Left - (viewport.ActualWidth - resizedBounds.Right)) < 0.001 &&
-                           Math.Abs(surface.TransformToAncestor(viewport).Transform(new Point(0, 487)).Y - viewport.ActualHeight / 2) < 0.001,
+                           Math.Abs(surface.TransformToAncestor(viewport).Transform(new Point(0, 490)).Y - viewport.ActualHeight / 2) < 0.001,
                         "Shrinking the embedded viewport after an ineffective drag must retain horizontal centering and the fixed town vertical reference at 50%.");
 
                     var initialCount = board.Samples.Count;
@@ -347,12 +348,19 @@ internal static partial class ContractSuite
                            ((MenuItem)openMenu.Items[0]).Header as string == EditorText.Get("QuestBoard_Replace"),
                         "Right-clicking a quest must select it and open its edit menu without falling through to the region's New menu.");
                     openMenu.IsOpen = false;
-                    var emptyRegion = mapCanvas.Children.OfType<Canvas>().Single(panel => (string)panel.Tag == "crypts");
-                    emptyRegion.RaiseEvent(new System.Windows.Input.MouseButtonEventArgs(System.Windows.Input.Mouse.PrimaryDevice, 0,
+                    var regionHeader = mapCanvas.Children.OfType<Canvas>().Single(panel => (string)panel.Tag == "crypts")
+                        .Children.OfType<Button>().Single(button => button.Content is TextBlock);
+                    regionHeader.RaiseEvent(new System.Windows.Input.MouseButtonEventArgs(System.Windows.Input.Mouse.PrimaryDevice, 0,
                         System.Windows.Input.MouseButton.Right) { RoutedEvent = UIElement.MouseRightButtonUpEvent });
                     openMenu = (ContextMenu)typeof(QuestBoardPreview).GetField("_menu", flags)!.GetValue(board)!;
                     Assert(openMenu.Items.Count == 1 && ((MenuItem)openMenu.Items[0]).Header as string == EditorText.Get("QuestBoard_Add"),
-                        "Right-clicking a region's blank area must open only New, regardless of the currently selected quest.");
+                        "Right-clicking the region header must open only New, regardless of the currently selected quest.");
+                    openMenu.IsOpen = false;
+                    viewport.RaiseEvent(new System.Windows.Input.MouseButtonEventArgs(System.Windows.Input.Mouse.PrimaryDevice, 0,
+                        System.Windows.Input.MouseButton.Right) { RoutedEvent = UIElement.MouseRightButtonUpEvent });
+                    openMenu = (ContextMenu)typeof(QuestBoardPreview).GetField("_menu", flags)!.GetValue(board)!;
+                    Assert(((MenuItem)openMenu.Items[0]).Items.OfType<MenuItem>().Any(item => Equals(item.Header, QuestBoardPreviewData.Regions[0].Name)),
+                        "Map background right-click must expose the global region selector, not a nearby region's New menu.");
                     openMenu.IsOpen = false;
                     var delete = board.CreateTaskMenu("crypts", replaced);
                     ((MenuItem)delete.Items[1]).RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
@@ -404,7 +412,7 @@ internal static partial class ContractSuite
                                detailImage.Width == 400 && detailImage.Height == 843 && detailImage.Clip is null,
                             "The compact details must retain the native artwork's original proportions and coordinate system.");
                         Assert(Canvas.GetTop((TextBlock)board.FindName("QuestDescription")) == 194 &&
-                               Canvas.GetTop((TextBlock)board.FindName("RewardHeading")) == 532,
+                               Canvas.GetTop((TextBlock)board.FindName("RewardHeading")) == 530,
                             "Native artwork and detail text must share the same original coordinate system.");
                     }
                     var scaleBeforeDetailsWheel = markerScale.ScaleX;
@@ -433,7 +441,7 @@ internal static partial class ContractSuite
                     RenderContractElement(menu, new Size(240, 125), Path.Combine(runRoot, $"context-menu-{language}.png"));
                     menu.IsOpen = false;
 
-                    ((Button)board.FindName("FitButton")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                    ((Button)board.FindName("ResetZoomButton")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                     FlushLanguageBindings();
                     var beforeManualBounds = surface.TransformToAncestor(viewport).TransformBounds(new Rect(surface.RenderSize));
                     ((Button)board.FindName("ResetZoomButton")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));

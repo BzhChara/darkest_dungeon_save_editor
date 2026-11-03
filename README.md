@@ -18,7 +18,7 @@ Download a **Windows x64 ZIP** from [GitHub Releases](https://github.com/BzhChar
 
 See [Installation and first use](docs/release-installation.md) for requirements, checksum verification, backups and updates. This is a prerelease: keep a separate save backup and check the selected profile before editing. The **Source code** archives on GitHub require building the project.
 
-The current source version is `0.1.0-beta.6`. See the [beta.6 release notes](docs/releases/v0.1.0-beta.6.md) for town events, quest-board editing, expedition objective completion, and explicit Mod directory handling.
+The current source version is `0.1.0-beta.7`. See the [beta.7 release notes](docs/releases/v0.1.0-beta.7.md) for quest-layout Mod support, accurate mouse targeting, consistent map zoom and reliable artwork refresh.
 
 ## License
 
@@ -52,7 +52,7 @@ The current event can be selected again to initialize it again without adding a 
 
 ### Quest board
 
-In town, the battle workspace becomes the **Quest Board**, using the game's map, region positions, progression markers, quest icons and reward artwork. Right-click an existing quest to replace or delete it, or an empty region to create one. Searchable choices use active Base/DLC/Mod definitions and group custom types by their actual objectives. The embedded map has a 50% minimum; **Full map** shows the complete background. See [Quest board](docs/quest-board-preview.md).
+In town, the battle workspace becomes the **Quest Board**, using the game's map, region positions, progression markers, quest icons and reward artwork. Right-click an existing quest to replace or delete it, a region heading to create one there, or empty background for the region menu. Searchable choices use active Base/DLC/Mod definitions and group custom types by their actual objectives. Zoom starts at **100%** of the default view; **Full map** shows the complete background. See [Quest board](docs/quest-board-preview.md).
 
 Manual creation and replacement may bypass natural generation requirements. The game still enforces entry requirements and controls settlement. Unresolvable dependencies and invalid initialization block writing. Edits change the selected board entry without advancing the week, settling another quest or rewriting completion history. A persistent expedition may reuse its existing map; replacing its board entry does not reset it.
 

@@ -74,7 +74,7 @@ internal static partial class ContractSuite
                        Named<TextBlock>("EmptyStateTitleTextBlock").Text == EditorText.Get("BattleMapView_WaveBattle_Title") &&
                        Named<TextBlock>("EmptyStateTextBlock").Text == EditorText.Get("BattleMapView_WaveBattle_Message") &&
                        Named<Button>("ForceTownButton").IsEnabled && !Named<Button>("ForceCompleteQuestButton").IsEnabled &&
-                       !Named<Button>("FitMapButton").IsEnabled &&
+                       !Named<Button>("ResetZoomButton").IsEnabled &&
                        !Named<Button>("ZoomInButton").IsEnabled && ((IList)Field("_cells")!).Count == 0 &&
                        Field("_selectedCell") is null && Field("_encounterCatalog") is null && Field("_roomAttachmentCatalog") is null,
                     "Wave UI must show the localized notice, detach edit targets/catalogs, disable navigation, and retain force-town.");
@@ -98,7 +98,7 @@ internal static partial class ContractSuite
                 SaveRaid();
                 await view.LoadProfileAsync(profile, codec, gameDirectory: null);
                 Assert(Named<Canvas>("MapCanvas").Visibility == Visibility.Visible &&
-                       Named<Button>("FitMapButton").IsEnabled && Named<Button>("ForceTownButton").IsEnabled,
+                       Named<Button>("ResetZoomButton").IsEnabled && Named<Button>("ForceTownButton").IsEnabled,
                     "Switching to an ordinary raid must restore its map and controls.");
                 typeof(BattleMapView).GetField("_selectedCell", flags)!.SetValue(view, ((IList)Field("_cells")!)[0]);
                 raidRoot["raid_instance"]!["type"] = "wave";
@@ -151,9 +151,10 @@ internal static partial class ContractSuite
                beforeMap == ComputeSha256(profile.MapSavePath) && beforeRaid == ComputeSha256(profile.RaidSavePath) &&
                File.Exists(Path.Combine(result.BackupDirectory, "persist.game.json")),
             "Force-town must remain usable for wave raids, preserve week/map/raid state, and create its normal backup.");
+        var previousCodec = UseNativeCodec;
         UseNativeCodec = true;
         try { await RunBattleMapContractsAsync(root, codec); }
-        finally { UseNativeCodec = false; }
+        finally { UseNativeCodec = previousCodec; }
         Console.WriteLine("PASS: Wave detection, write rejection, localized WPF notice, normal/wave transitions, shared synchronization, clearing, and force-town recovery.");
         Console.WriteLine("Artifacts: " + root);
     }

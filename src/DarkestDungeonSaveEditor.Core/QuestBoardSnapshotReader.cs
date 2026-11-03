@@ -99,32 +99,12 @@ public static partial class QuestBoardSnapshotReader
                 LengthIconPath = QuestArt + $"quest_select_length_{(isPlot ? "plot" : "generated")}_{length}.png"
             });
         }
-        var requests = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var file in new[] { "quest_select.background.png", "quest_select.questverbose_bg.png", "quest_select.icon.png",
-                     "dungeon_no_progressionbar.png", "dungeon_progressionbar.png", "quest_select_selected.png" }) requests.Add(QuestArt + file);
-        foreach (var file in new[] { "marker_battle.png", "room_boss.png", "marker_curio.png", "room_treasure.png",
-                     "marker_trap.png", "marker_obstacle.png", "indicator.png" }) requests.Add("panels/icons_map/" + file);
-        foreach (var quest in result)
-        {
-            requests.Add(quest.IconPath);
-            requests.Add(quest.LengthIconPath);
-            if (quest.IsPlotQuest) requests.Add(QuestArt + $"quest_select_{quest.Id}.png");
-            foreach (var reward in quest.Rewards)
-            {
-                requests.Add(reward.IconPath);
-                if (reward.Rarity.Length > 0) requests.Add($"panels/icons_equip/trinket/rarity_{reward.Rarity}.png");
-            }
-        }
-        var safeRequests = requests.Where(path => !Path.IsPathRooted(path) &&
-            !path.Replace('\\', '/').Split('/').Any(part => part is ".." or ".")).ToArray();
-        var images = NativeContentFileResolver.ResolveOpenRequests(content.Sources, safeRequests, "Quest board artwork", issues)
-            .ToDictionary(pair => pair.Key, pair => pair.Value.Path, StringComparer.Ordinal);
+        var images = QuestBoardArtwork.Resolve(content.Sources, result, issues);
         // A plot can supply a dedicated icon; ordinary plots use their saved type and difficulty.
-        result = result.Select(quest => quest.IsPlotQuest && images.ContainsKey(QuestArt + $"quest_select_{quest.Id}.png")
-            ? quest with { IconPath = QuestArt + $"quest_select_{quest.Id}.png" } : quest).ToList();
+        result = result.Select(quest => QuestBoardArtwork.WithResolvedIcon(quest, images)).ToList();
         return new(content.Profile.ProfileDirectory, sourceSha256, result,
             regions.Select(region => region with { LocalizedName = localization.GetQuestText("dungeon_name_" + region.Id) }).ToArray(),
-            images, issues.Distinct(StringComparer.Ordinal).ToArray());
+            images, issues.Distinct(StringComparer.Ordinal).ToArray()) { Layout = resources.Layout };
     }
 
     private static string LocalizationIdentity(JsonObject quest) => RequiredBool(quest, "is_plot_quest")

@@ -18,6 +18,77 @@ public static partial class QuestBoardSnapshotReader
     private sealed class QuestBoardResources(ActiveContentSnapshot content, List<string> issues)
     {
         private readonly Dictionary<NativeReferenceJsonKind, JsonElement[]> _json = [];
+        internal QuestBoardLayout Layout { get; private set; } = new();
+
+        private void ReadLayout(string kind, string body, string path)
+        {
+            QuestBoardPoint Read(string field, QuestBoardPoint current, bool positive = false)
+            {
+                var slots = NativeDarkestReader.ReadRawStringSlots(body, field, 2).ToArray();
+                if (slots.Length == 0) return current;
+                if (slots.Length == 2 && double.TryParse(slots[0], CultureInfo.InvariantCulture, out var x) &&
+                    double.TryParse(slots[1], CultureInfo.InvariantCulture, out var y) && double.IsFinite(x) && double.IsFinite(y) &&
+                    (!positive || x > 0 && y > 0)) return new(x, y);
+                issues.Add($"Quest board layout has an invalid {field}: {path}.");
+                return current;
+            }
+            double Number(string field, double current)
+            {
+                var slots = NativeDarkestReader.ReadRawStringSlots(body, field, 1).ToArray();
+                if (slots.Length == 0) return current;
+                if (double.TryParse(slots[0], CultureInfo.InvariantCulture, out var value) && double.IsFinite(value) && value > 0)
+                    return value;
+                issues.Add($"Quest board layout has an invalid {field}: {path}.");
+                return current;
+            }
+            if (kind == "town_quest_select_dungeon_layout")
+                Layout = Layout with
+                {
+                    BackgroundOffset = Read(".background_offset", Layout.BackgroundOffset),
+                    NameOffset = Read(".dungeon_name_offset", Layout.NameOffset),
+                    LevelOffset = Read(".dungeon_level_offset", Layout.LevelOffset),
+                    ProgressOffset = Read(".dungeon_xp_bar_offset", Layout.ProgressOffset),
+                    ProgressSize = Read(".dungeon_xp_bar_size", Layout.ProgressSize, positive: true),
+                    QuestStart = Read(".quest_button_start_offset", Layout.QuestStart),
+                    QuestSpacing = Read(".quest_button_spacing", Layout.QuestSpacing)
+                };
+            else if (kind == "town_quest_select_quest_button_layout")
+                Layout = Layout with
+                {
+                    LengthIconOffset = Read(".length_icon_offset", Layout.LengthIconOffset),
+                    TypeIconOffset = Read(".type_icon_offset", Layout.TypeIconOffset),
+                    SelectionOffset = Read(".selected_background_offset", Layout.SelectionOffset)
+                };
+            else if (kind == "town_quest_select_quest_layout")
+                Layout = Layout with { Details = Layout.Details with
+                {
+                    Name = Read(".name_text_offset", Layout.Details.Name),
+                    Description = Read(".description_text_offset", Layout.Details.Description),
+                    DescriptionWidth = Number(".description_text_width", Layout.Details.DescriptionWidth),
+                    Specifics = Read(".specifics_text_offset", Layout.Details.Specifics),
+                    Camping = Read(".camping_text_offset", Layout.Details.Camping),
+                    Goals = Read(".goals_text_offset", Layout.Details.Goals),
+                    GoalDescription = Read(".goal_description_text_start_offset", Layout.Details.GoalDescription),
+                    RewardHeading = Read(".rewards_text_offset", Layout.Details.RewardHeading),
+                    RewardInventory = Read(".rewards_inventory_system_offset", Layout.Details.RewardInventory)
+                } };
+            else if (kind == "town_quest_rewards_inventory_system_grid_layout")
+            {
+                var columns = NativeDarkestReader.ReadInt(body, ".number_of_columns") ?? Layout.Rewards.Columns;
+                if (columns <= 0)
+                {
+                    issues.Add($"Quest board layout has an invalid .number_of_columns: {path}.");
+                    columns = Layout.Rewards.Columns;
+                }
+                Layout = Layout with { Rewards = Layout.Rewards with
+                {
+                    Columns = columns,
+                    Start = Read(".start_pos", Layout.Rewards.Start),
+                    Spacing = Read(".offset", Layout.Rewards.Spacing, positive: true),
+                    Centered = (NativeDarkestReader.ReadInt(body, ".is_centred") ?? (Layout.Rewards.Centered ? 1 : 0)) != 0
+                } };
+            }
+        }
 
         private IReadOnlyList<EffectiveContentFile> Files(string directory, Func<string, bool, IReadOnlyList<string>, bool> accepts)
         {
@@ -115,6 +186,7 @@ public static partial class QuestBoardSnapshotReader
                 {
                     foreach (var (kind, body) in NativeDarkestReader.ReadRecords(file.Path))
                     {
+                        ReadLayout(kind, body, file.Path);
                         const string prefix = "quest_select_dungeon_layout_";
                         if (!kind.StartsWith(prefix, StringComparison.Ordinal)) continue;
                         var coordinates = NativeDarkestReader.ReadRawStringSlots(body, ".quest_map_pos", 2).ToArray();

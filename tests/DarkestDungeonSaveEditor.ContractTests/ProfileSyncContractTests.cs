@@ -1,3 +1,6 @@
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
+
 internal static partial class ContractSuite
 {
     private static async Task RunProfileSyncContractsAsync(ContractFixture fixture)
@@ -38,6 +41,62 @@ internal static partial class ContractSuite
                 scratchFiles.All(file => File.GetLastWriteTimeUtc(file.Key) == file.Value),
                 "Idle resource polling must not decode or rewrite scratch copies of unchanged saves.");
         }
+        const string mapArtRelativePath = "panels/icons_map/room_empty.png";
+        var mapArtPath = Path.Combine(fixture.ActiveWorkshopRoot, mapArtRelativePath);
+        var manifestPath = Path.Combine(fixture.ActiveWorkshopRoot, "modfiles.txt");
+        var originalManifest = File.ReadAllBytes(manifestPath);
+        Directory.CreateDirectory(Path.GetDirectoryName(mapArtPath)!);
+        static void WriteMapPixel(string path, byte red)
+        {
+            var image = BitmapSource.Create(1, 1, 96, 96, PixelFormats.Bgra32, null, new byte[] { 0, 0, red, 255 }, 4);
+            var encoder = new PngBitmapEncoder();
+            encoder.Frames.Add(BitmapFrame.Create(image));
+            using var stream = File.Create(path);
+            encoder.Save(stream);
+        }
+        WriteMapPixel(mapArtPath, 32);
+        File.AppendAllText(manifestPath, $"\n{mapArtRelativePath} {new FileInfo(mapArtPath).Length}\n");
+        var beforeArt = await reader.ReadAsync(refreshContent: true);
+        var artTime = File.GetLastWriteTimeUtc(mapArtPath);
+        WriteMapPixel(mapArtPath, 64);
+        File.SetLastWriteTimeUtc(mapArtPath, artTime);
+        var changedArt = await reader.ReadAsync(refreshContent: true);
+        Assert(changedArt.ContentFingerprint == beforeArt.ContentFingerprint &&
+               changedArt.BattleMapArtworkFingerprint != beforeArt.BattleMapArtworkFingerprint &&
+               ProfileCatalogSnapshotReader.HashesEqual(beforeArt.FileHashes, changedArt.FileHashes) &&
+               !ReferenceEquals(changedArt.QuantityItems, beforeArt.QuantityItems) &&
+               changedArt.BattleMapImagePaths[mapArtRelativePath] == Path.GetFullPath(mapArtPath),
+            "Registered map artwork changes must use the common catalog refresh while preserving save data.");
+        // Disabled artwork-only experiment expected the opposite cache behavior:
+        // ReferenceEquals(changedArt.QuantityItems, beforeArt.QuantityItems) &&
+        // ReferenceEquals(changedArt.QuestBoard, beforeArt.QuestBoard)
+        Assert(changedArt.BattleMapArtworkFingerprint == BattleMapArtwork.Capture(changedArt.Content.Sources),
+            "The published map paths and fingerprint must describe the same effective artwork.");
+        var quietArt = await reader.ReadAsync(refreshContent: true);
+        Assert(quietArt.BattleMapArtworkFingerprint == changedArt.BattleMapArtworkFingerprint && ReferenceEquals(quietArt.Content, changedArt.Content),
+            "Unchanged artwork must not cause repeated content refreshes.");
+        var baseArtPath = Path.Combine(fixture.GameRoot, mapArtRelativePath);
+        Directory.CreateDirectory(Path.GetDirectoryName(baseArtPath)!);
+        WriteMapPixel(baseArtPath, 128);
+        Assert((await reader.ReadAsync(refreshContent: true)).BattleMapArtworkFingerprint == changedArt.BattleMapArtworkFingerprint,
+            "Changing a shadowed base image must not refresh the effective map artwork.");
+        File.Delete(mapArtPath);
+        var missingArt = await reader.ReadAsync(refreshContent: true);
+        Assert(missingArt.BattleMapArtworkFingerprint != changedArt.BattleMapArtworkFingerprint &&
+               missingArt.ContentFingerprint == changedArt.ContentFingerprint &&
+               missingArt.BattleMapImagePaths[mapArtRelativePath] == Path.GetFullPath(mapArtPath),
+            "A missing registered winner must update the artwork state without reviving a shadowed image.");
+        WriteMapPixel(mapArtPath, 64);
+        Assert((await reader.ReadAsync(refreshContent: true)).BattleMapArtworkFingerprint == changedArt.BattleMapArtworkFingerprint,
+            "Restoring the registered image must recover the same effective artwork.");
+        File.WriteAllBytes(manifestPath, originalManifest);
+        File.Delete(mapArtPath);
+        var baseArt = await reader.ReadAsync(refreshContent: true);
+        Assert(baseArt.BattleMapImagePaths[mapArtRelativePath] == Path.GetFullPath(baseArtPath),
+            "Removing a manifest override must restore the base provider on the normal content-check path.");
+        File.Delete(baseArtPath);
+        first = await reader.ReadAsync(refreshContent: true);
+
         var hotUpdatePath = WriteMultiMash(fixture.GameRoot, "dungeons/cove/maintenance_hot_update.1.mash.darkest",
             "hall: .chance 1 .types hot_updated_monster\n");
         var hotUpdated = await reader.ReadAsync(refreshContent: true);

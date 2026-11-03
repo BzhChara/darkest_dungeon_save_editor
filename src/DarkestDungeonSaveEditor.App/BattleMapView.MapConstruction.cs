@@ -46,6 +46,11 @@ public partial class BattleMapView : UserControl
             _fitToView = true;
             _ = Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(FitMapToViewport));
         }
+        else if (_isRaidAvailable)
+        {
+            // Refresh may change map bounds while preserving the user's zoom/pan.
+            UpdateZoomText();
+        }
     }
 
     private void BuildSnapshotMap(BattleMapSnapshot snapshot)

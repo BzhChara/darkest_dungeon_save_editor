@@ -18,6 +18,8 @@ public partial class MainWindow : Window
     private bool _contentRefreshRequested;
     private ManagedBattleEncounterBridgeService? _battleMaintenance;
     private string? _catalogContentFingerprint;
+    private string? _catalogQuestBoardArtworkFingerprint;
+    private string? _catalogBattleMapArtworkFingerprint;
     private string? _lastMaintenanceMessage;
     private string? _maintenanceGameDirectory;
     private string? _maintenanceLocalModDirectory;
@@ -100,6 +102,8 @@ public partial class MainWindow : Window
         _contentRefreshRequested = false;
         _battleMaintenance = null;
         _catalogContentFingerprint = null;
+        _catalogQuestBoardArtworkFingerprint = null;
+        _catalogBattleMapArtworkFingerprint = null;
         _lastMaintenanceMessage = null;
         _catalogSnapshotReader = null;
         _catalogFileHashes = null;
@@ -198,8 +202,7 @@ public partial class MainWindow : Window
                 if (gameStateVersion != _gameStateVersion) { _syncRequested = true; continue; }
                 // Retain resource-check intent until publication has also passed
                 // its guards, including checks triggered by configuration changes.
-                refreshContent |= snapshot.ConfigurationKey != _catalogConfigurationKey ||
-                    snapshot.ContentFingerprint != _catalogContentFingerprint;
+                refreshContent |= HasCatalogContentChanges(snapshot);
                 if (IsProfileOperationBusy) { _syncRequested = true; return; }
                 if (operationGeneration != _catalogOperationGeneration) { _syncRequested = true; continue; }
                 var unchanged = IsPublishedSnapshot(snapshot);
@@ -296,8 +299,10 @@ public partial class MainWindow : Window
                     }
                     if (_busyDepth > 0) { _syncRequested = true; return; }
                     InvalidatePreparedEdit();
-                    var contentChanged = snapshot.ConfigurationKey != _catalogConfigurationKey ||
-                        (_catalogContentFingerprint is not null && _catalogContentFingerprint != snapshot.ContentFingerprint);
+                    // Artwork-only refresh experiment (disabled 2026-11-03):
+                    // var contentChanged = snapshot.ConfigurationKey != _catalogConfigurationKey ||
+                    //     (_catalogContentFingerprint is not null && _catalogContentFingerprint != snapshot.ContentFingerprint);
+                    var contentChanged = HasCatalogContentChanges(snapshot);
                     var changedFiles = _catalogFileHashes is null ? [] : ProfileCatalogSnapshotReader.WatchedFileNames
                         .Where(name => snapshot.FileHashes[name] != _catalogFileHashes[name]).ToArray();
                     var trinkets = contentChanged
@@ -319,6 +324,14 @@ public partial class MainWindow : Window
                         throw new IOException(EditorText.Get("MainWindow_ProfileSync_006"));
                     if (contentChanged && snapshot.ContentFingerprint != await Task.Run(() =>
                             ProfileCatalogContentFingerprint.Capture(snapshot.Content.Sources, token), token))
+                        throw new IOException(EditorText.Get("MainWindow_ProfileSync_007"));
+                    if (snapshot.QuestBoardArtworkFingerprint != _catalogQuestBoardArtworkFingerprint &&
+                        snapshot.QuestBoardArtworkFingerprint != await Task.Run(() => QuestBoardArtwork.Capture(
+                            snapshot.Content.Sources, snapshot.QuestBoard, snapshot.QuestBoardCatalog, token), token))
+                        throw new IOException(EditorText.Get("MainWindow_ProfileSync_007"));
+                    if (snapshot.BattleMapArtworkFingerprint != _catalogBattleMapArtworkFingerprint &&
+                        snapshot.BattleMapArtworkFingerprint != await Task.Run(() => BattleMapArtwork.Capture(
+                            snapshot.Content.Sources, token), token))
                         throw new IOException(EditorText.Get("MainWindow_ProfileSync_007"));
                     if (generation != _catalogGeneration || token.IsCancellationRequested) return;
                     if (ObserveGameProcess()) return;
@@ -368,6 +381,8 @@ public partial class MainWindow : Window
                     _catalogFileHashes = snapshot.FileHashes;
                     _catalogConfigurationKey = snapshot.ConfigurationKey;
                     _catalogContentFingerprint = snapshot.ContentFingerprint;
+                    _catalogQuestBoardArtworkFingerprint = snapshot.QuestBoardArtworkFingerprint;
+                    _catalogBattleMapArtworkFingerprint = snapshot.BattleMapArtworkFingerprint;
                     _syncReady = !_syncInvalidated;
                     if (changedFiles.Length > 0)
                     {
@@ -422,13 +437,25 @@ public partial class MainWindow : Window
     }
 
     private bool IsPublishedSnapshot(ProfileCatalogSnapshot snapshot) =>
-        _catalogFileHashes is not null && _catalogConfigurationKey == snapshot.ConfigurationKey &&
-        _catalogContentFingerprint == snapshot.ContentFingerprint &&
+        _catalogFileHashes is not null && _catalogContentFingerprint is not null &&
+        _catalogQuestBoardArtworkFingerprint is not null && _catalogBattleMapArtworkFingerprint is not null &&
+        !HasCatalogContentChanges(snapshot) &&
         ProfileCatalogSnapshotReader.HashesEqual(_catalogFileHashes, snapshot.FileHashes);
 
+    // One policy for catalog rebuilding, retry intent and battle maintenance.
+    // Initial loading has already built the definition catalogs; an uninitialized
+    // artwork stamp requires publication, not a second full load.
+    private bool HasCatalogContentChanges(ProfileCatalogSnapshot snapshot) =>
+        _catalogConfigurationKey != snapshot.ConfigurationKey ||
+        (_catalogContentFingerprint is not null && _catalogContentFingerprint != snapshot.ContentFingerprint) ||
+        (_catalogQuestBoardArtworkFingerprint is not null && _catalogQuestBoardArtworkFingerprint != snapshot.QuestBoardArtworkFingerprint) ||
+        (_catalogBattleMapArtworkFingerprint is not null && _catalogBattleMapArtworkFingerprint != snapshot.BattleMapArtworkFingerprint);
+
+    // Artwork-only refresh experiment (disabled): maintenance excluded art stamps:
+    // _catalogConfigurationKey != snapshot.ConfigurationKey || _catalogContentFingerprint != snapshot.ContentFingerprint
     private bool NeedsBattleMaintenance(ProfileCatalogSnapshot snapshot) =>
         _catalogFileHashes is null || _battleMaintenanceDeferred || _maintenanceRetryPending ||
-        _catalogConfigurationKey != snapshot.ConfigurationKey || _catalogContentFingerprint != snapshot.ContentFingerprint ||
+        HasCatalogContentChanges(snapshot) ||
         new[] { "persist.game.json", "persist.map.json", "persist.raid.json", "raid_save" }
             .Any(name => _catalogFileHashes.GetValueOrDefault(name) != snapshot.FileHashes.GetValueOrDefault(name));
 

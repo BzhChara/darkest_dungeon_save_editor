@@ -7,6 +7,7 @@ internal static partial class ContractSuite
 {
     public static async Task RunDesktopCodecOnlyAsync(string repositoryRoot)
     {
+        var previousCodec = UseNativeCodec;
         UseNativeCodec = true;
         try
         {
@@ -23,7 +24,7 @@ internal static partial class ContractSuite
             });
             Console.WriteLine($"Artifacts: {fixture.RunRoot}");
         }
-        finally { UseNativeCodec = false; }
+        finally { UseNativeCodec = previousCodec; }
     }
 
     private static void VerifyDesktopCodecSelection(string root)

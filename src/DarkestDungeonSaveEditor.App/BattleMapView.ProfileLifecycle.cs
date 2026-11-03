@@ -92,7 +92,7 @@ public partial class BattleMapView : UserControl
         _encounterCatalog = null;
         _roomAttachmentCatalog = null;
         _currentSnapshot = null;
-        ConfigureOriginalMapAssets(gameDirectory);
+        ConfigureOriginalMapAssets(gameDirectory, activeContent);
         ShowUnavailableState("BattleMapView_ProfileLifecycle_006", "BattleMapView_ProfileLifecycle_007");
 
         BattleMapSnapshot? snapshot = null;
@@ -239,7 +239,6 @@ public partial class BattleMapView : UserControl
         ZoomOutButton.IsEnabled = true;
         ZoomInButton.IsEnabled = true;
         ResetZoomButton.IsEnabled = true;
-        FitMapButton.IsEnabled = true;
         ForceTownButton.IsEnabled = _currentSnapshot is { IsTutorialRaid: false };
     }
 
@@ -259,7 +258,7 @@ public partial class BattleMapView : UserControl
         ZoomOutButton.IsEnabled = false;
         ZoomInButton.IsEnabled = false;
         ResetZoomButton.IsEnabled = false;
-        FitMapButton.IsEnabled = false;
+        ZoomTextBlock.Text = "100%";
         ForceTownButton.IsEnabled = false;
         ForceCompleteQuestButton.IsEnabled = false;
         LocalizedUi.Set(MapTitleTextBlock, TextBlock.TextProperty, () => EditorText.Get("BattleMapView_ProfileLifecycle_025"));

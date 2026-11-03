@@ -46,7 +46,7 @@ The viewport contains:
 
 - a compact title and profile/expedition status;
 - an important `Force return to town` recovery button available only for a real loaded expedition;
-- zoom-out, zoom percentage, zoom-in, and fit-to-view controls;
+- zoom-out, zoom percentage, zoom-in, and a single `100%` reset control;
 - a pannable and zoomable map surface;
 - one concise status line describing the selected tile or latest action result.
 
@@ -54,7 +54,9 @@ The map does not repeat the game's icon meanings in a permanent legend. This kee
 
 The prototype renderer uses the neutral grid region cropped at runtime from the original `panels/panel_map.png` backdrop and the original `panels/icons_map` sprites. The crop deliberately excludes the game's map/inventory tab buttons; DPI metadata must not leave the backdrop confined to one corner. Room content is represented by the matching original room sprite; every visible hallway square uses `hall_dark`, `hall_dim`, or `hall_clear`; and pending hallway content uses the original marker sprites. The fire-torch `indicator.png` marks the party. These are runtime links to the installed game, not editor-owned approximations or packaged copies.
 
-The original layout uses a 24-pixel map grid, 24×24 hallway sprites, and 64×64 room sprites. Drawing save `type=2` transition nodes as `hall_door.png` exposes clipped red fragments around rooms because those nodes lie in the visual gap rather than on a normal corridor square. The editor excludes those nodes from the rendered and interactive tile set instead of inventing artwork or a transparent target for them.
+Map artwork is resolved in one batch from the loaded profile's active base, DLC and Mod sources, using native priority and Mod manifest registration. A registered missing winner does not silently fall back to a lower provider. Decoded images are cached for drawing and context menus; a profile load or artwork refresh clears that cache even when paths stay unchanged. A separate artwork fingerprint records requested paths, effective providers and image bytes, including missing/restored images. Image updates enter the common content refresh, redraw displayed cells, dismiss open menus and use the existing encounter/Bridge maintenance checks. The artwork-only optimization is disabled and retained as commented alternatives in `ProfileCatalogSnapshotReader`, `MainWindow.ProfileSync` and `BattleMapView.ProfileSync`. Source configuration, manifests, definitions and save changes retain their existing checks. Snapshot publication revalidates the artwork and passes its resolved paths to the view. Checks run only at existing load, pre-operation and game-exit boundaries, without scanning all PNG files or adding polling or per-click manifest reads. Direct game-root lookup is used only without an active-content snapshot.
+
+The original layout uses a 24-pixel map grid, 24×24 hallway sprites, and 64×64 room sprites. This update changes artwork sources, not map-grid spacing or save coordinates. Drawing save `type=2` transition nodes as `hall_door.png` exposes clipped red fragments around rooms because those nodes lie in the visual gap rather than on a normal corridor square. The editor excludes those nodes from the rendered and interactive tile set instead of inventing artwork or a transparent target for them.
 
 Persisted `mappos` Y values already follow the game's map-display order. The editor maps them directly from `minimumY` to the screen and must not apply a Cartesian Y-axis inversion. This keeps the displayed north/south orientation aligned with the in-game map.
 
@@ -68,9 +70,10 @@ The main runtime log remains visible below the workspace.
 - Right-button drag pans the map.
 - A right click without meaningful pointer movement opens the selected tile's context menu.
 - The implementation must use a movement threshold so a context-menu click and a pan gesture do not compete.
-- `Fit to window` fits the complete map in the current viewport.
-- `100%` restores neutral scale and recenters the map.
-- Zoom is clamped to a usable range; the UI prototype uses 45% through 240%.
+- The default view retains the existing fit calculation for the current map and viewport, including its 56-unit padding allowance and raw-scale limits of 0.45 through 1.25. It is displayed as `100%` rather than a percentage of the original drawing size.
+- `100%` restores that default size, recenters the map, and resumes automatic fitting on resize. There is no separate Fit button. Doubling the default size displays `200%` when it is within the existing zoom limits.
+- Manual zoom retains the raw drawing-scale range of 0.45 through 2.40; these are no longer the displayed percentages. A small map can therefore still be reduced below its default `100%`. This is separate from the quest board's minimum-view policy.
+- Resizing or refreshing a manually positioned map recalculates the percentage against the current fit reference without moving or rescaling it. Returning to the tab and changing language preserve manual zoom/pan. Loading a different profile starts from its own fitted `100%` view. Empty, wave and tutorial states disable the map controls.
 
 ## State presentation
 
@@ -392,5 +395,5 @@ The latest hard-delete change additionally removes consumed prop bindings. Its c
 - Roaming/special placement writes an ordinary battle marker and does not mutate `final_room_id`, weekly roaming assignments, or natural conditional/additional counters. The visible category opens the searchable picker directly; the managed Bridge materializes or reuses the row and re-resolves a valid current-table index internally, so users never select or manage foreign indexes.
 - Every displayed room and corridor tile offers confirmed transactional party movement when the raid is in a stationary supported state.
 - A real loaded expedition offers a confirmed and fully backed-up force-town save edit that changes only `inraid` and `raiddungeon`, preserves the map/raid pair, and clearly does not promise normal-retreat settlement.
-- Right-drag pan, wheel zoom, 100%, and fit-to-view operate without resizing surrounding layout.
+- Right-drag pan, wheel zoom, and the fitted `100%` reset operate without resizing surrounding layout.
 - Runtime game assets remain read-only. Standalone `Create` and `Replace`, `Delete`, verified battle placement, room-battle attachment editing, and `Move party here` use the battle-map save service, full-profile backup, paired stale-hash guards, round-trip validation, and rollback. Curios may cross regions, but not room/hall pool membership. Trap/obstacle automatic selection and the writer both require the current region.
