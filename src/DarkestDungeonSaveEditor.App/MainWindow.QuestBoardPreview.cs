@@ -25,15 +25,19 @@ public partial class MainWindow
     private async Task QuestBoardPanel_SaveEditRequested(QuestBoardEditRequest request)
     {
         if (!await CheckProfileBeforeOperationAsync(requireUnchanged: true) || _activeContentSnapshot is not { } content) return;
+        await RunProfileEditAsync(() => ApplyQuestBoardEditAsync(request, content));
+    }
+
+    private async Task ApplyQuestBoardEditAsync(QuestBoardEditRequest request, ActiveContentSnapshot content)
+    {
         var committed = false;
         string? backupDirectory = null;
         try
         {
-            SetBusy(true);
             InvalidatePreparedEdit();
             if (_quantitySaveContext != QuantityItemSaveContext.Town)
                 throw new InvalidOperationException(EditorText.Get("TownOnlyOperation"));
-            var service = new SaveEditService(_codecSession.Codec, _saveLocations);
+            var service = new SaveEditService(_codecSession.Codec, _saveLocations, _gameRunningProbe);
             var prepared = await Task.Run(() => service.PrepareQuestBoardEditAsync(content.Profile, request, content));
             var summary = FormatQuestBoardEdit(prepared.Preview);
             if (!ThemedDialog.Confirm(this, summary + Environment.NewLine + Environment.NewLine +
@@ -52,7 +56,6 @@ public partial class MainWindow
                 Environment.NewLine + EditorText.Format("QuestBoard_Backup", backupDirectory)),
                 EditorText.Get("QuestBoard_WindowTitle"), ThemedDialogKind.Error);
         }
-        finally { await CompleteProfileEditAsync(); }
     }
 
     private static string FormatQuestBoardEdit(QuestBoardMutationPreview preview)

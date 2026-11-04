@@ -9,7 +9,7 @@ public sealed partial class SaveEditService
     public async Task<PreparedQuestCompletionEdit> PrepareQuestCompletionAsync(SaveProfile profile,
         BattleMapSnapshot snapshot, ActiveContentSnapshot content, CancellationToken cancellationToken = default)
     {
-        EnsureGameIsNotRunning();
+        RequireGameStopped();
         _codec.ValidateAvailability();
         ValidateProfile(profile);
         ValidateActiveContentSnapshot(profile, content);
@@ -102,8 +102,8 @@ public sealed partial class SaveEditService
             {
                 ValidateQuestCompletionGuard(prepared, replaced, cancellationToken, checkContent: false);
                 State("replacing_" + file.FileName);
-                var replacement = new GuardedSaveReplacement(file.TargetPath, file.EncodedPath,
-                    file.OriginalSha256, file.EncodedSha256, BeforeTargetReplace, AfterTargetReplace);
+                var replacement = CreateReplacement(file.TargetPath, file.EncodedPath,
+                    file.OriginalSha256, file.EncodedSha256);
                 replacements.Add(replacement);
                 try { replacement.Replace(); }
                 finally { if (replacement.HasReplaced) replaced.Add(file); }
@@ -134,11 +134,11 @@ public sealed partial class SaveEditService
         finally { foreach (var replacement in replacements) replacement.Dispose(); }
     }
 
-    private static void ValidateQuestCompletionGuard(PreparedQuestCompletionEdit prepared, IReadOnlyList<PreparedSaveFile> replaced,
+    private void ValidateQuestCompletionGuard(PreparedQuestCompletionEdit prepared, IReadOnlyList<PreparedSaveFile> replaced,
         CancellationToken token, bool checkContent)
     {
         token.ThrowIfCancellationRequested();
-        EnsureGameIsNotRunning();
+        RequireGameStopped();
         ValidateActiveContentSnapshot(prepared.Profile, prepared.Content);
         var location = new RaidSaveLocation(prepared.Profile.ProfileDirectory, prepared.Profile.RaidSaveRelativeDirectory);
         foreach (var name in QuestCompletionSaveNames)

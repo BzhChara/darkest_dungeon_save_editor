@@ -14,7 +14,7 @@ public sealed partial class SaveEditService
     {
         ArgumentNullException.ThrowIfNull(prepared);
         cancellationToken.ThrowIfCancellationRequested();
-        EnsureGameIsNotRunning();
+        RequireGameStopped();
         ValidateProfile(prepared.Profile);
         ValidateStagecoachContentGuard(prepared.Profile, prepared.ContentGuard);
         ValidatePreparedStagecoachFile(prepared.Profile, prepared.TownFile, "persist.town.json");
@@ -75,8 +75,8 @@ public sealed partial class SaveEditService
                     $"replacing_{Path.GetFileNameWithoutExtension(file.FileName).Replace("persist.", string.Empty, StringComparison.Ordinal)}",
                     replacedFiles,
                     error: null);
-                var replacement = new GuardedSaveReplacement(file.TargetPath, file.EncodedPath,
-                    file.OriginalSha256, file.EncodedSha256, BeforeTargetReplace, AfterTargetReplace);
+                var replacement = CreateReplacement(file.TargetPath, file.EncodedPath,
+                    file.OriginalSha256, file.EncodedSha256);
                 replacements.Add(replacement);
                 try
                 {

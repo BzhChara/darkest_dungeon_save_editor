@@ -75,7 +75,7 @@ public partial class BattleMapView : UserControl
         {
             Owner = dialogOwner
         };
-        if (dialog.ShowDialog() != true || dialog.SelectedAttachment is not { } definition)
+        if (!_picker.Show(dialog) || !CanBrowseProfile() || dialog.SelectedAttachment is not { } definition)
         {
             return;
         }

@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Globalization;
 using System.Security;
 using System.Security.Cryptography;
@@ -53,7 +52,7 @@ public sealed partial class ManagedBattleEncounterBridgeService
     {
         _codec = codec ?? throw new ArgumentNullException(nameof(codec));
         _locations = locations ?? SaveEditorLocations.CreateDefault();
-        _gameRunningProbe = gameRunningProbe ?? IsGameRunning;
+        _gameRunningProbe = gameRunningProbe ?? GameProcessGuard.IsRunning;
     }
 
     public async Task<ManagedBattleEncounterBridgeResult> EnsureEncounterAsync(
@@ -122,8 +121,8 @@ public sealed partial class ManagedBattleEncounterBridgeService
         if (packageExisted)
         {
             RejectReparsePoint(packageDirectory, EditorText.Get("ManagedBattleEncounterBridgeService_005"));
-            CopyDirectory(packageDirectory, stagedPackage);
             CopyDirectory(packageDirectory, rollbackPackage);
+            CopyDirectory(rollbackPackage, stagedPackage);
             manifest = ReadManifest(Path.Combine(stagedPackage, ManifestFileName));
             ValidateManifestIdentity(manifest, profile, projectTitle);
         }
@@ -242,10 +241,10 @@ public sealed partial class ManagedBattleEncounterBridgeService
             workspace,
             cancellationToken).ConfigureAwait(false);
         var packageChanged = !packageExisted || !DirectoriesHaveSameFiles(packageDirectory, stagedPackage);
-        var packageCommitted = false;
+        using var publication = new PackagePublication(packageDirectory, rollbackPackage, EnsureGameIsNotRunning);
         using var gameReplacement = gameUpdate is null ? null : new GuardedSaveReplacement(
             gameUpdate.TargetPath, gameUpdate.EncodedPath, gameUpdate.OriginalSha256,
-            gameUpdate.FinalSha256, BeforeGameReplace, AfterGameReplace);
+            gameUpdate.FinalSha256, BeforeGameReplace, AfterGameReplace, EnsureGameIsNotRunning);
         string? profileBackupDirectory = null;
         FileStream? recoveryGameGuard = null;
 
@@ -263,8 +262,9 @@ public sealed partial class ManagedBattleEncounterBridgeService
 
             if (packageChanged)
             {
-                packageCommitted = true;
-                ApplyStagedPackage(stagedPackage, packageDirectory);
+                EnsureGameIsNotRunning();
+                RejectReparsePoint(packageDirectory, EditorText.Get("ManagedBattleEncounterBridgeService_005"));
+                publication.Publish(stagedPackage);
             }
 
             if (gameUpdate is not null)
@@ -297,6 +297,7 @@ public sealed partial class ManagedBattleEncounterBridgeService
             }
 
             BattleEncounterCatalog.ValidateDirectEncounter(directEncounter);
+            publication.Complete();
             gameReplacement?.Complete();
             return new ManagedBattleEncounterBridgeResult(
                 packageDirectory,
@@ -342,18 +343,9 @@ public sealed partial class ManagedBattleEncounterBridgeService
                 }
             }
 
-            if (packageCommitted && canRestorePackage)
-            {
-                try
-                {
-                    RestorePackage(packageDirectory, packageExisted ? rollbackPackage : null);
-                }
-                catch (Exception rollbackError)
-                {
-                    rollbackErrors.Add(rollbackError);
-                }
-            }
-            else if (packageCommitted)
+            if (publication.HasChanges && canRestorePackage)
+                publication.Recover(rollbackErrors);
+            else if (publication.HasChanges)
             {
                 rollbackErrors.Add(new IOException(
                     EditorText.Format("ManagedBattleEncounterBridgeService_008", packageDirectory) +
@@ -900,65 +892,16 @@ public sealed partial class ManagedBattleEncounterBridgeService
         }
     }
 
-    private static void ApplyStagedPackage(string source, string destination)
-    {
-        if (!Directory.Exists(destination))
-        {
-            CopyDirectory(source, destination);
-            return;
-        }
-
-        RejectReparsePoint(destination, EditorText.Get("ManagedBattleEncounterBridgeService_005"));
-        foreach (var sourcePath in Directory.EnumerateFiles(source, "*", SearchOption.AllDirectories))
-        {
-            var relative = Path.GetRelativePath(source, sourcePath);
-            var destinationPath = Path.Combine(destination, relative);
-            Directory.CreateDirectory(Path.GetDirectoryName(destinationPath)!);
-            var temporaryPath = destinationPath + $".ddse-{Guid.NewGuid():N}.tmp";
-            try
-            {
-                File.Copy(sourcePath, temporaryPath, overwrite: false);
-                if (File.Exists(destinationPath))
-                {
-                    File.Replace(
-                        temporaryPath,
-                        destinationPath,
-                        destinationBackupFileName: null,
-                        ignoreMetadataErrors: true);
-                }
-                else
-                {
-                    File.Move(temporaryPath, destinationPath);
-                }
-            }
-            finally
-            {
-                TryDeleteFile(temporaryPath);
-            }
-        }
-    }
-
-    private static void RestorePackage(string packageDirectory, string? rollbackPackage)
-    {
-        if (Directory.Exists(packageDirectory))
-        {
-            RejectReparsePoint(packageDirectory, EditorText.Get("ManagedBattleEncounterBridgeService_005"));
-            Directory.Delete(packageDirectory, recursive: true);
-        }
-        if (rollbackPackage is not null)
-        {
-            CopyDirectory(rollbackPackage, packageDirectory);
-        }
-    }
-
-    private static void CopyDirectory(string source, string destination)
+    private static void CopyDirectory(string source, string destination, Action<string, string>? publish = null,
+        Action<string>? ensureDirectory = null)
     {
         RejectReparsePoint(source, EditorText.Get("ManagedBattleEncounterBridgeService_041"));
-        Directory.CreateDirectory(destination);
+        ensureDirectory ??= path => Directory.CreateDirectory(path);
+        ensureDirectory(destination);
         foreach (var directory in Directory.EnumerateDirectories(source, "*", SearchOption.AllDirectories))
         {
             RejectReparsePoint(directory, EditorText.Get("ManagedBattleEncounterBridgeService_042"));
-            Directory.CreateDirectory(Path.Combine(destination, Path.GetRelativePath(source, directory)));
+            ensureDirectory(Path.Combine(destination, Path.GetRelativePath(source, directory)));
         }
         foreach (var file in Directory.EnumerateFiles(source, "*", SearchOption.AllDirectories))
         {
@@ -967,8 +910,8 @@ public sealed partial class ManagedBattleEncounterBridgeService
                 throw new IOException(EditorText.Format("ManagedBattleEncounterBridgeService_043", file));
             }
             var destinationPath = Path.Combine(destination, Path.GetRelativePath(source, file));
-            Directory.CreateDirectory(Path.GetDirectoryName(destinationPath)!);
-            File.Copy(file, destinationPath, overwrite: false);
+            if (publish is null) File.Copy(file, destinationPath, overwrite: false);
+            else publish(file, destinationPath);
         }
     }
 
@@ -1001,37 +944,6 @@ public sealed partial class ManagedBattleEncounterBridgeService
             throw new InvalidOperationException(
                 EditorText.Get("ManagedBattleEncounterBridgeService_044"));
         }
-    }
-
-    private static bool IsGameRunning()
-    {
-        foreach (var processName in new[] { "Darkest", "DarkestDungeon" })
-        {
-            Process[] processes;
-            try
-            {
-                processes = Process.GetProcessesByName(processName);
-            }
-            catch
-            {
-                continue;
-            }
-            try
-            {
-                if (processes.Length > 0)
-                {
-                    return true;
-                }
-            }
-            finally
-            {
-                foreach (var process in processes)
-                {
-                    process.Dispose();
-                }
-            }
-        }
-        return false;
     }
 
     private static bool RevisionMatches(string leftPath, string rightPath)

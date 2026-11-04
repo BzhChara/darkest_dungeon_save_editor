@@ -1651,6 +1651,9 @@
     <value>游戏运行中 · 已禁用修改 · 显示上次载入的数据</value>
     <comment>src/DarkestDungeonSaveEditor.App/MainWindow.OperationSync.cs</comment>
   </data>
+  <data xml:space="preserve" name="MainWindow_CloseSaving">
+    <value>正在完成保存操作，完成后将关闭编辑器…</value>
+  </data>
   <data xml:space="preserve" name="MainWindow_ProfileSync_GameExited">
     <value>游戏已退出 · 等待存档稳定并同步</value>
     <comment>src/DarkestDungeonSaveEditor.App/MainWindow.OperationSync.cs</comment>
@@ -1707,8 +1710,16 @@
     <value>副本占格={0}；内容目录重建={1}；旧预览已失效。</value>
     <comment>src/DarkestDungeonSaveEditor.App/MainWindow.ProfileSync.cs</comment>
   </data>
-  <data xml:space="preserve" name="MainWindow_ProfileSync_013">
-    <value>已自动切换为{0}物品，请重新选择修改目标。</value>
+  <data xml:space="preserve" name="MainWindow_ProfileSync_SwitchedToRaid">
+    <value>已切换至副本环境。</value>
+    <comment>src/DarkestDungeonSaveEditor.App/MainWindow.ProfileSync.cs</comment>
+  </data>
+  <data xml:space="preserve" name="MainWindow_ProfileSync_SwitchedToTown">
+    <value>已切换至小镇环境。</value>
+    <comment>src/DarkestDungeonSaveEditor.App/MainWindow.ProfileSync.cs</comment>
+  </data>
+  <data xml:space="preserve" name="MainWindow_ProfileSync_ReselectItem">
+    <value>{0}请重新选择要修改的物品。</value>
     <comment>src/DarkestDungeonSaveEditor.App/MainWindow.ProfileSync.cs</comment>
   </data>
   <data xml:space="preserve" name="MainWindow_ProfileSync_014">
@@ -5317,6 +5328,9 @@
   </data>
   <data name="QuestBoard_MissingRarity" xml:space="preserve">
     <value>无法解析任务奖励稀有度：{0}。</value>
+  </data>
+  <data name="QuestBoard_InvalidRewardField" xml:space="preserve">
+    <value>任务奖励字段“{0}”的格式不正确。</value>
   </data>
   <data name="QuestBoard_MissingTrinket" xml:space="preserve">
     <value>无法解析任务奖励饰品：{0}。</value>

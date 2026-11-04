@@ -214,6 +214,25 @@ internal static partial class ContractSuite
             Assert(before.Width == 40 && !before.ContainsArtwork(new Point(8, 20)) && before.ContainsArtwork(new Point(32, 20)),
                 "Initial task geometry must use the original image size and right-side opaque pixels.");
             var oldBackground = ((Image)board.FindName("MapBackdrop")).Source;
+            var tabs = (TabControl)window.FindName("CatalogTabs");
+            for (var i = 0; i < 3; i++)
+            {
+                tabs.SelectedIndex = 0;
+                window.UpdateLayout();
+                tabs.SelectedIndex = 4;
+                window.UpdateLayout();
+                await Dispatcher.Yield(DispatcherPriority.ContextIdle);
+                Call("UpdateEnabledState");
+                Assert(ReferenceEquals(before, Selected()) &&
+                       ReferenceEquals(oldBackground, ((Image)board.FindName("MapBackdrop")).Source),
+                    "Re-entering the board and updating enabled state must reuse its task visuals and decoded artwork.");
+            }
+            // A save-only board publication may rebuild task controls, but unchanged
+            // image providers must retain their decoded pixels and alpha masks.
+            board.SynchronizeProfile(initial.QuestBoard! with { }, initial.QuestBoardCatalog, contentChanged: false);
+            Assert(ReferenceEquals(oldBackground, ((Image)board.FindName("MapBackdrop")).Source),
+                "A save-only board publication must not evict unchanged artwork.");
+            before = Selected();
             WriteBoardTestImage(framePath, 80, 80, 96, opaqueSide: -1);
             WriteBoardTestImage(Path.Combine(f.ActiveWorkshopRoot, BoardArtRoot + "quest_select.background.png"), 1920, 1080, 96);
             Call("RequestProfileSync", false, true);

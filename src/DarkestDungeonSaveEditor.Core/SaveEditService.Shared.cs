@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -71,38 +70,6 @@ public sealed partial class SaveEditService
             {
                 throw new InvalidOperationException(
                     $"An active Mod manifest changed {changeContext}: {fingerprint.Path}");
-            }
-        }
-    }
-
-    private static void EnsureGameIsNotRunning()
-    {
-        foreach (var processName in new[] { "Darkest", "DarkestDungeon" })
-        {
-            Process[] processes;
-            try
-            {
-                processes = Process.GetProcessesByName(processName);
-            }
-            catch
-            {
-                continue;
-            }
-
-            try
-            {
-                if (processes.Length > 0)
-                {
-                    throw new InvalidOperationException(
-                        "Darkest Dungeon is running. Close the game before applying a save edit.");
-                }
-            }
-            finally
-            {
-                foreach (var process in processes)
-                {
-                    process.Dispose();
-                }
             }
         }
     }

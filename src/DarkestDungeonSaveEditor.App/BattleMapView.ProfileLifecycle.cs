@@ -70,6 +70,7 @@ public partial class BattleMapView : UserControl
         diagnosticBatch ??= new CatalogDiagnosticBatch();
         var profileDirectory = Path.GetFullPath(profile.ProfileDirectory);
         var generation = unchecked(++_profileGeneration);
+        DismissProfileMenu();
         CancelScheduledRefreshRetry();
         StopProfileMonitoring();
         _profileDirectory = profileDirectory;
@@ -86,9 +87,9 @@ public partial class BattleMapView : UserControl
             ? null
             : Path.GetFullPath(localModDirectory);
         _snapshotReader = new BattleMapSnapshotReader(codec);
-        _editService = new BattleMapEditService(codec);
-        _forceTownSaveService = new ForceTownSaveService(codec);
-        _managedEncounterBridgeService = new ManagedBattleEncounterBridgeService(codec);
+        _editService = new BattleMapEditService(codec, SaveLocations, GameRunningProbe);
+        _forceTownSaveService = new ForceTownSaveService(codec, SaveLocations, GameRunningProbe);
+        _managedEncounterBridgeService = new ManagedBattleEncounterBridgeService(codec, SaveLocations, GameRunningProbe);
         _encounterCatalog = null;
         _roomAttachmentCatalog = null;
         _currentSnapshot = null;
@@ -117,6 +118,7 @@ public partial class BattleMapView : UserControl
                         _encounterCatalog = await Task.Run(
                             () => BattleEncounterCatalog.Load(activeContent, snapshot),
                             cancellationToken);
+                        cancellationToken.ThrowIfCancellationRequested();
                         var directByType = _encounterCatalog.DirectEncounters
                             .GroupBy(encounter => encounter.MashType)
                             .ToDictionary(group => group.Key, group => group.Count());
@@ -156,6 +158,7 @@ public partial class BattleMapView : UserControl
                         _roomAttachmentCatalog = await Task.Run(
                             () => BattleRoomAttachmentCatalog.Load(activeContent, snapshot.DungeonId),
                             cancellationToken);
+                        cancellationToken.ThrowIfCancellationRequested();
                         diagnosticBatch.Add(EditorText.Get("BattleMapView_ProfileLifecycle_015"), _roomAttachmentCatalog.Issues);
                         CrashDiagnostics.RecordStatus(
                             EditorText.Format("BattleMapView_ProfileLifecycle_016", _roomAttachmentCatalog.Curios.Count) +
@@ -196,6 +199,7 @@ public partial class BattleMapView : UserControl
                 ScheduleRefreshRetry(generation);
             }
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
         catch
         {
             if (generation == _profileGeneration)
@@ -239,16 +243,22 @@ public partial class BattleMapView : UserControl
         ZoomOutButton.IsEnabled = true;
         ZoomInButton.IsEnabled = true;
         ResetZoomButton.IsEnabled = true;
-        ForceTownButton.IsEnabled = _currentSnapshot is { IsTutorialRaid: false };
+        UpdateForceActionAvailability();
     }
 
-    private void ShowUnavailableState(string messageKey, string liveStatusKey, params object[] messageArguments)
+    private void ClearRaidState()
     {
-        CloseActiveContextMenu();
+        DismissProfileMenu();
         _isRaidAvailable = false;
         _selectedCell = null;
         _currentSnapshot = null;
         _cells.Clear();
+        UpdateForceActionAvailability();
+    }
+
+    private void ShowUnavailableState(string messageKey, string liveStatusKey, params object[] messageArguments)
+    {
+        ClearRaidState();
         MapCanvas.Children.Clear();
         MapCanvas.Visibility = Visibility.Collapsed;
         EmptyStatePanel.Visibility = Visibility.Visible;

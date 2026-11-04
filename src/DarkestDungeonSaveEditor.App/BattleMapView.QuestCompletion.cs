@@ -13,23 +13,18 @@ public partial class BattleMapView : UserControl
         var profile = _profile!;
         var snapshot = _currentSnapshot!;
         var content = _activeContentSnapshot!;
-        var service = new SaveEditService(_codec!);
+        var service = new SaveEditService(_codec!, SaveLocations, GameRunningProbe);
         var generation = _profileGeneration;
-        var gateTaken = false;
+        await RunMapEditAsync(() => CompleteQuestAsync(owner, profile, snapshot, content, service, generation));
+    }
+
+    private async Task CompleteQuestAsync(Window owner, SaveProfile profile, BattleMapSnapshot snapshot,
+        ActiveContentSnapshot content, SaveEditService service, int generation)
+    {
         var committed = false;
         string? backup = null;
-        _isApplyingEdit = true;
-        CloseActiveContextMenu();
-        CancelScheduledRefreshRetry();
-        StopProfileMonitoring();
-        MapCanvas.IsHitTestVisible = false;
-        ForceTownButton.IsEnabled = false;
-        ForceCompleteQuestButton.IsEnabled = false;
         try
         {
-            await NotifySaveEditBusyAsync(true);
-            await _refreshGate.WaitAsync();
-            gateTaken = true;
             if (generation != _profileGeneration || !ReferenceEquals(snapshot, _currentSnapshot))
                 throw new InvalidOperationException(EditorText.Get("QuestCompletion_Changed"));
             LocalizedUi.Set(MapSelectionTextBlock, TextBlock.TextProperty, () => EditorText.Get("QuestCompletion_Preparing"));
@@ -61,21 +56,6 @@ public partial class BattleMapView : UserControl
                 committed ? "QuestCompletion_RefreshFailed" : "QuestCompletion_Failed"));
             ThemedDialog.ShowMessage(owner, error.Message, EditorText.Get(
                 committed ? "QuestCompletion_RefreshFailed" : "QuestCompletion_Failed"), ThemedDialogKind.Error);
-        }
-        finally
-        {
-            if (gateTaken) _refreshGate.Release();
-            try { await NotifySaveEditBusyAsync(false); }
-            finally
-            {
-                _isApplyingEdit = false;
-                MapCanvas.IsHitTestVisible = true;
-                if (generation == _profileGeneration)
-                {
-                    ForceTownButton.IsEnabled = _currentSnapshot is { IsTutorialRaid: false };
-                    StartProfileMonitoring();
-                }
-            }
         }
     }
 }

@@ -252,7 +252,7 @@ public partial class BattleMapView : UserControl
         {
             Owner = owner
         };
-        if (dialog.ShowDialog() == true && dialog.SelectedAttachment is { } attachment)
+        if (_picker.Show(dialog) && CanBrowseProfile() && dialog.SelectedAttachment is { } attachment)
         {
             await SetBattleAttachmentAsync(target, attachment);
         }
@@ -345,7 +345,7 @@ public partial class BattleMapView : UserControl
         {
             Owner = owner
         };
-        if (dialog.ShowDialog() == true && dialog.SelectedEncounter is { } encounter)
+        if (_picker.Show(dialog) && CanBrowseProfile() && dialog.SelectedEncounter is { } encounter)
         {
             var directEncounter = encounter.CanPlaceDirectly && encounter.MashIndex is not null
                 ? encounter
@@ -400,6 +400,10 @@ public partial class BattleMapView : UserControl
 
         var activeContent = _activeContentSnapshot;
         var managedService = _managedEncounterBridgeService;
+        var gameDirectory = _gameDirectory;
+        var workshopDirectory = _workshopDirectory;
+        var localModDirectory = _localModDirectory;
+        var placement = new BattleMapPlacementTarget(target.SourceAreaId!, target.SourceTileId!);
         await ApplySaveEditAsync(
             target,
             profile,
@@ -409,16 +413,8 @@ public partial class BattleMapView : UserControl
             encounterResolver: async () =>
             {
                 LocalizedUi.Set(MapSelectionTextBlock, TextBlock.TextProperty, () => EditorText.Format("BattleMapView_Commands_021", encounter.DisplayName));
-                var result = await managedService.EnsureEncounterAsync(
-                    profile,
-                    snapshot,
-                    activeContent,
-                    catalog,
-                    encounter,
-                    _gameDirectory,
-                    _workshopDirectory,
-                    _localModDirectory,
-                    placementTarget: new BattleMapPlacementTarget(target.SourceAreaId!, target.SourceTileId!));
+                var result = await Task.Run(() => managedService.EnsureEncounterAsync(profile, snapshot,
+                    activeContent, catalog, encounter, gameDirectory, workshopDirectory, localModDirectory, placementTarget: placement));
                 _activeContentSnapshot = result.ActiveContent;
                 _encounterCatalog = result.Catalog;
                 await ReloadRoomAttachmentCatalogAsync(result.ActiveContent);
@@ -703,18 +699,26 @@ public partial class BattleMapView : UserControl
     {
         if (!await CheckProfileEditAsync()) return;
         var generation = _profileGeneration;
-        var gateTaken = false;
+        var refreshAfterFailure = false;
+        await RunMapEditAsync(async () =>
+        {
+            refreshAfterFailure = await CommitMapEditAsync(target, profile, snapshot, service, kind, encounter,
+                attachment, encounterResolver, generation);
+        });
+        if (refreshAfterFailure && !UsesSharedProfileMonitor && generation == _profileGeneration)
+            await RefreshLiveSnapshotAsync(generation);
+    }
+
+    private async Task<bool> CommitMapEditAsync(PrototypeMapCell target, SaveProfile profile,
+        BattleMapSnapshot snapshot, BattleMapEditService service, BattleMapEditKind kind,
+        BattleEncounterDefinition? encounter, BattleRoomAttachmentDefinition? attachment,
+        Func<Task<BattleEncounterDefinition>>? encounterResolver, int generation)
+    {
         var committed = false;
         var managedEncounterResolved = false;
         var refreshedSuccessfully = false;
         PreparedBattleMapEdit? prepared = null;
         string? backupDirectory = null;
-        _isApplyingEdit = true;
-        await NotifySaveEditBusyAsync(true);
-        CloseActiveContextMenu();
-        CancelScheduledRefreshRetry();
-        StopProfileMonitoring();
-        MapCanvas.IsHitTestVisible = false;
         LocalizedUi.Set(MapSelectionTextBlock, TextBlock.TextProperty, () => kind switch
         {
             BattleMapEditKind.DeleteContent => EditorText.Format("BattleMapView_Commands_060", target.DisplayName),
@@ -728,8 +732,6 @@ public partial class BattleMapView : UserControl
 
         try
         {
-            await _refreshGate.WaitAsync();
-            gateTaken = true;
             if (generation != _profileGeneration ||
                 !ReferenceEquals(snapshot, _currentSnapshot) ||
                 !_cells.Contains(target) ||
@@ -740,15 +742,22 @@ public partial class BattleMapView : UserControl
                     EditorText.Get("BattleMapView_Commands_067"));
             }
 
-            if (_managedEncounterBridgeService is not null && _codec is not null && !string.IsNullOrWhiteSpace(_gameDirectory))
+            var gameDirectory = _gameDirectory;
+            if (_managedEncounterBridgeService is { } bridge && _codec is { } codec && !string.IsNullOrWhiteSpace(gameDirectory))
             {
-                var currentContent = await ActiveContentResolver.ResolveAsync(profile, _gameDirectory,
-                    _workshopDirectory, _localModDirectory, _codec, SaveEditorLocations.CreateDefault().WorkspaceDirectory);
-                var maintenance = await _managedEncounterBridgeService.ReconcileAsync(currentContent, _gameDirectory, _localModDirectory);
+                var workshopDirectory = _workshopDirectory;
+                var localModDirectory = _localModDirectory;
+                var workspace = SaveLocations.WorkspaceDirectory;
+                var (currentContent, maintenance) = await Task.Run(async () =>
+                {
+                    Task<ActiveContentSnapshot> Resolve() => ActiveContentResolver.ResolveAsync(profile, gameDirectory,
+                        workshopDirectory, localModDirectory, codec, workspace);
+                    var content = await Resolve();
+                    var result = await bridge.ReconcileAsync(content, gameDirectory, localModDirectory);
+                    return (result.Changed ? await Resolve() : content, result);
+                });
                 if (maintenance.Changed)
                 {
-                    currentContent = await ActiveContentResolver.ResolveAsync(profile, _gameDirectory,
-                        _workshopDirectory, _localModDirectory, _codec, SaveEditorLocations.CreateDefault().WorkspaceDirectory);
                     SaveEditApplied?.Invoke(maintenance.Message);
                     ActiveContentChanged?.Invoke(currentContent);
                     if (_snapshotReader is not null)
@@ -759,7 +768,7 @@ public partial class BattleMapView : UserControl
                         RenderSnapshot(updated, fitToView: false);
                     }
                     LocalizedUi.Set(MapSelectionTextBlock, TextBlock.TextProperty, () => EditorText.Get("BattleMapView_Commands_068"));
-                    return;
+                    return false;
                 }
                 if (maintenance.Deferred) throw new InvalidOperationException(maintenance.Message);
             }
@@ -811,7 +820,7 @@ public partial class BattleMapView : UserControl
                         target.SourceTileId),
                 _ => throw new InvalidOperationException(EditorText.Get("BattleMapView_Commands_070"))
             };
-            var result = await service.CommitAsync(prepared);
+            var result = await Task.Run(() => service.CommitAsync(prepared));
             backupDirectory = result.BackupDirectory;
             committed = true;
             var operationLabel = kind switch
@@ -839,7 +848,7 @@ public partial class BattleMapView : UserControl
                 EditorText.Format("BattleMapView_Commands_084", result.BackupDirectory));
             if (generation != _profileGeneration || _snapshotReader is null)
             {
-                return;
+                return false;
             }
 
             var refreshed = await LoadSnapshotWithRetryAsync(
@@ -848,7 +857,7 @@ public partial class BattleMapView : UserControl
                 CancellationToken.None);
             if (generation != _profileGeneration)
             {
-                return;
+                return false;
             }
 
             RenderSnapshot(refreshed, fitToView: false);
@@ -886,25 +895,7 @@ public partial class BattleMapView : UserControl
                     ThemedDialogKind.Error);
             }
         }
-        finally
-        {
-            if (gateTaken)
-            {
-                _refreshGate.Release();
-            }
-            try { await NotifySaveEditBusyAsync(false); }
-            finally
-            {
-                _isApplyingEdit = false;
-                MapCanvas.IsHitTestVisible = true;
-                if (generation == _profileGeneration) StartProfileMonitoring();
-            }
-        }
-
-        if (!refreshedSuccessfully && generation == _profileGeneration)
-        {
-            await RefreshLiveSnapshotAsync(generation);
-        }
+        return !refreshedSuccessfully;
     }
 
     private void MovePartyPreview(PrototypeMapCell target)

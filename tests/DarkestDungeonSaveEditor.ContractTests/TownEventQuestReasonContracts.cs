@@ -161,7 +161,8 @@ internal static partial class ContractSuite
     {
         // Policy fixtures cover completed and locked plots through the real
         // binary preview/commit path; they are not claimed installed Mod cases.
-        foreach (var scenario in new[] { "completed", "prerequisite", "invalid-reward", "malformed-reward" })
+        foreach (var scenario in new[] { "completed", "prerequisite", "invalid-reward", "malformed-reward", "scalar-items",
+                     "scalar-thresholds", "invalid-extra-reward", "invalid-rarity", "missing-goal" })
         {
             var run = Path.Combine(root, scenario);
             var f = await BuildTownEventFixtureAsync(run);
@@ -184,19 +185,49 @@ internal static partial class ContractSuite
                     { ["id"] = "missing_event_reward", ["type"] = "trinket", ["amount"] = 1 };
             if (scenario == "malformed-reward")
                 definition["quest"]!["completion_reward"] = "malformed";
+            if (scenario == "scalar-items")
+                definition["quest"]!["completion_reward"]!["items_definition"]!["items"] = "not-an-item-list";
+            if (scenario == "scalar-thresholds")
+                definition["quest"]!["threshold_rewards"] = 42;
+            if (scenario == "invalid-extra-reward")
+                definition["quest"]!["completion_reward"]!["additional_threshold_trinket_rewards"] = new JsonArray(true);
+            if (scenario == "invalid-rarity")
+                definition["quest"]!["completion_reward"]!["additional_threshold_trinket_rewards"] =
+                    new JsonArray(new JsonObject { ["chance_of_loot"] = 1.0, ["rarity_table"] = new JsonArray(false) });
+            if (scenario == "missing-goal")
+                definition["quest"]!["goal_ids"] = new JsonArray("absent_goal");
             File.WriteAllText(plotPath, document.ToJsonString());
             var selected = TownEventCatalog.Load(f.Content).Events.Single(row => row.Id == "test_plot_quest");
             var before = f.Saves.Keys.ToDictionary(name => name, name => ComputeSha256(Path.Combine(profile.ProfileDirectory, name)));
-            if (scenario is "invalid-reward" or "malformed-reward")
+            if (scenario is not ("completed" or "prerequisite"))
             {
                 InvalidDataException? failure = null;
                 try { await f.Service.PrepareTownEventEditAsync(profile, selected, f.Content); }
                 catch (InvalidDataException error) { failure = error; }
-                var expected = scenario == "invalid-reward"
-                    ? $"Unresolved event trinket identity: {unchecked((int)HashLoc2Key("missing_event_reward"))}."
-                    : "Invalid completion reward for quest: event_plot.";
+                var expected = scenario switch
+                {
+                    "invalid-reward" => EditorText.Format("QuestBoard_MissingTrinket", "missing_event_reward"),
+                    "missing-goal" => EditorText.Format("QuestBoard_MissingGoal", "absent_goal"),
+                    "scalar-items" => EditorText.Format("QuestBoard_InvalidRewardField", "items_definition.items"),
+                    "scalar-thresholds" => EditorText.Format("QuestBoard_InvalidRewardField", "threshold_rewards"),
+                    "invalid-extra-reward" => EditorText.Format("QuestBoard_InvalidRewardField", "additional_threshold_trinket_rewards[0]"),
+                    "invalid-rarity" => EditorText.Format("QuestBoard_InvalidRewardField", "rarity_table[0]"),
+                    _ => "Invalid completion reward for quest: event_plot."
+                };
                 Assert(failure?.Message == expected,
-                    "Bypassing completion must still reject a quest whose reward cannot be initialized.");
+                    "Bypassing natural eligibility must still reject a quest that cannot be initialized.");
+                var row = QuestBoardEditCatalog.Load(f.Content).Templates.Single(item => item.Quest.Id == "event_plot");
+                Assert(row.UnavailableReason == expected, "Both entry points must identify the same initialization failure.");
+                if (scenario == "missing-goal")
+                {
+                    var copies = f.Saves.ToDictionary(pair => pair.Key, pair => pair.Value.DeepClone().AsObject());
+                    var board = copies["persist.quest.json"]["base_root"]!["quests"]!.AsObject();
+                    board["0"]!["id"] = "event_plot";
+                    var oldBoard = board.DeepClone();
+                    var duplicate = TownEventSaveEditor.ReplaceCurrent(copies, selected, new TownEventInitializer(f.Content, 7).Initialize);
+                    Assert(JsonNode.DeepEquals(board, oldBoard) && duplicate.Warnings.Contains(EditorText.Format("TownEvent_QuestAlreadyPresent", "event_plot")),
+                        "An existing event quest is preserved without trying to initialize it again.");
+                }
                 Assert(before.All(pair => ComputeSha256(Path.Combine(profile.ProfileDirectory, pair.Key)) == pair.Value),
                     "Rejected initialization must leave every binary profile file untouched.");
                 continue;

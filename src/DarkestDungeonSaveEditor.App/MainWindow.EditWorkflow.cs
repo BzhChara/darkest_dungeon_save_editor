@@ -22,21 +22,30 @@ public partial class MainWindow : Window
         }
 
         if (!await CheckProfileBeforeOperationAsync()) return;
+        await RunProfileOperationAsync(PreparePreviewAsync, isPreview: true);
+    }
 
+    private async Task PreparePreviewAsync(CancellationToken token)
+    {
         InvalidatePreparedEdit();
         var previewRevision = _editRevision;
+        var tab = CatalogTabs.SelectedIndex;
+        bool IsCurrent()
+        {
+            token.ThrowIfCancellationRequested();
+            return !ObserveGameProcess() && previewRevision == _editRevision && CatalogTabs.SelectedIndex == tab;
+        }
+
         try
         {
-            SetBusy(true);
-            var profile = SteamDiscovery.OpenProfile(ProfileDirectoryTextBox.Text.Trim());
-            EnsureCatalogMatches(
-                profile,
-                requireCurrentQuantitySnapshot: CatalogTabs.SelectedIndex == 0,
-                requireCurrentEstateSnapshot: CatalogTabs.SelectedIndex == 1);
-            var editService = new SaveEditService(_codecSession.Codec, _saveLocations);
+            var profile = await GetPreviewProfileAsync(ProfileDirectoryTextBox.Text.Trim(),
+                requireCurrentQuantitySnapshot: tab == 0, requireCurrentEstateSnapshot: tab == 1, token: token);
+            if (!IsCurrent()) return;
+            var content = _activeContentSnapshot;
+            var editService = new SaveEditService(_codecSession.Codec, _saveLocations, _gameRunningProbe);
             AppendStatus(EditorText.Format("MainWindow_EditWorkflow_001", profile.ProfileId));
 
-            if (CatalogTabs.SelectedIndex == 0)
+            if (tab == 0)
             {
                 if (ItemGrid.SelectedItem is not ItemRow selectedItem)
                 {
@@ -60,17 +69,15 @@ public partial class MainWindow : Window
                         QuantityItemSaveEditor.MaximumWalletAmount));
                 }
 
-                if (_activeContentSnapshot is null)
+                if (content is null)
                 {
                     throw new InvalidOperationException(EditorText.Get("MainWindow_EditWorkflow_004"));
                 }
 
-                var preparedItemEdit = await editService.PrepareQuantityItemEditAsync(
-                    profile,
-                    selectedItem.Definition,
-                    targetAmount,
-                    _activeContentSnapshot);
-                if (previewRevision != _editRevision || CatalogTabs.SelectedIndex != 0)
+                var item = selectedItem.Definition;
+                var preparedItemEdit = await Task.Run(() =>
+                    editService.PrepareQuantityItemEditAsync(profile, item, targetAmount, content, token), token);
+                if (!IsCurrent())
                 {
                     AppendStatus(EditorText.Get("MainWindow_EditWorkflow_005"), level: DiagnosticLogLevel.Warning);
                     return;
@@ -97,14 +104,13 @@ public partial class MainWindow : Window
                 {
                     AppendStatus(EditorText.Format("MainWindow_EditWorkflow_009", itemWarning), level: DiagnosticLogLevel.Warning);
                 }
-                ApplyButton.IsEnabled = true;
                 AppendStatus(
                     EditorText.Format("MainWindow_EditWorkflow_010", preview.ItemId, preview.ExistingAmount, preview.TargetAmount) +
                     EditorText.Format("MainWindow_EditWorkflow_011", FormatItemStorage(preview.StorageKind), preparedItemEdit.WorkspaceDirectory));
                 return;
             }
 
-            if (CatalogTabs.SelectedIndex == 1)
+            if (tab == 1)
             {
                 if (TrinketGrid.SelectedItem is not TrinketRow selected)
                 {
@@ -126,18 +132,16 @@ public partial class MainWindow : Window
                     throw new InvalidOperationException(EditorText.Get("MainWindow_EditWorkflow_016"));
                 }
 
-                if (_activeContentSnapshot is null)
+                if (content is null)
                 {
                     throw new InvalidOperationException(EditorText.Get("MainWindow_EditWorkflow_004"));
                 }
 
-                var preparedEdit = await editService.PrepareTrinketEditAsync(
-                    profile,
-                    selected.Definition,
-                    copies,
-                    _trinketStorage,
-                    _activeContentSnapshot);
-                if (previewRevision != _editRevision || CatalogTabs.SelectedIndex != 1)
+                var trinket = selected.Definition;
+                var storage = _trinketStorage;
+                var preparedEdit = await Task.Run(() =>
+                    editService.PrepareTrinketEditAsync(profile, trinket, copies, storage, content, token), token);
+                if (!IsCurrent())
                 {
                     AppendStatus(EditorText.Get("MainWindow_EditWorkflow_005"), level: DiagnosticLogLevel.Warning);
                     return;
@@ -159,47 +163,47 @@ public partial class MainWindow : Window
                     PreviewWarningTextBlock.Visibility = Visibility.Visible;
                     AppendStatus(EditorText.Format("MainWindow_EditWorkflow_022", PreviewWarningTextBlock.Text), level: DiagnosticLogLevel.Warning);
                 }
-                ApplyButton.IsEnabled = true;
                 AppendStatus(EditorText.Format("MainWindow_EditWorkflow_023", preparedEdit.WorkspaceDirectory));
                 return;
             }
 
-            if (CatalogTabs.SelectedIndex == EventTabIndex)
+            if (tab == EventTabIndex)
             {
-                if (EventGrid.SelectedItem is not TownEventRow selectedEvent || _activeContentSnapshot is null)
+                if (EventGrid.SelectedItem is not TownEventRow selectedEvent || content is null)
                     throw new InvalidOperationException(EditorText.Get("TownEvent_Select"));
-                var eventEdit = await Task.Run(() => editService.PrepareTownEventEditAsync(profile,
-                    selectedEvent.Definition, _activeContentSnapshot));
-                if (previewRevision != _editRevision || CatalogTabs.SelectedIndex != EventTabIndex) return;
+                var definition = selectedEvent.Definition;
+                var eventEdit = await Task.Run(() =>
+                    editService.PrepareTownEventEditAsync(profile, definition, content, token), token);
+                if (!IsCurrent()) return;
                 _editService = editService;
                 _preparedTownEventEdit = eventEdit;
                 UpdateTownEventPreview();
                 AppendStatus(FormatTownEventPreview(eventEdit.Preview));
-                ApplyButton.IsEnabled = true;
                 return;
             }
 
-            if (HeroGrid.SelectedItem is not HeroRow selectedHero || _heroCatalog is null)
+            var heroCatalog = _heroCatalog;
+            if (HeroGrid.SelectedItem is not HeroRow selectedHero || heroCatalog is null)
             {
                 throw new InvalidOperationException(EditorText.Get("MainWindow_CatalogInteraction_001"));
             }
-            if (_activeContentSnapshot is null)
+            if (content is null)
             {
                 throw new InvalidOperationException(EditorText.Get("MainWindow_EditWorkflow_004"));
             }
 
-            var generated = StagecoachHeroCandidateFactory.Generate(
-                _heroCatalog,
-                selectedHero.Definition,
-                RandomNumberGenerator.GetInt32(int.MaxValue),
-                GetSelectedHeroLevel(),
-                _selectedInitialQuirkIds);
-            var preparedHeroEdit = await editService.PrepareStagecoachHeroEditAsync(
-                profile,
-                generated,
-                _heroCatalog,
-                _activeContentSnapshot);
-            if (previewRevision != _editRevision || CatalogTabs.SelectedIndex != HeroTabIndex)
+            var heroClass = selectedHero.Definition;
+            var level = GetSelectedHeroLevel();
+            var quirks = _selectedInitialQuirkIds.ToArray();
+            var (preparedHeroEdit, heroPreview) = await Task.Run(async () =>
+            {
+                var generated = StagecoachHeroCandidateFactory.Generate(heroCatalog, heroClass,
+                    RandomNumberGenerator.GetInt32(int.MaxValue), level, quirks);
+                token.ThrowIfCancellationRequested();
+                var prepared = await editService.PrepareStagecoachHeroEditAsync(profile, generated, heroCatalog, content, token);
+                return (prepared, generated.Preview);
+            }, token);
+            if (!IsCurrent())
             {
                 AppendStatus(EditorText.Get("MainWindow_EditWorkflow_005"), level: DiagnosticLogLevel.Warning);
                 return;
@@ -207,7 +211,7 @@ public partial class MainWindow : Window
 
             _editService = editService;
             _preparedHeroEdit = preparedHeroEdit;
-            _preparedHeroCandidatePreview = generated.Preview;
+            _preparedHeroCandidatePreview = heroPreview;
             var heroWarning = FormatHeroPreviewWarnings(preparedHeroEdit.Preview);
             if (string.IsNullOrWhiteSpace(heroWarning))
             {
@@ -220,7 +224,6 @@ public partial class MainWindow : Window
                 PreviewWarningTextBlock.Visibility = Visibility.Visible;
                 AppendStatus(EditorText.Format("MainWindow_EditWorkflow_024", heroWarning.Replace(Environment.NewLine, "；", StringComparison.Ordinal)), level: DiagnosticLogLevel.Warning);
             }
-            var heroPreview = generated.Preview;
             var targetStagecoach = preparedHeroEdit.Preview.TargetPool == StagecoachRecruitPool.Shard
                 ? EditorText.Get("MainWindow_EditWorkflow_025")
                 : EditorText.Get("MainWindow_EditWorkflow_026");
@@ -232,7 +235,6 @@ public partial class MainWindow : Window
                 EditorText.Format("MainWindow_EditWorkflow_031", preparedHeroEdit.Preview.UpgradePurchaseCount) +
                 $"{targetStagecoach} {preparedHeroEdit.Preview.ExistingCandidates} → {preparedHeroEdit.Preview.ResultingCandidates}，" +
                 $"GUID {preparedHeroEdit.Preview.CandidateGuid}。";
-            ApplyButton.IsEnabled = true;
             AppendStatus(
                 EditorText.Format("MainWindow_EditWorkflow_032", targetStagecoach, heroPreview.Name, heroPreview.HeroClass, heroPreview.ResolveLevel) +
                 EditorText.Format("MainWindow_EditWorkflow_033", heroPreview.ResolveXp, heroPreview.WeaponRank, heroPreview.ArmourRank) +
@@ -248,15 +250,12 @@ public partial class MainWindow : Window
             }
             AppendStatus(EditorText.Format("MainWindow_EditWorkflow_041", preparedHeroEdit.WorkspaceDirectory));
         }
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { throw; }
         catch (Exception ex)
         {
             CrashDiagnostics.RecordException("Save edit: preview", ex,
                 EditorText.Format("MainWindow_EditWorkflow_042", ProfileDirectoryTextBox.Text.Trim(), CatalogTabs.SelectedIndex));
             AppendStatusSafely(EditorText.Format("MainWindow_EditWorkflow_043", ex.Message), "Save edit: preview failure status", DiagnosticLogLevel.Error);
-        }
-        finally
-        {
-            SetBusy(false);
         }
     }
 
@@ -345,37 +344,44 @@ public partial class MainWindow : Window
 
         if (!await CheckProfileBeforeOperationAsync(requireUnchanged: true)) return;
 
+        string? savedBackup = null;
+        await RunProfileEditAsync(async () =>
+        {
+            savedBackup = await CommitPreparedEditAsync(_editService, operationDetails);
+        });
+        if (savedBackup is not null && _syncReady && !_catalogCloseRequested)
+            ThemedDialog.ShowMessage(this,
+                EditorText.Format("MainWindow_EditWorkflow_062", savedBackup),
+                EditorText.Get("MainWindow_EditWorkflow_063"), ThemedDialogKind.Information);
+    }
+
+    private async Task<string?> CommitPreparedEditAsync(SaveEditService service, string operationDetails)
+    {
+        var item = _preparedQuantityItemEdit;
+        var townEvent = _preparedTownEventEdit;
+        var hero = _preparedHeroEdit;
+        var trinket = _preparedTrinketEdit;
+        SaveCommitResult? estateCommit = null;
+
+        async Task<string> WriteFilesAsync()
+        {
+            if (townEvent is not null) return (await service.CommitAsync(townEvent)).BackupDirectory;
+            if (hero is not null) return (await service.CommitAsync(hero)).BackupDirectory;
+            estateCommit = item is not null ? await service.CommitAsync(item) : await service.CommitAsync(trinket!);
+            return estateCommit.BackupDirectory;
+        }
+
         var committed = false;
         string? backupDirectory = null;
-        var reportedFailure = false;
         try
         {
-            SetBusy(true);
             AppendStatusSafely(EditorText.Format("MainWindow_EditWorkflow_060", operationDetails), "Save edit: start diagnostics");
-            SaveCommitResult? estateCommit = null;
-            if (isItemEdit)
-            {
-                estateCommit = await _editService.CommitAsync(_preparedQuantityItemEdit!);
-                backupDirectory = estateCommit.BackupDirectory;
-            }
-            else if (isEventEdit)
-            {
-                backupDirectory = (await Task.Run(() => _editService.CommitAsync(_preparedTownEventEdit!))).BackupDirectory;
-            }
-            else if (isHeroEdit)
-            {
-                backupDirectory = (await _editService.CommitAsync(_preparedHeroEdit!)).BackupDirectory;
-            }
-            else
-            {
-                estateCommit = await _editService.CommitAsync(_preparedTrinketEdit!);
-                backupDirectory = estateCommit.BackupDirectory;
-            }
+            backupDirectory = await Task.Run(WriteFilesAsync);
 
             committed = true;
             AppendStatusSafely(EditorText.Format("MainWindow_EditWorkflow_061", operationDetails, backupDirectory), "Save edit: success diagnostics");
 
-            if (isItemEdit && estateCommit is not null)
+            if (item is not null && estateCommit is not null)
             {
                 _catalogQuantitySaveSha256 = estateCommit.FinalSha256;
                 if (_quantitySaveContext == QuantityItemSaveContext.Town)
@@ -388,11 +394,11 @@ public partial class MainWindow : Window
                 _catalogEstateSaveSha256 = estateCommit.FinalSha256;
             }
 
-            if (isItemEdit)
+            if (item is not null)
             {
-                var editedKey = _preparedQuantityItemEdit!.Item.CatalogKey;
-                var targetAmount = _preparedQuantityItemEdit.Preview.TargetAmount;
-                var resultingEntryCount = _preparedQuantityItemEdit.Preview.ResultingMatchingEntries;
+                var editedKey = item.Item.CatalogKey;
+                var targetAmount = item.Preview.TargetAmount;
+                var resultingEntryCount = item.Preview.ResultingMatchingEntries;
                 _allItems = _allItems
                     .Select(item => item.CatalogKey.Equals(editedKey, StringComparison.Ordinal)
                         ? item with
@@ -408,23 +414,16 @@ public partial class MainWindow : Window
             }
 
             InvalidatePreparedEdit();
+            return backupDirectory;
         }
         catch (Exception ex)
         {
-            reportedFailure = true;
             var failureLabel = committed ? EditorText.Get("MainWindow_EditWorkflow_064") : EditorText.Get("MainWindow_EditWorkflow_065");
             CrashDiagnostics.RecordException("Save edit: " + (committed ? "post-commit UI" : "commit"), ex, operationDetails);
             AppendStatusSafely($"{failureLabel}：{ex.Message}；{operationDetails}", "Save edit: failure diagnostics", DiagnosticLogLevel.Error);
             ThemedDialog.ShowMessage(this, ex.Message, failureLabel, ThemedDialogKind.Error);
+            return null;
         }
-        finally
-        {
-            await CompleteProfileEditAsync();
-        }
-        if (committed && !reportedFailure && _syncReady && !_catalogCloseRequested)
-            ThemedDialog.ShowMessage(this,
-                EditorText.Format("MainWindow_EditWorkflow_062", backupDirectory),
-                EditorText.Get("MainWindow_EditWorkflow_063"), ThemedDialogKind.Information);
     }
 
 }

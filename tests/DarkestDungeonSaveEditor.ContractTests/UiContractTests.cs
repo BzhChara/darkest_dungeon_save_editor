@@ -55,10 +55,8 @@ internal static partial class ContractSuite
                    handlerCode.Contains("ex is AggregateException", StringComparison.Ordinal),
                 "Handled map/force-town failures must record the exception and operation context and disclose incomplete recovery.");
         }
-        var battleMapIntegrationCode = File.ReadAllText(Path.Combine(appSourceDirectory, "MainWindow.BattleMapIntegration.cs"));
-        Assert(liveRefreshCode.Contains("if (UsesSharedProfileMonitor ||", StringComparison.Ordinal) &&
-            battleMapIntegrationCode.Contains("await CompleteProfileEditAsync();", StringComparison.Ordinal),
-            "Shared profile sync must suppress legacy map-only refreshes and catch up after map operations, including failures.");
+        Assert(liveRefreshCode.Contains("if (UsesSharedProfileMonitor ||", StringComparison.Ordinal),
+            "Shared profile sync must suppress legacy map-only refreshes.");
         var battleMapReaderCode = File.ReadAllText(Path.Combine(
             repositoryRoot,
             "src",
@@ -731,7 +729,7 @@ internal static partial class ContractSuite
             catalogTabHeaders.SequenceEqual(
                 new[] { "物品", "饰品", "事件", "人物", "战斗" },
                 StringComparer.Ordinal) &&
-            mainWindowCode.Contains("QuantityItemCatalog.LoadAsync(activeContent, codec)", StringComparison.Ordinal) &&
+            mainWindowCode.Contains("QuantityItemCatalog.LoadAsync(activeContent, codec, token)", StringComparison.Ordinal) &&
             showUnusedItemsCheckBox.Attribute("Checked")?.Value == "ShowUnusedItemsCheckBox_Changed" &&
             showUnusedItemsCheckBox.Attribute("Unchecked")?.Value == "ShowUnusedItemsCheckBox_Changed" &&
             mainWindowCode.Contains("definition.IsHiddenByDefault", StringComparison.Ordinal) &&
@@ -772,7 +770,7 @@ internal static partial class ContractSuite
             !mainWindowCode.Contains("此功能只修改 persist.estate.json", StringComparison.Ordinal) &&
             !mainWindowCode.Contains("persist.raid.json 不会变化", StringComparison.Ordinal) &&
             !mainWindowCode.Contains("estate 类型能表示庄园计数", StringComparison.Ordinal) &&
-            mainWindowCode.Contains("requireCurrentQuantitySnapshot: CatalogTabs.SelectedIndex == 0", StringComparison.Ordinal) &&
+            mainWindowCode.Contains("requireCurrentQuantitySnapshot: tab == 0", StringComparison.Ordinal) &&
             mainWindowCode.Contains("expectedInRaid ? profile.RaidSavePath : profile.EstateSavePath", StringComparison.Ordinal) &&
             mainWindowCode.Contains("MainWindow_CatalogLoading_011", StringComparison.Ordinal),
             "The quantity editor must appear immediately left of trinkets, use an absolute target amount, switch between town storage and the current raid inventory, keep only concise user-facing risks, retain persisted unused definitions, invalidate stale previews when input changes, and reject stale displayed quantities or a changed town/raid state.");
@@ -948,8 +946,7 @@ internal static partial class ContractSuite
             battleMapEditorCode.Contains("ValidateStationaryRaidState", StringComparison.Ordinal) &&
             battleMapEditorCode.Contains("BattleMapSaveEditor_037", StringComparison.Ordinal) &&
             battleMapEditorCode.Contains("BattleMapSaveEditor_001", StringComparison.Ordinal) &&
-            battleMapEditServiceCode.Contains("EnsureGameIsNotRunning", StringComparison.Ordinal) &&
-            battleMapEditServiceCode.Contains("BattleMapEditService_030", StringComparison.Ordinal) &&
+            battleMapEditServiceCode.Contains("GameProcessGuard.RequireStopped", StringComparison.Ordinal) &&
             battleMapEditServiceCode.Contains("ValidateLivePair", StringComparison.Ordinal) &&
             battleMapEditServiceCode.Contains("CreateBackup", StringComparison.Ordinal) &&
             battleMapEditServiceCode.Contains("GuardedSaveReplacement", StringComparison.Ordinal) &&
@@ -959,24 +956,12 @@ internal static partial class ContractSuite
             forceTownSaveServiceCode.Contains("ValidateLiveState", StringComparison.Ordinal) &&
             forceTownSaveServiceCode.Contains("EnsureGameIsNotRunning", StringComparison.Ordinal) &&
             forceTownSaveServiceCode.Contains("CreateBackup", StringComparison.Ordinal) &&
-            forceTownSaveServiceCode.Contains("RestoreTarget", StringComparison.Ordinal) &&
-            forceTownSaveServiceCode.Contains("destinationBackupFileName: displacedTarget", StringComparison.Ordinal) &&
-            forceTownSaveServiceCode.Contains("RestoreFileVersion", StringComparison.Ordinal) &&
+            forceTownSaveServiceCode.Contains("GuardedSaveReplacement", StringComparison.Ordinal) &&
+            forceTownSaveServiceCode.Contains("replacement.Recover()", StringComparison.Ordinal) &&
             forceTownSaveServiceCode.Contains("FileShare.Read", StringComparison.Ordinal) &&
             !forceTownSaveServiceCode.Contains("Process.Start", StringComparison.Ordinal) &&
             !forceTownSaveServiceCode.Contains("-forcetown", StringComparison.Ordinal),
             "The battle workspace must expose a pannable, zoomable real save map rendered from original sprites, keep system/script cells out of ordinary content editing, retain a native PART_Popup/ItemsPresenter menu chain for stable nested hover navigation, limit interaction to rooms and visible corridor tiles in native map orientation, retain previews for unresolved content, route proven battle/delete/move actions through guarded save transactions, and expose a backed-up two-field force-town save repair without launching the game.");
-        var forceTownViewCode = File.ReadAllText(Path.Combine(
-            appSourceDirectory, "BattleMapView.ForceTown.cs"));
-        var forceTownFinally = forceTownViewCode[
-            forceTownViewCode.IndexOf("        finally", StringComparison.Ordinal)..];
-        Assert(
-            System.Text.RegularExpressions.Regex.IsMatch(
-                forceTownFinally,
-                @"await NotifySaveEditBusyAsync\(false\);[\s\S]*finally[\s\S]*_isApplyingEdit = false;\s*MapCanvas.IsHitTestVisible = true;") &&
-            !forceTownFinally.Contains("if (!committed)", StringComparison.Ordinal) &&
-            forceTownFinally.Contains("ForceTownButton.IsEnabled = _currentSnapshot is { IsTutorialRaid: false };", StringComparison.Ordinal),
-            "Force-town completion must await owner synchronization and then unconditionally release its input lock, including failure; the button must follow current snapshot availability and exclude the tutorial.");
         var battleMapLifecycleCode = File.ReadAllText(Path.Combine(
             appSourceDirectory, "BattleMapView.ProfileLifecycle.cs"));
         var showMapSurfaceCode = battleMapLifecycleCode[
@@ -1304,10 +1289,8 @@ internal static partial class ContractSuite
             initialQuirkGrid.Attribute("RowStyle") is null &&
             initialQuirkCheckBox.Attribute("IsChecked")?.Value == "{Binding IsSelected, Mode=OneWay}" &&
             initialQuirkDialogCode.Contains("_view is IEditableCollectionView editableView", StringComparison.Ordinal) &&
-            initialQuirkDialogCode.Contains("editableView.CommitEdit();", StringComparison.Ordinal) &&
-            mainWindowCode.Contains("if (dialog?.IsVisible == true)", StringComparison.Ordinal) &&
-            mainWindowCode.Contains("dialog.Close();", StringComparison.Ordinal),
-            "The quirk selector must not open DataGrid edit transactions and must close an orphaned dialog if ShowDialog unwinds unexpectedly.");
+            initialQuirkDialogCode.Contains("editableView.CommitEdit();", StringComparison.Ordinal),
+            "The quirk selector must not open DataGrid edit transactions.");
         var initialQuirkSearchBox = initialQuirkDialogXaml
             .Descendants(presentationNamespace + "TextBox")
             .Single(textBox => textBox.Attribute(xamlName)?.Value == "SearchTextBox");

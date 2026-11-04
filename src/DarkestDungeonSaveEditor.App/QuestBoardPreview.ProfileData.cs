@@ -12,16 +12,15 @@ public partial class QuestBoardPreview
 
     internal void SetEditCatalog(QuestBoardEditCatalog? catalog)
     {
-        _editCatalog = catalog;
-        UpdateResolvedImages();
+        SynchronizeProfile(_snapshot, catalog, contentChanged: false);
     }
 
-    private void UpdateResolvedImages()
+    private bool UpdateResolvedImages(bool invalidateCache = false)
     {
         var images = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (var pair in _editCatalog?.ImagePaths ?? new Dictionary<string, string>()) images[pair.Key] = pair.Value;
         foreach (var pair in _snapshot?.ImagePaths ?? new Dictionary<string, string>()) images[pair.Key] = pair.Value;
-        _assets.SetResolvedImages(images);
+        return _assets.SetResolvedImages(images, invalidateCache);
     }
 
     private QuestBoardChoice[] EditChoices(string regionId) => _fixtureMode ? QuestBoardPreviewData.Choices(regionId).ToArray() :
@@ -44,14 +43,28 @@ public partial class QuestBoardPreview
 
     internal void SetSnapshot(QuestBoardSnapshot? snapshot)
     {
-        if (ReferenceEquals(_snapshot, snapshot) && !_fixtureMode) return;
+        SynchronizeProfile(snapshot, snapshot is null ? null : _editCatalog, contentChanged: false);
+    }
+
+    internal void SynchronizeProfile(QuestBoardSnapshot? snapshot, QuestBoardEditCatalog? catalog, bool contentChanged)
+    {
+        var snapshotChanged = !ReferenceEquals(_snapshot, snapshot) || _fixtureMode;
+        if (!snapshotChanged && ReferenceEquals(_editCatalog, catalog) && !contentChanged) return;
+        _editCatalog = catalog;
+        if (!snapshotChanged)
+        {
+            if (UpdateResolvedImages(contentChanged)) RebuildBoard();
+            return;
+        }
         var previousProfile = _snapshot?.ProfileDirectory;
         if (!string.Equals(previousProfile, snapshot?.ProfileDirectory, StringComparison.OrdinalIgnoreCase)) _regionChoices.Clear();
         _fixtureMode = false;
         _snapshot = snapshot;
         _assets.Layout = snapshot?.Layout ?? new();
-        if (snapshot is null) _editCatalog = null;
-        UpdateResolvedImages();
+        // Follow the shared content policy, including same-path artwork changes.
+        // Ordinary save changes keep decoded images and alpha masks when providers
+        // are unchanged; entering the tab is not a content refresh boundary.
+        UpdateResolvedImages(contentChanged);
         _regions = snapshot?.Regions.Select(region => new QuestBoardRegion(region.Id, region.X, region.Y)
         {
             LocalizedName = region.LocalizedName, QuestsPerRow = region.QuestsPerRow, HasLayout = region.HasLayout,

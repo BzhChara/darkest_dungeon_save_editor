@@ -37,6 +37,7 @@ public partial class ThemedDialog : Window
     }
 
     internal static bool Confirm(Window owner, string message, string title) =>
+        owner is not MainWindow { CloseRequested: true } &&
         new ThemedDialog(owner, message, title, ThemedDialogKind.Warning, isConfirmation: true)
             .ShowDialog() == true;
 
@@ -44,8 +45,11 @@ public partial class ThemedDialog : Window
         Window owner,
         string message,
         string title,
-        ThemedDialogKind kind) =>
+        ThemedDialogKind kind)
+    {
+        if (owner is MainWindow { CloseRequested: true }) return;
         _ = new ThemedDialog(owner, message, title, kind, isConfirmation: false).ShowDialog();
+    }
 
     protected override void OnSourceInitialized(EventArgs e)
     {

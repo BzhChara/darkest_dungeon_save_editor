@@ -115,10 +115,10 @@ internal static partial class ContractSuite
                 gate = ReaderGate();
                 await gate.WaitAsync();
                 Call("RequestProfileSync", false);
-                if (mapOperation) await (Task)Call("BattleMapPanel_SaveEditBusyChanged", true)!;
-                else Call("SetBusy", true);
-                var completion = (Task)(mapOperation
-                    ? Call("BattleMapPanel_SaveEditBusyChanged", false) : Call("CompleteProfileEditAsync"))!;
+                Func<Task> write = () => Task.CompletedTask;
+                var completion = mapOperation
+                    ? ((BattleMapView)Get("BattleMapPanel")!).RunMapEditAsync(write)
+                    : (Task)Call("RunProfileEditAsync", write)!;
                 Assert(!completion.IsCompleted && Flag("_completingProfileEdit") && !Flag("_syncReady") &&
                     !((Control)Get("BattleMapPanel")!).IsEnabled && !((TabControl)Get("CatalogTabs")!).IsEnabled &&
                     !((Button)Get("ApplyButton")!).IsEnabled && !((Button)Get("PreviewButton")!).IsEnabled,
@@ -132,8 +132,7 @@ internal static partial class ContractSuite
             }
             using (var lockedSave = new FileStream(f.EstatePath, FileMode.Open, FileAccess.Read, FileShare.None))
             {
-                Call("SetBusy", true);
-                await (Task)Call("CompleteProfileEditAsync")!;
+                await (Task)Call("RunProfileEditAsync", (Func<Task>)(() => Task.CompletedTask))!;
                 Assert(!Flag("_completingProfileEdit") && !Flag("_syncReady") &&
                     !((Control)Get("BattleMapPanel")!).IsEnabled && !((Button)Get("PreviewButton")!).IsEnabled &&
                     !((Button)Get("ApplyButton")!).IsEnabled && ((FrameworkElement)Get("PathInputsBorder")!).IsEnabled,
@@ -317,7 +316,7 @@ internal static partial class ContractSuite
             window.Close();
         }
     }
-    private static async Task VerifyRaidStateMaintenanceSyncAsync(ContractFixture f)
+    private static async Task VerifyRaidStateMaintenanceSyncAsync(ContractFixture f, bool closeDuringCleanup = false)
     {
         var root = Path.Combine(f.RunRoot, "sync-deferred-raid");
         var game = Path.Combine(root, "game");
@@ -387,10 +386,27 @@ internal static partial class ContractSuite
             }
             raid["base_root"]!["inbattle"] = false;
             File.WriteAllText(profile.RaidSavePath, raid.ToJsonString());
+            var closed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            if (closeDuringCleanup)
+            {
+                window.Closed += (_, _) => closed.TrySetResult();
+                var maintenance = (ManagedBattleEncounterBridgeService)Get("_battleMaintenance")!;
+                maintenance.AfterMaintenanceReplace = _ => window.Dispatcher.Invoke(() =>
+                {
+                    window.Close();
+                    Assert(!closed.Task.IsCompleted, "Close must wait while Bridge maintenance is replacing files.");
+                });
+            }
             Call("RequestProfileSync", false);
             await (Task)Call("DrainProfileSyncAsync")!;
-            Assert((bool)Get("_syncReady")! && !(bool)Get("_maintenanceRetryPending")! &&
-                ComputeSha256(profile.MapSavePath) != originalMapHash &&
+            if (closeDuringCleanup)
+            {
+                await closed.Task.WaitAsync(TimeSpan.FromSeconds(10));
+                Console.WriteLine("PASS: close waits for the shared sync's Bridge maintenance writer.");
+            }
+            else Assert((bool)Get("_syncReady")! && !(bool)Get("_maintenanceRetryPending")!,
+                "Finishing deferred maintenance must publish a ready snapshot.");
+            Assert(ComputeSha256(profile.MapSavePath) != originalMapHash &&
                 (await new BattleMapSnapshotReader(f.Codec).LoadAsync(profile.ProfileDirectory)).Areas
                     .Single(area => area.AreaId == "rooB").Tiles.Single().MashIndex == -1,
                 "A new stationary raid save must automatically resume and finish the deferred cleanup.");

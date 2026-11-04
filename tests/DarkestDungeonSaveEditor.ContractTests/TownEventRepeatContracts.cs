@@ -96,6 +96,9 @@ internal static partial class ContractSuite
 
         // Also exercise commits where the event-owned state itself is unchanged:
         // a repeated currency grant, a rule-only event, and an already-present quest.
+        var estateWithTwoGoldRows = await Read("persist.estate.json");
+        estateWithTwoGoldRows["base_root"]!["wallet"]!["1"] = new JsonObject { ["type"] = "gold", ["amount"] = 50 };
+        await Write("persist.estate.json", estateWithTwoGoldRows);
         foreach (var eventId in new[] { "test_bonus_currency", "test_free_activity", "test_plot_quest" })
         {
             var selected = catalog.Events.Single(row => row.Id == eventId);
@@ -113,8 +116,12 @@ internal static partial class ContractSuite
                 JsonNode.DeepEquals(oldQuest, await Read("persist.quest.json")),
                 eventId + ": repeat commits preserve history and already generated quests.");
             if (eventId == "test_bonus_currency")
-                Assert((await Read("persist.estate.json"))["base_root"]!["wallet"]!["0"]!["amount"]!.GetValue<int>() == 150,
-                    "An unchanged event ID does not prevent its repeated currency grant from committing.");
+            {
+                var wallet = (await Read("persist.estate.json"))["base_root"]!["wallet"]!.AsObject();
+                Assert(wallet.Count == 2 && wallet["0"]!["amount"]!.GetValue<int>() == 150 &&
+                       JsonNode.DeepEquals(wallet["1"], estateWithTwoGoldRows["base_root"]!["wallet"]!["1"]),
+                    "Both currency grants survive native DSON commits and retain the other saved row of the same currency.");
+            }
         }
         Console.WriteLine("PASS: repeated revival after recruitment, unchanged event/history transactions, backup/rollback and other repeated event commits.");
     }

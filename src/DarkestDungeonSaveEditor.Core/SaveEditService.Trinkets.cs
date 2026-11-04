@@ -156,7 +156,7 @@ public sealed partial class SaveEditService
     {
         ArgumentNullException.ThrowIfNull(prepared);
         cancellationToken.ThrowIfCancellationRequested();
-        EnsureGameIsNotRunning();
+        RequireGameStopped();
         ValidateProfile(prepared.Profile);
         ValidateTrinketContentGuard(prepared);
 
@@ -182,8 +182,8 @@ public sealed partial class SaveEditService
                 $"The live estate save changed while its backup was being created. A backup was kept at '{backupDirectory}', but no save edit was applied.");
         }
 
-        using var replacement = new GuardedSaveReplacement(targetPath, prepared.EncodedPath,
-            prepared.OriginalSha256, prepared.EncodedSha256, BeforeTargetReplace, AfterTargetReplace);
+        using var replacement = CreateReplacement(targetPath, prepared.EncodedPath,
+            prepared.OriginalSha256, prepared.EncodedSha256);
         IReadOnlyList<FileStream> contentLocks = [];
 
         try

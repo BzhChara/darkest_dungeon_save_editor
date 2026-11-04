@@ -7,7 +7,19 @@ namespace DarkestDungeonSaveEditor.App;
 
 public partial class BattleMapView : UserControl
 {
-    public void DismissProfileMenu() => CloseActiveContextMenu();
+    private readonly ProfileSelectionDialog _picker = new();
+
+    private void MapAvailabilityChanged(object sender, DependencyPropertyChangedEventArgs e)
+    {
+        if (e.NewValue is false && MapViewport is not null) DismissProfileMenu();
+    }
+
+    public void DismissProfileMenu()
+    {
+        CloseActiveContextMenu();
+        _picker.Dismiss();
+        EndMapPan();
+    }
 
     private bool _usesSharedProfileMonitor;
     public bool UsesSharedProfileMonitor
@@ -48,7 +60,7 @@ public partial class BattleMapView : UserControl
             // stamp still initializes this view on its first shared publication.
             if (contentChanged || _mapArtworkFingerprint is null)
             {
-                CloseActiveContextMenu();
+                DismissProfileMenu();
                 ConfigureOriginalMapAssets(_gameDirectory, content, profileSnapshot.BattleMapImagePaths);
                 _mapArtworkFingerprint = profileSnapshot.BattleMapArtworkFingerprint;
                 foreach (var cell in _cells) RefreshCellVisual(cell);
@@ -62,7 +74,13 @@ public partial class BattleMapView : UserControl
                     _roomAttachmentCatalog = null;
                 }
                 if (_currentSnapshot is not null || _isRaidAvailable)
-                    ShowUnavailableState("BattleMapView_ProfileSync_001", "BattleMapView_LiveRefresh_006");
+                {
+                    // The shared monitor switches to the quest board after its final
+                    // checks. Retain the disabled frame until that publication, rather
+                    // than briefly showing the standalone view's town placeholder.
+                    if (UsesSharedProfileMonitor) ClearRaidState();
+                    else ShowUnavailableState("BattleMapView_ProfileSync_001", "BattleMapView_LiveRefresh_006");
+                }
                 return;
             }
 

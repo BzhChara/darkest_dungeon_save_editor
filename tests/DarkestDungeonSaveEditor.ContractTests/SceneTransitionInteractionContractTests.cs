@@ -10,6 +10,8 @@ internal static partial class ContractSuite
         var root = Path.Combine(f.RunRoot, "scene-transition-ui");
         var profile = WriteBattleSafetyProfile(Path.Combine(root, "profile_0"));
         var codec = f.Codec;
+        CreateBattleMonsterDefinitions(f.GameRoot, ["native"]);
+        WriteMultiMash(f.GameRoot, "dungeons/cove/cove.2.mash.darkest", "room: .chance 1 .types native\n");
         foreach (var (seed, name) in new[] { (f.DecodedSeedPath, "persist.estate.json"),
             (f.DecodedTownSeedPath, "persist.town.json"), (f.DecodedRosterSeedPath, "persist.roster.json"),
             (f.DecodedUpgradesSeedPath, "persist.upgrades.json") })
@@ -77,8 +79,45 @@ internal static partial class ContractSuite
         }
         Task Settled() => Until(() => !Flag("_syncInProgress") && !Flag("_syncRequested") &&
             !Flag("_checkingProfileOperation") && !Flag("_completingProfileEdit") && (int)Get("_busyDepth")! == 0);
+
+        async Task CheckPickerInvalidation<T>(Func<Task> open, FrameworkElement? disableTemporarily = null) where T : Window
+        {
+            var dismissed = false;
+            var before = ProfileFilesHash(profile.ProfileDirectory);
+            var observe = window.Dispatcher.InvokeAsync(() =>
+            {
+                if (window.OwnedWindows.OfType<T>().SingleOrDefault() is not { } picker) return;
+                try
+                {
+                    if (disableTemporarily is not null)
+                    {
+                        disableTemporarily.IsEnabled = false;
+                        disableTemporarily.IsEnabled = true;
+                    }
+                    else
+                    {
+                        running = true;
+                        Call("CheckGameProcess");
+                    }
+                    dismissed = !picker.IsVisible;
+                }
+                finally { if (picker.IsVisible) picker.Close(); }
+            }, DispatcherPriority.ContextIdle);
+            await open();
+            await observe;
+            Assert(dismissed && (disableTemporarily is not null || !Enabled("BattleMapPanel")) &&
+                before.OrderBy(p => p.Key).SequenceEqual(ProfileFilesHash(profile.ProfileDirectory).OrderBy(p => p.Key)),
+                typeof(T).Name + " must close on invalidation without accepting a selection or writing the profile.");
+            if (running) { running = false; Call("CheckGameProcess"); await Settled(); }
+        }
         var grid = (DataGrid)Get("ItemGrid")!;
         var panel = (BattleMapView)Get("BattleMapPanel")!;
+        var trackTownTransition = false;
+        var showedIntermediateEmptyState = false;
+        ((FrameworkElement)panel.FindName("EmptyStatePanel")).IsVisibleChanged += (_, args) =>
+        {
+            if (trackTownTransition && args.NewValue is true) showedIntermediateEmptyState = true;
+        };
         var tabs = (TabControl)Get("CatalogTabs")!;
         var amount = (TextBox)Get("CopiesTextBox")!;
         QuantityItemDefinition Gold() => ((IReadOnlyList<QuantityItemDefinition>)Get("_allItems")!).Single(item => item.DisplayId == "gold");
@@ -89,12 +128,22 @@ internal static partial class ContractSuite
                 ((QuantityItemDefinition)row.GetType().GetProperty("Definition")!.GetValue(row)!).DisplayId == "gold");
             amount.Text = (Gold().CurrentAmount + 1).ToString(System.Globalization.CultureInfo.InvariantCulture);
             Call("Preview_Click", window, new RoutedEventArgs());
+            // The async click resumes after preflight briefly clears the busy flags.
+            await Until(() => Get("_preparedQuantityItemEdit") is not null && Enabled("ApplyButton"));
             await Settled();
-            Assert(Get("_preparedQuantityItemEdit") is not null && Enabled("ApplyButton"),
-                "The old scene must have a real editable preview before testing its invalidation.");
         }
-        void CheckScene(QuantityItemSaveContext expected, int gold)
+        var status = (TextBox)Get("StatusTextBox")!;
+        var checkedLogLength = 0;
+        void CheckScene(QuantityItemSaveContext expected, int gold, bool expectItemPrompt)
         {
+            var sceneMessage = EditorText.Get(expected == QuantityItemSaveContext.Raid
+                ? "MainWindow_ProfileSync_SwitchedToRaid" : "MainWindow_ProfileSync_SwitchedToTown");
+            var expectedMessage = expectItemPrompt ? EditorText.Format("MainWindow_ProfileSync_ReselectItem", sceneMessage) : sceneMessage;
+            var messages = status.Text[checkedLogLength..].Split(Environment.NewLine)
+                .Where(line => line.Contains("] " + sceneMessage, StringComparison.Ordinal)).ToArray();
+            checkedLogLength = status.Text.Length;
+            Assert(messages.Length == 1 && messages[0].EndsWith("] " + expectedMessage, StringComparison.Ordinal),
+                $"Expected one scene notification '{expectedMessage}', got: {string.Join(" | ", messages)}");
             Assert(grid.SelectedItem is null && grid.SelectedItems.Count == 0,
                 "Scene changes must clear the item selection even while another tab is active.");
             tabs.SelectedIndex = 0;
@@ -110,20 +159,47 @@ internal static partial class ContractSuite
         }
         SemaphoreSlim? heldGate = null;
         DispatcherTimer? dialogs = null;
+        var dialogMessages = new List<string>();
+        var confirmForceTown = false;
         try
         {
             window.Show();
+            dialogs = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(20) };
+            dialogs.Tick += (_, _) =>
+            {
+                foreach (var dialog in window.OwnedWindows.OfType<ThemedDialog>().ToArray())
+                {
+                    dialogMessages.Add(((TextBlock)dialog.FindName("MessageTextBlock")).Text);
+                    dialog.DialogResult = confirmForceTown && dialogMessages.Count == 1;
+                }
+            };
+            dialogs.Start();
             ((DispatcherTimer)Get("_gameProcessPoll")!).Stop();
             ((TextBox)Get("ProfileDirectoryTextBox")!).Text = profile.ProfileDirectory;
             ((TextBox)Get("GameDirectoryTextBox")!).Text = f.GameRoot;
-            var content = await ActiveContentResolver.ResolveAsync(profile, f.GameRoot, null, codec, locations.WorkspaceDirectory);
+            ((TextBox)Get("LocalModDirectoryTextBox")!).Text = f.LocalModDirectory;
+            var content = await ActiveContentResolver.ResolveAsync(profile, f.GameRoot, null, f.LocalModDirectory, codec, locations.WorkspaceDirectory);
             var items = await QuantityItemCatalog.LoadAsync(content, codec);
             Set("_activeContentSnapshot", content);
             Set("_allItems", items.Items);
             Set("_quantitySaveContext", items.SaveContext);
-            await panel.LoadProfileAsync(profile, codec, f.GameRoot, content);
-            await (Task)Call("StartProfileSyncAsync", content, items, codec, f.GameRoot, null, null,
+            await panel.LoadProfileAsync(profile, codec, f.GameRoot, content, localModDirectory: f.LocalModDirectory);
+            await (Task)Call("StartProfileSyncAsync", content, items, codec, f.GameRoot, null, f.LocalModDirectory,
                 ProfileCatalogContentFingerprint.Capture(content.Sources), locations)!;
+            var heroes = HeroClassCatalog.Load(content);
+            Set("_heroCatalog", heroes); Set("_allHeroes", heroes.HeroClasses);
+            Call("PopulateHeroLevels", heroes); Call("ApplyFilter");
+            tabs.SelectedIndex = 3;
+            ((DataGrid)Get("HeroGrid")!).SelectedIndex = 0;
+            var quirkButton = (Button)Get("InitialQuirksButton")!;
+            Assert(quirkButton.IsEnabled, "Open the quirk picker from its enabled town button.");
+            await CheckPickerInvalidation<InitialQuirkSelectionDialog>(() =>
+            {
+                quirkButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                return Task.CompletedTask;
+            });
+            Assert(((IReadOnlyList<string>)Get("_selectedInitialQuirkIds")!).Count == 0,
+                "Dismissing the hero picker must leave the original selection intact.");
             var townGold = Gold();
             await PrimePreview();
 
@@ -141,20 +217,59 @@ internal static partial class ContractSuite
                 await Settled();
             }
             await ExitGameInto(true);
-            CheckScene(QuantityItemSaveContext.Raid, 25);
+            CheckScene(QuantityItemSaveContext.Raid, 25, expectItemPrompt: true);
+            tabs.SelectedIndex = 4;
+            var encounters = (BattleEncounterCatalogResult)typeof(BattleMapView).GetField("_encounterCatalog", flags)!.GetValue(panel)!;
+            var pickerTarget = ((System.Collections.IEnumerable)typeof(BattleMapView).GetField("_cells", flags)!.GetValue(panel)!).Cast<object>().First();
+            Assert(encounters.Encounters.Count > 0, "The encounter selection must have an available candidate.");
+            Task OpenEncounter() => (Task)typeof(BattleMapView).GetMethod("SelectAndPlaceEncounterAsync", flags)!.Invoke(panel,
+                [pickerTarget, encounters.Encounters.ToArray(), "Encounter"])!;
+            await CheckPickerInvalidation<BattleEncounterSelectionDialog>(OpenEncounter, panel);
+            await CheckPickerInvalidation<BattleEncounterSelectionDialog>(OpenEncounter);
+            Console.WriteLine("PASS: game launch dismisses live hero and encounter pickers without applying their choices.");
+            var forceTownAction = (Button)panel.FindName("ForceTownButton");
+            var forceCompleteAction = (Button)panel.FindName("ForceCompleteQuestButton");
+            Assert(forceTownAction.IsEnabled && forceCompleteAction.IsEnabled,
+                "Both force actions must be available before an ordinary map edit.");
+            var beforeMapEdit = ComputeSha256(profile.MapSavePath);
+            var mapService = new BattleMapEditService(codec, locations)
+            {
+                BeforeTargetReplace = _ =>
+                {
+                    heldGate = ReaderGate();
+                    Assert(heldGate.Wait(0), "The map edit must finish its pre-write check before commit.");
+                }
+            };
+            var cells = (System.Collections.IEnumerable)typeof(BattleMapView).GetField("_cells", flags)!.GetValue(panel)!;
+            var target = cells.Cast<object>().Single(cell =>
+                (string?)cell.GetType().GetProperty("SourceAreaId")!.GetValue(cell) == "coAB" &&
+                (string?)cell.GetType().GetProperty("SourceTileId")!.GetValue(cell) == "tile1");
+            var edit = (Task)typeof(BattleMapView).GetMethod("ApplySaveEditAsync", flags)!.Invoke(panel,
+                [target, profile, panel.CurrentSnapshot, mapService, BattleMapEditKind.DeleteContent, null, null, null])!;
+            await Until(() => Flag("_completingProfileEdit") || edit.IsCompleted);
+            Assert(heldGate is not null && !edit.IsCompleted && !forceTownAction.IsEnabled && !forceCompleteAction.IsEnabled,
+                "Both force actions must remain disabled while a committed map edit waits for shared synchronization: " + string.Join(" | ", dialogMessages));
+            heldGate!.Release(); heldGate = null;
+            await edit;
+            await Settled();
+            Assert(ComputeSha256(profile.MapSavePath) != beforeMapEdit && forceTownAction.IsEnabled && forceCompleteAction.IsEnabled,
+                "An actual map deletion must restore both force actions after its snapshot and shared synchronization finish.");
             await PrimePreview();
-            tabs.SelectedIndex = 1; // Keep the item selection behind another tab during natural return.
+            tabs.SelectedIndex = 4; // Observe the visible raid-to-board transition, keeping the old item selection behind it.
+            trackTownTransition = true;
             var estate = JsonNode.Parse(File.ReadAllText(f.DecodedSeedPath))!.AsObject();
             File.WriteAllText(profile.EstateSavePath, QuantityItemSaveEditor.SetAmount(estate, townGold, 4321).UpdatedRoot.ToJsonString());
             await ExitGameInto(false);
-            CheckScene(QuantityItemSaveContext.Town, 4321);
+            Assert(!showedIntermediateEmptyState, "Natural return must switch directly from the disabled map to the quest board without a town-unsupported placeholder.");
+            trackTownTransition = false;
+            CheckScene(QuantityItemSaveContext.Town, 4321, expectItemPrompt: false);
             Assert(File.Exists(profile.RaidSavePath) && File.Exists(profile.MapSavePath),
                 "Returning to town must ignore retained expedition files without deleting them.");
             Console.WriteLine("PASS: WPF game start/exit town-to-raid and natural raid-to-town clear selection/preview/target, switch wallet/backpack quantities and hide stale maps.");
 
-            await PrimePreview();
+            // Stay on the item tab with its selection already empty.
             await ExitGameInto(true);
-            CheckScene(QuantityItemSaveContext.Raid, 25);
+            CheckScene(QuantityItemSaveContext.Raid, 25, expectItemPrompt: false);
             await PrimePreview();
             var originalRaid = ComputeSha256(profile.RaidSavePath);
             var originalMap = ComputeSha256(profile.MapSavePath);
@@ -166,20 +281,13 @@ internal static partial class ContractSuite
                 heldGate = gate;
             });
             typeof(BattleMapView).GetField("_forceTownSaveService", flags)!.SetValue(panel, forceTown);
-            var dialogMessages = new List<string>();
-            dialogs = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(20) };
-            dialogs.Tick += (_, _) =>
-            {
-                foreach (var dialog in window.OwnedWindows.OfType<ThemedDialog>().ToArray())
-                {
-                    dialogMessages.Add(((TextBlock)dialog.FindName("MessageTextBlock")).Text);
-                    dialog.DialogResult = dialogMessages.Count == 1;
-                }
-            };
-            dialogs.Start();
+            Assert(dialogMessages.Count == 0, "Earlier operations must not raise unexpected dialogs: " + string.Join(" | ", dialogMessages));
+            confirmForceTown = true;
             tabs.SelectedIndex = 4;
             var forceTownButton = (Button)panel.FindName("ForceTownButton");
             Assert(forceTownButton.IsEnabled, "Force town must be available on the actual battle tab.");
+            trackTownTransition = true;
+            showedIntermediateEmptyState = false;
             forceTownButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             await Until(() => Flag("_completingProfileEdit") || dialogMessages.Count > 1);
             Assert(dialogMessages.Count == 1 && heldGate is not null && !Enabled("ApplyButton") &&
@@ -187,7 +295,9 @@ internal static partial class ContractSuite
                 "Force town must consume the raid preview and retain the write lock through post-edit synchronization: " + string.Join(" | ", dialogMessages));
             heldGate!.Release(); heldGate = null;
             await Settled();
-            CheckScene(QuantityItemSaveContext.Town, 4321);
+            Assert(!showedIntermediateEmptyState, "Force town must keep the previous disabled frame until the quest board is ready.");
+            trackTownTransition = false;
+            CheckScene(QuantityItemSaveContext.Town, 4321, expectItemPrompt: false);
             Assert(ComputeSha256(profile.RaidSavePath) == originalRaid && ComputeSha256(profile.MapSavePath) == originalMap &&
                    Directory.EnumerateFiles(locations.BackupDirectory, "persist.game.json", SearchOption.AllDirectories).Any(),
                 "Force town must retain expedition bytes, back up its configuration write and display town data after synchronization.");

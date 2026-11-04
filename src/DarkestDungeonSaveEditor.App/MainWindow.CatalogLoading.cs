@@ -31,6 +31,7 @@ public partial class MainWindow : Window
         locations ??= _saveLocations;
         var diagnosticBatch = new CatalogDiagnosticBatch();
         using var loadCancellation = new CancellationTokenSource();
+        var token = loadCancellation.Token;
         try
         {
             RequireGameStopped();
@@ -73,7 +74,7 @@ public partial class MainWindow : Window
             {
                 if (generation == _catalogGeneration) AppendStatus(message);
             });
-            await Task.Run(() => new ModManifestPreparationService().EnsureAsync(activeContent,
+            await Task.Run(() => new ModManifestPreparationService(gameRunningProbe: _gameRunningProbe).EnsureAsync(activeContent,
                 gameDirectory, manifestProgress, loadCancellation.Token), loadCancellation.Token);
             if (generation != _catalogGeneration) return;
             diagnosticBatch.Add(EditorText.Get("MainWindow_CatalogLoading_005"), activeContent.Issues);
@@ -82,19 +83,24 @@ public partial class MainWindow : Window
                 EditorText.Format("MainWindow_CatalogLoading_007", activeContent.Profile.ProfileDirectory) +
                 $"persist.game.json SHA-256={activeContent.SourceGameSha256}");
             CrashDiagnostics.SetStage("LoadCatalog: inventorying active Mod files");
-            var inventory = await Task.Run(() => ScanContentFilesForDiagnostics(activeContent));
-            await RecordContentFileDiagnosticsAsync(inventory);
+            var inventory = await Task.Run(() => ScanContentFilesForDiagnostics(activeContent, token), token);
+            token.ThrowIfCancellationRequested();
+            await RecordContentFileDiagnosticsAsync(inventory, token);
             CrashDiagnostics.SetStage("LoadCatalog: building content catalogs");
-            var contentFingerprint = await Task.Run(() => ProfileCatalogContentFingerprint.Capture(activeContent.Sources));
-            var staticCatalogTask = Task.Run(() => new
+            var contentFingerprint = await Task.Run(() => ProfileCatalogContentFingerprint.Capture(activeContent.Sources, token), token);
+            var staticCatalogTask = Task.Run(() =>
             {
-                Trinkets = diagnosticBatch.Capture(EditorText.Get("MainWindow_CatalogLoading_008"), () => TrinketCatalog.Load(activeContent), catalog => catalog.Issues),
-                Events = diagnosticBatch.Capture(EditorText.Get("TownEvent_Tab"), () => TownEventCatalog.Load(activeContent), catalog => catalog.Issues),
-                Heroes = diagnosticBatch.Capture(EditorText.Get("MainWindow_CatalogLoading_009"), () => HeroClassCatalog.Load(activeContent), catalog => catalog.Issues)
-            });
+                var trinkets = diagnosticBatch.Capture(EditorText.Get("MainWindow_CatalogLoading_008"), () => TrinketCatalog.Load(activeContent), catalog => catalog.Issues);
+                token.ThrowIfCancellationRequested();
+                var events = diagnosticBatch.Capture(EditorText.Get("TownEvent_Tab"), () => TownEventCatalog.Load(activeContent), catalog => catalog.Issues);
+                token.ThrowIfCancellationRequested();
+                var heroes = diagnosticBatch.Capture(EditorText.Get("MainWindow_CatalogLoading_009"), () => HeroClassCatalog.Load(activeContent), catalog => catalog.Issues);
+                return new { Trinkets = trinkets, Events = events, Heroes = heroes };
+            }, token);
             var quantityItemCatalogTask = diagnosticBatch.CaptureAsync(EditorText.Get("MainWindow_CatalogLoading_010"),
-                () => QuantityItemCatalog.LoadAsync(activeContent, codec), catalog => catalog.Issues);
+                () => QuantityItemCatalog.LoadAsync(activeContent, codec, token), catalog => catalog.Issues);
             await Task.WhenAll(staticCatalogTask, quantityItemCatalogTask);
+            token.ThrowIfCancellationRequested();
             var catalogs = await staticCatalogTask;
             var quantityItems = await quantityItemCatalogTask;
             if (generation != _catalogGeneration) return;
@@ -126,8 +132,10 @@ public partial class MainWindow : Window
                     activeContent,
                     workshopDirectory,
                     localModDirectory,
+                    cancellationToken: token,
                     diagnosticBatch: diagnosticBatch);
             }
+            catch (OperationCanceledException) when (token.IsCancellationRequested) { throw; }
             catch (Exception mapException)
             {
                 CrashDiagnostics.RecordException(

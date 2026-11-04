@@ -36,9 +36,11 @@ internal static partial class ContractSuite
                maps.Contains("BattleMap: snapshot diagnostics", StringComparison.Ordinal) &&
                state.Contains("_battleMapLogTracker.Reset()", StringComparison.Ordinal),
             "App logging must wire build identity, diagnostic levels, grouped catalog counts and guarded per-window map-delta tracking.");
+        var write = workflow.IndexOf("backupDirectory = await Task.Run(WriteFilesAsync)", StringComparison.Ordinal);
+        var committed = workflow.IndexOf("committed = true", StringComparison.Ordinal);
         var success = workflow.IndexOf("AppendStatusSafely(EditorText.Format(\"MainWindow_EditWorkflow_061\"", StringComparison.Ordinal);
-        var updateUi = workflow.IndexOf("if (isItemEdit && estateCommit is not null)", StringComparison.Ordinal);
-        Assert(success > 0 && success < updateUi &&
+        var updateUi = workflow.IndexOf("_catalogQuantitySaveSha256 = estateCommit.FinalSha256", StringComparison.Ordinal);
+        Assert(write >= 0 && write < committed && committed < success && success < updateUi &&
                workflow.Contains("SaveEditLogFormatter.Describe(_preparedQuantityItemEdit!)", StringComparison.Ordinal) &&
                workflow.Contains("SaveEditLogFormatter.Describe(_preparedTrinketEdit!)", StringComparison.Ordinal) &&
                workflow.Contains("SaveEditLogFormatter.Describe(_preparedHeroEdit!, _preparedHeroCandidatePreview)", StringComparison.Ordinal) &&
@@ -71,8 +73,8 @@ internal static partial class ContractSuite
                app.Contains("EditorText.Format(\"App_001\", CrashDiagnostics.LogFilePath)", StringComparison.Ordinal),
             "The application must create one lazy session writer, reuse it for all entries and identify the current file at startup rather than choosing a daily file per write.");
         Assert(loading.Contains("diagnosticBatch: diagnosticBatch", StringComparison.Ordinal) &&
-               loading.Contains("Trinkets = diagnosticBatch.Capture(EditorText.Get(\"MainWindow_CatalogLoading_008\")", StringComparison.Ordinal) &&
-               loading.Contains("Heroes = diagnosticBatch.Capture(EditorText.Get(\"MainWindow_CatalogLoading_009\")", StringComparison.Ordinal) &&
+               loading.Contains("diagnosticBatch.Capture(EditorText.Get(\"MainWindow_CatalogLoading_008\")", StringComparison.Ordinal) &&
+               loading.Contains("diagnosticBatch.Capture(EditorText.Get(\"MainWindow_CatalogLoading_009\")", StringComparison.Ordinal) &&
                loading.Contains("quantityItemCatalogTask = diagnosticBatch.CaptureAsync(EditorText.Get(\"MainWindow_CatalogLoading_010\")", StringComparison.Ordinal) &&
                loading.Replace("\r\n", "\n", StringComparison.Ordinal).Contains("finally\n        {\n            // Flush partial results", StringComparison.Ordinal) &&
                battleLoading.Contains("diagnosticBatch.Add(EditorText.Get(\"BattleMapView_Commands_032\"), _encounterCatalog.Issues)", StringComparison.Ordinal) &&

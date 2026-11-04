@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
@@ -23,12 +22,7 @@ public sealed class ModManifestPreparationService
         Func<string, string, string, CancellationToken, Task<byte[]>> generate)
     {
         _locations = locations ?? SaveEditorLocations.CreateDefault();
-        _gameRunning = gameRunningProbe ?? (() =>
-        {
-            var processes = Process.GetProcessesByName("Darkest");
-            try { return processes.Length != 0; }
-            finally { foreach (var process in processes) process.Dispose(); }
-        });
+        _gameRunning = gameRunningProbe ?? GameProcessGuard.IsRunning;
         _generate = generate;
     }
 

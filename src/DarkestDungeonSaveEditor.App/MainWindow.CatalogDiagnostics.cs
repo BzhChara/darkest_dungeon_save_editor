@@ -4,12 +4,13 @@ namespace DarkestDungeonSaveEditor.App;
 
 public partial class MainWindow
 {
-    private static ContentFileInventorySnapshot? ScanContentFilesForDiagnostics(ActiveContentSnapshot activeContent)
+    private static ContentFileInventorySnapshot? ScanContentFilesForDiagnostics(ActiveContentSnapshot activeContent, CancellationToken token)
     {
         try
         {
-            return ContentFileInventory.Scan(activeContent);
+            return ContentFileInventory.Scan(activeContent, token);
         }
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { throw; }
         catch (Exception ex)
         {
             // Diagnostic discovery must not replace the existing catalog failure/availability rules.
@@ -18,7 +19,7 @@ public partial class MainWindow
         }
     }
 
-    private async Task RecordContentFileDiagnosticsAsync(ContentFileInventorySnapshot? inventory)
+    private async Task RecordContentFileDiagnosticsAsync(ContentFileInventorySnapshot? inventory, CancellationToken token)
     {
         if (inventory is null)
         {
@@ -32,8 +33,9 @@ public partial class MainWindow
         {
             foreach (var entry in ContentFileInventory.FormatLogDetails(inventory))
             {
+                token.ThrowIfCancellationRequested();
                 CrashDiagnostics.RecordStatus(entry.Message, entry.Level);
             }
-        });
+        }, token);
     }
 }

@@ -17,7 +17,7 @@ public partial class QuestBoardPreview : UserControl
     private bool _updatingUnpositioned;
     private Guid? _selected;
     private ContextMenu? _menu;
-    private QuestBoardPreviewDialog? _picker;
+    private readonly ProfileSelectionDialog _picker = new();
     private Window? _expandedWindow;
     private bool _ready;
     private bool _profileLoaded;
@@ -61,14 +61,13 @@ public partial class QuestBoardPreview : UserControl
     private bool ConfigureAssets()
     {
         var changed = _assets.Configure(_pendingGameDirectory);
-        if (!_fixtureMode) UpdateResolvedImages();
+        if (changed && !_fixtureMode) UpdateResolvedImages();
         return changed;
     }
 
     private void Preview_Loaded(object sender, RoutedEventArgs e)
     {
-        ConfigureAssets();
-        RebuildBoard();
+        if (ConfigureAssets()) RebuildBoard();
         RefreshMapView();
     }
 
@@ -77,8 +76,7 @@ public partial class QuestBoardPreview : UserControl
         if (!_ready) return;
         if (IsVisible)
         {
-            ConfigureAssets();
-            RebuildBoard();
+            if (ConfigureAssets()) RebuildBoard();
             _ = Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(RefreshMapView));
         }
         else DismissTransientUi();
@@ -92,7 +90,7 @@ public partial class QuestBoardPreview : UserControl
     internal void DismissTransientUi()
     {
         CloseMenu();
-        _picker?.Close();
+        _picker.Dismiss();
         _expandedWindow?.Close();
         EndPan();
     }
@@ -405,16 +403,11 @@ public partial class QuestBoardPreview : UserControl
         {
             Owner = _expandedWindow ?? Window.GetWindow(this)
         };
-        _picker = dialog;
-        try
-        {
-            if (dialog.ShowDialog() != true || dialog.SelectedChoice is not { } choice) return;
-            if (_fixtureMode) ApplySample(regionId, choice, replacing);
-            else if (ReferenceEquals(snapshot, _snapshot) && snapshot is not null && CanInteract() && SaveEditRequested is { } handler)
-                await handler(new(replacing is null ? QuestBoardEditKind.Create : QuestBoardEditKind.Replace,
-                    snapshot.SourceSha256, previous?.Choice.SavedQuest?.SaveKey, choice.TemplateKey));
-        }
-        finally { _picker = null; }
+        if (!_picker.Show(dialog) || dialog.SelectedChoice is not { } choice) return;
+        if (_fixtureMode) ApplySample(regionId, choice, replacing);
+        else if (ReferenceEquals(snapshot, _snapshot) && snapshot is not null && CanInteract() && SaveEditRequested is { } handler)
+            await handler(new(replacing is null ? QuestBoardEditKind.Create : QuestBoardEditKind.Replace,
+                snapshot.SourceSha256, previous?.Choice.SavedQuest?.SaveKey, choice.TemplateKey));
     }
 
     internal void ApplySample(string regionId, QuestBoardChoice choice, Guid? replacing = null)

@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -29,6 +28,7 @@ public sealed class ForceTownSaveService
     private readonly SaveEditorLocations _locations;
     private readonly Func<bool> _gameRunningProbe;
     private readonly Action<string>? _beforeTargetReplace;
+    internal Action<string, string, string>? AtomicReplaceOverride { get; init; }
 
     public ForceTownSaveService(
         DsonSaveCodec codec,
@@ -38,7 +38,7 @@ public sealed class ForceTownSaveService
     {
         _codec = codec;
         _locations = locations ?? SaveEditorLocations.CreateDefault();
-        _gameRunningProbe = gameRunningProbe ?? IsGameRunning;
+        _gameRunningProbe = gameRunningProbe ?? GameProcessGuard.IsRunning;
         _beforeTargetReplace = beforeTargetReplace;
     }
 
@@ -170,139 +170,45 @@ public sealed class ForceTownSaveService
         ValidateLiveState(prepared, paths, EditorText.Get("BattleMapEditService_003"));
         EnsureGameIsNotRunning();
 
-        var targetDirectory = Path.GetDirectoryName(paths.GamePath)
-            ?? throw new InvalidOperationException(EditorText.Format("ForceTownSaveService_008", paths.GamePath));
-        var temporaryTarget = Path.Combine(
-            targetDirectory,
-            $".persist.game.json.ddse-{Guid.NewGuid():N}.tmp");
-        var displacedTarget = Path.Combine(
-            targetDirectory,
-            $".persist.game.json.ddse-displaced-{Guid.NewGuid():N}.tmp");
-        var backupTargetPath = Path.Combine(backupDirectory, "persist.game.json");
-        var replacementSucceeded = false;
-        var preserveDisplacedTarget = false;
+        using var mapLock = OpenGuard(paths.MapPath);
+        using var raidLock = OpenGuard(paths.RaidPath);
+        if (!ComputeSha256(mapLock).Equals(prepared.MapOriginalSha256, StringComparison.OrdinalIgnoreCase) ||
+            !ComputeSha256(raidLock).Equals(prepared.RaidOriginalSha256, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException(EditorText.Get("ForceTownSaveService_009"));
 
+        using var replacement = new GuardedSaveReplacement(paths.GamePath, prepared.GameFile.EncodedPath,
+            prepared.GameFile.OriginalSha256, prepared.GameFile.EncodedSha256, _beforeTargetReplace,
+            requireGameStopped: EnsureGameIsNotRunning) { AtomicReplaceOverride = AtomicReplaceOverride };
         try
         {
-            File.Copy(prepared.GameFile.EncodedPath, temporaryTarget, overwrite: false);
-            using var mapLock = OpenGuard(paths.MapPath);
-            using var raidLock = OpenGuard(paths.RaidPath);
-            using var gameLock = new FileStream(
-                paths.GamePath,
-                FileMode.Open,
-                FileAccess.Read,
-                FileShare.Read | FileShare.Delete,
-                bufferSize: 4096,
-                FileOptions.SequentialScan);
+            replacement.Replace();
+            var finalHash = replacement.Verify();
             if (!ComputeSha256(mapLock).Equals(prepared.MapOriginalSha256, StringComparison.OrdinalIgnoreCase) ||
-                !ComputeSha256(raidLock).Equals(prepared.RaidOriginalSha256, StringComparison.OrdinalIgnoreCase) ||
-                !ComputeSha256(gameLock).Equals(prepared.GameFile.OriginalSha256, StringComparison.OrdinalIgnoreCase))
-            {
-                throw new InvalidOperationException(
-                    EditorText.Get("ForceTownSaveService_009"));
-            }
-
-            _beforeTargetReplace?.Invoke(paths.GamePath);
-            File.Replace(
-                temporaryTarget,
-                paths.GamePath,
-                destinationBackupFileName: displacedTarget,
-                ignoreMetadataErrors: true);
-            replacementSucceeded = true;
-
-            var displacedHash = ComputeSha256(displacedTarget);
-            if (!displacedHash.Equals(prepared.GameFile.OriginalSha256, StringComparison.OrdinalIgnoreCase))
-            {
-                replacementSucceeded = false;
-                try
-                {
-                    RestoreFileVersion(displacedTarget, paths.GamePath, displacedHash);
-                }
-                catch (Exception restoreError)
-                {
-                    preserveDisplacedTarget = true;
-                    throw new AggregateException(
-                        EditorText.Format("ForceTownSaveService_010") +
-                        EditorText.Format("ForceTownSaveService_011", displacedTarget),
-                        restoreError);
-                }
-
-                throw new InvalidOperationException(
-                    EditorText.Get("ForceTownSaveService_012"));
-            }
-
-            using var finalGameLock = new FileStream(
-                paths.GamePath,
-                FileMode.Open,
-                FileAccess.Read,
-                FileShare.Read,
-                bufferSize: 4096,
-                FileOptions.SequentialScan);
-            var finalHash = ComputeSha256(finalGameLock);
-            if (!finalHash.Equals(prepared.GameFile.EncodedSha256, StringComparison.OrdinalIgnoreCase))
-            {
-                replacementSucceeded = false;
-                throw new InvalidOperationException(
-                    EditorText.Get("ForceTownSaveService_013"));
-            }
-            if (
-                !ComputeSha256(mapLock).Equals(prepared.MapOriginalSha256, StringComparison.OrdinalIgnoreCase) ||
                 !ComputeSha256(raidLock).Equals(prepared.RaidOriginalSha256, StringComparison.OrdinalIgnoreCase))
-            {
                 throw new IOException(EditorText.Get("ForceTownSaveService_014"));
-            }
 
-            var result = new SaveCommitResult(
-                prepared.Profile.ProfileDirectory,
-                paths.GamePath,
-                backupDirectory,
-                prepared.GameFile.OriginalSha256,
-                finalHash,
-                DateTime.UtcNow);
+            var result = new SaveCommitResult(prepared.Profile.ProfileDirectory, paths.GamePath, backupDirectory,
+                prepared.GameFile.OriginalSha256, finalHash, DateTime.UtcNow);
+            replacement.Complete();
             await Task.CompletedTask.ConfigureAwait(false);
             return result;
         }
-        catch (Exception commitError)
+        catch (Exception error) when (replacement.HasReplaced)
         {
-            if (replacementSucceeded)
+            SaveFileRecovery recovery;
+            try { recovery = replacement.Recover(); }
+            catch (Exception restoreError)
             {
-                try
-                {
-                    var restoreSource = File.Exists(displacedTarget) &&
-                                        ComputeSha256(displacedTarget).Equals(
-                                            prepared.GameFile.OriginalSha256,
-                                            StringComparison.OrdinalIgnoreCase)
-                        ? displacedTarget
-                        : backupTargetPath;
-                    RestoreTarget(restoreSource, prepared.GameFile);
-                    throw new InvalidOperationException(
-                        EditorText.Format("ForceTownSaveService_015", backupDirectory),
-                        commitError);
-                }
-                catch (InvalidOperationException ex) when (ReferenceEquals(ex.InnerException, commitError))
-                {
-                    throw;
-                }
-                catch (Exception restoreError)
-                {
-                    preserveDisplacedTarget = true;
-                    throw new AggregateException(
-                        EditorText.Format("ForceTownSaveService_016", backupDirectory) +
-                        (File.Exists(displacedTarget) ? EditorText.Format("ForceTownSaveService_017", displacedTarget) : string.Empty),
-                        commitError,
-                        restoreError);
-                }
+                throw new AggregateException(EditorText.Format("ForceTownSaveService_016", backupDirectory) +
+                    EditorText.Format("ForceTownSaveService_017", replacement.DisplacedPath), error, restoreError);
             }
-
-            throw;
-        }
-        finally
-        {
-            TryDeleteFile(temporaryTarget);
-            if (!preserveDisplacedTarget)
+            var message = recovery switch
             {
-                TryDeleteFile(displacedTarget);
-            }
+                SaveFileRecovery.RestoredExternal => EditorText.Get("ForceTownSaveService_012"),
+                SaveFileRecovery.KeptExternal => EditorText.Get("ForceTownSaveService_013"),
+                _ => EditorText.Format("ForceTownSaveService_015", backupDirectory)
+            };
+            throw new InvalidOperationException(message, error);
         }
     }
 
@@ -466,39 +372,6 @@ public sealed class ForceTownSaveService
         }
     }
 
-    private static bool IsGameRunning()
-    {
-        foreach (var processName in new[] { "Darkest", "DarkestDungeon" })
-        {
-            Process[] processes;
-            try
-            {
-                processes = Process.GetProcessesByName(processName);
-            }
-            catch
-            {
-                continue;
-            }
-
-            try
-            {
-                if (processes.Any(process => !process.HasExited))
-                {
-                    return true;
-                }
-            }
-            finally
-            {
-                foreach (var process in processes)
-                {
-                    process.Dispose();
-                }
-            }
-        }
-
-        return false;
-    }
-
     private static FileStream OpenGuard(string path) => new(
         path,
         FileMode.Open,
@@ -506,75 +379,6 @@ public sealed class ForceTownSaveService
         FileShare.Read,
         bufferSize: 4096,
         FileOptions.SequentialScan);
-
-    private static void RestoreTarget(string backupPath, PreparedSaveFile targetFile)
-    {
-        if (!File.Exists(backupPath) ||
-            !ComputeSha256(backupPath).Equals(targetFile.OriginalSha256, StringComparison.OrdinalIgnoreCase))
-        {
-            throw new InvalidDataException(EditorText.Get("ForceTownSaveService_023"));
-        }
-
-        var targetDirectory = Path.GetDirectoryName(targetFile.TargetPath)
-            ?? throw new InvalidOperationException(EditorText.Format("ForceTownSaveService_008", targetFile.TargetPath));
-        var temporaryTarget = Path.Combine(
-            targetDirectory,
-            $".persist.game.json.ddse-restore-{Guid.NewGuid():N}.tmp");
-        try
-        {
-            File.Copy(backupPath, temporaryTarget, overwrite: false);
-            File.Replace(
-                temporaryTarget,
-                targetFile.TargetPath,
-                destinationBackupFileName: null,
-                ignoreMetadataErrors: true);
-            if (!ComputeSha256(targetFile.TargetPath).Equals(
-                    targetFile.OriginalSha256,
-                    StringComparison.OrdinalIgnoreCase))
-            {
-                throw new IOException(EditorText.Get("ForceTownSaveService_024"));
-            }
-        }
-        finally
-        {
-            TryDeleteFile(temporaryTarget);
-        }
-    }
-
-    private static void RestoreFileVersion(
-        string sourcePath,
-        string targetPath,
-        string expectedSha256)
-    {
-        if (!File.Exists(sourcePath) ||
-            !ComputeSha256(sourcePath).Equals(expectedSha256, StringComparison.OrdinalIgnoreCase))
-        {
-            throw new InvalidDataException(EditorText.Get("ForceTownSaveService_025"));
-        }
-
-        var targetDirectory = Path.GetDirectoryName(targetPath)
-            ?? throw new InvalidOperationException(EditorText.Format("ForceTownSaveService_008", targetPath));
-        var temporaryTarget = Path.Combine(
-            targetDirectory,
-            $".persist.game.json.ddse-race-restore-{Guid.NewGuid():N}.tmp");
-        try
-        {
-            File.Copy(sourcePath, temporaryTarget, overwrite: false);
-            File.Replace(
-                temporaryTarget,
-                targetPath,
-                destinationBackupFileName: null,
-                ignoreMetadataErrors: true);
-            if (!ComputeSha256(targetPath).Equals(expectedSha256, StringComparison.OrdinalIgnoreCase))
-            {
-                throw new IOException(EditorText.Get("ForceTownSaveService_026"));
-            }
-        }
-        finally
-        {
-            TryDeleteFile(temporaryTarget);
-        }
-    }
 
     private static bool RevisionMatches(string leftPath, string rightPath)
     {
@@ -621,20 +425,6 @@ public sealed class ForceTownSaveService
     {
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         File.WriteAllText(path, JsonSerializer.Serialize(value, JsonSupport.SerializerOptions), Utf8NoBom);
-    }
-
-    private static void TryDeleteFile(string path)
-    {
-        try
-        {
-            if (File.Exists(path))
-            {
-                File.Delete(path);
-            }
-        }
-        catch
-        {
-        }
     }
 
     private sealed record ForceTownProfilePaths(string GamePath, string MapPath, string RaidPath);

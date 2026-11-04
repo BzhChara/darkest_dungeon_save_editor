@@ -204,10 +204,10 @@ internal static partial class ContractSuite
 
         var loading = File.ReadAllText(Path.Combine(repositoryRoot, "src", "DarkestDungeonSaveEditor.App", "MainWindow.CatalogLoading.cs"));
         var logging = File.ReadAllText(Path.Combine(repositoryRoot, "src", "DarkestDungeonSaveEditor.App", "MainWindow.CatalogDiagnostics.cs"));
-        Assert(loading.IndexOf("await RecordContentFileDiagnosticsAsync(inventory)", StringComparison.Ordinal) >= 0 &&
-               loading.IndexOf("await RecordContentFileDiagnosticsAsync(inventory)", StringComparison.Ordinal) <
-               loading.IndexOf("Trinkets = diagnosticBatch.Capture", StringComparison.Ordinal) &&
-               loading.Contains("Task.Run(() => ScanContentFilesForDiagnostics(activeContent))", StringComparison.Ordinal) &&
+        Assert(loading.IndexOf("await RecordContentFileDiagnosticsAsync(inventory, token)", StringComparison.Ordinal) >= 0 &&
+               loading.IndexOf("await RecordContentFileDiagnosticsAsync(inventory, token)", StringComparison.Ordinal) <
+               loading.IndexOf("var trinkets = diagnosticBatch.Capture", StringComparison.Ordinal) &&
+               loading.Contains("Task.Run(() => ScanContentFilesForDiagnostics(activeContent, token), token)", StringComparison.Ordinal) &&
                logging.Contains("CrashDiagnostics.RecordStatus(entry.Message, entry.Level);", StringComparison.Ordinal) &&
                logging.Contains("await Task.Run(() =>", StringComparison.Ordinal) &&
                !logging.Contains("AppendStatus(line)", StringComparison.Ordinal),

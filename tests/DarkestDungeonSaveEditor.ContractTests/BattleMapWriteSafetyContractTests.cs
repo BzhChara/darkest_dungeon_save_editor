@@ -78,6 +78,12 @@ internal static partial class ContractSuite
         }
         File.WriteAllBytes(gamePath, originalGame);
         var raceEdit = await preparations[0]();
+        var running = false;
+        var interrupted = new BattleMapEditService(codec, locations, () => running) { BeforeTargetReplace = _ => running = true };
+        var launchError = await CaptureSaveFailureAsync(() => interrupted.CommitAsync(raceEdit));
+        Assert(launchError.Message.Contains(EditorText.Get("BattleMapEditService_030"), StringComparison.Ordinal) &&
+               ComputeSha256(snapshot.MapSavePath) == mapHash && ComputeSha256(snapshot.RaidSavePath) == raidHash,
+            "A game launch at the map replacement boundary must retain both expedition files.");
         await VerifyServiceReplacementRacesAsync(raceEdit.TargetFile.TargetPath, async (before, after) =>
         {
             service.BeforeTargetReplace = before;

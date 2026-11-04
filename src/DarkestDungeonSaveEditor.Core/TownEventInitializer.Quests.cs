@@ -7,6 +7,7 @@ internal sealed partial class TownEventInitializer
 {
     private readonly HashSet<uint> _generatedProgressionDungeons = [];
     private readonly HashSet<uint> _generatedRetentionDungeons = [];
+    private enum QuestSource { TownEvent, BoardPlot, BoardGenerated }
 
     private JsonObject[] ReadPlotQuestDefinitions() => ReadResources("campaign/quest", NativeReferenceJsonKind.PlotQuests)
         .SelectMany(root => Objects(root["plot_quests"]))
@@ -38,7 +39,7 @@ internal sealed partial class TownEventInitializer
     }
 
     private void AddPlotQuest(IReadOnlyDictionary<string, JsonObject> saves, JsonObject definition,
-        List<string> changes, List<string> warnings, bool reportNaturalEligibility = true)
+        List<string> changes, List<string> warnings, QuestSource source = QuestSource.TownEvent)
     {
         var id = Text(definition, "id");
         var board = JsonSupport.RequireObject(Root(saves, "quest"), "quests");
@@ -51,14 +52,14 @@ internal sealed partial class TownEventInitializer
         }
         // Both entry points are explicit manual edits. Natural generation
         // predicates are advisory; identity and initialization guards still apply.
-        var unavailable = reportNaturalEligibility ? PlotQuestUnavailableReason(saves, definition) : string.Empty;
+        var template = ValidateQuestTemplate(definition);
+        var unavailable = source == QuestSource.TownEvent ? PlotQuestUnavailableReason(saves, definition) : string.Empty;
         if (unavailable.Length > 0)
         {
             var warning = EditorText.Format("TownEvent_QuestEligibilityBypassed", id, unavailable);
             changes.Add(warning);
             warnings.Add(warning);
         }
-        var template = definition["quest"] as JsonObject ?? throw new InvalidDataException($"Missing quest template: {id}.");
         var quest = new JsonObject
         {
             ["id"] = id,
@@ -80,12 +81,8 @@ internal sealed partial class TownEventInitializer
             ["is_from_town_event"] = false
         };
         var owned = CountOwnedTrinkets(saves);
-        var rewardTemplate = template["completion_reward"] switch
-        {
-            null => new JsonObject(),
-            JsonObject value => value,
-            _ => throw new InvalidDataException($"Invalid completion reward for quest: {id}.")
-        };
+        var rewardTemplate = source == QuestSource.BoardGenerated
+            ? BoardGeneratedReward(saves, template) : template["completion_reward"]?.AsObject() ?? new JsonObject();
         var reward = BuildQuestReward(rewardTemplate, owned);
         var items = JsonSupport.RequireObject(reward, "items_definition", "items");
         foreach (var additional in Objects(definition["additional_trinket_completion_rewards"]))
@@ -120,8 +117,8 @@ internal sealed partial class TownEventInitializer
         }
         quest["completion_reward"] = reward;
         var thresholds = new JsonObject();
-        foreach (var pair in Indexed(template["threshold_rewards"]))
-            thresholds[pair.Key] = BuildQuestReward(pair.Value.AsObject(), owned);
+        foreach (var pair in RewardRows(template["threshold_rewards"], "threshold_rewards"))
+            thresholds[pair.Key] = BuildQuestReward(pair.Value, owned);
         quest["threshold_rewards"] = thresholds;
         var requestedModifiers = Strings(definition["potential_quest_modifiers"]).ToArray();
         if (requestedModifiers.Length > 0)
@@ -233,7 +230,7 @@ internal sealed partial class TownEventInitializer
     private JsonObject BuildQuestReward(JsonObject template, IReadOnlyDictionary<uint, int> owned)
     {
         var items = new JsonObject();
-        foreach (var item in Objects(template["items_definition"]?["items"]))
+        foreach (var item in RewardItems(template))
         {
             var id = Text(item, "id");
             var type = Text(item, "type");
@@ -255,6 +252,11 @@ internal sealed partial class TownEventInitializer
             saved["amount"] = amount;
             items[NextKey(items)] = saved;
         }
+        return CreateQuestRewardRecord(template, items);
+    }
+
+    private static JsonObject CreateQuestRewardRecord(JsonObject template, JsonObject items)
+    {
         var reward = new JsonObject
         {
             ["resolve_xp"] = JsonSupport.ReadInt(template, "resolve_xp") ?? 0,
@@ -263,14 +265,14 @@ internal sealed partial class TownEventInitializer
             ["max_times_dungeon_xp_awarded"] = JsonSupport.ReadInt(template, "max_times_dungeon_xp_awarded") ?? 0
         };
         var additional = new JsonObject();
-        foreach (var pair in Indexed(template["additional_threshold_trinket_rewards"]))
+        foreach (var pair in RewardRows(template["additional_threshold_trinket_rewards"], "additional_threshold_trinket_rewards"))
         {
-            var row = pair.Value.AsObject();
+            var row = pair.Value;
             var rarities = new JsonObject();
-            foreach (var rarity in Indexed(row["rarity_table"]))
-                rarities[rarity.Key] = new JsonObject { ["chance"] = TownEventSaveEditor.Float(rarity.Value["chance"]!.GetValue<double>()),
-                    ["rarity"] = Text(rarity.Value.AsObject(), "rarity") };
-            additional[pair.Key] = new JsonObject { ["chance_of_loot"] = TownEventSaveEditor.Float(row["chance_of_loot"]!.GetValue<double>()),
+            foreach (var rarity in RewardRows(row["rarity_table"], "rarity_table"))
+                rarities[rarity.Key] = new JsonObject { ["chance"] = RewardChance(rarity.Value, "chance"),
+                    ["rarity"] = Text(rarity.Value, "rarity") };
+            additional[pair.Key] = new JsonObject { ["chance_of_loot"] = RewardChance(row, "chance_of_loot"),
                 ["rarity_table"] = rarities };
         }
         reward["additional_threshold_trinket_rewards"] = additional;
@@ -283,10 +285,30 @@ internal sealed partial class TownEventInitializer
     private static IEnumerable<string> Strings(JsonNode? node) => node is JsonArray array
         ? array.Select(value => NativeJsonReader.CString(value!.GetValue<string>())) : [];
     private static JsonArray StringArray(JsonNode? node) => new(Strings(node).Select(value => (JsonNode?)JsonValue.Create(value)).ToArray());
-    private static IEnumerable<KeyValuePair<string, JsonNode>> Indexed(JsonNode? node) => node switch
+    private static IEnumerable<JsonObject> RewardItems(JsonObject reward) => reward["items_definition"] switch
     {
-        JsonArray array => array.Select((value, index) => new KeyValuePair<string, JsonNode>(index.ToString(CultureInfo.InvariantCulture), value!)),
-        JsonObject map => map.Select(pair => new KeyValuePair<string, JsonNode>(pair.Key, pair.Value!)),
-        _ => []
+        null => [],
+        JsonObject definition => RewardRows(definition["items"], "items_definition.items").Select(pair => pair.Value),
+        _ => throw InvalidRewardField("items_definition")
     };
+
+    private static IEnumerable<KeyValuePair<string, JsonObject>> RewardRows(JsonNode? node, string field)
+    {
+        KeyValuePair<string, JsonObject> Entry(string key, JsonNode? value) =>
+            new(key, value as JsonObject ?? throw InvalidRewardField($"{field}[{key}]"));
+        return node switch
+        {
+            null => [],
+            JsonArray array => array.Select((value, index) => Entry(index.ToString(CultureInfo.InvariantCulture), value)),
+            JsonObject map => map.Select(pair => Entry(pair.Key, pair.Value)),
+            _ => throw InvalidRewardField(field)
+        };
+    }
+
+    private static InvalidDataException InvalidRewardField(string field) =>
+        new(EditorText.Format("QuestBoard_InvalidRewardField", field));
+
+    private static JsonNode RewardChance(JsonObject row, string field) =>
+        row[field] is JsonValue value && value.TryGetValue<double>(out var number)
+            ? TownEventSaveEditor.Float(number) : throw InvalidRewardField(field);
 }

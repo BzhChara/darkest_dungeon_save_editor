@@ -76,6 +76,49 @@ internal static partial class ContractSuite
                 index < args.Length ? args[index] : parameter.DefaultValue).ToArray());
         }
         string Log() => ((TextBox)Get("StatusTextBox")!).Text;
+        void SelectRow(int tab, string gridName, string id)
+        {
+            ((TabControl)Get("CatalogTabs")!).SelectedIndex = tab;
+            var grid = (DataGrid)Get(gridName)!;
+            grid.SelectedItem = grid.Items.Cast<object>().Single(row =>
+                (string)row.GetType().GetProperty("Id")!.GetValue(row)! == id);
+        }
+
+        async Task PreviewAsync(Action? duringPreparation = null)
+        {
+            var field = typeof(MainWindow).GetField("_activeContentSnapshot", flags)!;
+            var content = (ActiveContentSnapshot)field.GetValue(window)!;
+            var dispatcherResponded = false;
+            var observed = new PreviewSources(content.Sources, () =>
+            {
+                if (window.Dispatcher.CheckAccess()) return;
+                window.Dispatcher.Invoke(() =>
+                {
+                    dispatcherResponded = (int)Get("_busyDepth")! > 0 && !((Button)Get("ApplyButton")!).IsEnabled;
+                    duringPreparation?.Invoke();
+                });
+            });
+            var instrumented = content with { Sources = observed, Resolution = content.Resolution };
+            field.SetValue(window, instrumented);
+            try
+            {
+                var button = (Button)Get("PreviewButton")!;
+                Assert(button.IsEnabled, "The selected row must allow preview: " + Log());
+                button.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                var deadline = DateTime.UtcNow.AddSeconds(60);
+                do
+                {
+                    await Task.Delay(15);
+                    await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
+                } while (((bool)Get("_checkingProfileOperation")! || (int)Get("_busyDepth")! > 0) && DateTime.UtcNow < deadline);
+                Assert(!(bool)Get("_checkingProfileOperation")! && (int)Get("_busyDepth")! == 0 && dispatcherResponded,
+                    "The dispatcher must respond while the preview reads active sources with Apply disabled: " + Log());
+            }
+            finally
+            {
+                if (ReferenceEquals(field.GetValue(window), instrumented)) field.SetValue(window, content);
+            }
+        }
         try
         {
             ((TextBox)Get("GameDirectoryTextBox")!).Text = f.GameRoot;
@@ -91,18 +134,26 @@ internal static partial class ContractSuite
                 "The map must receive the window's selected backend.");
             ((DispatcherTimer)Get("_gameProcessPoll")!).Stop();
 
-            ((TabControl)Get("CatalogTabs")!).SelectedIndex = 0;
-            var grid = (DataGrid)Get("ItemGrid")!;
-            grid.SelectedItem = grid.Items.Cast<object>().Single(row =>
-                (string)row.GetType().GetProperty("Id")!.GetValue(row)! == "gold");
-            ((TextBox)Get("CopiesTextBox")!).Text = "4321";
-            Call("Preview_Click", window, new RoutedEventArgs());
-            var deadline = DateTime.UtcNow.AddSeconds(60);
-            // Preview awaits the profile precheck before entering its busy phase.
-            while (((bool)Get("_checkingProfileOperation")! || (int)Get("_busyDepth")! > 0) && DateTime.UtcNow < deadline)
-                await Task.Delay(15);
-            Assert(!(bool)Get("_checkingProfileOperation")! && (int)Get("_busyDepth")! == 0,
-                "The desktop preview must finish both its precheck and preparation before the timeout: " + Log());
+            SelectRow(1, "TrinketGrid", "focus_ring");
+            ((TextBox)Get("CopiesTextBox")!).Text = "2";
+            await PreviewAsync();
+            Assert(Get("_preparedTrinketEdit") is PreparedTrinketEdit { Preview: { TrinketId: "focus_ring", RequestedCopies: 2 } }
+                && ((Button)Get("ApplyButton")!).IsEnabled, "The trinket preview must retain the requested copies: " + Log());
+
+            SelectRow(3, "HeroGrid", "local_hero");
+            ((ComboBox)Get("HeroLevelComboBox")!).SelectedIndex = 1;
+            typeof(MainWindow).GetField("_selectedInitialQuirkIds", flags)!.SetValue(window, new[] { "tough" });
+            await PreviewAsync();
+            Assert(Get("_preparedHeroCandidatePreview") is StagecoachHeroCandidatePreview { HeroClass: "local_hero", ResolveLevel: 1 } hero
+                && hero.PositiveQuirks.SequenceEqual(["tough"]) && Get("_preparedHeroEdit") is PreparedStagecoachHeroEdit
+                && ((Button)Get("ApplyButton")!).IsEnabled, "The hero preview must retain the selected class, level and quirks: " + Log());
+
+            SelectRow(0, "ItemGrid", "gold");
+            ((TextBox)Get("CopiesTextBox")!).Text = "4320";
+            await PreviewAsync(() => ((TextBox)Get("CopiesTextBox")!).Text = "4321");
+            Assert(Get("_preparedQuantityItemEdit") is null && !((Button)Get("ApplyButton")!).IsEnabled,
+                "Changing the input while a preview is being prepared must discard that result.");
+            await PreviewAsync();
             var prepared = Get("_preparedQuantityItemEdit") as PreparedQuantityItemEdit;
             var service = Get("_editService") as SaveEditService;
             Assert(prepared is not null && service is not null && ((Button)Get("ApplyButton")!).IsEnabled,
@@ -112,10 +163,16 @@ internal static partial class ContractSuite
             Assert(prepared!.WorkspaceDirectory.StartsWith(locations.WorkspaceDirectory + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase),
                 "Desktop contract edits must remain in their isolated workspace.");
 
-            // Exercise exactly the prepared service used by Apply_Click, without
-            // opening confirmation/message dialogs or writing any real profile.
-            var result = await service!.CommitAsync(prepared);
-            Assert(File.Exists(Path.Combine(result.BackupDirectory, "persist.estate.json")), "A native desktop commit must retain its backup.");
+            // Exercise the desktop apply path with the prepared binary and isolate the dialog from this test.
+            var uiRespondedDuringCommit = false;
+            service!.BeforeTargetReplace = _ =>
+            {
+                if (!window.Dispatcher.CheckAccess())
+                    window.Dispatcher.Invoke(() => { uiRespondedDuringCommit = true; });
+            };
+            var backup = await ((Task<string?>)Call("CommitPreparedEditAsync", service, "native quantity test")!).WaitAsync(TimeSpan.FromSeconds(60));
+            Assert(uiRespondedDuringCommit && backup is not null && File.Exists(Path.Combine(backup, "persist.estate.json")),
+                "The dispatcher must remain responsive during native commit and the complete backup must be retained.");
             var readback = Path.Combine(f.RunRoot, "desktop-committed.json");
             await session.Codec.DecodeAsync(f.EstatePath, readback);
             Assert(QuantityItemSaveEditor.CountAmount(JsonNode.Parse(File.ReadAllText(readback))!.AsObject(), prepared.Item) == 4321,
@@ -125,7 +182,7 @@ internal static partial class ContractSuite
             await ((Task)Get("_catalogSyncTask")!).WaitAsync(TimeSpan.FromSeconds(60));
             Assert(((IReadOnlyList<QuantityItemDefinition>)Get("_allItems")!).Single(item => item.DisplayId == "gold").CurrentAmount == 4321,
                 "Desktop synchronization must reload the committed native value.");
-            Console.WriteLine("PASS: native WPF catalog/initial sync/map backend, real quantity preview, guarded commit/backup and saved-value refresh without Java.");
+            Console.WriteLine("PASS: native WPF item, trinket and hero background previews, stale preview rejection, guarded commit/backup and saved-value refresh.");
         }
         finally
         {
@@ -133,5 +190,18 @@ internal static partial class ContractSuite
             if (Get("_catalogSyncTask") is Task sync) await sync.WaitAsync(TimeSpan.FromSeconds(60));
             window.Close();
         }
+    }
+
+    private sealed class PreviewSources(IReadOnlyList<ActiveContentSource> sources, Action onFirstRead) : IReadOnlyList<ActiveContentSource>
+    {
+        private int _read;
+        public int Count => sources.Count;
+        public ActiveContentSource this[int index] => sources[index];
+        public IEnumerator<ActiveContentSource> GetEnumerator()
+        {
+            if (Interlocked.Exchange(ref _read, 1) == 0) onFirstRead();
+            return sources.GetEnumerator();
+        }
+        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
     }
 }

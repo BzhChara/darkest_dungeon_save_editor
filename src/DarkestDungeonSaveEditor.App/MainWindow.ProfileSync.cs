@@ -13,6 +13,9 @@ public partial class MainWindow : Window
     private CancellationTokenSource? _catalogLoadCancellation;
     private Task? _catalogLoadTask;
     private Task? _catalogSyncTask;
+    private TaskCompletionSource? _profileOperationFinished;
+    private CancellationTokenSource? _previewCancellation;
+    private Task<EditorBattleMaintenanceResult>? _bridgeMaintenanceTask;
     private bool _catalogLoading;
     private bool _catalogCloseRequested;
     private bool _contentRefreshRequested;
@@ -41,6 +44,41 @@ public partial class MainWindow : Window
     // Loading locks the UI while still allowing its own initial sync to run.
     private bool IsProfileOperationBusy => _busyDepth > 0 || _syncApplying;
     private bool IsBusy => _catalogLoading || _checkingProfileOperation || _completingProfileEdit || IsProfileOperationBusy;
+
+    private Task RunProfileEditAsync(Func<Task> edit) =>
+        RunProfileOperationAsync(_ => edit(), isPreview: false);
+
+    private async Task RunProfileOperationAsync(Func<CancellationToken, Task> operation, bool isPreview)
+    {
+        if (_catalogCloseRequested || _profileOperationFinished is not null) return;
+        // Register before invoking UI callbacks: a modal dialog can dispatch Close
+        // before the caller of an async method gets its Task back.
+        var finished = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        _profileOperationFinished = finished;
+        using var previewCancellation = isPreview ? new CancellationTokenSource() : null;
+        _previewCancellation = previewCancellation;
+        try
+        {
+            SetBusy(true);
+            previewCancellation?.Token.ThrowIfCancellationRequested();
+            await operation(previewCancellation?.Token ?? CancellationToken.None);
+        }
+        catch (OperationCanceledException) when (previewCancellation?.IsCancellationRequested == true) { }
+        finally
+        {
+            try
+            {
+                if (isPreview) SetBusy(false);
+                else await CompleteProfileEditAsync();
+            }
+            finally
+            {
+                _previewCancellation = null;
+                _profileOperationFinished = null;
+                finished.SetResult();
+            }
+        }
+    }
 
     private async Task CompleteProfileEditAsync()
     {
@@ -72,7 +110,7 @@ public partial class MainWindow : Window
         // A previous reader must finish cancellation/codec cleanup before the new
         // load can publish a snapshot or finish closing the window.
         if (_catalogSyncTask is { } previousSync) await previousSync;
-        if (generation != _catalogGeneration) throw new OperationCanceledException();
+        if (_catalogCloseRequested || generation != _catalogGeneration) throw new OperationCanceledException();
         RequireGameStopped();
         _catalogConfigurationKey = ProfileContentConfiguration.GetKey(content.DecodedGamePath);
         _catalogContentFingerprint = contentFingerprint;
@@ -86,7 +124,7 @@ public partial class MainWindow : Window
         RequestProfileSync(refreshContent: true); // Catch writes since the initial load.
         await DrainProfileSyncAsync();
         token.ThrowIfCancellationRequested();
-        if (generation != _catalogGeneration) throw new OperationCanceledException();
+        if (_catalogCloseRequested || generation != _catalogGeneration) throw new OperationCanceledException();
         if (!_syncReady)
             throw new IOException(EditorText.Get("MainWindow_ProfileSync_001") + _lastSyncError);
     }
@@ -124,7 +162,7 @@ public partial class MainWindow : Window
 
     private void RequestProfileSync(bool invalidatePreview = true, bool refreshContent = false)
     {
-        if (_catalogSnapshotReader is null || _catalogSyncCancellation is null) return;
+        if (_catalogCloseRequested || _catalogSnapshotReader is null || _catalogSyncCancellation is null) return;
         if (ObserveGameProcess())
         {
             _syncRequested = false;
@@ -155,6 +193,7 @@ public partial class MainWindow : Window
     private Task DrainProfileSyncAsync()
     {
         if (_syncInProgress) return _catalogSyncTask ?? Task.CompletedTask;
+        if (_catalogCloseRequested) return Task.CompletedTask;
         if (ObserveGameProcess())
         {
             _syncRequested = false;
@@ -179,7 +218,7 @@ public partial class MainWindow : Window
         var refreshContent = false;
         try
         {
-            while (_syncRequested && !IsProfileOperationBusy && generation == _catalogGeneration)
+            while (!_catalogCloseRequested && _syncRequested && !IsProfileOperationBusy && generation == _catalogGeneration)
             {
                 if (ObserveGameProcess()) return;
                 var gameStateVersion = _gameStateVersion;
@@ -257,19 +296,22 @@ public partial class MainWindow : Window
                         EditorBattleMaintenanceResult? result = null;
                         try
                         {
-                            result = await Task.Run(() => maintenance.ReconcileAsync(snapshot.Content,
+                            _bridgeMaintenanceTask = Task.Run(() => maintenance.ReconcileAsync(snapshot.Content,
                                 maintenanceGameDirectory, maintenanceLocalModDirectory, token), token);
+                            result = await _bridgeMaintenanceTask;
                         }
                         catch (Exception error) when (error is not OperationCanceledException)
                         {
                             if (generation != _catalogGeneration || token.IsCancellationRequested) return;
                             ReportMaintenanceError(error, maintenance);
+                            if (_catalogCloseRequested) return;
                             // Unproven encounter indexes must not disable inventory/hero
                             // workflows. Map writes repeat maintenance before committing.
                             refreshContent = true;
                             snapshot = await Task.Run(() => reader.ReadAsync(token, refreshContent: true), token);
                         }
-                        if (generation != _catalogGeneration || token.IsCancellationRequested) return;
+                        finally { _bridgeMaintenanceTask = null; }
+                        if (_catalogCloseRequested || generation != _catalogGeneration || token.IsCancellationRequested) return;
                         if (result is not null)
                         {
                             _maintenanceRetryPending = false;
@@ -348,8 +390,7 @@ public partial class MainWindow : Window
                     _quantitySaveContext = snapshot.QuantityItems.SaveContext;
                     _allItems = snapshot.QuantityItems.Items;
                     _raidInventoryStorage = snapshot.QuantityItems.RaidStorage;
-                    QuestBoardPanel.SetSnapshot(snapshot.QuestBoard);
-                    QuestBoardPanel.SetEditCatalog(snapshot.QuestBoardCatalog);
+                    QuestBoardPanel.SynchronizeProfile(snapshot.QuestBoard, snapshot.QuestBoardCatalog, contentChanged);
                     if (snapshot.QuestBoard is { } board && (contentChanged || changedFiles.Contains("persist.quest.json")))
                     {
                         var boardDiagnostics = new CatalogDiagnosticBatch();
@@ -376,6 +417,7 @@ public partial class MainWindow : Window
                     }
                     LocalizedUi.Set(ItemTab, HeaderedContentControl.HeaderProperty, () => _quantitySaveContext == QuantityItemSaveContext.Raid
                         ? EditorText.Get("MainWindow_CatalogLoading_011") : EditorText.Get("MainWindow_CatalogLoading_012"));
+                    var hadSelectedItem = ItemTab.IsSelected && ItemGrid.SelectedItem is ItemRow;
                     if (itemsChanged || contentChanged)
                         RefreshCatalogRowsPreservingInput(sceneChanged, contentChanged);
                     _catalogFileHashes = snapshot.FileHashes;
@@ -392,7 +434,13 @@ public partial class MainWindow : Window
                             EditorText.Format("MainWindow_ProfileSync_012", snapshot.QuantityItems.RaidOccupiedSlots, contentChanged));
                     }
                     if (sceneChanged)
-                        AppendStatus(EditorText.Format("MainWindow_ProfileSync_013", FormatQuantitySaveContext(_quantitySaveContext)));
+                    {
+                        var message = EditorText.Get(_quantitySaveContext == QuantityItemSaveContext.Raid
+                            ? "MainWindow_ProfileSync_SwitchedToRaid" : "MainWindow_ProfileSync_SwitchedToTown");
+                        if (hadSelectedItem && ItemGrid.SelectedItem is null)
+                            message = EditorText.Format("MainWindow_ProfileSync_ReselectItem", message);
+                        AppendStatus(message);
+                    }
                     if (_lastSyncError is not null) AppendStatus(EditorText.Get("MainWindow_ProfileSync_014"));
                     _lastSyncError = null;
                     LocalizedUi.Set(ProfileSyncStatusTextBlock, TextBlock.TextProperty, () => EditorText.Format("BattleMapView_LiveRefresh_008", snapshot.ReadAtUtc.ToLocalTime()));

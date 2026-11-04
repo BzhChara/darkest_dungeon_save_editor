@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
@@ -26,6 +25,7 @@ public partial class MainWindow
 
     private void CheckGameProcess()
     {
+        if (_catalogCloseRequested) return;
         ObserveGameProcess();
         // Idle ticks and focus changes inspect processes only. Drain an explicit
         // request (including an exit noticed inside an awaited operation) once.
@@ -93,7 +93,7 @@ public partial class MainWindow
             RequireGameStopped();
             RequestProfileSync(invalidatePreview: false, refreshContent: true);
             await DrainProfileSyncAsync();
-            if (generation != _catalogGeneration) return false;
+            if (_catalogCloseRequested || generation != _catalogGeneration) return false;
             RequireGameStopped();
             if (!_syncReady)
                 throw new IOException(EditorText.Get("MainWindow_ProfileSync_001") + _lastSyncError);
@@ -133,18 +133,5 @@ public partial class MainWindow
             if (attempt < 4) await Task.Delay(300, token);
         }
         throw new IOException(EditorText.Get("MainWindow_ProfileSync_006"));
-    }
-
-    private static bool IsDarkestDungeonRunning()
-    {
-        foreach (var name in new[] { "Darkest", "DarkestDungeon" })
-        {
-            Process[] processes;
-            try { processes = Process.GetProcessesByName(name); }
-            catch { return true; } // Do not enable writing when process inspection fails.
-            try { if (processes.Length > 0) return true; }
-            finally { foreach (var process in processes) process.Dispose(); }
-        }
-        return false;
     }
 }

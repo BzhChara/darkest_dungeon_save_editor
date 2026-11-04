@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -11,14 +10,21 @@ public sealed class BattleMapEditService
     private static readonly UTF8Encoding Utf8NoBom = new(false);
     private readonly DsonSaveCodec _codec;
     private readonly SaveEditorLocations _locations;
+    private readonly Func<bool> _gameRunningProbe;
     internal Action<string>? BeforeTargetReplace { get; set; }
     internal Action<string>? AfterTargetReplace { get; set; }
 
     public BattleMapEditService(DsonSaveCodec codec, SaveEditorLocations? locations = null)
+        : this(codec, locations, GameProcessGuard.IsRunning) { }
+
+    public BattleMapEditService(DsonSaveCodec codec, SaveEditorLocations? locations, Func<bool> gameRunningProbe)
     {
         _codec = codec;
         _locations = locations ?? SaveEditorLocations.CreateDefault();
+        _gameRunningProbe = gameRunningProbe ?? throw new ArgumentNullException(nameof(gameRunningProbe));
     }
+
+    private void RequireGameStopped() => GameProcessGuard.RequireStopped(_gameRunningProbe);
 
     public Task<PreparedBattleMapEdit> PrepareDeleteContentAsync(
         SaveProfile profile,
@@ -119,7 +125,7 @@ public sealed class BattleMapEditService
     {
         ArgumentNullException.ThrowIfNull(prepared);
         cancellationToken.ThrowIfCancellationRequested();
-        EnsureGameIsNotRunning();
+        RequireGameStopped();
         var (mapPath, raidPath) = ValidateBattleProfile(prepared.Profile);
         ValidatePreparedTarget(prepared, mapPath, raidPath);
         ValidateLivePair(prepared, mapPath, raidPath, EditorText.Get("BattleMapEditService_001"));
@@ -135,13 +141,13 @@ public sealed class BattleMapEditService
 
         var backupDirectory = CreateBackup(prepared.Profile, prepared);
         ValidateLivePair(prepared, mapPath, raidPath, EditorText.Get("BattleMapEditService_003"));
-        EnsureGameIsNotRunning();
+        RequireGameStopped();
 
         var targetPath = prepared.TargetFile.TargetPath;
         var guardPath = EditsMap(prepared.Preview.Kind) ? raidPath : mapPath;
         using var replacement = new GuardedSaveReplacement(targetPath, prepared.TargetFile.EncodedPath,
             prepared.TargetFile.OriginalSha256, prepared.TargetFile.EncodedSha256,
-            BeforeTargetReplace, AfterTargetReplace);
+            BeforeTargetReplace, AfterTargetReplace, RequireGameStopped);
 
         try
         {
@@ -646,38 +652,6 @@ public sealed class BattleMapEditService
             files
         });
         return backupDirectory;
-    }
-
-    private static void EnsureGameIsNotRunning()
-    {
-        foreach (var processName in new[] { "Darkest", "DarkestDungeon" })
-        {
-            Process[] processes;
-            try
-            {
-                processes = Process.GetProcessesByName(processName);
-            }
-            catch
-            {
-                continue;
-            }
-
-            try
-            {
-                if (processes.Length > 0)
-                {
-                    throw new InvalidOperationException(
-                        EditorText.Get("BattleMapEditService_030"));
-                }
-            }
-            finally
-            {
-                foreach (var process in processes)
-                {
-                    process.Dispose();
-                }
-            }
-        }
     }
 
     private static bool RevisionMatches(string leftPath, string rightPath)

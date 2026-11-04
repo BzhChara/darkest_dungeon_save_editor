@@ -31,8 +31,9 @@ The expected public site is:
 
 The `.nojekyll` file keeps the site as plain static files. Publishing from `/docs`
 also exposes the other tracked files in that directory; the homepage links to
-documentation on GitHub for readable Markdown. Ignored local files under
-`docs/change-history/` and `.research/` must not be force-added or published.
+documentation on GitHub for readable Markdown. Ignored local archives and
+evidence under `backups/`, `artifacts/` and `.research/` must not be force-added
+or published.
 
 To take the website offline, use **Unpublish site** in the Pages settings.
 Reverting the website commit restores its source files without changing editor

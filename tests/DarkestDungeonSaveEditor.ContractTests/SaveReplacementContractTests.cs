@@ -9,6 +9,9 @@ internal static partial class ContractSuite
 
     private static void RunSaveReplacementContracts(string runRoot)
     {
+        Assert(GameProcessGuard.IsRunning(name => name == "Darkest") && GameProcessGuard.IsRunning(name => name == "DarkestDungeon") &&
+               GameProcessGuard.IsRunning(_ => throw new InvalidOperationException("Process access unavailable")) &&
+               !GameProcessGuard.IsRunning(_ => false), "Both game names and an unavailable process list must guard writes.");
         var root = Path.Combine(runRoot, "guarded-replacement");
         Directory.CreateDirectory(root);
         var longTarget = Path.Combine(root, new string('a', 96), new string('b', 96), "save.json");

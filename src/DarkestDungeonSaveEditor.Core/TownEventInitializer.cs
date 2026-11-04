@@ -40,7 +40,7 @@ internal sealed partial class TownEventInitializer(ActiveContentSnapshot content
                     upgrades[Hash(effect.StringData)] = checked(upgrades.GetValueOrDefault(Hash(effect.StringData)) + Integer(effect.NumberData));
                     break;
                 case "event_cost":
-                    var currency = ResolveCurrency(saves, effect.StringData);
+                    var currency = ResolveCurrency(saves, effect.StringData).PersistedType;
                     var key = Hash(currency);
                     costs[key] = (currency, checked(costs.GetValueOrDefault(key).Amount + Integer(effect.NumberData)));
                     break;
@@ -105,31 +105,22 @@ internal sealed partial class TownEventInitializer(ActiveContentSnapshot content
         return warnings.ToArray();
     }
 
-    private string ResolveCurrency(IReadOnlyDictionary<string, JsonObject> saves, string id)
+    private QuantityItemDefinition ResolveCurrency(IReadOnlyDictionary<string, JsonObject> saves, string id)
     {
         var catalog = QuantityItemCatalog.Load(content, saves["persist.estate.json"]);
         var match = catalog.Items.FirstOrDefault(item => item.StorageKind == QuantityItemStorageKind.Wallet &&
             Hash(item.PersistedType) == Hash(id) && !item.HasProviderConflict && !item.IsSaveOnly && item.SaveIdentityIssue.Length == 0);
-        return match?.PersistedType ?? throw new InvalidDataException(EditorText.Format("TownEvent_MissingCurrency", id));
+        return match ?? throw new InvalidDataException(EditorText.Format("TownEvent_MissingCurrency", id));
     }
 
     private void GrantCurrency(IReadOnlyDictionary<string, JsonObject> saves, TownEventEffect effect, List<string> changes)
     {
-        var type = ResolveCurrency(saves, effect.StringData);
-        var wallet = JsonSupport.RequireObject(TownEventSaveEditor.Root(saves, "estate"), "wallet");
-        var matches = wallet.Select(pair => pair.Value).OfType<JsonObject>()
-            .Where(item => NativeInventoryIdentity.HashSavedField(Text(item, "type")) == Hash(type)).ToArray();
-        if (matches.Length > 1) throw new InvalidDataException("Duplicate wallet currency identity.");
-        var entry = matches.SingleOrDefault();
-        var before = entry is null ? 0 : TownEventSaveEditor.RequiredInt(entry, "amount");
+        var currency = ResolveCurrency(saves, effect.StringData);
+        var estate = saves["persist.estate.json"];
+        var before = QuantityItemSaveEditor.CountAmount(estate, currency);
         var after = (int)Math.Clamp((long)before + Integer(effect.NumberData), 0, QuantityItemSaveEditor.MaximumWalletAmount);
-        if (entry is null)
-        {
-            entry = new JsonObject { ["type"] = type };
-            wallet[NextKey(wallet)] = entry;
-        }
-        entry["amount"] = after;
-        changes.Add(EditorText.Format("TownEvent_CurrencyChange", type, before, after));
+        QuantityItemSaveEditor.SetAmountInPlace(estate, currency, after, allowUnchanged: true);
+        changes.Add(EditorText.Format("TownEvent_CurrencyChange", currency.PersistedType, before, after));
     }
 
     internal static uint Hash(string value) => NativeResourceIdentity.HashCString(value);

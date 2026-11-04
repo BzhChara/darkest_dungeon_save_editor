@@ -92,7 +92,8 @@ public sealed partial class ManagedBattleEncounterBridgeService
                 }
                 foreach (var entry in plan.OrderBy(entry => entry.Target.EndsWith("persist.map.json", StringComparison.OrdinalIgnoreCase) ? 1 : 0))
                 {
-                    var replacement = new GuardedSaveReplacement(entry.Target, entry.Original, entry.FinalHash, entry.OriginalHash);
+                    var replacement = new GuardedSaveReplacement(entry.Target, entry.Original, entry.FinalHash, entry.OriginalHash,
+                        requireGameStopped: EnsureGameIsNotRunning);
                     replacements.Add(replacement);
                     replacement.Replace();
                 }

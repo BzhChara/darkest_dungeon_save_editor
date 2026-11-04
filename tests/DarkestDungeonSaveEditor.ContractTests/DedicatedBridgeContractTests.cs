@@ -181,7 +181,52 @@ internal static partial class ContractSuite
         var catalog = BattleEncounterCatalog.Load(content, snapshot);
         var service = new ManagedBattleEncounterBridgeService(codec, locations, () => false);
         var historical = catalog.BridgeEncounters.Single(row => row.OriginDungeonId == "ruins" && row.MonsterIds[0] == "historical");
+        async Task CheckInterruptedPublication(ActiveContentSnapshot active, BattleEncounterCatalogResult choices,
+            BattleEncounterDefinition selection, int stopAtFile)
+        {
+            var package = Path.Combine(mods, ManagedBattleEncounterBridgeService.GetPackageDirectoryName(profile));
+            var existed = Directory.Exists(package);
+            Dictionary<string, string> PackageFiles() => Directory.Exists(package)
+                ? Directory.EnumerateFiles(package, "*", SearchOption.AllDirectories).ToDictionary(file => file, ComputeSha256) : [];
+            var packageBefore = PackageFiles();
+            var profileBefore = ProfileFilesHash(profile.ProfileDirectory);
+            var publishing = 0;
+            FileStream? gameReadLock = null;
+            var interrupted = new ManagedBattleEncounterBridgeService(codec, locations, () =>
+            {
+                if (publishing < stopAtFile && Directory.Exists(package) &&
+                    Directory.EnumerateFiles(package, "*.ddse-*.tmp", SearchOption.AllDirectories)
+                        .Any(path => !path.EndsWith(".displaced.tmp", StringComparison.OrdinalIgnoreCase)))
+                    publishing++;
+                if (publishing != stopAtFile) return false;
+                if (existed) gameReadLock ??= File.OpenRead(Path.Combine(package, "project.xml"));
+                return true;
+            });
+            Exception? error;
+            try { error = await CaptureSaveFailureAsync(() => interrupted.EnsureEncounterAsync(profile, snapshot, active, choices, selection, game, null, mods)); }
+            finally { gameReadLock?.Dispose(); }
+            Assert(error is InvalidOperationException && error.Message == EditorText.Get("ManagedBattleEncounterBridgeService_044") &&
+                   publishing == stopAtFile && Directory.Exists(package) == existed &&
+                   PackageFiles().OrderBy(p => p.Key).SequenceEqual(packageBefore.OrderBy(p => p.Key)) &&
+                   ProfileFilesHash(profile.ProfileDirectory).OrderBy(p => p.Key).SequenceEqual(profileBefore.OrderBy(p => p.Key)),
+                "Starting the game between Bridge files must stop publication and restore the complete original installation and saves.");
+        }
+        await CheckInterruptedPublication(content, catalog, historical, stopAtFile: 2);
+        var manifestIsProtected = false;
+        service.BeforeGameReplace = _ =>
+        {
+            var manifestPath = Path.Combine(mods, ManagedBattleEncounterBridgeService.GetPackageDirectoryName(profile),
+                ManagedBattleEncounterBridgeService.ManifestFileName);
+            try { using var writer = File.Open(manifestPath, FileMode.Open, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete); }
+            catch (IOException error) when ((error.HResult & 0xffff) == 32) { manifestIsProtected = true; }
+        };
         var installed = await service.EnsureEncounterAsync(profile, snapshot, content, catalog, historical, game, null, mods);
+        service.BeforeGameReplace = null;
+        Assert(manifestIsProtected, "A newly published manifest must deny external writes until save activation is complete.");
+        var nextEncounter = installed.Catalog.BridgeEncounters.Single(row =>
+            row.OriginDungeonId == "ruins" && row.MashType == 0 && row.MonsterIds.SequenceEqual(["valid"]));
+        await CheckInterruptedPublication(installed.ActiveContent, installed.Catalog, nextEncounter, stopAtFile: 1);
+        await CheckInterruptedPublication(installed.ActiveContent, installed.Catalog, nextEncounter, stopAtFile: 2);
         var dedicatedPath = installed.MashFilePath;
         Assert(installed.MashIndex == 1 && File.ReadAllLines(dedicatedPath).Length == 1 &&
                installed.ProjectTitle == "DDSE_Managed_Encounter_Bridge(profile - contract-user)" &&

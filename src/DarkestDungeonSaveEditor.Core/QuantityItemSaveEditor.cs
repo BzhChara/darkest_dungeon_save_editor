@@ -22,26 +22,34 @@ public static class QuantityItemSaveEditor
         int targetAmount)
     {
         ArgumentNullException.ThrowIfNull(estateRoot);
+        var updated = estateRoot.DeepClone().AsObject();
+        return (updated, SetAmountInPlace(updated, definition, targetAmount, allowUnchanged: false));
+    }
+
+    internal static QuantityItemMutationPreview SetAmountInPlace(JsonObject updated, QuantityItemDefinition definition,
+        int targetAmount, bool allowUnchanged)
+    {
         ArgumentNullException.ThrowIfNull(definition);
         NativeInventoryIdentity.RequireWritable(definition.SaveIdentityIssue);
         ValidateTargetAmount(definition, targetAmount);
 
-        var updated = estateRoot.DeepClone() as JsonObject
-            ?? throw new InvalidDataException("Failed to clone decoded estate save.");
         var items = GetStorageItems(updated, definition.StorageKind);
         var matches = FindMatches(items, definition).ToArray();
         var existingAmount = SumAmounts(matches.Select(item => ReadRequiredAmount(item, definition.DisplayId)),
             definition.StorageKind, definition.DisplayId);
         if (existingAmount == targetAmount)
         {
-            throw new InvalidOperationException(
-                $"'{definition.DisplayId}' already has the requested amount {targetAmount.ToString(CultureInfo.InvariantCulture)}.");
+            if (!allowUnchanged)
+                throw new InvalidOperationException(
+                    $"'{definition.DisplayId}' already has the requested amount {targetAmount.ToString(CultureInfo.InvariantCulture)}.");
+            if (matches.Length > 0)
+                return new(definition.DisplayId, definition.StorageKind, existingAmount, targetAmount, matches.Length, false);
         }
 
         var createdEntry = false;
         if (matches.Length == 0)
         {
-            var nextKey = (FindHighestNumericKey(items) + 1).ToString(CultureInfo.InvariantCulture);
+            var nextKey = checked(FindHighestNumericKey(items) + 1).ToString(CultureInfo.InvariantCulture);
             items[nextKey] = CreateItem(definition, targetAmount);
             createdEntry = true;
         }
@@ -75,15 +83,8 @@ public static class QuantityItemSaveEditor
                 $"Quantity mutation failed for '{definition.DisplayId}': expected {targetAmount}, actual {resultingAmount}.");
         }
 
-        return (
-            updated,
-            new QuantityItemMutationPreview(
-                definition.DisplayId,
-                definition.StorageKind,
-                existingAmount,
-                targetAmount,
-                matches.Length,
-                createdEntry));
+        return new QuantityItemMutationPreview(definition.DisplayId, definition.StorageKind,
+            existingAmount, targetAmount, matches.Length, createdEntry);
     }
 
     public static int CountAmount(JsonObject estateRoot, QuantityItemDefinition definition)

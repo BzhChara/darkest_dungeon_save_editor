@@ -23,7 +23,7 @@ internal sealed partial class TownEventInitializer
         foreach (var entry in templates)
         {
             var template = entry.Definition["quest"]!.AsObject();
-            try { ValidateBoardTemplate(entry.Definition); }
+            try { ValidateQuestTemplate(entry.Definition); }
             catch (Exception error) when (error is IOException or InvalidDataException or InvalidOperationException or ArgumentException)
             { errors[entry.Key] = error.Message; }
             var display = (JsonObject)template.DeepClone();
@@ -51,8 +51,6 @@ internal sealed partial class TownEventInitializer
         var entry = BoardTemplates().SingleOrDefault(item => item.Key == key)
             ?? throw new InvalidOperationException(EditorText.Get("QuestBoard_DefinitionChanged"));
         var definition = (JsonObject)entry.Definition.DeepClone();
-        var template = definition["quest"]!.AsObject();
-        ValidateBoardTemplate(definition);
         var board = JsonSupport.RequireObject(Root(saves, "quest"), "quests");
         if (entry.Generated)
         {
@@ -62,13 +60,12 @@ internal sealed partial class TownEventInitializer
             var index = 0;
             while (identities.Contains(Hash("generated_" + index.ToString(CultureInfo.InvariantCulture)))) index = checked(index + 1);
             definition["id"] = "generated_" + index.ToString(CultureInfo.InvariantCulture);
-            template["completion_reward"] = BoardGeneratedReward(saves, template);
         }
         var id = Text(definition, "id");
         if (Objects(board).Any(quest => Hash(Text(quest, "id")) == Hash(id)))
             throw new InvalidOperationException(EditorText.Format("QuestBoard_Duplicate", id));
         var slot = NextKey(board);
-        AddPlotQuest(saves, definition, [], [], reportNaturalEligibility: false);
+        AddPlotQuest(saves, definition, [], [], entry.Generated ? QuestSource.BoardGenerated : QuestSource.BoardPlot);
         return board[slot]?.AsObject() ?? throw new InvalidDataException("Quest initialization produced no entry.");
     }
 
@@ -122,9 +119,10 @@ internal sealed partial class TownEventInitializer
         return _boardTemplates = result.ToArray();
     }
 
-    private void ValidateBoardTemplate(JsonObject definition)
+    private JsonObject ValidateQuestTemplate(JsonObject definition)
     {
-        var template = definition["quest"]!.AsObject();
+        var template = definition["quest"] as JsonObject
+            ?? throw new InvalidDataException($"Missing quest template: {Text(definition, "id")}.");
         var type = Text(template, "type");
         var dungeon = Text(template, "dungeon");
         if (!BoardTypes.SelectMany(root => Objects(root["types"])).Any(row => Hash(Text(row, "id")) == Hash(type)))
@@ -143,17 +141,26 @@ internal sealed partial class TownEventInitializer
             NativeInventoryIdentity.RequireWritable(NativeInventoryIdentity.GetSaveIssue("quest", goal));
             if (!goals.Contains(Hash(goal))) throw new InvalidDataException(EditorText.Format("QuestBoard_MissingGoal", goal));
         }
-        foreach (var reward in Objects(template["threshold_rewards"]).Prepend(template["completion_reward"] as JsonObject ?? new JsonObject()))
-        foreach (var item in Objects(reward["items_definition"]?["items"]).Where(item => JsonSupport.ReadInt(item, "amount") > 0))
+        var completionReward = template["completion_reward"];
+        if (completionReward is not (null or JsonObject))
+            throw new InvalidDataException($"Invalid completion reward for quest: {Text(definition, "id")}.");
+        foreach (var reward in RewardRows(template["threshold_rewards"], "threshold_rewards").Select(pair => pair.Value)
+                     .Prepend(completionReward?.AsObject() ?? new JsonObject()))
         {
-            var id = Text(item, "id");
-            var itemType = Text(item, "type");
-            NativeInventoryIdentity.RequireWritable(NativeInventoryIdentity.GetSaveIssue(itemType, id));
-            if (Hash(itemType) != Hash("trinket")) continue;
-            if (!EventTrinkets.TryGetValue(Hash(id), out var trinket) || trinket.Definition.HasProviderConflict)
-                throw new InvalidDataException(EditorText.Format("QuestBoard_MissingTrinket", id));
-            NativeInventoryIdentity.RequireWritable(trinket.Definition.SaveIdentityIssue);
+            foreach (var item in RewardItems(reward).Where(item => TownEventSaveEditor.RequiredInt(item, "amount") > 0))
+            {
+                var id = Text(item, "id");
+                var itemType = Text(item, "type");
+                NativeInventoryIdentity.RequireWritable(NativeInventoryIdentity.GetSaveIssue(itemType, id));
+                if (Hash(itemType) != Hash("trinket")) continue;
+                if (!EventTrinkets.TryGetValue(Hash(id), out var trinket) || trinket.Definition.HasProviderConflict)
+                    throw new InvalidDataException(EditorText.Format("QuestBoard_MissingTrinket", id));
+                NativeInventoryIdentity.RequireWritable(trinket.Definition.SaveIdentityIssue);
+            }
+            // Check the same XP and threshold reward data without rolling owned items.
+            _ = CreateQuestRewardRecord(reward, new JsonObject());
         }
+        return template;
     }
 
     private JsonObject BoardGeneratedReward(IReadOnlyDictionary<string, JsonObject> saves, JsonObject quest)

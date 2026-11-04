@@ -66,6 +66,11 @@ internal static partial class ContractSuite
                "number_of_extra_positive_quirks":0,"number_of_extra_negative_quirks":0}]}}]}}
             """);
         Write("campaign/town/buildings/nomad_wagon/nomad_wagon.building.json", """{"data":{"stores":[{"id":"trinket_supply"}]}}""");
+        Write("dungeons/weald/weald.dungeon.json", """{"requires_quest_to_display":false}""");
+        Write("campaign/quest/event.quest.types.json", """
+            {"types":[{"id":"kill_boss","goal_lists":[]}],
+             "goals":[{"id":"kill_event","type":"kill_monster","data":{"monster_class_ids":["event_boss"],"amount":1}}]}
+            """);
         Write("campaign/quest/event.quest.plot_quests.json", """
             {"plot_quests":[{"id":"event_plot","is_enabled":true,"is_repeatable":false,"is_generated_by_event":true,
               "quest":{"is_plot_quest":true,"type":"kill_boss","dungeon":"weald","difficulty":1,"length":1,

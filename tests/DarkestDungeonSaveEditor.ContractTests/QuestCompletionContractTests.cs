@@ -43,7 +43,8 @@ internal static partial class ContractSuite
         var definitions = QuestBoardSnapshotReader.ReadGoalDefinitions(content);
         var map = CompletionTestMap();
         var codec = DsonSaveCodec.CreateNative();
-        var service = new SaveEditService(codec, new(root, Path.Combine(root, "work"), Path.Combine(root, "backups")));
+        var gameRunning = false;
+        var service = new SaveEditService(codec, new(root, Path.Combine(root, "work"), Path.Combine(root, "backups")), () => gameRunning);
         var item = new QuantityItemDefinition("quest_item", "holy_relic", QuantityItemStorageKind.RaidInventory,
             1, false, 0, "base", "fixture.inventory.items.darkest", false, ["base"]);
         QuantityItemCatalogResult Inventory(JsonObject _) => new([item], [], "")
@@ -133,6 +134,12 @@ internal static partial class ContractSuite
         try { await service.CommitAsync(prepared); } catch (InvalidOperationException) { failed = true; }
         Assert(failed && ProfileFilesHash(profileRoot).OrderBy(p => p.Key).SequenceEqual(originals.OrderBy(p => p.Key)),
             "A failure on the second file restores the first file, preserving the complete original profile.");
+        service.BeforeTargetReplace = path => gameRunning = path == profile.RaidSavePath;
+        try { await service.CommitAsync(prepared); throw new Exception("Second replacement accepted a game launch."); }
+        catch (InvalidOperationException error) when (error.InnerException?.Message == EditorText.Get("BattleMapEditService_030")) { }
+        Assert(gameRunning && ProfileFilesHash(profileRoot).OrderBy(p => p.Key).SequenceEqual(originals.OrderBy(p => p.Key)),
+            "A game launch at the second replacement must block that write and still permit recovery of the first.");
+        gameRunning = false;
         service.BeforeTargetReplace = null;
         var result = await service.CommitAsync(prepared);
         Assert(File.Exists(Path.Combine(result.BackupDirectory, "plot_trial", "persist.map.json")) &&
@@ -150,22 +157,23 @@ internal static partial class ContractSuite
         {
             var view = new BattleMapView { UsesSharedProfileMonitor = true };
             var button = (Button)view.FindName("ForceCompleteQuestButton");
+            var returnButton = (Button)view.FindName("ForceTownButton");
             var notify = typeof(BattleMapView).GetMethod("NotifySaveEditBusyAsync", BindingFlags.Instance | BindingFlags.NonPublic)!;
             Task Busy(bool value) => (Task)notify.Invoke(view, [value])!;
             try
             {
-                Assert(!button.IsEnabled, "Quest completion is disabled before loading.");
+                Assert(!button.IsEnabled && !returnButton.IsEnabled, "Both force actions are disabled before loading.");
                 await view.LoadProfileAsync(profile, codec, null, content);
-                Assert(button.IsEnabled, "A loaded ordinary raid exposes quest completion.");
+                Assert(button.IsEnabled && returnButton.IsEnabled, "A loaded ordinary raid exposes both force actions.");
                 await Busy(true);
-                Assert(!button.IsEnabled, "Quest completion is disabled during other writes.");
+                Assert(!button.IsEnabled && !returnButton.IsEnabled, "Both force actions are disabled during other writes.");
                 var synchronization = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
                 view.SaveEditBusyChanged += busy => busy ? Task.CompletedTask : synchronization.Task;
                 var finishing = Busy(false);
-                Assert(!button.IsEnabled && !finishing.IsCompleted, "The button stays disabled until synchronization completes.");
+                Assert(!button.IsEnabled && !returnButton.IsEnabled && !finishing.IsCompleted, "Both actions stay disabled until synchronization completes.");
                 synchronization.SetResult();
                 await finishing;
-                Assert(button.IsEnabled, "Successful synchronization restores quest completion.");
+                Assert(button.IsEnabled && returnButton.IsEnabled, "Successful synchronization restores both force actions.");
                 foreach (var language in new[] { "en", "zh-CN" })
                 {
                     EditorText.Initialize(language, EditorText.SystemCulture);
@@ -175,7 +183,8 @@ internal static partial class ContractSuite
                 }
             }
             finally { view.ClearProfile(); }
-            Assert(!button.IsEnabled, "Clearing a profile disables quest completion.");
+            Assert(!button.IsEnabled && !returnButton.IsEnabled, "Clearing a profile disables both force actions.");
+            await VerifyCloseDuringQuestWriteAsync(root, prepared, codec);
         });
 
         await Encode("persist.map.json", map); await Encode("persist.raid.json", transactionRaid);
@@ -213,6 +222,85 @@ internal static partial class ContractSuite
             "Recovery preserves a newer external map and leaves the unwritten raid untouched.");
         Console.WriteLine("PASS: Native/Mod objective types, deletion semantics, inventory, tutorial/wave rejection, DSON roundtrip, nested targets, rollback and resource invalidation.");
         Console.WriteLine("Artifacts: " + root);
+    }
+
+    private static async Task VerifyCloseDuringQuestWriteAsync(string testRoot,
+        PreparedQuestCompletionEdit prepared, DsonSaveCodec codec)
+    {
+        foreach (var failSecondFile in new[] { true, false })
+        {
+            var root = Path.Combine(testRoot, failSecondFile ? "close-rollback" : "close-commit");
+            var locations = new SaveEditorLocations(root, Path.Combine(root, "work"), Path.Combine(root, "backups"));
+            foreach (var file in prepared.Files) File.Copy(file.SourceCopyPath, file.TargetPath, overwrite: true);
+            var service = new SaveEditService(codec, locations);
+            var firstReplaced = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            using var resume = new ManualResetEventSlim();
+            service.AfterTargetReplace = path =>
+            {
+                if (path != prepared.Profile.MapSavePath) return;
+                firstReplaced.SetResult();
+                if (!resume.Wait(TimeSpan.FromSeconds(20))) throw new TimeoutException("Close did not release the writer.");
+            };
+            service.BeforeTargetReplace = path =>
+            {
+                if (failSecondFile && path == prepared.Profile.RaidSavePath) throw new IOException("Second file unavailable");
+            };
+            var window = new MainWindow(Path.Combine(root, "language.json"), saveLocations: locations, gameRunningProbe: () => false)
+            {
+                WindowStartupLocation = WindowStartupLocation.Manual, Left = -20000, Top = -20000, ShowInTaskbar = false, ShowActivated = false
+            };
+            var closed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            bool finalizedAtClose = false;
+            window.Closed += (_, _) =>
+            {
+                finalizedAtClose = prepared.Files.All(file => ComputeSha256(file.TargetPath).Equals(
+                    failSecondFile ? file.OriginalSha256 : file.EncodedSha256, StringComparison.OrdinalIgnoreCase));
+                closed.TrySetResult();
+            };
+            window.Show();
+            var map = (BattleMapView)window.FindName("BattleMapPanel");
+            await map.LoadProfileAsync(prepared.Profile, codec, null, prepared.Content);
+            const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic;
+            var generation = (int)typeof(BattleMapView).GetField("_profileGeneration", flags)!.GetValue(map)!;
+            var action = typeof(BattleMapView).GetMethod("CompleteQuestAsync", flags)!;
+            var confirmations = 0;
+            var lateDialog = false;
+            var dialogs = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(15) };
+            dialogs.Tick += (_, _) =>
+            {
+                foreach (var dialog in window.OwnedWindows.OfType<ThemedDialog>().ToArray())
+                {
+                    lateDialog |= window.CloseRequested;
+                    dialog.DialogResult = !window.CloseRequested && ++confirmations == 1;
+                }
+            };
+            dialogs.Start();
+            var writing = map.RunMapEditAsync(() => (Task)action.Invoke(map,
+                [window, prepared.Profile, map.CurrentSnapshot, prepared.Content, service, generation])!);
+            try
+            {
+                await firstReplaced.Task.WaitAsync(TimeSpan.FromSeconds(20));
+                window.Close();
+                window.Close();
+                Assert(!closed.Task.IsCompleted && !window.IsEnabled && !writing.IsCompleted,
+                    "Closing repeatedly between map and raid replacements must leave the writer and window alive.");
+                resume.Set();
+                await writing;
+                await closed.Task.WaitAsync(TimeSpan.FromSeconds(10));
+                var state = Directory.EnumerateFiles(locations.BackupDirectory, "transaction-state.json", SearchOption.AllDirectories).Single();
+                Assert(confirmations == 1 && !lateDialog && finalizedAtClose &&
+                    JsonSupport.ReadString(JsonSupport.ReadObject(state), "status") == (failSecondFile ? "restored" : "committed"),
+                    "The confirmed UI action must commit or roll back both files before closing without an extra modal prompt.");
+            }
+            finally
+            {
+                resume.Set();
+                await writing;
+                dialogs.Stop();
+                if (!closed.Task.IsCompleted) window.Close();
+            }
+        }
+        Console.WriteLine("PASS: closing between native map and raid replacements waits for both commit and rollback.");
     }
 
     private static JsonObject CompletionTestRaid(string[] goals) => JsonNode.Parse("""

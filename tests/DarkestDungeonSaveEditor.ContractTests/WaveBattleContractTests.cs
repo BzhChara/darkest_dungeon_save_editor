@@ -138,11 +138,23 @@ internal static partial class ContractSuite
         raidRoot["inbattle"] = true;
         SaveRaid();
         wave = await reader.LoadAsync(profileRoot);
-        var service = new ForceTownSaveService(codec,
-            new SaveEditorLocations(root, Path.Combine(root, "work"), Path.Combine(root, "backups")), () => false);
+        var locations = new SaveEditorLocations(root, Path.Combine(root, "work"), Path.Combine(root, "backups"));
+        var service = new ForceTownSaveService(codec, locations, () => false);
         var beforeMap = ComputeSha256(profile.MapSavePath);
         var beforeRaid = ComputeSha256(profile.RaidSavePath);
         var prepared = await service.PrepareAsync(profile, wave);
+        var partialReplace = new ForceTownSaveService(codec, locations, () => false)
+        {
+            AtomicReplaceOverride = (_, target, displaced) =>
+            {
+                File.Move(target, displaced);
+                throw new IOException("Injected partial replacement", unchecked((int)0x80070499));
+            }
+        };
+        try { await partialReplace.CommitAsync(prepared); throw new Exception("Partial replacement was accepted."); }
+        catch (InvalidOperationException error) when (error.InnerException is IOException io && (io.HResult & 0xffff) == 1177) { }
+        Assert(ComputeSha256(gamePath).Equals(prepared.GameFile.OriginalSha256, StringComparison.OrdinalIgnoreCase) && ComputeSha256(profile.MapSavePath) == beforeMap &&
+               ComputeSha256(profile.RaidSavePath) == beforeRaid, "Force-town must restore its displaced file on Windows error 1177.");
         var result = await service.CommitAsync(prepared);
         var expected = JsonNode.Parse(gameJson)!;
         expected["base_root"]!["inraid"] = false;

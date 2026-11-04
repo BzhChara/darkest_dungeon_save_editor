@@ -104,14 +104,19 @@ public partial class BattleMapView : UserControl
             return;
         }
 
+        EndMapPan();
+        e.Handled = true;
+    }
+
+    private void EndMapPan()
+    {
+        _isRightButtonDown = false;
         _isPanning = false;
         MapViewport.Cursor = Cursors.Arrow;
         if (ReferenceEquals(Mouse.Captured, MapViewport))
         {
             Mouse.Capture(null);
         }
-
-        e.Handled = true;
     }
 
     private void ZoomOutButton_Click(object sender, RoutedEventArgs e)

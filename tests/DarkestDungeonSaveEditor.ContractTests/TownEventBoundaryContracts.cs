@@ -66,6 +66,25 @@ internal static partial class ContractSuite
         Assert(currency["persist.estate.json"]["base_root"]!["wallet"]!.AsObject().Count == 1 &&
             currency["persist.estate.json"]["base_root"]!["wallet"]!["0"]!["amount"]!.GetValue<int>() == 125,
             "Currency grants match native saved identities without adding an alias wallet entry.");
+        var wallet = currency["persist.estate.json"]["base_root"]!["wallet"]!.AsObject();
+        wallet["0"]!["amount"] = 100;
+        wallet["1"] = new JsonObject { ["type"] = "gold", ["amount"] = 50, ["marker"] = "keep" };
+        var grant = catalog.Events.Single(item => item.Id == "test_bonus_currency");
+        var gold = QuantityItemCatalog.Load(f.Content, currency["persist.estate.json"]).Items.Single(item => item.PersistedType == "gold");
+        var itemResult = QuantityItemSaveEditor.SetAmount(currency["persist.estate.json"], gold, 175).UpdatedRoot;
+        TownEventSaveEditor.ReplaceCurrent(currency, grant, new TownEventInitializer(f.Content, 7).Initialize);
+        Assert(JsonNode.DeepEquals(currency["persist.estate.json"], itemResult), "Event and item edits must preserve and count the same wallet rows.");
+        wallet["0"]!["amount"] = QuantityItemSaveEditor.MaximumWalletAmount - 60;
+        TownEventSaveEditor.ReplaceCurrent(currency, grant, new TownEventInitializer(f.Content, 7).Initialize);
+        var capped = wallet.DeepClone();
+        TownEventSaveEditor.ReplaceCurrent(currency, grant, new TownEventInitializer(f.Content, 7).Initialize);
+        Assert(QuantityItemSaveEditor.CountAmount(currency["persist.estate.json"], gold) == QuantityItemSaveEditor.MaximumWalletAmount &&
+               JsonNode.DeepEquals(wallet, capped), "A capped repeated grant must complete without creating more currency.");
+        wallet["0"]!["amount"] = 1_800_000_000;
+        wallet["1"]!["amount"] = 500_000_000;
+        var overCap = wallet.DeepClone();
+        TownEventSaveEditor.ReplaceCurrent(currency, grant, new TownEventInitializer(f.Content, 7).Initialize);
+        Assert(JsonNode.DeepEquals(wallet, overCap), "A grant that cannot increase the effective balance must leave its saved rows intact.");
         foreach (var (amount, expectedHp) in new[] { (.5, 60.0), (-2.0, 0.0) })
         {
             var revival = Copies();

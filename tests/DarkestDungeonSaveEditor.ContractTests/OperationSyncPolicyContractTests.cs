@@ -16,7 +16,11 @@ internal static partial class ContractSuite
         {
             var fixture = BuildContractFixture(repositoryRoot);
             await SeedSyncFixtureAsync(fixture);
-            await RunWpfContractsAsync(() => VerifyOperationSyncPolicyAsync(fixture));
+            await RunWpfContractsAsync(async () =>
+            {
+                await VerifyOperationSyncPolicyAsync(fixture);
+                await VerifyRaidStateMaintenanceSyncAsync(fixture, closeDuringCleanup: true);
+            });
             Console.WriteLine($"Artifacts: {fixture.RunRoot}");
         }
         finally { UseNativeCodec = previousCodec; }
@@ -118,7 +122,7 @@ internal static partial class ContractSuite
             SetGold(4400);
             Call("Preview_Click", window, new RoutedEventArgs());
             var deadline = DateTime.UtcNow.AddSeconds(60);
-            while (Get("_preparedQuantityItemEdit") is null && DateTime.UtcNow < deadline)
+            while (!Enabled("ApplyButton") && DateTime.UtcNow < deadline)
             {
                 if (!Flag("_checkingProfileOperation") && (int)Get("_busyDepth")! == 0)
                 {
@@ -130,7 +134,7 @@ internal static partial class ContractSuite
                 }
                 await Task.Delay(15);
             }
-            Assert(Get("_preparedQuantityItemEdit") is PreparedQuantityItemEdit actualPreview && actualPreview.Preview.ExistingAmount == 4400,
+            Assert(Enabled("ApplyButton") && Get("_preparedQuantityItemEdit") is PreparedQuantityItemEdit actualPreview && actualPreview.Preview.ExistingAmount == 4400,
                 "The actual Preview button must use the latest saved quantity. " + ((TextBox)Get("StatusTextBox")!).Text);
             var beforeRejectedWrite = ComputeSha256(f.EstatePath);
             extraDefinition = WriteMultiMash(f.GameRoot, "inventory/operation-sync.inventory.items.darkest",
@@ -208,6 +212,30 @@ internal static partial class ContractSuite
             Assert(!await (Task<bool>)Call("CheckProfileBeforeOperationAsync", true)! && !Enabled("ApplyButton"),
                 "Operation entry must inspect the process again instead of trusting the previous timer tick.");
             Console.WriteLine("PASS: WPF game start/exit, one-shot final sync, failure recovery and launch-during-check keep edits guarded.");
+
+            running = false; Call("CheckGameProcess"); await Settled();
+            grid.SelectedItem = grid.Items.Cast<object>().First(row =>
+                ((QuantityItemDefinition)row.GetType().GetProperty("Definition")!.GetValue(row)!).DisplayId == "gold");
+            ((TextBox)Get("CopiesTextBox")!).Text = (Gold() + 1).ToString(System.Globalization.CultureInfo.InvariantCulture);
+            var closed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            window.Closed += (_, _) => closed.TrySetResult();
+            var cancelledBeforeClose = false;
+            var closingPreview = false;
+            ((TextBox)Get("StatusTextBox")!).TextChanged += (_, _) =>
+            {
+                // The preview's start message is published after the precheck and before encoding.
+                if (closingPreview || Get("_previewCancellation") is not CancellationTokenSource preview) return;
+                closingPreview = true;
+                window.Close();
+                cancelledBeforeClose = preview.IsCancellationRequested && !closed.Task.IsCompleted;
+            };
+            var originalHash = ComputeSha256(f.EstatePath);
+            Call("Preview_Click", window, new RoutedEventArgs());
+            await closed.Task.WaitAsync(TimeSpan.FromSeconds(20));
+            Assert(cancelledBeforeClose && Get("_profileOperationFinished") is null &&
+                Get("_preparedQuantityItemEdit") is null && ComputeSha256(f.EstatePath) == originalHash,
+                "Closing an actual quantity preview must cancel and drain it without publishing a result.");
+            Console.WriteLine("PASS: closing during an actual preview cancels work and waits for cleanup.");
         }
         finally
         {

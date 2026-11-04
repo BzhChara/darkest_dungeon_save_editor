@@ -41,23 +41,19 @@ public partial class BattleMapView : UserControl
 
         if (!await CheckProfileEditAsync()) return;
         var generation = _profileGeneration;
-        var gateTaken = false;
+        await RunMapEditAsync(() => ReturnToTownAsync(owner, profile, snapshot, service, generation));
+    }
+
+    private async Task ReturnToTownAsync(Window owner, SaveProfile profile, BattleMapSnapshot snapshot,
+        ForceTownSaveService service, int generation)
+    {
         var committed = false;
         PreparedForceTownEdit? prepared = null;
         string? backupDirectory = null;
-        _isApplyingEdit = true;
-        await NotifySaveEditBusyAsync(true);
-        CloseActiveContextMenu();
-        CancelScheduledRefreshRetry();
-        StopProfileMonitoring();
-        MapCanvas.IsHitTestVisible = false;
-        ForceTownButton.IsEnabled = false;
         LocalizedUi.Set(MapSelectionTextBlock, TextBlock.TextProperty, () => EditorText.Get("BattleMapView_ForceTown_006"));
 
         try
         {
-            await _refreshGate.WaitAsync();
-            gateTaken = true;
             if (generation != _profileGeneration ||
                 !ReferenceEquals(snapshot, _currentSnapshot) ||
                 !ReferenceEquals(profile, _profile))
@@ -66,14 +62,15 @@ public partial class BattleMapView : UserControl
             }
 
             prepared = await service.PrepareAsync(profile, snapshot);
-            var result = await service.CommitAsync(prepared);
+            var result = await Task.Run(() => service.CommitAsync(prepared));
             backupDirectory = result.BackupDirectory;
             committed = true;
             SaveEditApplied?.Invoke(
                 EditorText.Format("BattleMapView_ForceTown_008", profile.ProfileId) +
                 EditorText.Format("BattleMapView_ForceTown_009", profile.ProfileDirectory, prepared.SessionId) +
                 EditorText.Format("BattleMapView_ForceTown_010", prepared.Preview.PreviousRaidDungeon, result.BackupDirectory));
-            ShowUnavailableState(
+            if (UsesSharedProfileMonitor) ClearRaidState();
+            else ShowUnavailableState(
                 "BattleMapView_ForceTown_011", "BattleMapView_ForceTown_012", profile.ProfileId);
         }
         catch (Exception ex)
@@ -91,25 +88,6 @@ public partial class BattleMapView : UserControl
                 ex.Message,
                 committed ? EditorText.Get("BattleMapView_ForceTown_018") : EditorText.Get("BattleMapView_ForceTown_019"),
                 ThemedDialogKind.Error);
-        }
-        finally
-        {
-            if (gateTaken)
-            {
-                _refreshGate.Release();
-            }
-            // A successful return hides the map, but the same canvas is reused on the next raid.
-            try { await NotifySaveEditBusyAsync(false); }
-            finally
-            {
-                _isApplyingEdit = false;
-                MapCanvas.IsHitTestVisible = true;
-                if (generation == _profileGeneration)
-                {
-                    ForceTownButton.IsEnabled = _currentSnapshot is { IsTutorialRaid: false };
-                    StartProfileMonitoring();
-                }
-            }
         }
     }
 }

@@ -6,7 +6,7 @@ Updated: 2026-09-14. These rules apply to new stagecoach candidates created by t
 
 Evidence consists of native disassembly of Windows x64 build 27890 and isolated catalog, candidate-generation, and DSON encode/decode tests. `Darkest.exe` SHA-256: `35E5A653279992564809FF8406FEBD5A02A7D6961044781B1296B38A7096F59B`. This is a static check of native branches, not a new live-game experiment. It does not guarantee identical results when the editor and game use the same random seed.
 
-Historical counterexamples, native addresses, and fix validation are kept in the local-only records `hero-generation-selection-audit-2026-09-14.md` and `hero-generation-selection-fixes-2026-09-14.md` under `docs/change-history/`. They are not included in a new clone. UI labels below are English descriptions of the localized controls.
+Historical counterexamples, native addresses, and fix validation are preserved in the archived records `hero-generation-selection-audit-2026-09-14.md` and `hero-generation-selection-fixes-2026-09-14.md`. These are entries inside the retired local ZIP, not working files or files included in a new clone; see [archive location and recovery](local-storage.md#retired-history-archive). UI labels below are English descriptions of the localized controls.
 
 ## Skin directories and saved indexes
 

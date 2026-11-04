@@ -1651,6 +1651,9 @@ Backup directory:
     <value>Game running · Editing disabled · Showing the last loaded data</value>
     <comment>src/DarkestDungeonSaveEditor.App/MainWindow.OperationSync.cs</comment>
   </data>
+  <data xml:space="preserve" name="MainWindow_CloseSaving">
+    <value>Finishing the save operation before closing…</value>
+  </data>
   <data xml:space="preserve" name="MainWindow_ProfileSync_GameExited">
     <value>Game closed · Waiting for stable saves and synchronizing</value>
     <comment>src/DarkestDungeonSaveEditor.App/MainWindow.OperationSync.cs</comment>
@@ -1707,8 +1710,16 @@ Backup directory:
     <value> occupied raid slots={0}; catalog rebuilt={1}; previous preview invalidated.</value>
     <comment>src/DarkestDungeonSaveEditor.App/MainWindow.ProfileSync.cs</comment>
   </data>
-  <data xml:space="preserve" name="MainWindow_ProfileSync_013">
-    <value>Switched automatically to {0} items. Select the edit target again.</value>
+  <data xml:space="preserve" name="MainWindow_ProfileSync_SwitchedToRaid">
+    <value>Switched to raid mode.</value>
+    <comment>src/DarkestDungeonSaveEditor.App/MainWindow.ProfileSync.cs</comment>
+  </data>
+  <data xml:space="preserve" name="MainWindow_ProfileSync_SwitchedToTown">
+    <value>Switched to town mode.</value>
+    <comment>src/DarkestDungeonSaveEditor.App/MainWindow.ProfileSync.cs</comment>
+  </data>
+  <data xml:space="preserve" name="MainWindow_ProfileSync_ReselectItem">
+    <value>{0} Select an item to edit.</value>
     <comment>src/DarkestDungeonSaveEditor.App/MainWindow.ProfileSync.cs</comment>
   </data>
   <data xml:space="preserve" name="MainWindow_ProfileSync_014">
@@ -5317,6 +5328,9 @@ Backup directory:
   </data>
   <data name="QuestBoard_MissingRarity" xml:space="preserve">
     <value>Quest reward rarity cannot be resolved: {0}.</value>
+  </data>
+  <data name="QuestBoard_InvalidRewardField" xml:space="preserve">
+    <value>The quest reward field '{0}' has an invalid format.</value>
   </data>
   <data name="QuestBoard_MissingTrinket" xml:space="preserve">
     <value>Quest reward trinket cannot be resolved: {0}.</value>

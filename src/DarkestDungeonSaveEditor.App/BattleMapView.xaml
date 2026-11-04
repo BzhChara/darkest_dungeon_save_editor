@@ -8,6 +8,8 @@
              Background="Transparent"
              Focusable="True"
              Loaded="BattleMapView_Loaded"
+             IsEnabledChanged="MapAvailabilityChanged"
+             IsVisibleChanged="MapAvailabilityChanged"
              SizeChanged="BattleMapView_SizeChanged"
              PreviewMouseWheel="BattleMapView_PreviewMouseWheel"
              PreviewMouseRightButtonDown="BattleMapView_PreviewMouseRightButtonDown"

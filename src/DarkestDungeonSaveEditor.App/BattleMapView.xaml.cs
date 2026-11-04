@@ -57,6 +57,45 @@ public partial class BattleMapView : UserControl
     public event Func<bool, Task>? SaveEditBusyChanged;
     public event Func<bool>? ProfileBrowseChecking;
     public event Func<Task<bool>>? ProfileEditChecking;
+    internal Func<Func<Task>, Task>? ProfileEditRunner { get; set; }
+    internal SaveEditorLocations SaveLocations { get; set; } = SaveEditorLocations.CreateDefault();
+    internal Func<bool> GameRunningProbe { get; set; } = GameProcessGuard.IsRunning;
+
+    internal async Task RunMapEditAsync(Func<Task> edit)
+    {
+        if (_isApplyingEdit) return;
+        var generation = _profileGeneration;
+        _isApplyingEdit = true;
+        try
+        {
+            CloseActiveContextMenu();
+            CancelScheduledRefreshRetry();
+            StopProfileMonitoring();
+            MapCanvas.IsHitTestVisible = false;
+            await NotifySaveEditBusyAsync(true);
+            if (ProfileEditRunner is { } run) await run(EditUnderGateAsync);
+            else await EditUnderGateAsync();
+        }
+        finally
+        {
+            try { await NotifySaveEditBusyAsync(false); }
+            finally
+            {
+                _isApplyingEdit = false;
+                MapCanvas.IsHitTestVisible = true;
+                UpdateForceActionAvailability();
+                if (generation == _profileGeneration) StartProfileMonitoring();
+            }
+        }
+
+        async Task EditUnderGateAsync()
+        {
+            await _refreshGate.WaitAsync();
+            try { await edit(); }
+            // The owner's post-write synchronization also needs this gate.
+            finally { _refreshGate.Release(); }
+        }
+    }
 
     private bool CanBrowseProfile()
     {
@@ -78,11 +117,18 @@ public partial class BattleMapView : UserControl
 
     private async Task NotifySaveEditBusyAsync(bool busy)
     {
+        ForceTownButton.IsEnabled = false;
         ForceCompleteQuestButton.IsEnabled = false;
         if (SaveEditBusyChanged is { } handlers)
             foreach (Func<bool, Task> handler in handlers.GetInvocationList())
                 await handler(busy);
-        ForceCompleteQuestButton.IsEnabled = !busy && CanCompleteQuest();
+        if (!busy) UpdateForceActionAvailability();
+    }
+
+    private void UpdateForceActionAvailability()
+    {
+        ForceTownButton.IsEnabled = !_isApplyingEdit && _currentSnapshot is { IsTutorialRaid: false };
+        ForceCompleteQuestButton.IsEnabled = !_isApplyingEdit && CanCompleteQuest();
     }
 
     private bool CanCompleteQuest() => _currentSnapshot is { IsWaveBattle: false, IsTutorialRaid: false, InBattle: false } &&

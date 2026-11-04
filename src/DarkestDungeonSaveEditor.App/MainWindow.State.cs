@@ -18,6 +18,7 @@ public partial class MainWindow : Window
 
     private void InvalidateCatalog()
     {
+        _initialQuirkPicker.Dismiss();
         StopProfileSync();
         _battleMapLogTracker.Reset();
         InvalidatePreparedEdit();
@@ -172,7 +173,7 @@ public partial class MainWindow : Window
             CatalogTabs.SelectedIndex == HeroTabIndex &&
             _heroCatalog is not null &&
             HeroGrid.SelectedItem is HeroRow;
-        InitialQuirksButton.IsEnabled = !busy && !_gameRunning &&
+        InitialQuirksButton.IsEnabled = !busy && _syncReady && !_gameRunning &&
             CatalogTabs.SelectedIndex == HeroTabIndex &&
             _heroCatalog is not null &&
             HeroGrid.SelectedItem is HeroRow;
@@ -185,68 +186,66 @@ public partial class MainWindow : Window
              _preparedHeroEdit is not null || _preparedTownEventEdit is not null);
     }
 
-    private void EnsureCatalogMatches(
-        SaveProfile profile,
+    private async Task<SaveProfile> GetPreviewProfileAsync(
+        string profileDirectory,
         bool requireCurrentQuantitySnapshot,
-        bool requireCurrentEstateSnapshot)
+        bool requireCurrentEstateSnapshot,
+        CancellationToken token)
     {
-        if (_catalogProfileDirectory is null || _catalogGameSaveSha256 is null ||
+        var gameHash = _catalogGameSaveSha256;
+        if (_catalogProfileDirectory is null || gameHash is null ||
             (_allItems.Count == 0 && _allTrinkets.Count == 0 && _heroCatalog is null))
         {
             throw new InvalidOperationException(EditorText.Get("MainWindow_State_003"));
         }
 
-        if (!Path.GetFullPath(profile.ProfileDirectory)
+        if (!Path.GetFullPath(profileDirectory)
                 .Equals(Path.GetFullPath(_catalogProfileDirectory), StringComparison.OrdinalIgnoreCase))
         {
             InvalidateCatalog();
             throw new InvalidOperationException(EditorText.Get("MainWindow_State_004"));
         }
 
-        profile = _activeContentSnapshot?.Profile ?? profile;
-        var gameSavePath = Path.Combine(profile.ProfileDirectory, "persist.game.json");
-        if (!_syncReady || _catalogFileHashes is null ||
-            !ProfileCatalogSnapshotReader.HashesEqual(_catalogFileHashes,
-                ProfileCatalogSnapshotReader.CaptureHashes(profile)))
+        var fileHashes = _catalogFileHashes;
+        if (!_syncReady || fileHashes is null)
         {
             RequestProfileSync();
             throw new InvalidOperationException(EditorText.Get("MainWindow_State_005"));
         }
-        if (!File.Exists(gameSavePath) ||
-            !ComputeSha256(gameSavePath).Equals(_catalogGameSaveSha256, StringComparison.OrdinalIgnoreCase))
+
+        var loadedProfile = _activeContentSnapshot?.Profile;
+        var expectedInRaid = _quantitySaveContext == QuantityItemSaveContext.Raid;
+        var quantityHash = _catalogQuantitySaveSha256;
+        var estateHash = _catalogEstateSaveSha256;
+        var (selectedProfile, errorKey) = await Task.Run(() =>
+        {
+            var selected = SteamDiscovery.OpenProfile(profileDirectory);
+            return (selected, CheckSaveHashes(loadedProfile ?? selected));
+        }, token);
+        token.ThrowIfCancellationRequested();
+        if (errorKey is not null)
         {
             RequestProfileSync();
-            throw new InvalidOperationException(EditorText.Get("MainWindow_State_006"));
+            throw new InvalidOperationException(EditorText.Get(errorKey));
+        }
+        return selectedProfile;
+
+        string? CheckSaveHashes(SaveProfile profile)
+        {
+            if (!ProfileCatalogSnapshotReader.HashesEqual(fileHashes, ProfileCatalogSnapshotReader.CaptureHashes(profile)))
+                return "MainWindow_State_005";
+            if (!MatchesHash(Path.Combine(profile.ProfileDirectory, "persist.game.json"), gameHash))
+                return "MainWindow_State_006";
+            // Town saves may retain an old expedition. Check the file supplying the displayed quantities.
+            if (requireCurrentQuantitySnapshot && !MatchesHash(expectedInRaid ? profile.RaidSavePath : profile.EstateSavePath, quantityHash))
+                return "MainWindow_State_007";
+            if (requireCurrentEstateSnapshot && !MatchesHash(profile.EstateSavePath, estateHash))
+                return "MainWindow_State_008";
+            return null;
         }
 
-        if (requireCurrentQuantitySnapshot)
-        {
-            var expectedInRaid = _quantitySaveContext == QuantityItemSaveContext.Raid;
-            var quantitySavePath = expectedInRaid ? profile.RaidSavePath : profile.EstateSavePath;
-            // The game-save hash above guards the scene resolved at load time.
-            // A town profile may legitimately retain an old raid file after force-town.
-            if (_catalogQuantitySaveSha256 is null ||
-                !File.Exists(quantitySavePath) ||
-                !ComputeSha256(quantitySavePath).Equals(
-                    _catalogQuantitySaveSha256,
-                    StringComparison.OrdinalIgnoreCase))
-            {
-                RequestProfileSync();
-                throw new InvalidOperationException(
-                    EditorText.Get("MainWindow_State_007"));
-            }
-        }
-
-        if (requireCurrentEstateSnapshot &&
-            (_catalogEstateSaveSha256 is null ||
-             !File.Exists(profile.EstateSavePath) ||
-             !ComputeSha256(profile.EstateSavePath).Equals(
-                 _catalogEstateSaveSha256,
-                 StringComparison.OrdinalIgnoreCase)))
-        {
-            RequestProfileSync();
-            throw new InvalidOperationException(EditorText.Get("MainWindow_State_008"));
-        }
+        static bool MatchesHash(string path, string? expected) => expected is not null && File.Exists(path) &&
+            ComputeSha256(path).Equals(expected, StringComparison.OrdinalIgnoreCase);
     }
 
     private bool CanPreviewCurrentTab()

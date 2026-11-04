@@ -27,6 +27,7 @@ internal sealed class GuardedSaveReplacement : IDisposable
     private readonly string _temporaryPath;
     private readonly Action<string>? _beforeReplace;
     private readonly Action<string>? _afterReplace;
+    private readonly Action _requireGameStopped;
     private FileStream? _target;
     private string? _displacedHash;
     private bool _completed;
@@ -35,7 +36,7 @@ internal sealed class GuardedSaveReplacement : IDisposable
 
     internal GuardedSaveReplacement(
         string targetPath, string encodedPath, string originalHash, string encodedHash,
-        Action<string>? beforeReplace = null, Action<string>? afterReplace = null)
+        Action<string>? beforeReplace = null, Action<string>? afterReplace = null, Action? requireGameStopped = null)
     {
         _targetPath = Path.GetFullPath(targetPath);
         _encodedPath = encodedPath;
@@ -43,6 +44,7 @@ internal sealed class GuardedSaveReplacement : IDisposable
         _encodedHash = encodedHash;
         _beforeReplace = beforeReplace;
         _afterReplace = afterReplace;
+        _requireGameStopped = requireGameStopped ?? GameProcessGuard.RequireStopped;
         var directory = Path.GetDirectoryName(_targetPath)!;
         var prefix = $".{Path.GetFileName(_targetPath)}.ddse-{Guid.NewGuid():N}";
         _temporaryPath = Path.Combine(directory, prefix + ".tmp");
@@ -96,6 +98,7 @@ internal sealed class GuardedSaveReplacement : IDisposable
             if (!Hash(original).Equals(_originalHash, StringComparison.OrdinalIgnoreCase))
                 throw new InvalidOperationException(EditorText.Format("GuardedSaveReplacement_003", _targetPath));
             _beforeReplace?.Invoke(_targetPath);
+            _requireGameStopped();
             try
             {
                 if (AtomicReplaceOverride is { } replace)

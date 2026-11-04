@@ -189,6 +189,15 @@ internal static partial class ContractSuite
             catch (ArgumentOutOfRangeException) { }
         }
         var prepared = await f.Service.PrepareQuantityItemEditAsync(f.Content.Profile, gold, 2_000_000_000, f.Content);
+        var running = false;
+        var boundary = new SaveEditService(codec, new SaveEditorLocations(root, Path.Combine(root, "work"), Path.Combine(root, "backups")), () => running)
+        {
+            BeforeTargetReplace = _ => running = true
+        };
+        try { await boundary.CommitAsync(prepared); throw new Exception("Game start at replacement was ignored."); }
+        catch (InvalidOperationException error) when (error.Message == EditorText.Get("BattleMapEditService_030")) { }
+        Assert(ComputeSha256(f.Content.Profile.EstateSavePath).Equals(prepared.OriginalSha256, StringComparison.OrdinalIgnoreCase),
+            "A game launch after backup and final resource validation must block the actual replacement.");
         await f.Service.CommitAsync(prepared);
         var decoded = Path.Combine(root, "committed.json");
         await codec.DecodeAsync(f.Content.Profile.EstateSavePath, decoded);

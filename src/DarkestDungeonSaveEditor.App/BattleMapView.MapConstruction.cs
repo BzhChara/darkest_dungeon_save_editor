@@ -13,6 +13,7 @@ public partial class BattleMapView : UserControl
 {
     private void RenderSnapshot(BattleMapSnapshot snapshot, bool fitToView)
     {
+        DismissProfileMenu();
         if (snapshot.IsTutorialRaid || snapshot.IsWaveBattle)
         {
             // Detach every map edit target. Only wave raids retain force-town recovery.
@@ -34,8 +35,7 @@ public partial class BattleMapView : UserControl
         _selectedCell = null;
         CancelScheduledRefreshRetry();
         _currentSnapshot = snapshot;
-        ForceTownButton.IsEnabled = !_isApplyingEdit && !snapshot.IsTutorialRaid;
-        ForceCompleteQuestButton.IsEnabled = !_isApplyingEdit && CanCompleteQuest();
+        UpdateForceActionAvailability();
         UpdateMapBadge();
         LocalizedUi.Set(MapTitleTextBlock, TextBlock.TextProperty, () => EditorText.Format("BattleMapView_MapConstruction_002", _profileId ?? EditorText.Get("BattleMapView_MapConstruction_001"), FormatDungeon(snapshot.DungeonId), snapshot.Difficulty));
         LocalizedUi.Set(LiveStatusTextBlock, TextBlock.TextProperty, () => EditorText.Format("BattleMapView_LiveRefresh_008", snapshot.ReadAtUtc.ToLocalTime()));

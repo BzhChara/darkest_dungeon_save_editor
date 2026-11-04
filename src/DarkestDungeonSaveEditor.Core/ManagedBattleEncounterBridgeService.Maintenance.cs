@@ -420,7 +420,7 @@ public sealed partial class ManagedBattleEncounterBridgeService
             foreach (var pair in stagedFiles.OrderBy(pair => pair.Key == snapshot?.MapSavePath ? 0 : 1))
             {
                 var replacement = new GuardedSaveReplacement(pair.Key, pair.Value, originalFiles[pair.Key], ComputeSha256(pair.Value),
-                    BeforeMaintenanceReplace, AfterMaintenanceReplace);
+                    BeforeMaintenanceReplace, AfterMaintenanceReplace, EnsureGameIsNotRunning);
                 replacements.Add(replacement);
                 replacement.Replace();
             }

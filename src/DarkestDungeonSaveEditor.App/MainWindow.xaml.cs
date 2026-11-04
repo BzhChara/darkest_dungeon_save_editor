@@ -50,19 +50,23 @@ public partial class MainWindow : Window
     private CroppedBitmap[]? _titleLogoFrames;
     private int _titleLogoFrameIndex;
     private readonly DesktopCodecSession _codecSession;
-    private readonly SaveEditorLocations? _saveLocations;
+    private readonly SaveEditorLocations _saveLocations;
 
     public MainWindow() : this(EditorLanguageSettings.DefaultPath) { }
 
     internal MainWindow(string languageSettingsPath, DesktopCodecSession? codecSession = null,
         SaveEditorLocations? saveLocations = null, Func<bool>? gameRunningProbe = null)
     {
-        _gameRunningProbe = gameRunningProbe ?? IsDarkestDungeonRunning;
-        _saveLocations = saveLocations;
+        _gameRunningProbe = gameRunningProbe ?? GameProcessGuard.IsRunning;
+        _saveLocations = saveLocations ?? SaveEditorLocations.CreateDefault();
         _codecSession = codecSession ?? (Application.Current as App)?.CodecSession
             ?? DesktopCodecSession.Create([], AppContext.BaseDirectory);
         _languageSettingsPath = languageSettingsPath;
         InitializeComponent();
+        InitialQuirksButton.IsEnabledChanged += (_, change) =>
+        {
+            if (change.NewValue is false) _initialQuirkPicker.Dismiss();
+        };
         LocalizedUi.Set(this, TitleProperty, () => EditorText.Get("MainWindow_001") +
             (!_codecSession.IsNative ? " — " + EditorText.Get("Codec_JavaReferenceTitle") :
                 DesktopCodecSession.IsNativeTestBuild ? " — " + EditorText.Get("Codec_NativeTestTitle") : string.Empty));
@@ -70,6 +74,8 @@ public partial class MainWindow : Window
         InitializeLanguageSelection();
         foreach (var grid in new[] { ItemGrid, TrinketGrid, EventGrid, HeroGrid }) EditorNameColumns.Apply(grid);
         BattleMapPanel.UsesSharedProfileMonitor = true;
+        BattleMapPanel.SaveLocations = _saveLocations;
+        BattleMapPanel.GameRunningProbe = _gameRunningProbe;
         ItemGrid.ItemsSource = _visibleItems;
         TrinketGrid.ItemsSource = _visibleTrinkets;
         HeroGrid.ItemsSource = _visibleHeroes;
@@ -78,7 +84,7 @@ public partial class MainWindow : Window
         BattleMapPanel.SnapshotRefreshed += BattleMapPanel_SnapshotRefreshed;
         BattleMapPanel.ActiveContentChanged += BattleMapPanel_ActiveContentChanged;
         BattleMapPanel.SaveEditApplied += BattleMapPanel_SaveEditApplied;
-        BattleMapPanel.SaveEditBusyChanged += BattleMapPanel_SaveEditBusyChanged;
+        BattleMapPanel.ProfileEditRunner = RunProfileEditAsync;
         BattleMapPanel.ProfileBrowseChecking += BattleMapPanel_ProfileBrowseChecking;
         BattleMapPanel.ProfileEditChecking += BattleMapPanel_ProfileEditChecking;
         QuestBoardPanel.ProfileBrowseChecking += BattleMapPanel_ProfileBrowseChecking;
@@ -94,22 +100,47 @@ public partial class MainWindow : Window
         NativeWindowTheme.ApplyDarkTitleBar(this);
     }
 
+    private bool _closeAfterCleanup;
+    internal bool CloseRequested => _catalogCloseRequested;
+
     protected override async void OnClosing(CancelEventArgs e)
     {
         base.OnClosing(e);
-        if (e.Cancel) return;
-        if (_catalogLoadTask is not { IsCompleted: false } loadTask) return;
-
-        // Keep the Dispatcher alive until cancellation has killed/waited for
-        // the official tool and finished its receipt/temp-directory cleanup.
-        e.Cancel = true;
-        if (_catalogCloseRequested) return;
+        if (e.Cancel || _closeAfterCleanup) return;
+        if (_catalogCloseRequested)
+        {
+            e.Cancel = true;
+            return;
+        }
         _catalogCloseRequested = true;
+        var pending = new[] { _profileOperationFinished?.Task, _catalogLoadTask, _catalogSyncTask }
+            .OfType<Task>().Where(task => !task.IsCompleted).ToArray();
+        if (pending.Length == 0) return;
+
+        e.Cancel = true;
+        _gameProcessPoll?.Stop();
         IsEnabled = false;
-        StopProfileSync();
-        try { await loadTask; }
-        catch (Exception ex) { CrashDiagnostics.RecordException("Close: catalog cleanup", ex); }
-        Close();
+        foreach (var dialog in OwnedWindows.OfType<ThemedDialog>().Where(dialog => dialog.IsVisible).ToArray())
+            dialog.Close();
+        // Read-only loading can be cancelled. A sync already applying Bridge
+        // maintenance must finish its writes/rollback with its token intact.
+        var maintainingBridge = _bridgeMaintenanceTask is { IsCompleted: false };
+        _previewCancellation?.Cancel();
+        if (maintainingBridge) _catalogLoadCancellation?.Cancel();
+        else StopProfileSync();
+        if ((_profileOperationFinished is not null && _previewCancellation is null) || maintainingBridge)
+        {
+            LocalizedUi.Set(ProfileSyncStatusTextBlock, TextBlock.TextProperty,
+                () => EditorText.Get("MainWindow_CloseSaving"));
+            AppendStatusSafely(EditorText.Get("MainWindow_CloseSaving"), "Close: waiting for save");
+        }
+        try { await Task.WhenAll(pending); }
+        catch (Exception ex) { CrashDiagnostics.RecordException("Close: operation cleanup", ex); }
+        await Dispatcher.InvokeAsync(() =>
+        {
+            _closeAfterCleanup = true;
+            Close();
+        }, DispatcherPriority.Background);
     }
 
     protected override void OnClosed(EventArgs e)
@@ -120,7 +151,7 @@ public partial class MainWindow : Window
         BattleMapPanel.SnapshotRefreshed -= BattleMapPanel_SnapshotRefreshed;
         BattleMapPanel.ActiveContentChanged -= BattleMapPanel_ActiveContentChanged;
         BattleMapPanel.SaveEditApplied -= BattleMapPanel_SaveEditApplied;
-        BattleMapPanel.SaveEditBusyChanged -= BattleMapPanel_SaveEditBusyChanged;
+        BattleMapPanel.ProfileEditRunner = null;
         BattleMapPanel.ProfileBrowseChecking -= BattleMapPanel_ProfileBrowseChecking;
         BattleMapPanel.ProfileEditChecking -= BattleMapPanel_ProfileEditChecking;
         QuestBoardPanel.ProfileBrowseChecking -= BattleMapPanel_ProfileBrowseChecking;

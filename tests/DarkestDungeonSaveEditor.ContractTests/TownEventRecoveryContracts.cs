@@ -26,6 +26,11 @@ internal static partial class ContractSuite
             });
         WriteMultiMash(game, "campaign/quest/recovery.quest.plot_quests.json",
             new JsonObject { ["plot_quests"] = definitions }.ToJsonString());
+        WriteMultiMash(game, "campaign/quest/recovery.quest.types.json", """
+            {"goals":[{"id":"kill_crow_A","type":"kill_monster","data":{"monster_class_ids":["crow_A"],"amount":1}},
+                      {"id":"kill_crow_B","type":"kill_monster","data":{"monster_class_ids":["crow_B"],"amount":1}},
+                      {"id":"kill_crow_C","type":"kill_monster","data":{"monster_class_ids":["crow_C"],"amount":1}}]}
+            """);
         WriteMultiMash(game, "trinkets/recovery.rarities.trinkets.json",
             """{"rarities":[{"id":"very_rare"},{"id":"rare"},{"id":"uncommon"},{"id":"common"},{"id":"event_rarity"}]}""");
 

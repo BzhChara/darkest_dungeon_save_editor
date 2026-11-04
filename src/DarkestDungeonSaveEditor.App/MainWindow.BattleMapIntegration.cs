@@ -46,12 +46,6 @@ public partial class MainWindow : Window
     private void BattleMapPanel_SaveEditApplied(string message) =>
         AppendStatusSafely(message, "BattleMap: applied save edit");
 
-    private async Task BattleMapPanel_SaveEditBusyChanged(bool isBusy)
-    {
-        if (isBusy) SetBusy(true);
-        else await CompleteProfileEditAsync();
-    }
-
     private bool BattleMapPanel_ProfileBrowseChecking()
     {
         CheckGameProcess();

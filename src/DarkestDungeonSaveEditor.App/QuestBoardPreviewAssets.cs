@@ -37,12 +37,17 @@ internal sealed class QuestBoardPreviewAssets
 
     internal ImageSource? QuestImage(string name) => Image(QuestArt + name);
 
-    internal void SetResolvedImages(IReadOnlyDictionary<string, string>? paths)
+    internal bool SetResolvedImages(IReadOnlyDictionary<string, string>? paths, bool invalidateCache = false)
     {
-        if (ReferenceEquals(_resolvedImages, paths)) return;
+        var unchanged = ReferenceEquals(_resolvedImages, paths) ||
+            (_resolvedImages is not null && paths is not null && _resolvedImages.Count == paths.Count &&
+             paths.All(pair => _resolvedImages.TryGetValue(pair.Key, out var previous) &&
+                 string.Equals(previous, pair.Value, StringComparison.OrdinalIgnoreCase)));
+        if (unchanged && !invalidateCache) return false;
         _resolvedImages = paths;
         _images.Clear();
         _alphaMasks.Clear();
+        return true;
     }
 
     internal ImageSource? Image(string relativePath)

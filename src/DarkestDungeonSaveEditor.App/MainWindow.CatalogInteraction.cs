@@ -133,19 +133,21 @@ public partial class MainWindow : Window
     private void HeroLevelComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e) =>
         InvalidatePreparedEdit();
 
+    private readonly ProfileSelectionDialog _initialQuirkPicker = new();
+
     private void SelectInitialQuirks_Click(object sender, RoutedEventArgs e)
     {
+        if (_catalogCloseRequested || ObserveGameProcess() || !InitialQuirksButton.IsEnabled) return;
         if (HeroGrid.SelectedItem is not HeroRow selectedHero || _heroCatalog is null)
         {
             AppendStatus(EditorText.Get("MainWindow_CatalogInteraction_001"), level: DiagnosticLogLevel.Warning);
             return;
         }
 
-        InitialQuirkSelectionDialog? dialog = null;
         var catalog = _heroCatalog;
         try
         {
-            dialog = new InitialQuirkSelectionDialog(
+            var dialog = new InitialQuirkSelectionDialog(
                 _heroCatalog,
                 selectedHero.Definition,
                 GetSelectedHeroLevel(),
@@ -153,7 +155,7 @@ public partial class MainWindow : Window
             {
                 Owner = this
             };
-            if (dialog.ShowDialog() != true)
+            if (!_initialQuirkPicker.Show(dialog) || ObserveGameProcess() || _catalogCloseRequested)
             {
                 return;
             }
@@ -178,11 +180,6 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             CrashDiagnostics.RecordException("Initial quirks: selection dialog", ex);
-            if (dialog?.IsVisible == true)
-            {
-                dialog.Close();
-            }
-
             AppendStatusSafely(EditorText.Format("MainWindow_CatalogInteraction_004", ex.Message), "Initial quirks: failure status", DiagnosticLogLevel.Error);
         }
     }

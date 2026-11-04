@@ -26,7 +26,7 @@ An expedition with several objectives is prepared as one change. Any unsupported
 
 `persist.game.json` determines the active `raid_save` directory. Only the active `persist.map.json` and/or `persist.raid.json` are written. Root leftovers and other persistent expeditions remain untouched. Preparation reuses `BattleMapWriteGuard`, checks the current content and snapshots, and performs a C# DSON encode/decode comparison with revision preservation.
 
-Commit uses the existing guarded file replacement and reverse recovery mechanism, a full profile backup, and a transaction status record. Game/map/raid hashes and active resource fingerprints are checked around the write. A newer external file is not silently overwritten during recovery. Normal profile synchronization refreshes the inventory and map together after a successful operation.
+Forced completion shares its per-file replacement and recovery with force return to town. If a map and raid edit are both required, a failure on the second file rolls back the first. The editor backs up the full profile and records the transaction status. Game/map/raid hashes and active resource fingerprints are checked around the write. A newer external file is not silently overwritten during recovery. Normal profile synchronization refreshes the inventory and map together after a successful operation.
 
 ## Evidence and validation
 

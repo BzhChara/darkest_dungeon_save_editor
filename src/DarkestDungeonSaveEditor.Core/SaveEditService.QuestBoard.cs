@@ -11,7 +11,7 @@ public sealed partial class SaveEditService
     public async Task<PreparedQuestBoardEdit> PrepareQuestBoardEditAsync(SaveProfile profile, QuestBoardEditRequest request,
         ActiveContentSnapshot content, CancellationToken cancellationToken = default)
     {
-        EnsureGameIsNotRunning();
+        RequireGameStopped();
         _codec.ValidateAvailability();
         ValidateProfile(profile);
         ValidateActiveContentSnapshot(profile, content);
@@ -101,8 +101,8 @@ public sealed partial class SaveEditService
         ValidateQuestBoardGuard(prepared, false, cancellationToken);
         var backup = CreateQuestBoardBackup(prepared);
         ValidateQuestBoardGuard(prepared, false, cancellationToken);
-        using var replacement = new GuardedSaveReplacement(file.TargetPath, file.EncodedPath,
-            file.OriginalSha256, file.EncodedSha256, BeforeTargetReplace, AfterTargetReplace);
+        using var replacement = CreateReplacement(file.TargetPath, file.EncodedPath,
+            file.OriginalSha256, file.EncodedSha256);
         try
         {
             replacement.Replace();
@@ -127,10 +127,10 @@ public sealed partial class SaveEditService
         }
     }
 
-    private static void ValidateQuestBoardGuard(PreparedQuestBoardEdit prepared, bool replaced, CancellationToken token)
+    private void ValidateQuestBoardGuard(PreparedQuestBoardEdit prepared, bool replaced, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
-        EnsureGameIsNotRunning();
+        RequireGameStopped();
         ValidateActiveContentSnapshot(prepared.Profile, prepared.Content);
         TownSceneGuard.RequireTown(prepared.Content);
         foreach (var name in QuestBoardSaveNames)

@@ -25,8 +25,7 @@ workspaces/
 logs/
 *.log
 
-# Local review, experiment and change-history records
-/docs/change-history/
+# External research material
 /.research/
 
 # Local-only configuration and transient files
