@@ -18,7 +18,7 @@ Download a **Windows x64 ZIP** from [GitHub Releases](https://github.com/BzhChar
 
 See [Installation and first use](docs/release-installation.md) for requirements, checksum verification, backups and updates. This is a prerelease: keep a separate save backup and check the selected profile before editing. The **Source code** archives on GitHub require building the project.
 
-The current source version is `0.1.0-beta.8`. This release improves preview responsiveness, quest-board navigation and recovery from interrupted save and Encounter Bridge writes. [Read the beta.8 release notes](docs/releases/v0.1.0-beta.8.md).
+The current source version is `0.1.0-beta.9`. This release aligns hero generation, town events, map pools and item-source analysis with the official game's resource consumers, and clarifies Mod manifest diagnostics. [Read the beta.9 release notes](docs/releases/v0.1.0-beta.9.md).
 
 ## License
 

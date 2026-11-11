@@ -1,6 +1,6 @@
 # Optional MO2 compatibility package
 
-This optional package replaces the Core component in **DarkestDungeonSaveEditor 0.1.0-beta.8**. It contains `DarkestDungeonSaveEditor.Core.dll`, its Chinese resource assembly, an example configuration and source code. It uses the same native C# codec as the matching editor. The editor also supports an explicit `--codec=java` reference mode.
+This optional package replaces the Core component in **DarkestDungeonSaveEditor 0.1.0-beta.9**. It contains `DarkestDungeonSaveEditor.Core.dll`, its Chinese resource assembly, an example configuration and source code. It uses the same native C# codec as the matching editor. The editor also supports an explicit `--codec=java` reference mode.
 
 ## Supported setup
 
@@ -73,7 +73,7 @@ From this repository, with Windows, PowerShell 7.1+, Git, and a .NET SDK support
 pwsh -NoProfile -File patch/mo2/Build.ps1
 ```
 
-The script builds both Core variants, runs compatibility contracts and public API/version checks, then writes `DarkestDungeonSaveEditor-0.1.0-beta.8-MO2-patch.zip` and `SHA256SUMS.txt` in a new directory under `patch/mo2/artifacts`. `build-info.json` identifies the supported mapper and compatibility revision. The compatibility Core links ordinary Core sources and injects source-resolution and source-validation hooks into a generated resolver under `obj`. Unexpected upstream hook changes fail the build.
+The script builds both Core variants, runs compatibility contracts and public API/version checks, then writes `DarkestDungeonSaveEditor-0.1.0-beta.9-MO2-patch.zip` and `SHA256SUMS.txt` in a new directory under `patch/mo2/artifacts`. `build-info.json` identifies the supported mapper and compatibility revision. The compatibility Core links ordinary Core sources and injects source-resolution and source-validation hooks into a generated resolver under `obj`. Unexpected upstream hook changes fail the build.
 
 When pairing the patch with a packaged editor, add `-EditorDirectory <extracted-editor-directory>`. The script checks that package's Core version and public API and records its exact SHA-256 as `ordinaryCoreSha256` in `build-info.json`. Without this argument it compares against the local ordinary Core build.
 
