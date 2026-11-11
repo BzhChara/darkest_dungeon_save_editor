@@ -76,8 +76,29 @@ public static partial class StagecoachHeroCandidateFactory
         IReadOnlyCollection<string> selectedInitialQuirkIds)
     {
         ArgumentNullException.ThrowIfNull(catalog);
-        ArgumentNullException.ThrowIfNull(heroClass);
         ArgumentNullException.ThrowIfNull(selectedInitialQuirkIds);
+        return GenerateCore(catalog, heroClass, seed, resolveLevel, ResolveSelectedQuirks(catalog, selectedInitialQuirkIds));
+    }
+
+    internal static GeneratedStagecoachHeroCandidate GenerateWithQuirkDefinitions(
+        HeroClassCatalogResult catalog, HeroClassDefinition heroClass, int seed, int resolveLevel,
+        IReadOnlyList<HeroInitialQuirkDefinition> selectedQuirks)
+    {
+        // Only definitions from this catalog can enter the instance-based path;
+        // manual selection still resolves saved IDs through the last-match list.
+        if (selectedQuirks.Any(quirk => !catalog.InitialQuirks.Concat(catalog.RandomInitialQuirks)
+                .Any(known => ReferenceEquals(known, quirk))))
+            throw new InvalidOperationException("Initial quirk definition does not belong to this catalog.");
+        ValidateSelectedQuirks(catalog, selectedQuirks);
+        return GenerateCore(catalog, heroClass, seed, resolveLevel, selectedQuirks);
+    }
+
+    private static GeneratedStagecoachHeroCandidate GenerateCore(
+        HeroClassCatalogResult catalog, HeroClassDefinition heroClass, int seed, int resolveLevel,
+        IReadOnlyList<HeroInitialQuirkDefinition> selectedQuirks)
+    {
+        ArgumentNullException.ThrowIfNull(catalog);
+        ArgumentNullException.ThrowIfNull(heroClass);
         if (heroClass.HasProviderConflict)
         {
             throw new InvalidOperationException(EditorText.Format("StagecoachHeroCandidateFactory_003", heroClass.Id));
@@ -116,22 +137,19 @@ public static partial class StagecoachHeroCandidateFactory
             warnings.Add(EditorText.Format("StagecoachHeroCandidateFactory_009", generation.TownEventDependency));
         }
 
-        var combatSkills = SelectCombatSkills(heroClass, generation, random, warnings);
+        var upgradePurchases = BuildUpgradePurchases(heroClass, levelProfile.ResolveLevel, warnings);
+        var combatSkills = SelectCombatSkills(heroClass, generation, random, warnings, upgradePurchases, out var initiallyUnlocked);
         var campingSkills = SelectCampingSkills(
             heroClass,
             classCampingCount,
             sharedCampingCount,
             random,
             warnings);
-        var selectedQuirks = ResolveSelectedQuirks(
-            catalog,
-            selectedInitialQuirkIds);
         var initialQuirkStates = selectedQuirks
             .Select(quirk => new InitialQuirkPersistenceState(
                 quirk,
                 ResolveEvolutionDuration(seed, quirk)))
             .ToArray();
-        var upgradePurchases = BuildUpgradePurchases(heroClass, levelProfile.ResolveLevel, warnings);
         HeroEquipmentProgression.Validate(heroClass, levelProfile, upgradePurchases, warnings);
 
         var evolvingQuirkSummaries = initialQuirkStates
@@ -190,7 +208,7 @@ public static partial class StagecoachHeroCandidateFactory
                 combatSkills,
                 campingSkills,
                 warnings),
-            upgradePurchases);
+            upgradePurchases) { InitiallyUnlockedCombatSkills = initiallyUnlocked ?? combatSkills };
     }
 
 }

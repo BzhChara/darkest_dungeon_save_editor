@@ -50,7 +50,10 @@ public static class TownEventCatalog
                         NativeJsonReader.ReadFloat(effect, "number_data") ?? 0)).ToArray();
                     parsed.Add(new TownEventDefinition(id, effects, file.Source.Id, file.Path, false)
                     {
-                        TriggerRules = TownEventTriggerRules.Read(entry)
+                        TriggerRules = TownEventTriggerRules.Read(entry),
+                        // Only nonemptiness is consumed here. Native truncation
+                        // can split UTF-8, but cannot change its first-byte gate.
+                        InteractionTextureId = NativeJsonReader.ReadCString(entry, "interaction_texture_id")
                     });
                 }
                 foreach (var definition in parsed)

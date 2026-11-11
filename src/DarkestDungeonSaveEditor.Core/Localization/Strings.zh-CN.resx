@@ -596,7 +596,7 @@
     <comment>src/DarkestDungeonSaveEditor.App/BattleMapView.Content.cs</comment>
   </data>
   <data xml:space="preserve" name="BattleMapView_Content_005">
-    <value>当前副本区域已经变化，请重新选择目标。</value>
+    <value>当前副本区域或难度已经变化，请重新选择目标。</value>
     <comment>src/DarkestDungeonSaveEditor.App/BattleMapView.Content.cs</comment>
   </data>
   <data xml:space="preserve" name="BattleMapView_Content_006">
@@ -1172,15 +1172,15 @@
     <comment>src/DarkestDungeonSaveEditor.App/MainWindow.CatalogLoading.cs</comment>
   </data>
   <data xml:space="preserve" name="MainWindow_CatalogLoading_017">
-    <value>目录扫描完成：档案 {0}；模式 {1}；</value>
+    <value>内容目录加载完成：档案 {0}；模式 {1}；</value>
     <comment>src/DarkestDungeonSaveEditor.App/MainWindow.CatalogLoading.cs</comment>
   </data>
   <data xml:space="preserve" name="MainWindow_CatalogLoading_018">
-    <value>本轮目录日志说明 {0} 条，</value>
+    <value>诊断信息 {0} 条，</value>
     <comment>src/DarkestDungeonSaveEditor.App/MainWindow.CatalogLoading.cs</comment>
   </data>
   <data xml:space="preserve" name="MainWindow_CatalogLoading_019">
-    <value>警告 {0} 条（含战斗目录，跨模块按文件/原因合并，不等于不可用内容数量）。</value>
+    <value>警告 {0} 条（含战斗内容诊断，已按文件和原因合并；明细见完整日志）。</value>
     <comment>src/DarkestDungeonSaveEditor.App/MainWindow.CatalogLoading.cs</comment>
   </data>
   <data xml:space="preserve" name="MainWindow_CatalogLoading_020">
@@ -1815,7 +1815,7 @@
     <comment>src/DarkestDungeonSaveEditor.App/MainWindow.RowModels.cs</comment>
   </data>
   <data xml:space="preserve" name="MainWindow_RowModels_019">
-    <value>（至少选一项） / </value>
+    <value>（生成时至少解锁一项） / </value>
     <comment>src/DarkestDungeonSaveEditor.App/MainWindow.RowModels.cs</comment>
   </data>
   <data xml:space="preserve" name="MainWindow_RowModels_020">
@@ -2387,7 +2387,7 @@
     <comment>src/DarkestDungeonSaveEditor.Core/BattleMapSaveEditor.Content.cs</comment>
   </data>
   <data xml:space="preserve" name="BattleMapSaveEditor_Content_002">
-    <value>陷阱和障碍只能使用当前副本区域的资源，请重新选择。</value>
+    <value>所选内容不适用于当前副本区域或难度，请重新选择。</value>
     <comment>src/DarkestDungeonSaveEditor.Core/BattleMapSaveEditor.Content.cs</comment>
   </data>
   <data xml:space="preserve" name="BattleMapSaveEditor_Content_003">
@@ -2847,15 +2847,15 @@
     <comment>src/DarkestDungeonSaveEditor.Core/CompiledLocalizationValueReader.cs</comment>
   </data>
   <data xml:space="preserve" name="ContentFileInventory_Diagnostics_001">
-    <value>文件清点：已定位 Mod 来源 {0} 个（不含无法定位的启用记录）；</value>
+    <value>Mod 文件核对：目录 {0} 个；</value>
     <comment>src/DarkestDungeonSaveEditor.Core/ContentFileInventory.Diagnostics.cs</comment>
   </data>
   <data xml:space="preserve" name="ContentFileInventory_Diagnostics_002">
-    <value>有清单 {0} 个；</value>
+    <value>有 modfiles.txt {0} 个；</value>
     <comment>src/DarkestDungeonSaveEditor.Core/ContentFileInventory.Diagnostics.cs</comment>
   </data>
   <data xml:space="preserve" name="ContentFileInventory_Diagnostics_003">
-    <value>确认无清单 {0} 个；</value>
+    <value>确认缺少 modfiles.txt {0} 个；</value>
     <comment>src/DarkestDungeonSaveEditor.Core/ContentFileInventory.Diagnostics.cs</comment>
   </data>
   <data xml:space="preserve" name="ContentFileInventory_Diagnostics_004">
@@ -2863,7 +2863,7 @@
     <comment>src/DarkestDungeonSaveEditor.Core/ContentFileInventory.Diagnostics.cs</comment>
   </data>
   <data xml:space="preserve" name="ContentFileInventory_Diagnostics_005">
-    <value>清单外数据/译文文件 {0} 个（仅盘点、未加载）；</value>
+    <value>清单外数据/译文候选 {0} 个（未纳入本次内容目录）；</value>
     <comment>src/DarkestDungeonSaveEditor.Core/ContentFileInventory.Diagnostics.cs</comment>
   </data>
   <data xml:space="preserve" name="ContentFileInventory_Diagnostics_006">
@@ -2871,11 +2871,11 @@
     <comment>src/DarkestDungeonSaveEditor.Core/ContentFileInventory.Diagnostics.cs</comment>
   </data>
   <data xml:space="preserve" name="ContentFileInventory_Diagnostics_007">
-    <value>（当前内容范围内 {0} 个）；</value>
+    <value>（其中数据/译文候选 {0} 个）；</value>
     <comment>src/DarkestDungeonSaveEditor.Core/ContentFileInventory.Diagnostics.cs</comment>
   </data>
   <data xml:space="preserve" name="ContentFileInventory_Diagnostics_008">
-    <value>扫描不完整 {0} 个。差异明细已写入完整日志，未改变内容纳入规则。</value>
+    <value>核对未完成的 Mod 目录 {0} 个。差异明细见完整日志。</value>
     <comment>src/DarkestDungeonSaveEditor.Core/ContentFileInventory.Diagnostics.cs</comment>
   </data>
   <data xml:space="preserve" name="ContentFileInventory_Diagnostics_009">
@@ -2887,11 +2887,11 @@
     <comment>src/DarkestDungeonSaveEditor.Core/ContentFileInventory.Diagnostics.cs</comment>
   </data>
   <data xml:space="preserve" name="ContentFileInventory_Diagnostics_011">
-    <value>文件清点说明：候选只表示文件类型和目录范围，不代表已解析、游戏已加载或允许写入；</value>
+    <value>加载规则：Mod 数据按 modfiles.txt、已启用 DLC 和对应资源的路径规则读取；数据/译文候选仅按文件类型和目录范围统计，实际载入结果见各内容目录。</value>
     <comment>src/DarkestDungeonSaveEditor.Core/ContentFileInventory.Diagnostics.cs</comment>
   </data>
   <data xml:space="preserve" name="ContentFileInventory_Diagnostics_012">
-    <value>清单外数据/译文均不参与内容加载；不以相同内容或无引用判旧，不执行脚本、不改写清单。</value>
+    <value>清单处理：缺少 modfiles.txt 时，关闭游戏后点击“载入存档”，由官方工具生成；已有清单不自动扩写，清单外候选不自动补入。文件核对只记录差异。</value>
     <comment>src/DarkestDungeonSaveEditor.Core/ContentFileInventory.Diagnostics.cs</comment>
   </data>
   <data xml:space="preserve" name="ContentFileInventory_Diagnostics_013">
@@ -2915,11 +2915,11 @@
     <comment>src/DarkestDungeonSaveEditor.Core/ContentFileInventory.Diagnostics.cs</comment>
   </data>
   <data xml:space="preserve" name="ContentFileInventory_Diagnostics_018">
-    <value>范围内数据/译文={0}；</value>
+    <value>范围内数据/译文候选={0}；</value>
     <comment>src/DarkestDungeonSaveEditor.Core/ContentFileInventory.Diagnostics.cs</comment>
   </data>
   <data xml:space="preserve" name="ContentFileInventory_Diagnostics_019">
-    <value>清单外数据/译文文件={0}（仅盘点、未加载）；清单外其他文件={1}；</value>
+    <value>清单外数据/译文候选={0}（未纳入本次内容目录）；清单外其他文件={1}；</value>
     <comment>src/DarkestDungeonSaveEditor.Core/ContentFileInventory.Diagnostics.cs</comment>
   </data>
   <data xml:space="preserve" name="ContentFileInventory_Diagnostics_020">
@@ -2931,7 +2931,7 @@
     <comment>src/DarkestDungeonSaveEditor.Core/ContentFileInventory.Diagnostics.cs</comment>
   </data>
   <data xml:space="preserve" name="ContentFileInventory_Diagnostics_022">
-    <value>清单外数据/译文文件：仅盘点、未加载</value>
+    <value>未列入 modfiles.txt 的数据/译文候选：未纳入本次内容目录</value>
     <comment>src/DarkestDungeonSaveEditor.Core/ContentFileInventory.Diagnostics.cs</comment>
   </data>
   <data xml:space="preserve" name="ContentFileInventory_Diagnostics_023">
@@ -5471,4 +5471,7 @@
   <data name="CatalogLogDiagnostics_UnavailableLocalDirectory" xml:space="preserve">
     <value>存档启用了本地 Mod「{0}」，但本地 Mod 目录未设置或不可用。请选择当前游戏的 mods 文件夹，然后重新载入存档。</value>
   </data>
+  <data name="QuirkEvolution_Turns" xml:space="preserve"><value>回合</value></data>
+  <data name="QuirkEvolution_CombatEnd" xml:space="preserve"><value>次战斗结束</value></data>
+  <data name="QuirkEvolution_QuestEnd" xml:space="preserve"><value>次任务结束</value></data>
 </root>

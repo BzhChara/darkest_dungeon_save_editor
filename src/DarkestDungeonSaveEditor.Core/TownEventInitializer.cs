@@ -16,7 +16,7 @@ internal sealed partial class TownEventInitializer(ActiveContentSnapshot content
         "stage_coach_bonus_recruits", "trinket_retention_add_from_storage", "remove_vampire", "districts_unlocked",
         "bonus_currency", "stress_treatment_debuff", "shard_buff", "event_cost", "quirked_recruit", "roster_stress_heal",
         "roster_disease_heal", "trinket_sell_multiplier", "idle_negative_quirk_remove", "heirloom_gain_multiplier",
-        "nomad_wagon_trinket_discount", "bonus_recruit_stage_coach_level"
+        "nomad_wagon_trinket_discount", "bonus_recruit_stage_coach_level", "specific_recruit"
     ];
 
     internal static string EffectType(TownEventEffect effect) => NativeEffectTypes.FirstOrDefault(type =>
@@ -28,6 +28,13 @@ internal sealed partial class TownEventInitializer(ActiveContentSnapshot content
         var unavailable = TownEventAvailability.UnavailableReason(definition);
         if (unavailable.Length > 0) throw new InvalidOperationException(unavailable);
         var state = TownEventSaveEditor.Root(saves, "town_event");
+        // 28385, RVA 0x471540: the paid buff is an interaction only when the
+        // event also supplies an interaction texture. Zero costs still qualify.
+        state["has_unclaimed_interaction"] = definition.Effects.Any(effect =>
+            EffectType(effect) is "roster_stress_heal" or "roster_disease_heal") ||
+            definition.InteractionTextureId.Length > 0 &&
+            definition.Effects.Any(effect => EffectType(effect) == "embark_party_buff") &&
+            definition.Effects.Any(effect => EffectType(effect) == "event_cost");
         var costs = new Dictionary<uint, (string Type, int Amount)>();
         var upgrades = new Dictionary<uint, int>();
         foreach (var effect in definition.Effects)
@@ -58,6 +65,7 @@ internal sealed partial class TownEventInitializer(ActiveContentSnapshot content
                 case "bonus_recruit":
                 case "bonus_recruit_stage_coach_level":
                 case "quirked_recruit":
+                case "specific_recruit":
                     AddRecruits(saves, definition, effect, type, changes);
                     break;
                 case "dead_recruit":

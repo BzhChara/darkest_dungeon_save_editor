@@ -83,19 +83,22 @@ internal sealed partial class TownEventInitializer
     }
 
     private (IReadOnlyList<string> Combat, IReadOnlyList<string> Camping) AddExtraRecruitSkills(
-        HeroClassDefinition hero, JsonObject skills, JsonObject? upgrade)
+        HeroClassDefinition hero, JsonObject skills, JsonObject? upgrade, IReadOnlyList<string> unlockedCombat)
     {
         if (upgrade is null) return ([], []);
-        string[] Pick(IEnumerable<string> all, JsonObject selected, string countKey)
+        string[] Pick(IEnumerable<string> all, IReadOnlyCollection<string> unlocked, string countKey)
         {
             var count = JsonSupport.ReadInt(upgrade, countKey) ?? 0;
             if (count < 0) throw new InvalidDataException("Negative additional recruit skill count.");
-            return all.Where(id => !selected.ContainsKey(id)).Distinct(StringComparer.Ordinal)
+            return all.Where(id => !unlocked.Contains(id, StringComparer.Ordinal)).Distinct(StringComparer.Ordinal)
                 .OrderBy(_ => _random.Next()).Take(count).ToArray();
         }
-        var combat = Pick(hero.CombatSkillIds, JsonSupport.RequireObject(skills, "selected_combat_skills"), "number_of_extra_combat_skills");
+        var combat = Pick(hero.CombatSkillIds.Where(id =>
+                hero.CombatSkillSelection.GetValueOrDefault(id) is not { Visible: false } &&
+                (hero.CanSelectCombatSkills == false || hero.CombatSkillSelection.GetValueOrDefault(id) is not { ForceSelection: true })),
+            unlockedCombat, "number_of_extra_combat_skills");
         var camping = Pick(hero.ClassCampingSkillIds.Concat(hero.SharedCampingSkillIds),
-            JsonSupport.RequireObject(skills, "selected_camping_skills"), "number_of_extra_camping_skills");
+            JsonSupport.RequireObject(skills, "selected_camping_skills").Select(pair => pair.Key).ToArray(), "number_of_extra_camping_skills");
         // Extra skills are purchased; the native generator does not equip all
         // of them beyond the hero's selected-skill limit.
         return (combat, camping);

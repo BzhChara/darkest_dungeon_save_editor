@@ -93,6 +93,8 @@ internal static partial class QuantityItemReferenceAnalyzer
             if (isEvent && !parsed) eventReads.RecordFailure();
         }
 
+        if (saveContext == QuantityItemSaveContext.Raid)
+            scanComplete &= ParseEffectLootReferences(activeContent, files, rootLootEvidence, uncertainLootEvidence, issues);
         TraverseLootRoots(lootTables, rootLootEvidence, uncertainLootEvidence, activeEvidence, incompleteEvidence);
 
         var sourcesById = activeContent.Sources.ToDictionary(

@@ -8,6 +8,14 @@ internal static partial class ContractSuite
         var content = ActiveContentResolver.ResolveDecoded(profile, fixture.GameRoot, null, null,
             fixture.RunRoot, gamePath, ComputeSha256(gamePath));
         RunLoggingUiContracts(repositoryRoot);
+        // The inventory cases exercise enabled versus disabled DLC paths;
+        // this focused logging profile otherwise has no enabled DLC.
+        const string inventoryDlc = "dlc/100_feature_pack/features/enabled_feature";
+        RunContentInventoryContracts(content with
+        {
+            Sources = content.Sources.Append(new ActiveContentSource("inventory-dlc", "Inventory DLC", "dlc-feature",
+                Path.Combine(fixture.GameRoot, inventoryDlc), 1) { VirtualPathPrefix = inventoryDlc }).ToArray()
+        }, fixture, repositoryRoot);
         RunLoggingContracts(content, fixture.RunRoot);
         var snapshot = await new BattleMapSnapshotReader(fixture.Codec).LoadAsync(profile.ProfileDirectory);
         VerifyEncounterDiagnosticContracts(content, snapshot, fixture.RunRoot);

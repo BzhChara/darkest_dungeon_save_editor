@@ -42,7 +42,7 @@ Curse removal and revival use effective quirk tags, compared by native hash (`0x
 
 ## Effect families
 
-All 31 known native effect types are classified by timing. Composite events initialize each applicable effect; costs and free-upgrade quotas combine by native identity.
+All 32 known native effect types, including the November 2026 update's `specific_recruit`, are classified by timing. Composite events initialize each applicable effect; costs and free-upgrade quotas combine by native identity.
 
 | Effects | Replacement behavior |
 | --- | --- |
@@ -50,8 +50,9 @@ All 31 known native effect types are classified by timing. Composite events init
 | Departure, idle and activity Buffs; idle resolve levels and negative quirk removal; stress-treatment and shard Buffs | Do not execute later treatment, departure or settlement early. |
 | Free upgrade quotas and event costs | Initialize unused quotas and costs. |
 | Roster stress/disease healing | Enable the new unclaimed interaction; do not heal before it is claimed. |
+| Paid embark Buffs | Enable the unclaimed interaction only when `embark_party_buff`, `event_cost` and a nonempty native `interaction_texture_id` occur together. Zero cost still qualifies. Payment and Buff application remain native claim/departure actions. |
 | Heirloom multiplier and Nomad Wagon discount | Initialize the current multiplier or available discount. |
-| Event recruits, stagecoach-level event recruits and quirked recruits | Generate complete event-owned offers with class/level/quirk rules, personal purchases and HP. Do not recruit them into the roster. |
+| Event recruits, stagecoach-level event recruits, quirked recruits and `specific_recruit` | Generate complete event-owned offers with class/level/quirk rules, personal purchases and HP. `specific_recruit` creates one offer per effect: `string_data` identifies the class and truncated `number_data` supplies the resolve level, including level zero. Do not recruit offers into the roster. |
 | Revival | Draw dead heroes without replacement from a shared pool; native behavior refills an exhausted pool at a later effect row. Heroes stay dead until the game accepts an offer. HP uses old equipment and supported HP effects before native preparation clears buffs and resets equipment. |
 | Extra stagecoach recruits | Append candidates using deck history, eligibility and purchased upgrade rules. Existing candidates remain. |
 | Trinket theft | Move eligible storage copies to the recovery pool. Protect existing quest rewards and match native saved item identities. Do not automatically generate a recovery quest. |
@@ -75,6 +76,8 @@ For reference, native weekly generation orders recovery variants by their minimu
 In the current native save format, `persist.quest.json` stores `trinket_retention_ids` as an inventory object with an `items` object, not an integer array. Native quest loading opens that node at `0x140572D33` and calls the inventory reader at `0x1405D5420`. Theft creates an amount-one trinket instance (`0x14058EE49`) and inserts it into that inventory (`0x14058EE5D`). Event quest ownership, recovery eligibility and reward ordering read its positive trinket entries. Recovery rewards copy the existing retained instances (`0x14057726C`-`0x140577280`) with their counters and other saved item state. Generating rewards does not consume these entries, and replacing the event preserves already stolen items. The contract fixtures use the structure observed in a native `profile_0` save; real-definition offline checks complement these fixtures.
 
 Resource selection and effect initialization follow the supported native rules, with the explicit manual quest-generation exception above. The editor does not promise the same random draw as a game session. Each preview uses a private random seed; applying that preview writes its prepared result without rerolling.
+
+Random recruit quirks retain every effective definition in native file order, including duplicate IDs and hash aliases. Each eligible definition contributes its own weight, classification, incompatibilities and singleton tag. The chosen definition supplies initial HP and evolution duration through candidate serialization; it is not re-resolved to the last ID match midway. Hash aliases cannot both be acquired by one recruit. Forced named quirks and manual selection still resolve the last matching definition; a forced hash already owned by the recruit keeps its existing instance. The save contains the quirk name and normal instance fields, not an invented definition index; the game's subsequent by-ID load still uses its last-match rule. A missing effective quirk file prevents random generation even when a later definition restores an individual named lookup. See [consumer evidence](resource-duplicate-semantics.md#38-building-queries-and-quirk-object-consumers-2026-11-11).
 
 ## Write protection
 

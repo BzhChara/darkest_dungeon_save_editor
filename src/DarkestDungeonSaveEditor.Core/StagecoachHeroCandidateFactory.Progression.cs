@@ -47,8 +47,17 @@ public static partial class StagecoachHeroCandidateFactory
         var combatPurchases = new List<HeroUpgradePurchase>();
         foreach (var (skillId, target) in combatTargets)
         {
+            // Hidden skills are auto-purchased only through authored upgrade trees
+            // (28385 RVA 0x5D4950); a missing tree does not create an unlock.
+            if (heroClass.CombatSkillSelection.GetValueOrDefault(skillId)?.Visible == false)
+            {
+                if (combatTrees.TryGetValue(target, out var hiddenTree))
+                    combatPurchases.AddRange(BuildHiddenCombatPurchases(heroClass, skillId, hiddenTree, resolveLevel));
+                continue;
+            }
             combatPurchases.AddRange(combatTrees.TryGetValue(target, out var tree)
-                ? BuildAuthoredCombatPurchases(heroClass, skillId, tree, resolveLevel, warnings)
+                ? BuildAuthoredCombatPurchases(heroClass, skillId, tree, resolveLevel, warnings,
+                    heroClass.CanSelectCombatSkills != false && heroClass.CombatSkillSelection.GetValueOrDefault(skillId)?.ForceSelection == true)
                 : BuildImplicitCombatPurchases(heroClass, skillId, combatTargets, resolveLevel, warnings));
         }
 
@@ -146,8 +155,11 @@ public static partial class StagecoachHeroCandidateFactory
         HeroClassDefinition heroClass,
         HeroGenerationDefinition generation,
         Random random,
-        List<string> warnings)
+        List<string> warnings,
+        IReadOnlyList<HeroUpgradePurchase> purchases,
+        out IReadOnlyList<string>? initiallyUnlocked)
     {
+        initiallyUnlocked = null;
         if (heroClass.CombatSkillIds.Count == 0)
         {
             throw new InvalidOperationException(EditorText.Format("StagecoachHeroCandidateFactory_Progression_014", heroClass.Id));
@@ -159,51 +171,19 @@ public static partial class StagecoachHeroCandidateFactory
             throw new InvalidOperationException(EditorText.Format("StagecoachHeroCandidateFactory_Progression_015", heroClass.Id));
         }
 
-        if (heroClass.CanSelectCombatSkills == false)
-        {
-            return heroClass.CombatSkillIds.ToArray();
-        }
-
-        var generatedSkillCount = generation.RandomCombatSkills ??
-            throw new InvalidOperationException(EditorText.Format("StagecoachHeroCandidateFactory_Progression_016", heroClass.Id));
-        if (generatedSkillCount <= 0)
-        {
+        var ordinary = heroClass.CombatSkillSelection.Values.All(flags => flags == new HeroCombatSkillSelection());
+        // Preserve ordinary-template safety guards. A zero random draw can now
+        // be usable when generation_guaranteed supplies a skill; hidden/forced/
+        // exempt templates retain their existing capability rules.
+        if (ordinary && heroClass.CanSelectCombatSkills != false && heroClass.SelectedCombatSkillsMax is <= 0)
             throw new InvalidOperationException(
-                EditorText.Format("StagecoachHeroCandidateFactory_Progression_017", heroClass.Id, generatedSkillCount, heroClass.CombatSkillIds.Count));
-        }
+                EditorText.Format("StagecoachHeroCandidateFactory_Progression_018", heroClass.Id, heroClass.SelectedCombatSkillsMax));
 
-        var target = heroClass.SelectedCombatSkillsMax is { } maximum
-            ? Math.Min(generatedSkillCount, maximum)
-            : generatedSkillCount;
-        if (target <= 0)
-        {
-            throw new InvalidOperationException(
-                EditorText.Format("StagecoachHeroCandidateFactory_Progression_018", heroClass.Id, target));
-        }
-
-        if (generatedSkillCount > heroClass.CombatSkillIds.Count)
-        {
-            warnings.Add(EditorText.Format("StagecoachHeroCandidateFactory_Progression_019", generatedSkillCount, heroClass.CombatSkillIds.Count));
-        }
-        target = Math.Min(target, heroClass.CombatSkillIds.Count);
-
-        var guaranteed = heroClass.GuaranteedCombatSkillIds.ToHashSet(StringComparer.Ordinal);
-        var remaining = heroClass.CombatSkillIds.ToList();
-        Shuffle(remaining, random);
-        var selected = remaining.Take(target).ToList();
-        // Native initial generation (0x1405C7CF0): at least one marked
-        // skill, not every marked skill. If the first draw misses all marks,
-        // continue without replacement, replacing the first selection slot.
-        if (guaranteed.Count > 0 && !selected.Any(guaranteed.Contains))
-        {
-            foreach (var skill in remaining.Skip(target))
-            {
-                selected[0] = skill;
-                if (guaranteed.Contains(skill)) break;
-            }
-        }
-
-        return heroClass.CombatSkillIds.Where(skill => selected.Contains(skill, StringComparer.Ordinal)).ToArray();
+        var selected = SelectInitialCombatSkills(heroClass, generation, random, purchases, warnings, out initiallyUnlocked);
+        if (ordinary && selected.Count == 0)
+            throw new InvalidOperationException(EditorText.Format("StagecoachHeroCandidateFactory_Progression_017",
+                heroClass.Id, generation.RandomCombatSkills, heroClass.CombatSkillIds.Count));
+        return selected;
     }
 
     private static IReadOnlyList<string> SelectCampingSkills(

@@ -17,7 +17,7 @@ Throughout this document, "first" and "last" refer to the actual load sequence a
 | Quantity item `(type,id)` | Query the first matching effective definition | Every related Effect/Buff also uses the first match |
 | Inventory config type (`raid`, `trinket_storage`) | Reuse the hash-keyed config; later `.max_slots` assignments replace earlier values, omission retains them | Pick the highest-priority Mod again across different file paths, or assume all inventory fields replace the complete object |
 | Trinket ID | Use the first matching complete effective entry; state fields from later entries are not merged into it | A referenced Buff with duplicate definitions also uses the first match |
-| Quirk ID | Use the last matching definition; see the existing quirk rules | All hero and monster attributes use the last complete declaration |
+| Quirk definitions | By-ID lookup takes the last full-hash match; random acquisition retains every definition; act-outs bind the first object (section 38) | One first/last dictionary describes every quirk consumer |
 | Hero class files | Resolve standard `.info`, `.art`, and `.override` paths independently; read the effective override after info | Arbitrarily named hero files are merged by class ID |
 | Hero combat skill `(skill ID, level)`, within one class | Reuse the existing skill object; tested scalars take later assignments, omitted scalars remain unchanged, and `.effect` lists append | A later declaration replaces the entire skill, or every list field appends |
 | Duplicate skill ID in a monster's standard info | Tested fields behave consistently with the shared combat-skill parser | Every AI, animation, or story field follows the skill-field rules |
@@ -190,7 +190,7 @@ These are separate field helpers, not a universal instruction to take the last f
 
 ### 8.2 Skill lists have limits and explicit entry conditions
 
-Initial equipped-skill selection is a separate consumer: `generation_guaranteed` means at least one marked skill, and an exhausted pool yields fewer skills instead of rejecting the hero. See [hero generation selection](hero-generation-selection.md) for the native branches, mounted skin directory query and current editor behavior.
+Initial skill unlocks and equipment are separate consumers. `generation_guaranteed` ensures at least one eligible marked unlock, even with zero random draws. Ordinary selectable classes then equip in class declaration order up to the selection limit, so a guaranteed unlock need not be equipped. Forced, hidden and slot-exempt skills follow their authored rules. An exhausted pool yields fewer skills instead of rejecting the hero. See [hero generation selection](hero-generation-selection.md) for the native branches, mounted skin directory query and current editor behavior.
 
 `0x140480CA0` reads ordinary `.effect` into sixteen 64-byte buffers. The consumer at `0x140481550`–`0x1404815FA` stops at the first empty or dot-prefixed token, including a quoted token. Each nonempty matching Effect appends to the existing skill list. An empty list does not clear previous declarations. This differs from the encounter parser, whose empty raw monster positions must remain counted.
 
@@ -266,6 +266,8 @@ The native inventory and trinket lookups (`0x1404F1590` and `0x1404F6480`) compa
 This integration concerns inventory/trinket identity and shared localization keys. It does not remove the remaining conservative identity guards in hero/quirk/Effect catalogs or establish support for every malformed, overlong or NUL-containing resource ID. See the audit and executable validation (archived record `inventory-identity-audit-2026-09-09.md`).
 
 ## 10. Map Prop Pools and Native Identities
+
+November 2026 extension: the canonical-only loading statements below now describe the default difficulty-zero pool. Positive difficulties append files matched by the native `.*.<region>.<difficulty>.props.darkest` query, preserving repeated weights and native file overlays. The current difficulty is part of catalog selection and stale-write validation. See the current [official-program compatibility rules](content-save-rules.md#november-2026-official-program-compatibility) for executable identity and RVAs.
 
 The fourth 2026-09-09 audit traced the same executable identified above. This addition uses static native evidence and isolated executable contracts; it is not a new live-game A/B experiment. See the audit (archived record `map-resource-rule-audit-2026-09-09.md`) and implementation record (archived record `map-resource-rules-fix-2026-09-09.md`).
 
@@ -727,6 +729,8 @@ The editor preserves the original candidate sequence before grouping by hash, so
 
 ## 37. Quirk, trinket and Effect native identities (2026-10-20)
 
+This section's quirk winner rules apply to **by-ID** consumers and manual selection. Random acquisition and act-out object binding are separate consumers; see section 38.
+
 The same executable identified in section 36 confirms three further consumer-specific rules:
 
 | Consumer | Native evidence | Editor behavior |
@@ -744,3 +748,20 @@ Saved aliases count toward the same native identity: singleton-quirk previews co
 Read certainty is tracked by the same hash as lookup. A failed later quirk file invalidates earlier matches; a complete later alias can restore its own hash. A trinket established before a later failed file stays authoritative, but a first candidate encountered after a failed file remains unverified. An Effect declaration omitting disease cannot restore an unknown earlier assignment. A UTF-8 sequence split at the native buffer boundary is reported as unreadable rather than hashed using a replacement character. Missing-source preflight, unknown dependencies, unsafe HP, invalid save identities and stale preview/commit guards remain active.
 
 `NativeCatalogHashContractTests.cs` runs with `--native-identities` and the full suite. It covers six source kinds, same-file and cross-file order, A/B/A, case/space controls, NULs, Effect field retention and clearing, native buffer limits, bilingual diagnostic severity, unavailable files, changed winners, saved-alias counts and limit warnings, and isolated DSON persistence of quirk HP and trinket counters. Existing read-completeness and transaction recovery contracts also run in the focused group. This is static native evidence plus executable editor regression testing; it does not claim a new live-game collision experiment or a complete Effect interpreter.
+
+## 38. Building queries and quirk object consumers (2026-11-11)
+
+These checks use Ode to Mods / 28385, Windows x64 `Darkest.exe` SHA-256 `f9d914ca1d7d9ad3ff4f151a46e4853e532ce1f5f109f700b0c1381a3f7e0d12`. Addresses are RVAs. Evidence is static executable analysis and isolated editor regressions, not official C++ source or a new live-game experiment. No old-executable comparison establishes that these particular rules changed in this patch.
+
+`Building::Load` constructs `.*<id>/.*<id>.building.json` at `0x5429EC` and recursively queries `campaign/town/buildings/` at `0x542A33–0x542A3E`, flags 0. For example, both `custom/tavern/tavern.building.json` and `custom_tavern/tavern.building.json` below that root feed tavern. The building identity is the query's consumer ID, not the first directory segment. The editor applies that identity to query grouping, ordinary same-path replacement, activity currency references and ApplyBuff roots, including missing and unreadable effective files. Wrong basenames, case-mismatched regex portions and unlisted Mod files are not consumers. Other building payloads retain their existing conservative reference handling.
+
+| Quirk consumer | Native rule and evidence | Editor consequence |
+| --- | --- | --- |
+| Saved-ID and explicit Effect lookup | Scan the vector to the last full-hash match (`0x5D27B0–0x5D27E9`, `0x5D29D0–0x5D2A09`, `0x4C6600–0x4C6689`) | Preserve last-definition manual selection, named assignment and evolution-target lookup. |
+| Random acquisition | Iterate every definition, skip nonpositive float32 chance, retain each eligible weight and return the selected pointer (`0x4EBCA0`, `0x4EBD42`, `0x4EBE91`) | Do not collapse duplicate IDs or aliases before random selection. Use the selected definition's classification, exclusions, singleton tag, HP Buffs and evolution data. |
+| Initial hero instance | Preserve the definition pointer, apply its Buffs and store it in the hero instance (`0x58A160`, `0x5CEE30`, `0x5D03F0`, `0x5D057F–0x5D0632`) | Pass selected definitions through generation; serialize normal quirk names and instance fields without a new save field. Subsequent game by-ID reload still selects the last definition. |
+| Act-out attachment and execution | Bind lists to the first full-hash match and append (`0x4EB901–0x4EB977`); Hero vtable slot 52 reads the owned pointer's lists (`0x5D7F10`) | A shadowed zero-chance first definition cannot provide act-outs via last-ID acquisition. A positive-chance first definition can provide them via random acquisition. Empty appended lists do not erase earlier entries. |
+
+For two same-hash definitions with chances `1, 0`, the first still supplies a random quirk and its Buffs, while a named lookup supplies the second. For chances `0, 0`, act-outs attached to the first are not an active path through a named acquisition of the second. An unknown file can contain more random entries or change first-object binding: a later readable last-ID match cannot repair that whole-pool uncertainty. Independent loot roots retain their own certainty. Repairing the effective file restores complete analysis and random generation.
+
+`BuildingQueryCompatibilityContractTests.cs`, `DuplicateQuirkSourceContractTests.cs` and `DuplicateRecruitQuirkContractTests.cs` cover Local, Workshop and enabled-DLC Mod mounts, recursive and wildcard paths, overlays/failures, ID/hash duplicates, first JSON members, probability underflow, random instance HP/evolution, manual/forced lookup, singleton/exclusion checks, ordinary/event routing and native DSON persistence. They run in `--official-mod-update` and `--native-all`.

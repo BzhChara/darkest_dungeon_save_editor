@@ -24,17 +24,23 @@ public static partial class HeroClassCatalog
     }
 
     private static IReadOnlyDictionary<uint, EffectQuirkAssignment> ResolveEffectDefinitions(
-        IReadOnlyList<EffectQuirkAssignment> candidates, OrderedDefinitionReadState<uint> reads, List<string> issues)
+        IReadOnlyList<EffectQuirkAssignment> candidates, OrderedDefinitionReadState<uint> reads, bool linksComplete, List<string> issues)
     {
         var result = new Dictionary<uint, EffectQuirkAssignment>();
         foreach (var group in candidates.GroupBy(effect => NativeResourceIdentity.HashCString(effect.Name)))
         {
-            if (!reads.IsVerified(group.Key)) continue;
-            // Effects reuse a hash-keyed object. Only the disease field is consumed
-            // here: omission retains its value, including a previous explicit "".
-            var winner = group.Last(effect => effect.QuirkId is not null);
-            result.Add(group.Key, winner);
-            if (NativeResourceIdentity.DescribeHashResolution(
+            if (!reads.IsVerified(group.Key) && !linksComplete) continue;
+            // Disease certainty is field-specific: a later explicit value can
+            // recover after a failed file. Appended links cannot prove their full
+            // state after a missing slot, even if disease has recovered.
+            var winner = reads.IsVerified(group.Key)
+                ? group.Last(effect => effect.QuirkId is not null)
+                : group.Last() with { QuirkId = null };
+            var links = new NativeEffectReferences.Links();
+            if (linksComplete)
+                foreach (var effect in group) links.Append(effect.Links);
+            result.Add(group.Key, winner with { Links = links });
+            if (reads.IsVerified(group.Key) && NativeResourceIdentity.DescribeHashResolution(
                     group, winner, effect => effect.Name, effect => effect.SourcePath, "Catalog_EffectHashResolution") is { } notice)
                 issues.Add(notice);
         }

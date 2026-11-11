@@ -199,7 +199,7 @@ public static partial class HeroClassCatalog
                 {
                     if (!campingSkills.TryGetValue(skill.Id, out var builder))
                     {
-                        builder = new CampingSkillBuilder(skill.Id, skill.IsShared);
+                        builder = new CampingSkillBuilder(skill.Id, skill.IsShared, skill.References);
                         campingSkills[skill.Id] = builder;
                     }
 
@@ -263,7 +263,10 @@ public static partial class HeroClassCatalog
                 .Concat(quirkCandidates.Select(quirk => NativeJsonReader.CString(quirk.Id))
                     .Select(ContentLocalizationCatalog.GetQuirkKey)));
         issues.AddRange(localization.Issues);
-        var effectiveEffects = ResolveEffectDefinitions(effectCandidates, effectReads, issues);
+        var effectLinksComplete = effectReads.CanProveAbsence &&
+            !ActiveContentResolver.HasUnresolvedModSources(activeContent) &&
+            activeContent.Sources.All(source => Directory.Exists(source.Directory));
+        var effectiveEffects = ResolveEffectDefinitions(effectCandidates, effectReads, effectLinksComplete, issues);
         var effectiveQuirks = ResolveQuirkDefinitions(quirkCandidates, quirkReads, issues);
         var verifiedQuirks = effectiveQuirks.Where(pair => quirkReads.IsVerified(pair.Key))
             .ToDictionary(pair => pair.Key, pair => pair.Value);
@@ -303,6 +306,7 @@ public static partial class HeroClassCatalog
                 eventsByClass,
                 effectiveEffects,
                 verifiedQuirks,
+                buffsByHash,
                 verifiedCampingSkills,
                 campingReads.CanProveAbsence,
                 effectiveUpgrades,
@@ -346,7 +350,12 @@ public static partial class HeroClassCatalog
             heroNames.OrderBy(name => name, StringComparer.Ordinal).ToArray(),
             issues)
         {
-            InitialQuirkLimits = initialQuirkLimits
+            InitialQuirkLimits = initialQuirkLimits,
+            RandomInitialQuirks = quirkCandidates.Select(quirk => BuildInitialQuirk(
+                quirk with { Id = NativeJsonReader.CString(quirk.Id) }, verifiedQuirks, buffsByHash, knownBuffHashes)).ToArray(),
+            RandomInitialQuirksComplete = quirkReads.CanProveAbsence &&
+                !ActiveContentResolver.HasUnresolvedModSources(activeContent) &&
+                activeContent.Sources.All(source => Directory.Exists(source.Directory))
         };
         var validatedHeroes = heroClasses.Select(hero => hero with
         {

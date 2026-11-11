@@ -196,7 +196,7 @@ internal static partial class QuantityItemReferenceAnalyzer
 
             case NativeReferenceJsonKind.Building:
                 if (!town) break;
-                VisitBuildingReferences(Child(root, "data"), file.MountedPath.Split('/')[3],
+                VisitBuildingReferences(Child(root, "data"), NativeResourceFileRules.BuildingId(file.MountedPath, [])!,
                     (currency, jsonPath) => MarkResolved(index.ResolveCurrencyHash(String(currency, "type")),
                         evidence, $"{path} ({jsonPath})"), Uncertain);
                 Uncertain(Child(root, "requirements"), "$.requirements");

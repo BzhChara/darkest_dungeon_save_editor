@@ -922,7 +922,7 @@ internal static partial class ContractSuite
             battleMapCode.Contains("CreateAsyncActionMenuItem(label, icon, () => PlaceRegionalContentAsync(target, kind))", StringComparison.Ordinal) &&
             battleMapCode.Contains("SelectRegionalContent(kind, snapshot.DungeonId, Random.Shared.NextDouble())", StringComparison.Ordinal) &&
             battleMapCode.Contains("await PlaceContentAsync(target, definition);", StringComparison.Ordinal) &&
-            battleMapCode.Contains("!definition.IsAvailableInDungeon(snapshot.DungeonId)", StringComparison.Ordinal) &&
+            battleMapCode.Contains("!definition.IsAvailableInDungeon(snapshot.DungeonId, snapshot.Difficulty)", StringComparison.Ordinal) &&
             battleMapCode.Contains("BattleMapView_Commands_003", StringComparison.Ordinal) &&
             battleMapCode.Contains("PrepareSetBattleAttachmentAsync", StringComparison.Ordinal) &&
             battleMapCode.Contains("PrepareRemoveBattleAttachmentAsync", StringComparison.Ordinal) &&

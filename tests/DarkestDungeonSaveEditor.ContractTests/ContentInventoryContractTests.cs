@@ -96,8 +96,9 @@ internal static partial class ContractSuite
                snapshot.Mods.Single(item => item.SourceId == "workshop:inventory").Files.All(file => file.ManifestMatch == ContentManifestMatch.NoManifest),
             "Inventory must distinguish missing metadata, missing content, no-manifest files and inactive Mods.");
         var lines = ContentFileInventory.FormatDetails(snapshot).ToArray();
-        Assert(ContentFileInventory.FormatSummary(snapshot).Contains("未改变内容纳入规则", StringComparison.Ordinal) &&
-               lines.Any(line => line.Contains("清单外数据/译文文件：仅盘点、未加载", StringComparison.Ordinal) && line.Contains("localization/new", StringComparison.Ordinal)) &&
+        Assert(ContentFileInventory.FormatSummary(snapshot).Contains("差异明细见完整日志", StringComparison.Ordinal) &&
+               lines.Any(line => line.Contains("未列入 modfiles.txt 的数据/译文候选：未纳入本次内容目录", StringComparison.Ordinal) && line.Contains("localization/new", StringComparison.Ordinal)) &&
+               lines.Any(line => line.Contains("已有清单不自动扩写", StringComparison.Ordinal) && line.Contains("由官方工具生成", StringComparison.Ordinal)) &&
                lines.All(line => !line.Contains("补读范围", StringComparison.Ordinal)) &&
                lines.Any(line => line.Contains("清单长度不同", StringComparison.Ordinal) && line.Contains(listedPath, StringComparison.Ordinal)) &&
                lines.Any(line => line.Contains("清单缺失：Windows 文件夹设置", StringComparison.Ordinal) && line.Contains("desktop.ini", StringComparison.Ordinal)) &&
@@ -166,7 +167,7 @@ internal static partial class ContractSuite
             Sources = [new("local:missing", "Missing", "local", Path.Combine(root, "does-not-exist"), 0)]
         });
         Assert(!missing.IsComplete && missing.Mods.Single().Issues.Count > 0 &&
-               ContentFileInventory.FormatSummary(missing).Contains("确认无清单 0 个", StringComparison.Ordinal),
+               ContentFileInventory.FormatSummary(missing).Contains("确认缺少 modfiles.txt 0 个", StringComparison.Ordinal),
             "Unreadable sources must not be reported as successfully scanned manifest-free Mods.");
         using (var cancellation = new CancellationTokenSource())
         {

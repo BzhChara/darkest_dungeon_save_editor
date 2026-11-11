@@ -19,7 +19,7 @@ internal static partial class BattleMapSaveEditor
         {
             throw new InvalidOperationException(EditorText.Get("BattleMapSaveEditor_Content_001"));
         }
-        if (!definition.IsAvailableInDungeon(snapshot.DungeonId))
+        if (!definition.IsAvailableInDungeon(snapshot.DungeonId, snapshot.Difficulty))
         {
             throw new InvalidOperationException(EditorText.Get("BattleMapSaveEditor_Content_002"));
         }

@@ -165,6 +165,22 @@ internal static partial class ContractSuite
             .Where(path => !path.Equals(mapPath, StringComparison.OrdinalIgnoreCase))
             .ToDictionary(path => path, ComputeSha256);
 
+        var initialSnapshot = await reader.LoadAsync(profileRoot);
+        var otherDifficulty = initialSnapshot.Difficulty == 1 ? 3 : 1;
+        var previousChoice = BattleRoomAttachmentCatalog.Load(content, initialSnapshot.DungeonId, otherDifficulty)
+            .Curios.Single(item => item.Id == "foreign_room_curio");
+        foreach (var prepare in new Func<Task>[]
+                 {
+                     () => service.PreparePlaceContentAsync(profile, initialSnapshot, "rooC", "tile0", previousChoice),
+                     () => service.PrepareSetBattleAttachmentAsync(profile, initialSnapshot, "rooC", "tile0", previousChoice)
+                 })
+        {
+            var error = await CaptureSaveFailureAsync(prepare);
+            Assert(error is InvalidOperationException && error.Message == EditorText.Get("BattleMapSaveEditor_Content_002") &&
+                File.ReadAllText(mapPath) == originalMap && File.ReadAllText(raidPath) == originalRaid,
+                "Both map write services reject selections from another difficulty before changing saves.");
+        }
+
         // Exercise both a battle replacement and a completed/empty tile with old scenery.
         foreach (var definition in new[] { roomCurio, treasure, hallCurio, trap, obstacle, hallCurio, spacedTrap })
         {

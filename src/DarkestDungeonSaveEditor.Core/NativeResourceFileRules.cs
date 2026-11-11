@@ -54,6 +54,12 @@ internal static partial class NativeResourceFileRules
     private static partial Regex QuestTypesName();
     [GeneratedRegex(@"quest.modifiers.json\z", RegexOptions.CultureInvariant)]
     private static partial Regex QuestModifiersName();
+    [GeneratedRegex(@".flashbacks.json\z", RegexOptions.CultureInvariant)]
+    private static partial Regex FlashbacksName();
+    [GeneratedRegex(@"quirk_act_outs.json\z", RegexOptions.CultureInvariant)]
+    private static partial Regex QuirkActOutsName();
+    [GeneratedRegex(@"raid_settings.json\z", RegexOptions.CultureInvariant)]
+    private static partial Regex RaidSettingsName();
     [GeneratedRegex(@"/.*districts.json\z", RegexOptions.CultureInvariant)]
     private static partial Regex DistrictsName();
     [GeneratedRegex(@"\.upgrades\.json\z", RegexOptions.CultureInvariant)]
@@ -64,6 +70,10 @@ internal static partial class NativeResourceFileRules
     // in the trinket and Buff suffixes are escaped by the game.
     [GeneratedRegex(@"\.entries.trinkets.json\z", RegexOptions.CultureInvariant)]
     private static partial Regex TrinketName();
+    [GeneratedRegex(@"\.sets.trinkets.json\z", RegexOptions.CultureInvariant)]
+    private static partial Regex TrinketSetName();
+    [GeneratedRegex(@"trait_library.json\z", RegexOptions.CultureInvariant)]
+    private static partial Regex TraitName();
     [GeneratedRegex(@"\.buffs.json\z", RegexOptions.CultureInvariant)]
     private static partial Regex BuffName();
     [GeneratedRegex(@"quirk_library.json\z", RegexOptions.CultureInvariant)]
@@ -137,6 +147,26 @@ internal static partial class NativeResourceFileRules
         return mounted.StartsWith("shared/buffs/", DirectoryComparison(manifestDirectory)) && BuffName().IsMatch(mounted);
     }
 
+    internal static bool IsTrinketSetFile(string path, IReadOnlyList<string> prefixes, bool manifestDirectory = false)
+    {
+        var mounted = MountedPath(path, prefixes, manifestDirectory);
+        return mounted.StartsWith("trinkets/", DirectoryComparison(manifestDirectory)) && TrinketSetName().IsMatch(mounted);
+    }
+
+    internal static bool IsTraitFile(string path, IReadOnlyList<string> prefixes, bool manifestDirectory = false)
+    {
+        var mounted = MountedPath(path, prefixes, manifestDirectory);
+        // 0x3EC1E9 routes this substring into the separate multiplayer library.
+        return mounted.StartsWith("shared/trait/", DirectoryComparison(manifestDirectory)) && TraitName().IsMatch(mounted)
+            && !mounted.Contains("network_trait_library.json", StringComparison.Ordinal);
+    }
+
+    internal static bool IsDistrictFile(string path, IReadOnlyList<string> prefixes, bool manifestDirectory = false)
+    {
+        var mounted = MountedPath(path, prefixes, manifestDirectory);
+        return mounted.StartsWith("campaign/town/districts/", DirectoryComparison(manifestDirectory)) && DistrictsName().IsMatch(mounted);
+    }
+
     internal static bool IsQuirkFile(string path, IReadOnlyList<string> enabledDlcPrefixes, bool manifestDirectory = false)
     {
         var mounted = MountedPath(path, enabledDlcPrefixes, manifestDirectory);
@@ -148,6 +178,18 @@ internal static partial class NativeResourceFileRules
         var mounted = MountedPath(path, enabledDlcPrefixes, manifestDirectory);
         return mounted.StartsWith("shared/", DirectoryComparison(manifestDirectory)) && SharedRuleName().IsMatch(mounted);
     }
+
+    internal static bool IsQuestModifierFile(string path, IReadOnlyList<string> prefixes, bool manifestDirectory = false) =>
+        IsInDirectory(path, "campaign/quest", prefixes, manifestDirectory) && QuestModifiersName().IsMatch(path.Replace('\\', '/'));
+
+    internal static bool IsFlashbackFile(string path, IReadOnlyList<string> prefixes, bool manifestDirectory = false) =>
+        IsInDirectory(path, "raid/flashback", prefixes, manifestDirectory) && FlashbacksName().IsMatch(path.Replace('\\', '/'));
+
+    internal static bool IsQuirkActOutFile(string path, IReadOnlyList<string> prefixes, bool manifestDirectory = false) =>
+        IsInDirectory(path, "shared/quirk", prefixes, manifestDirectory) && QuirkActOutsName().IsMatch(path.Replace('\\', '/'));
+
+    internal static bool IsRaidSettingsFile(string path, IReadOnlyList<string> prefixes, bool manifestDirectory = false) =>
+        IsInDirectory(path, "scripts", prefixes, manifestDirectory) && RaidSettingsName().IsMatch(path.Replace('\\', '/'));
 
     internal static bool IsCampingSkillFile(string path, IReadOnlyList<string> enabledDlcPrefixes, bool manifestDirectory = false)
     {
@@ -199,18 +241,34 @@ internal static partial class NativeResourceFileRules
             return NativeReferenceJsonKind.Districts;
         if (IsUpgradeFile(mounted, [], manifestDirectory))
             return NativeReferenceJsonKind.Upgrades;
-        // Building::Load (0x140536860) formats a query for the building ID,
-        // e.g. stage_coach/.*stage_coach.building.json, within its directory.
-        const string buildings = "campaign/town/buildings/";
-        if (mounted.StartsWith(buildings, DirectoryComparison(manifestDirectory)))
-        {
-            var rest = mounted[buildings.Length..];
-            var slash = rest.IndexOf('/');
-            if (slash > 0 && Regex.IsMatch(rest[(slash + 1)..],
-                    Regex.Escape(rest[..slash]) + @".building.json\z", RegexOptions.CultureInvariant))
-                return NativeReferenceJsonKind.Building;
-        }
+        if (BuildingId(mounted, [], manifestDirectory) is not null) return NativeReferenceJsonKind.Building;
         return NativeReferenceJsonKind.None;
+    }
+
+    internal static string? BuildingId(string path, IReadOnlyList<string> enabledDlcPrefixes, bool manifestDirectory = false)
+    {
+        // Registered town buildings. The query is per consumer, not per first
+        // directory segment; none of these IDs is a suffix of another.
+        return TownBuildingIds.FirstOrDefault(id => IsBuildingFile(path, id, enabledDlcPrefixes, manifestDirectory));
+    }
+
+    private static readonly string[] TownBuildingIds =
+    [
+        "abbey", "blacksmith", "camping_trainer", "circus", "graveyard", "guild",
+        "nomad_wagon", "sanitarium", "stage_coach", "statue", "tavern"
+    ];
+
+    internal static bool IsBuildingFile(string path, string buildingId, IReadOnlyList<string> enabledDlcPrefixes,
+        bool manifestDirectory = false)
+    {
+        // 28385 Building::Load, 0x5429EC–0x542A3E: recursively query
+        // campaign/town/buildings/ with .*<id>/.*<id>.building.json, flags 0.
+        // Regex matching is case-sensitive and the dots remain wildcards.
+        const string root = "campaign/town/buildings/";
+        var mounted = MountedPath(path, enabledDlcPrefixes, manifestDirectory);
+        return mounted.StartsWith(root, DirectoryComparison(manifestDirectory)) &&
+            Regex.IsMatch(mounted[root.Length..], Regex.Escape(buildingId) + "/.*" +
+                Regex.Escape(buildingId) + @".building.json\z", RegexOptions.CultureInvariant);
     }
 
     internal static string MountedPath(string path, IReadOnlyList<string> enabledDlcPrefixes, bool manifestDirectory = false)

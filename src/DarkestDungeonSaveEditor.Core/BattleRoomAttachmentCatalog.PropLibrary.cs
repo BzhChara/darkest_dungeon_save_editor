@@ -5,7 +5,8 @@ namespace DarkestDungeonSaveEditor.Core;
 
 public static partial class BattleRoomAttachmentCatalog
 {
-    // Only the metadata needed by map placement is modeled here, not combat effects.
+    // Placement metadata and named trap effects share the native prop inheritance
+    // and difficulty lookup. Effect execution remains outside this catalog.
     private sealed record PropData
     {
         public string InstanceType { get; init; } = "";
@@ -17,6 +18,9 @@ public static partial class BattleRoomAttachmentCatalog
         public string? CurioTypeId { get; init; }
         public string? Rejection { get; init; }
         public IReadOnlyList<string> Parents { get; init; } = [];
+        public IReadOnlyList<string> SuccessEffects { get; init; } = [];
+        public IReadOnlyList<string> FailEffects { get; init; } = [];
+        public bool InvalidEffects { get; init; }
     }
 
     private sealed class PropResource(int difficulty, PropData data)
@@ -56,7 +60,7 @@ public static partial class BattleRoomAttachmentCatalog
         public PropResource GetOrCreate(string id) => Find(id) ?? Add(id, -1, new PropData());
     }
 
-    private static void ReadPropFile(EffectiveContentFile file, PropResources resources)
+    private static void ReadPropFile(EffectiveContentFile file, PropResources resources, bool validateReferenceStructure = false)
     {
         using var document = JsonDocument.Parse(File.ReadAllBytes(file.Path), new JsonDocumentOptions
         { AllowTrailingCommas = true, CommentHandling = JsonCommentHandling.Skip });
@@ -64,6 +68,16 @@ public static partial class BattleRoomAttachmentCatalog
         if (root.ValueKind != JsonValueKind.Object)
             throw new InvalidDataException(EditorText.Format("BattleRoomAttachmentCatalog_PropLibrary_001", file.Path));
         var fileDefault = ApplyPropData(new PropData(), root, "default_data", resources);
+        // Placement only diagnoses referenced resources. Whole-library reference
+        // analysis must also account for malformed records that produced none.
+        if (validateReferenceStructure)
+        {
+            if (fileDefault.Rejection is not null || fileDefault.InvalidEffects)
+                throw new InvalidDataException($"Invalid prop defaults: {file.Path}");
+            if (NativeJsonReader.TryGetProperty(root, "props", out var props) &&
+                (props.ValueKind != JsonValueKind.Array || props.EnumerateArray().Any(value => value.ValueKind != JsonValueKind.Object)))
+                throw new InvalidDataException($"Invalid prop records: {file.Path}");
+        }
         foreach (var prop in NativeJsonReader.Array(root, "props").Where(value => value.ValueKind == JsonValueKind.Object))
         {
             var name = NativeJsonReader.ReadString(prop, "name");
@@ -159,10 +173,29 @@ public static partial class BattleRoomAttachmentCatalog
         var ambush = StringField("generate_ambush", current.GenerateAmbush);
         var teleport = BoolField("teleport", current.Teleport);
         var ancestor = BoolField("ancestor_talk", current.AncestorTalk);
+        IReadOnlyList<string> Effects(string key, IReadOnlyList<string> previous)
+        {
+            if (!NativeJsonReader.TryGetProperty(data, key, out var value)) return previous;
+            if (value.ValueKind != JsonValueKind.Array)
+            { current = current with { InvalidEffects = true }; return []; }
+            var result = new List<string>();
+            foreach (var entry in value.EnumerateArray())
+            {
+                if (entry.ValueKind != JsonValueKind.String)
+                { current = current with { InvalidEffects = true }; continue; }
+                try { result.Add(NativeJsonReader.BoundedCString(entry.GetString()!, 127)); }
+                catch (Exception error) when (error is EncoderFallbackException or DecoderFallbackException or InvalidOperationException)
+                { current = current with { InvalidEffects = true }; }
+            }
+            return result;
+        }
+        // 0x4E04D0 replaces a present list, preserving it on omission.
+        var success = Effects("success_effects", current.SuccessEffects);
+        var fail = Effects("fail_effects", current.FailEffects);
         return current with
         {
             InstanceType = instanceType, NameId = nameId, GenerateAmbush = ambush,
-            Teleport = teleport, AncestorTalk = ancestor
+            Teleport = teleport, AncestorTalk = ancestor, SuccessEffects = success, FailEffects = fail
         };
     }
 }

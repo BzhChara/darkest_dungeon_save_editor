@@ -25,6 +25,7 @@ internal static partial class ContractSuite
 
     public static async Task RunNativeCodecOnlyAsync(string repositoryRoot)
     {
+        VerifyDazeFieldPreservation();
         var root = Path.Combine(repositoryRoot, "artifacts", "native-codec-contracts", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
         var codec = DsonSaveCodec.CreateNative();

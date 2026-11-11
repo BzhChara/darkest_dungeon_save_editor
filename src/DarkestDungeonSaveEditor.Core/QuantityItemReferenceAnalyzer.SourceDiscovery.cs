@@ -71,7 +71,7 @@ internal static partial class QuantityItemReferenceAnalyzer
             var kind = NativeResourceFileRules.ReferenceJsonKind(path, enabledDlcPrefixes, manifest);
             return kind switch
             {
-                NativeReferenceJsonKind.Building => "building:" + mounted.Split('/')[3],
+                NativeReferenceJsonKind.Building => "building:" + NativeResourceFileRules.BuildingId(path, enabledDlcPrefixes, manifest),
                 // Fixed paths and unmodeled reference consumers keep full-path
                 // overlays; do not invent a shared enumeration for them.
                 NativeReferenceJsonKind.None or NativeReferenceJsonKind.Unverified => "open",

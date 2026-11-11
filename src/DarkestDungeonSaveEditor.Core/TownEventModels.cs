@@ -13,6 +13,7 @@ public sealed record TownEventDefinition(
     public BilingualContentName LocalizedName { get; init; } = BilingualContentName.Empty;
     public BilingualContentName LocalizedDescription { get; init; } = BilingualContentName.Empty;
     public TownEventTriggerRules TriggerRules { get; init; } = new();
+    public string InteractionTextureId { get; init; } = string.Empty;
     internal ContentSourceLabel? LocalizedSource { get; init; }
     public string SourceLabel => LocalizedSource?.ToString() ?? Source;
 }

@@ -44,7 +44,8 @@ public static partial class HeroClassCatalog
             yield return new CampingSkillDefinition(
                 id,
                 heroClasses,
-                hasClasses ? (uint)classNodes.GetArrayLength() > threshold : null);
+                hasClasses ? (uint)classNodes.GetArrayLength() > threshold : null,
+                NativeEffectReferences.Camping(item).ToArray());
         }
     }
 
@@ -82,9 +83,10 @@ public static partial class HeroClassCatalog
             {
                 foreach (var dataNode in data.EnumerateArray())
                 {
+                    var type = Loc2LocalizationReader.HashName(NativeJsonReader.ReadBoundedString(dataNode, "type", 63));
+                    var specific = type == Loc2LocalizationReader.HashName("specific_recruit");
                     if (dataNode.ValueKind != JsonValueKind.Object ||
-                        Loc2LocalizationReader.HashName(NativeJsonReader.ReadBoundedString(dataNode, "type", 63)) !=
-                            Loc2LocalizationReader.HashName("bonus_recruit"))
+                        !specific && type != Loc2LocalizationReader.HashName("bonus_recruit"))
                     {
                         continue;
                     }
@@ -98,9 +100,12 @@ public static partial class HeroClassCatalog
                     recruits.Add(new HeroRecruitEventDefinition(
                         eventId,
                         heroClass,
-                        NativeJsonReader.ReadFloat(dataNode, "number_data"),
+                        specific ? 1 : NativeJsonReader.ReadFloat(dataNode, "number_data"),
                         source,
-                        Path.GetFullPath(path)));
+                        Path.GetFullPath(path))
+                    {
+                        ResolveLevel = specific ? (int)(NativeJsonReader.ReadFloat(dataNode, "number_data") ?? 0) : null
+                    });
                 }
             }
 

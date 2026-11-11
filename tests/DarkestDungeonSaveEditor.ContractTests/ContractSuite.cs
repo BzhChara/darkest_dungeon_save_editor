@@ -60,6 +60,7 @@ internal static partial class ContractSuite
         await RunUpgradeReferenceContractsAsync(runRoot, codec);
         await RunInitialHpConditionContractsAsync(runRoot, codec);
         await RunTownEventContractsAsync(Path.Combine(runRoot, "town-events"));
+        await RunOfficialModUpdateContractsAsync(Path.Combine(runRoot, "official-mod-update"));
 
         if (includeBattle)
         {

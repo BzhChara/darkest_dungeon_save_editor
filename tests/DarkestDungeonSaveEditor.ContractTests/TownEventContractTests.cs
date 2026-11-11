@@ -12,7 +12,7 @@ internal static partial class ContractSuite
     private sealed record TownEventFixture(string Root, ActiveContentSnapshot Content, SaveEditService Service,
         Dictionary<string, JsonObject> Saves, string EventsPath);
 
-    // This table is an acceptance matrix of the 31 effect enums from the
+    // This table is an acceptance matrix of the 32 effect enums from the
     // native event library, independent of the initializer's dispatch table.
     private static readonly (string Type, string Text, double Number, string[] Files)[] EventCases =
     [
@@ -33,7 +33,8 @@ internal static partial class ContractSuite
         ("roster_stress_heal", "", 20, []), ("roster_disease_heal", "", 1, []),
         ("trinket_sell_multiplier", "", 2, []), ("idle_negative_quirk_remove", "", 1, []),
         ("heirloom_gain_multiplier", "", 1.25, []), ("nomad_wagon_trinket_discount", "", .5, []),
-        ("bonus_recruit_stage_coach_level", "progression", 1, ["roster", "upgrades"])
+        ("bonus_recruit_stage_coach_level", "progression", 1, ["roster", "upgrades"]),
+        ("specific_recruit", "progression", 4, ["roster", "upgrades"])
     ];
 
     private static async Task<TownEventFixture> BuildTownEventFixtureAsync(string root)
@@ -195,7 +196,7 @@ internal static partial class ContractSuite
             if (test.Type == "bonus_currency")
                 Assert(saves["persist.estate.json"]["base_root"]!["wallet"]!["0"]!["amount"]!.GetValue<int>() == 150,
                     "Setting a currency event again applies its initial grant once more.");
-            if (test.Type is "bonus_recruit" or "bonus_recruit_stage_coach_level" or "quirked_recruit")
+            if (test.Type is "bonus_recruit" or "bonus_recruit_stage_coach_level" or "quirked_recruit" or "specific_recruit")
                 Assert(state["bonus_hero_entries"]!.AsObject().Count == (test.Type == "bonus_recruit" ? 2 : 1) &&
                     !state["bonus_hero_entries"]!.AsObject().Any(pair => once["persist.town_event.json"]["base_root"]!["bonus_hero_entries"]!.AsObject().ContainsKey(pair.Key)),
                     "Repeating recruitment replaces pending offers instead of accumulating them.");
@@ -225,14 +226,14 @@ internal static partial class ContractSuite
     {
         JsonNode Root(string name) => saves["persist." + name + ".json"]["base_root"]!;
         var state = Root("town_event");
-        if (type is "bonus_recruit" or "bonus_recruit_stage_coach_level" or "quirked_recruit")
+        if (type is "bonus_recruit" or "bonus_recruit_stage_coach_level" or "quirked_recruit" or "specific_recruit")
         {
             var offers = state["bonus_hero_entries"]!.AsObject();
             Assert(offers.Count == (type == "bonus_recruit" ? 2 : 1), "Recruit count follows the effect.");
             var hero = offers.First().Value!;
             Assert(hero["is_from_town_event"]!.GetValue<bool>(), "New event candidates stay in the event pool.");
             var upgraded = type != "bonus_recruit";
-            Assert(hero["resolveXp"]!.GetValue<int>() == (upgraded ? 10 : 0) && hero["armour_rank"]!.GetValue<int>() == (upgraded ? 1 : 0) &&
+            Assert(hero["resolveXp"]!.GetValue<int>() == (type == "specific_recruit" ? 40 : upgraded ? 10 : 0) && hero["armour_rank"]!.GetValue<int>() == (upgraded ? 1 : 0) &&
                    hero["actor"]!["current_hp"]!.GetValue<double>() == (upgraded ? 40 : 20), "High-level offers include equipment and full HP, not XP alone.");
         }
         if (type == "stage_coach_bonus_recruits")

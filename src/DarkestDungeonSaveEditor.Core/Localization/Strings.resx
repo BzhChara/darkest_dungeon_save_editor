@@ -596,7 +596,7 @@ Right-click to open the action menu</value>
     <comment>src/DarkestDungeonSaveEditor.App/BattleMapView.Content.cs</comment>
   </data>
   <data xml:space="preserve" name="BattleMapView_Content_005">
-    <value>The expedition region has changed. Select the target again.</value>
+    <value>The expedition region or difficulty has changed. Select the target again.</value>
     <comment>src/DarkestDungeonSaveEditor.App/BattleMapView.Content.cs</comment>
   </data>
   <data xml:space="preserve" name="BattleMapView_Content_006">
@@ -1172,15 +1172,15 @@ Right-click to open the action menu</value>
     <comment>src/DarkestDungeonSaveEditor.App/MainWindow.CatalogLoading.cs</comment>
   </data>
   <data xml:space="preserve" name="MainWindow_CatalogLoading_017">
-    <value>Catalog scan complete: profile {0}; mode {1};</value>
+    <value>Content catalogs loaded: profile {0}; mode {1};</value>
     <comment>src/DarkestDungeonSaveEditor.App/MainWindow.CatalogLoading.cs</comment>
   </data>
   <data xml:space="preserve" name="MainWindow_CatalogLoading_018">
-    <value> this scan logged {0} informational entries and</value>
+    <value> diagnostics: {0} informational entries and</value>
     <comment>src/DarkestDungeonSaveEditor.App/MainWindow.CatalogLoading.cs</comment>
   </data>
   <data xml:space="preserve" name="MainWindow_CatalogLoading_019">
-    <value> {0} warnings (including battle catalogs, grouped across modules by file/reason; not a count of unavailable content).</value>
+    <value> {0} warnings (including battle content diagnostics, grouped by file and reason; details are in the full log).</value>
     <comment>src/DarkestDungeonSaveEditor.App/MainWindow.CatalogLoading.cs</comment>
   </data>
   <data xml:space="preserve" name="MainWindow_CatalogLoading_020">
@@ -1815,7 +1815,7 @@ Backup directory:
     <comment>src/DarkestDungeonSaveEditor.App/MainWindow.RowModels.cs</comment>
   </data>
   <data xml:space="preserve" name="MainWindow_RowModels_019">
-    <value> (select at least one) / </value>
+    <value> (unlock at least one on generation) / </value>
     <comment>src/DarkestDungeonSaveEditor.App/MainWindow.RowModels.cs</comment>
   </data>
   <data xml:space="preserve" name="MainWindow_RowModels_020">
@@ -2387,7 +2387,7 @@ Backup directory:
     <comment>src/DarkestDungeonSaveEditor.Core/BattleMapSaveEditor.Content.cs</comment>
   </data>
   <data xml:space="preserve" name="BattleMapSaveEditor_Content_002">
-    <value>Traps and obstacles must use resources from the current expedition region. Select again.</value>
+    <value>The selected content does not match the current expedition region or difficulty. Select again.</value>
     <comment>src/DarkestDungeonSaveEditor.Core/BattleMapSaveEditor.Content.cs</comment>
   </data>
   <data xml:space="preserve" name="BattleMapSaveEditor_Content_003">
@@ -2847,15 +2847,15 @@ Backup directory:
     <comment>src/DarkestDungeonSaveEditor.Core/CompiledLocalizationValueReader.cs</comment>
   </data>
   <data xml:space="preserve" name="ContentFileInventory_Diagnostics_001">
-    <value>File inventory: located Mod sources {0} (excluding unresolved enabled records);</value>
+    <value>Mod file check: directories {0};</value>
     <comment>src/DarkestDungeonSaveEditor.Core/ContentFileInventory.Diagnostics.cs</comment>
   </data>
   <data xml:space="preserve" name="ContentFileInventory_Diagnostics_002">
-    <value> with manifest {0};</value>
+    <value> with modfiles.txt {0};</value>
     <comment>src/DarkestDungeonSaveEditor.Core/ContentFileInventory.Diagnostics.cs</comment>
   </data>
   <data xml:space="preserve" name="ContentFileInventory_Diagnostics_003">
-    <value> confirmed without manifest {0};</value>
+    <value> confirmed missing modfiles.txt {0};</value>
     <comment>src/DarkestDungeonSaveEditor.Core/ContentFileInventory.Diagnostics.cs</comment>
   </data>
   <data xml:space="preserve" name="ContentFileInventory_Diagnostics_004">
@@ -2863,7 +2863,7 @@ Backup directory:
     <comment>src/DarkestDungeonSaveEditor.Core/ContentFileInventory.Diagnostics.cs</comment>
   </data>
   <data xml:space="preserve" name="ContentFileInventory_Diagnostics_005">
-    <value> unlisted data/translation files {0} (inventoried only, not loaded);</value>
+    <value> unlisted data/translation candidates {0} (excluded from this catalog load);</value>
     <comment>src/DarkestDungeonSaveEditor.Core/ContentFileInventory.Diagnostics.cs</comment>
   </data>
   <data xml:space="preserve" name="ContentFileInventory_Diagnostics_006">
@@ -2871,11 +2871,11 @@ Backup directory:
     <comment>src/DarkestDungeonSaveEditor.Core/ContentFileInventory.Diagnostics.cs</comment>
   </data>
   <data xml:space="preserve" name="ContentFileInventory_Diagnostics_007">
-    <value> ({0} in the current content scope);</value>
+    <value> ({0} data/translation candidates);</value>
     <comment>src/DarkestDungeonSaveEditor.Core/ContentFileInventory.Diagnostics.cs</comment>
   </data>
   <data xml:space="preserve" name="ContentFileInventory_Diagnostics_008">
-    <value> incomplete scans {0}. Details are in the full log; content inclusion rules are unchanged.</value>
+    <value> Mod directories with incomplete checks {0}. Difference details are in the full log.</value>
     <comment>src/DarkestDungeonSaveEditor.Core/ContentFileInventory.Diagnostics.cs</comment>
   </data>
   <data xml:space="preserve" name="ContentFileInventory_Diagnostics_009">
@@ -2887,11 +2887,11 @@ Backup directory:
     <comment>src/DarkestDungeonSaveEditor.Core/ContentFileInventory.Diagnostics.cs</comment>
   </data>
   <data xml:space="preserve" name="ContentFileInventory_Diagnostics_011">
-    <value>File inventory note: candidate status indicates file type and directory scope only, not successful parsing, game loading, or write eligibility;</value>
+    <value>Loading rules: Mod data follows modfiles.txt, enabled DLC and each resource consumer's path rules. Data/translation candidates are counted by file type and directory scope; see each content catalog for actual loading results.</value>
     <comment>src/DarkestDungeonSaveEditor.Core/ContentFileInventory.Diagnostics.cs</comment>
   </data>
   <data xml:space="preserve" name="ContentFileInventory_Diagnostics_012">
-    <value> unlisted data/translations are not loaded. Identical or unreferenced content is not assumed obsolete. Scripts are not executed and manifests are not rewritten.</value>
+    <value> Manifest preparation: if modfiles.txt is missing, close the game and click Load Save to generate it with the official tool. Existing manifests are not automatically expanded, and unlisted candidates are not automatically added. The file check only records differences.</value>
     <comment>src/DarkestDungeonSaveEditor.Core/ContentFileInventory.Diagnostics.cs</comment>
   </data>
   <data xml:space="preserve" name="ContentFileInventory_Diagnostics_013">
@@ -2915,11 +2915,11 @@ Backup directory:
     <comment>src/DarkestDungeonSaveEditor.Core/ContentFileInventory.Diagnostics.cs</comment>
   </data>
   <data xml:space="preserve" name="ContentFileInventory_Diagnostics_018">
-    <value> in-scope data/translations={0};</value>
+    <value> in-scope data/translation candidates={0};</value>
     <comment>src/DarkestDungeonSaveEditor.Core/ContentFileInventory.Diagnostics.cs</comment>
   </data>
   <data xml:space="preserve" name="ContentFileInventory_Diagnostics_019">
-    <value> unlisted data/translations={0} (inventoried only, not loaded); other unlisted files={1};</value>
+    <value> unlisted data/translation candidates={0} (excluded from this catalog load); other unlisted files={1};</value>
     <comment>src/DarkestDungeonSaveEditor.Core/ContentFileInventory.Diagnostics.cs</comment>
   </data>
   <data xml:space="preserve" name="ContentFileInventory_Diagnostics_020">
@@ -2931,7 +2931,7 @@ Backup directory:
     <comment>src/DarkestDungeonSaveEditor.Core/ContentFileInventory.Diagnostics.cs</comment>
   </data>
   <data xml:space="preserve" name="ContentFileInventory_Diagnostics_022">
-    <value>Unlisted data/translation file: inventoried only, not loaded</value>
+    <value>Data/translation candidate absent from modfiles.txt: excluded from this catalog load</value>
     <comment>src/DarkestDungeonSaveEditor.Core/ContentFileInventory.Diagnostics.cs</comment>
   </data>
   <data xml:space="preserve" name="ContentFileInventory_Diagnostics_023">
@@ -5471,4 +5471,7 @@ Objectives: {1}; battle locations to clear: {2}; quest items to add: {3}.</value
   <data name="CatalogLogDiagnostics_UnavailableLocalDirectory" xml:space="preserve">
     <value>The save enables local Mod '{0}', but the local Mod directory is not configured or is unavailable. Select this game's mods directory, then reload the profile.</value>
   </data>
+  <data name="QuirkEvolution_Turns" xml:space="preserve"><value>turns</value></data>
+  <data name="QuirkEvolution_CombatEnd" xml:space="preserve"><value>combat completions</value></data>
+  <data name="QuirkEvolution_QuestEnd" xml:space="preserve"><value>quest completions</value></data>
 </root>

@@ -53,7 +53,13 @@ public static partial class StagecoachHeroCandidateFactory
                 ? EditorText.Get("StagecoachHeroCandidateFactory_Evolution_001")
                 : EditorText.Format("StagecoachHeroCandidateFactory_Evolution_002", evolution.TargetQuirkId)
             : $"→ {evolution.TargetQuirkId}";
-        return $"{state.Definition.Id}={state.EvolutionDurationRemaining}" +
+        var unit = evolution.DurationType switch
+        {
+            HeroQuirkEvolutionDurationType.CombatEnd => EditorText.Get("QuirkEvolution_CombatEnd"),
+            HeroQuirkEvolutionDurationType.QuestEnd => EditorText.Get("QuirkEvolution_QuestEnd"),
+            _ => EditorText.Get("QuirkEvolution_Turns")
+        };
+        return $"{state.Definition.Id}={state.EvolutionDurationRemaining} {unit}" +
                EditorText.Format("StagecoachHeroCandidateFactory_Evolution_003", evolution.DurationMin, evolution.DurationMax, outcome);
     }
 

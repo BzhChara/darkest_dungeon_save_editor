@@ -156,7 +156,7 @@ public partial class BattleMapView : UserControl
                     try
                     {
                         _roomAttachmentCatalog = await Task.Run(
-                            () => BattleRoomAttachmentCatalog.Load(activeContent, snapshot.DungeonId),
+                            () => BattleRoomAttachmentCatalog.Load(activeContent, snapshot.DungeonId, snapshot.Difficulty),
                             cancellationToken);
                         cancellationToken.ThrowIfCancellationRequested();
                         diagnosticBatch.Add(EditorText.Get("BattleMapView_ProfileLifecycle_015"), _roomAttachmentCatalog.Issues);

@@ -35,6 +35,21 @@ public static partial class StagecoachHeroCandidateFactory
             }
 
             var quirk = matches[0];
+            selected.Add(quirk);
+        }
+        ValidateSelectedQuirks(catalog, selected);
+        return selected;
+    }
+
+    private static void ValidateSelectedQuirks(HeroClassCatalogResult catalog, IReadOnlyList<HeroInitialQuirkDefinition> selected)
+    {
+        var hashes = new HashSet<uint>();
+        foreach (var quirk in selected)
+        {
+            if (string.IsNullOrWhiteSpace(quirk.Id))
+                throw new InvalidOperationException(EditorText.Get("StagecoachHeroCandidateFactory_Quirks_001"));
+            if (!hashes.Add(NativeResourceIdentity.HashCString(quirk.Id)))
+                throw new InvalidOperationException(EditorText.Format("StagecoachHeroCandidateFactory_Quirks_002", quirk.Id));
             if (quirk.IsPositive is null)
             {
                 throw new InvalidOperationException(EditorText.Format("StagecoachHeroCandidateFactory_Quirks_005", quirk.Id));
@@ -48,7 +63,6 @@ public static partial class StagecoachHeroCandidateFactory
                 throw new InvalidOperationException(
                     EditorText.Format("StagecoachHeroCandidateFactory_Quirks_006", quirk.Id, quirk.WriteStatusReason));
             }
-            selected.Add(quirk);
         }
 
         // Native positive and disease predicates overlap (0x1404E0D50 / 0x1404E0BF0).
@@ -84,7 +98,6 @@ public static partial class StagecoachHeroCandidateFactory
             }
         }
 
-        return selected;
     }
 
 }

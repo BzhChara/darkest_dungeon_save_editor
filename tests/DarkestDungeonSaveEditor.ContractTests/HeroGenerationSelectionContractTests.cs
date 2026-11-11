@@ -59,19 +59,24 @@ internal static partial class ContractSuite
                 $"{kind}/{test}: all seven generation levels must be available.");
             var generated = Enumerable.Range(0, 512).Select(seed => GenerateSelectionHero(catalog, seed)).ToArray();
             var actualSets = generated.Select(g => string.Join(',', g.Preview.CombatSkills.Order(StringComparer.Ordinal))).ToHashSet();
-            var count = Math.Min(Math.Min(target, 4), skills);
-            // Acceptance oracle: enumerate valid subsets, independently of the
-            // product's shuffle/replacement implementation and random seeds.
-            var expectedSets = Enumerable.Range(0, 1 << skills)
+            var actualUnlocks = generated.Select(g => string.Join(',', g.InitiallyUnlockedCombatSkills!)).ToHashSet();
+            var count = Math.Min(target, skills);
+            // Enumerate valid unlock subsets independently of the shuffle.
+            // The current native equip pass takes class order after unlocking;
+            // the guarantee constrains the larger unlock set, not equipment.
+            var expectedUnlocks = Enumerable.Range(0, 1 << skills)
                 .Select(mask => Enumerable.Range(0, skills).Where(i => (mask & (1 << i)) != 0).ToArray())
                 .Where(set => set.Length == count && (marked == 0 || set.Any(i => i < marked)))
-                .Select(set => string.Join(',', set.Select(i => "s" + i))).ToHashSet();
-            Assert(actualSets.SetEquals(expectedSets), $"{kind}/{test}: all and only eligible marked-skill subsets must be reachable.");
+                .ToArray();
+            var expectedSets = expectedUnlocks.Select(set => string.Join(',', set.Take(4).Select(i => "s" + i))).ToHashSet();
+            Assert(actualUnlocks.SetEquals(expectedUnlocks.Select(set => string.Join(',', set.Select(i => "s" + i)))) &&
+                actualSets.SetEquals(expectedSets) && generated.All(g => g.Preview.CombatSkills.SequenceEqual(g.InitiallyUnlockedCombatSkills!.Take(4))),
+                $"{kind}/{test}: native unlock subsets and subsequent class-order equipment must both match.");
             Assert(generated.All(g => g.Preview.Warnings.Any(w => w.StartsWith("战斗技能要求", StringComparison.Ordinal)) == (test == "shortage")),
                 "Skill-pool exhaustion warns with the actual count; the separate selection cap is preserved.");
             if (kind == "local") await VerifyHeroSelectionPersistenceAsync(f.Root, generated[0], codec);
         }
-        Console.WriteLine("PASS: 42 combat generation cases, marked-skill subset coverage, shortages, selection caps and seven-level preflight.");
+        Console.WriteLine("PASS: 42 combat generation cases, separate unlock/equip coverage, shortages, selection caps and seven-level preflight.");
 
         foreach (var kind in QuirkRuleSourceKinds)
         foreach (var test in new[] { "within", "class-shortage", "shared-shortage", "class-empty" })

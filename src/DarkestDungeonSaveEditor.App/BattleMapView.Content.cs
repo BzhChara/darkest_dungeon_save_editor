@@ -97,7 +97,7 @@ public partial class BattleMapView : UserControl
             LocalizedUi.Set(MapSelectionTextBlock, TextBlock.TextProperty, () => EditorText.Get("BattleMapView_Content_004"));
             return;
         }
-        if (!definition.IsAvailableInDungeon(snapshot.DungeonId))
+        if (!definition.IsAvailableInDungeon(snapshot.DungeonId, snapshot.Difficulty))
         {
             LocalizedUi.Set(MapSelectionTextBlock, TextBlock.TextProperty, () => EditorText.Get("BattleMapView_Content_005"));
             return;

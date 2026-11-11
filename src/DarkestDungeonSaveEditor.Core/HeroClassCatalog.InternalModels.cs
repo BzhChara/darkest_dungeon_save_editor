@@ -24,6 +24,7 @@ public static partial class HeroClassCatalog
         private string _townEventDependency = string.Empty;
         private string _deckReductionTarget = string.Empty;
         private readonly List<string> _combatSkillIds = [];
+        private readonly Dictionary<string, HeroCombatSkillSelection> _skillSelection = new(StringComparer.Ordinal);
         private readonly HashSet<string> _combatSkillSet = new(StringComparer.Ordinal);
         private readonly Dictionary<string, HashSet<int>> _combatSkillLevels =
             new(StringComparer.Ordinal);
@@ -55,6 +56,7 @@ public static partial class HeroClassCatalog
             SelectedCombatSkillsMax = candidate.SelectedCombatSkillsMax;
             BaseHp = candidate.BaseHp;
             ColourVariationCount = candidate.ColourVariationCount;
+            foreach (var pair in candidate.SkillSelection) _skillSelection[pair.Key] = pair.Value;
             if (candidate.Generation is { } generation)
             {
                 _hasGeneration = true;
@@ -125,6 +127,15 @@ public static partial class HeroClassCatalog
             {
                 _combatSkillIds.Add(id);
             }
+        }
+
+        public void UpdateSkillSelection(string id, string body)
+        {
+            var previous = _skillSelection.GetValueOrDefault(id) ?? new HeroCombatSkillSelection();
+            _skillSelection[id] = new(
+                NativeDarkestReader.ReadBoolean(body, ".skill_visible") ?? previous.Visible,
+                NativeDarkestReader.ReadBoolean(body, ".counts_towards_skill_limit") ?? previous.CountsTowardsLimit,
+                NativeDarkestReader.ReadBoolean(body, ".force_selection") ?? previous.ForceSelection);
         }
 
         public void AddGuaranteedCombatSkill(string id)
@@ -284,7 +295,10 @@ public static partial class HeroClassCatalog
                     StringComparer.Ordinal),
                 _guaranteedCombatSkillIds.ToArray(),
                 IncompatibleInitialQuirkIds.ToArray(),
-                skillEffects);
+                skillEffects)
+            {
+                SkillSelection = new Dictionary<string, HeroCombatSkillSelection>(_skillSelection, StringComparer.Ordinal)
+            };
         }
     }
 
@@ -304,14 +318,21 @@ public static partial class HeroClassCatalog
         IReadOnlyDictionary<string, IReadOnlyList<int>> CombatSkillLevels,
         IReadOnlyList<string> GuaranteedCombatSkillIds,
         IReadOnlyList<string> IncompatibleInitialQuirkIds,
-        IReadOnlyList<SkillEffectReference> SkillEffects);
+        IReadOnlyList<SkillEffectReference> SkillEffects)
+    {
+        public IReadOnlyDictionary<string, HeroCombatSkillSelection> SkillSelection { get; init; } =
+            new Dictionary<string, HeroCombatSkillSelection>(StringComparer.Ordinal);
+    }
 
     private sealed record SkillEffectReference(string SkillId, string AttributeKey, string EffectName);
     private sealed record EffectQuirkAssignment(
         string Name,
         string? QuirkId,
         string Source,
-        string SourcePath);
+        string SourcePath)
+    {
+        public NativeEffectReferences.Links Links { get; init; } = new();
+    }
     private sealed record QuirkDefinition(
         string Id,
         double? RandomChance,
@@ -333,7 +354,10 @@ public static partial class HeroClassCatalog
         string? TargetQuirkId,
         bool CausesDeath,
         int? TownAttemptUseItemDurationThreshold,
-        IReadOnlyList<string> ValidationErrors);
+        IReadOnlyList<string> ValidationErrors)
+    {
+        public HeroQuirkEvolutionDurationType DurationType { get; init; }
+    }
 
     private sealed record BuffDefinition(
         string Id,
@@ -348,15 +372,18 @@ public static partial class HeroClassCatalog
         string SourcePath)
     {
         public bool HasInvalidNativeString { get; init; }
+        public IReadOnlyList<NativeEffectReferences.Reference> Triggers { get; init; } = [];
     }
     private sealed record CampingSkillDefinition(
         string Id,
         IReadOnlyList<string> HeroClasses,
-        bool? IsShared);
-    private sealed class CampingSkillBuilder(string id, bool? isShared)
+        bool? IsShared,
+        IReadOnlyList<NativeEffectReferences.Reference> References);
+    private sealed class CampingSkillBuilder(string id, bool? isShared, IReadOnlyList<NativeEffectReferences.Reference> references)
     {
         public string Id { get; } = id;
         public bool? IsShared { get; } = isShared;
+        public IReadOnlyList<NativeEffectReferences.Reference> References { get; } = references;
         public HashSet<string> HeroClasses { get; } = new(StringComparer.Ordinal);
 
         public void Add(CampingSkillDefinition definition)

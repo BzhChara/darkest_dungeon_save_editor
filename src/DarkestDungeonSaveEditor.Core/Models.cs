@@ -88,7 +88,10 @@ public sealed record HeroRecruitEventDefinition(
     string HeroClass,
     double? Count,
     string Source,
-    string SourcePath);
+    string SourcePath)
+{
+    public int? ResolveLevel { get; init; }
+}
 
 public sealed record HeroRuntimeQuirkSignal(
     string QuirkId,
@@ -167,10 +170,14 @@ public sealed record HeroClassDefinition(
     }
     public IReadOnlyList<HeroGenerationAvailability> GenerationAvailability { get; init; } = [];
     public bool CampingSkillsComplete { get; init; } = true;
+    public IReadOnlyDictionary<string, HeroCombatSkillSelection> CombatSkillSelection { get; init; } =
+        new Dictionary<string, HeroCombatSkillSelection>(StringComparer.Ordinal);
     public IReadOnlyDictionary<string, IReadOnlyList<int>> CombatSkillLevels { get; init; } =
         new Dictionary<string, IReadOnlyList<int>>(StringComparer.Ordinal);
     internal HeroEquipmentDefinition? Equipment { get; init; }
 }
+
+public sealed record HeroCombatSkillSelection(bool Visible = true, bool CountsTowardsLimit = true, bool ForceSelection = false);
 
 public enum HeroMaxHpModifierKind
 {
@@ -193,7 +200,12 @@ public sealed record HeroQuirkEvolutionDefinition(
     int? TownProgressionDurationChange,
     string? TargetQuirkId,
     bool CausesDeath,
-    int? TownAttemptUseItemDurationThreshold);
+    int? TownAttemptUseItemDurationThreshold)
+{
+    public HeroQuirkEvolutionDurationType DurationType { get; init; }
+}
+
+public enum HeroQuirkEvolutionDurationType { Turns, CombatEnd, QuestEnd }
 
 public enum HeroInitialQuirkKind
 {
@@ -256,6 +268,10 @@ public sealed record HeroClassCatalogResult(
     IReadOnlyList<string> Issues)
 {
     public HeroInitialQuirkLimits InitialQuirkLimits { get; init; } = HeroInitialQuirkLimits.Default;
+    // The UI/save-ID catalog above is last-match. Native random generation
+    // retains every definition and its own weight, attributes and identity.
+    internal IReadOnlyList<HeroInitialQuirkDefinition> RandomInitialQuirks { get; init; } = [];
+    internal bool RandomInitialQuirksComplete { get; init; }
 }
 
 public sealed record TrinketDefinition(
@@ -487,7 +503,12 @@ public sealed record StagecoachHeroCandidatePreview(
 public sealed record GeneratedStagecoachHeroCandidate(
     JsonObject Candidate,
     StagecoachHeroCandidatePreview Preview,
-    IReadOnlyList<HeroUpgradePurchase> UpgradePurchases);
+    IReadOnlyList<HeroUpgradePurchase> UpgradePurchases)
+{
+    // Event offers retain initial random unlocks even when forced skills leave
+    // fewer equipment slots. Manual generation keeps its full purchase policy.
+    internal IReadOnlyList<string>? InitiallyUnlockedCombatSkills { get; init; }
+}
 
 public sealed record PreparedSaveFile(
     string FileName,

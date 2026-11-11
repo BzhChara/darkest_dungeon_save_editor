@@ -157,7 +157,10 @@ public static partial class HeroClassCatalog
                         effectiveQuirks.TryGetValue(NativeResourceIdentity.HashCString(targetId), out var target)
                             ? target.Id : parsedEvolution.TargetQuirkId,
                     parsedEvolution.CausesDeath,
-                    parsedEvolution.TownAttemptUseItemDurationThreshold);
+                    parsedEvolution.TownAttemptUseItemDurationThreshold)
+                {
+                    DurationType = parsedEvolution.DurationType
+                };
             }
         }
 
@@ -236,7 +239,7 @@ public static partial class HeroClassCatalog
                     name,
                     quirkId,
                     source,
-                    Path.GetFullPath(path));
+                    Path.GetFullPath(path)) { Links = NativeEffectReferences.Links.Read(body) };
             }
         }
     }
@@ -387,7 +390,11 @@ public static partial class HeroClassCatalog
                 hasRuleData ? ReadJsonFloat(ruleData, "float") : null,
                 hasRuleData ? ReadNativeBuffString(ruleData, "string", ref invalidString) : string.Empty,
                 source,
-                Path.GetFullPath(path)) { HasInvalidNativeString = invalidString };
+                Path.GetFullPath(path))
+            {
+                HasInvalidNativeString = invalidString,
+                Triggers = NativeEffectReferences.BuffTriggers(item).ToArray()
+            };
         }
     }
 
@@ -415,6 +422,13 @@ public static partial class HeroClassCatalog
         // 0x1404E02E0 initializes these six fields to zero/false. The quirk
         // loader reads their exact names; an arbitrary evolution_* note has no effect.
         var validationErrors = new List<string>();
+        // 28385, RVA 0x4EA6E1: only combat_end and quest_end assign the enum.
+        // Missing, non-string and unsupported values leave the turns default.
+        var durationHash = NativeResourceIdentity.HashCString(NativeJsonReader.ReadCString(element, "evolution_duration_type"));
+        var durationType = durationHash == NativeResourceIdentity.HashCString("combat_end")
+            ? HeroQuirkEvolutionDurationType.CombatEnd
+            : durationHash == NativeResourceIdentity.HashCString("quest_end")
+                ? HeroQuirkEvolutionDurationType.QuestEnd : HeroQuirkEvolutionDurationType.Turns;
         var durationMin = ReadEvolutionInteger(
             element,
             "evolution_duration_min",
@@ -494,7 +508,7 @@ public static partial class HeroClassCatalog
             targetQuirkId,
             causesDeath,
             townAttemptUseItemDurationThreshold,
-            validationErrors);
+            validationErrors) { DurationType = durationType };
     }
 
     private static int? ReadEvolutionInteger(

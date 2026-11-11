@@ -14,6 +14,7 @@ public static partial class HeroClassCatalog
         IReadOnlyDictionary<uint, IReadOnlyList<HeroRecruitEventDefinition>> eventsByClass,
         IReadOnlyDictionary<uint, EffectQuirkAssignment> effectiveEffects,
         IReadOnlyDictionary<uint, QuirkDefinition> effectiveQuirks,
+        IReadOnlyDictionary<uint, BuffDefinition> effectiveBuffs,
         IReadOnlyDictionary<string, CampingSkillBuilder> campingSkills,
         bool campingSkillsComplete,
         HeroUpgradeTreeResolution effectiveUpgrades,
@@ -72,18 +73,16 @@ public static partial class HeroClassCatalog
             .Concat(selected.ProviderSources)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
-        var runtimeQuirks = selected.SkillEffects
-            .Select(reference => ResolveRuntimeQuirk(reference, effectiveEffects, effectiveQuirks))
-            .Where(signal => signal is not null)
-            .Select(signal => signal!)
+        var availableCampingSkills = campingSkills.Values
+            .Where(skill => skill.HeroClasses.Contains(selected.Id))
+            .ToArray();
+        var runtimeQuirks = ResolveRuntimeQuirks(selected.SkillEffects, availableCampingSkills,
+                effectiveEffects, effectiveQuirks, effectiveBuffs)
             .DistinctBy(
                 signal => $"{signal.QuirkId}\n{signal.EffectName}\n{signal.SkillId}",
                 StringComparer.Ordinal)
             .OrderBy(signal => signal.QuirkId, StringComparer.OrdinalIgnoreCase)
             .ThenBy(signal => signal.SkillId, StringComparer.OrdinalIgnoreCase)
-            .ToArray();
-        var availableCampingSkills = campingSkills.Values
-            .Where(skill => skill.HeroClasses.Contains(selected.Id))
             .ToArray();
         var upgrade = BindHeroUpgradeTrees(selected, effectiveUpgrades, issues);
         var progression = BuildHeroProgression(selected, upgrade, resolveLevelThresholds);
@@ -129,6 +128,7 @@ public static partial class HeroClassCatalog
             sources)
         {
             CampingSkillsComplete = campingSkillsComplete,
+            CombatSkillSelection = selected.SkillSelection,
             Equipment = CreateEquipmentDefinition(selected),
             CombatSkillLevels = selected.CombatSkillLevels.ToDictionary(
                 pair => pair.Key,
@@ -214,6 +214,8 @@ public static partial class HeroClassCatalog
                 {
                     builder.SetGuaranteedCombatSkill(skillId, generationGuaranteed);
                 }
+
+                builder.UpdateSkillSelection(skillId, body);
 
                 builder.AppendSkillEffects(skillId, "effect", NativeDarkestReader.ReadStringList(body, ".effect", 16));
                 foreach (var mode in NativeDarkestReader.ReadStringList(body, ".valid_modes", 8, skipEmptyOrFieldTokens: true))

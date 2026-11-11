@@ -28,6 +28,7 @@ public sealed record BattleRoomAttachmentCatalogGuard(
 {
     public ActiveContentResolution? Resolution { get; init; }
     public string? RequestedDungeonId { get; init; }
+    public int? RequestedDifficulty { get; init; }
 }
 
 public sealed record BattleRoomAttachmentDefinition(
@@ -64,6 +65,9 @@ public sealed record BattleRoomAttachmentDefinition(
     public bool IsAvailableInDungeon(string? dungeonId) => !IsRegionBound ||
         (!string.IsNullOrWhiteSpace(OriginDungeonId) &&
          OriginDungeonId.Equals(dungeonId, StringComparison.Ordinal));
+
+    public bool IsAvailableInDungeon(string? dungeonId, int difficulty) => IsAvailableInDungeon(dungeonId) &&
+        (CatalogGuard.RequestedDifficulty is null || CatalogGuard.RequestedDifficulty == difficulty);
 
     // The original room-attachment catalog is shared with standalone map content.
     // Keep hall and room curios distinct even when they reference the same prop ID.
@@ -137,7 +141,7 @@ public static partial class BattleRoomAttachmentCatalog
 {
     private static readonly UTF8Encoding StrictUtf8 = new(false, true);
 
-    public static BattleRoomAttachmentCatalogResult Load(ActiveContentSnapshot activeContent, string? dungeonId = null)
+    public static BattleRoomAttachmentCatalogResult Load(ActiveContentSnapshot activeContent, string? dungeonId = null, int? difficulty = null)
     {
         ArgumentNullException.ThrowIfNull(activeContent);
         var profileDirectory = Path.GetFullPath(activeContent.Profile.ProfileDirectory);
@@ -155,7 +159,7 @@ public static partial class BattleRoomAttachmentCatalog
         }
 
         var issues = new List<string>();
-        var effectiveFiles = ResolveEffectivePropFiles(activeContent.Sources, issues, dungeonId);
+        var effectiveFiles = ResolveEffectivePropFiles(activeContent.Sources, issues, dungeonId, difficulty);
         var resourceFiles = ResolveEffectiveResourceFiles(activeContent.Sources, issues);
         var resources = ReadResources(resourceFiles);
         var curioFiles = ResolveEffectiveCurioFiles(activeContent.Sources, issues);
@@ -179,7 +183,7 @@ public static partial class BattleRoomAttachmentCatalog
             activeContent.SourceGameSha256,
             activeContent.Sources.ToArray(),
             fingerprints,
-            ComputeCatalogFingerprint(fingerprints)) { RequestedDungeonId = dungeonId, Resolution = activeContent.Resolution };
+            ComputeCatalogFingerprint(fingerprints)) { RequestedDungeonId = dungeonId, RequestedDifficulty = difficulty, Resolution = activeContent.Resolution };
 
         var parsed = effectiveFiles
             .SelectMany(file => ParseFile(file, activeContent.Sources, guard, issues))
@@ -266,7 +270,7 @@ public static partial class BattleRoomAttachmentCatalog
         }
 
         var issues = new List<string>();
-        var currentFiles = ResolveEffectivePropFiles(guard.ActiveSources, issues, guard.RequestedDungeonId)
+        var currentFiles = ResolveEffectivePropFiles(guard.ActiveSources, issues, guard.RequestedDungeonId, guard.RequestedDifficulty)
             .Concat(ResolveEffectiveResourceFiles(guard.ActiveSources, issues))
             .Concat(ResolveEffectiveCurioFiles(guard.ActiveSources, issues))
             .Select(file => new BattleRoomAttachmentFileFingerprint(
@@ -308,7 +312,7 @@ public static partial class BattleRoomAttachmentCatalog
         }
 
         var issues = new List<string>();
-        var parsed = ResolveEffectivePropFiles(definition.CatalogGuard.ActiveSources, issues, definition.CatalogGuard.RequestedDungeonId)
+        var parsed = ResolveEffectivePropFiles(definition.CatalogGuard.ActiveSources, issues, definition.CatalogGuard.RequestedDungeonId, definition.CatalogGuard.RequestedDifficulty)
             .SelectMany(file => ParseFile(
                 file,
                 definition.CatalogGuard.ActiveSources,
@@ -382,7 +386,7 @@ public static partial class BattleRoomAttachmentCatalog
     private static IReadOnlyList<EffectiveContentFile> ResolveEffectivePropFiles(
         IReadOnlyList<ActiveContentSource> sources,
         List<string> issues,
-        string? dungeonId = null)
+        string? dungeonId = null, int? difficulty = null)
     {
         var enabledDlcPrefixes = ContentFileOverlay.GetEnabledDlcPrefixes(sources);
         var candidates = new List<ContentFileCandidate>();
@@ -411,7 +415,30 @@ public static partial class BattleRoomAttachmentCatalog
             // the spelling of a directory returned by physical discovery.
             requests.Add($"dungeons/{dungeonId}/{dungeonId}.props.darkest");
         }
-        return NativeContentFileResolver.ResolveOpenedFiles(sources, requests, "Room prop", issues);
+        var canonical = NativeContentFileResolver.ResolveOpenedFiles(sources, requests, "Room prop", issues);
+        // RVA 0x3ED631 loads keys 0..6. An unregistered difficulty still
+        // receives the selector's default pool, without inventing a new query.
+        if (difficulty is null or <= 0 or > 6) return canonical;
+        // 28385: the selector copies pool 0, then appends the exact difficulty
+        // pool (traps RVA 0x4B7F00). It does not replace the canonical entries.
+        var regions = requests.Select(path => path.Split('/')[1]).Distinct(StringComparer.Ordinal);
+        var additive = new List<EffectiveContentFile>();
+        foreach (var region in regions)
+        {
+            var additions = new List<ContentFileCandidate>();
+            var directory = $"dungeons/{region}";
+            // Native query is ".*.%s.%d.props.darkest": its separators are
+            // unescaped regex dots, not literal filename suffixes.
+            var pattern = new System.Text.RegularExpressions.Regex(
+                $".{region}.{difficulty}.props.darkest\\z", System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+            foreach (var source in sources)
+                foreach (var path in ContentFileDiscovery.EnumerateQuery(source, enabledDlcPrefixes, issues, "Difficulty props",
+                    relative => NativeResourceFileRules.IsInDirectory(relative, directory, enabledDlcPrefixes, source.Kind is "local" or "workshop") &&
+                        pattern.IsMatch(relative.Replace('\\', '/')), new ContentFileRule(directory, "*darkest")))
+                    additions.Add(new(source, path));
+            additive.AddRange(NativeContentFileResolver.Resolve(additions, sources, "Difficulty props", issues));
+        }
+        return canonical.Concat(additive).ToArray();
     }
 
     internal static IReadOnlyList<string> EnumerateCanonicalPropFiles(ActiveContentSource source,
@@ -428,8 +455,8 @@ public static partial class BattleRoomAttachmentCatalog
             .FirstOrDefault(value => relative.StartsWith(value + "/", StringComparison.OrdinalIgnoreCase));
         if (prefix is not null) relative = relative[(prefix.Length + 1)..];
         var parts = relative.Split('/');
-        // Dungeon::Load opens this constructed path (build 27890, 0x1404AF1F2).
-        // It never enumerates arbitrary names or classification subdirectories.
+        // The default (difficulty 0) pool still opens this constructed path.
+        // Positive difficulty pools use the separate additive query above.
         return parts.Length == 3 && parts[0].Equals("dungeons", StringComparison.OrdinalIgnoreCase) &&
             !parts[1].Equals("arena", StringComparison.Ordinal) &&
             parts[2].Equals(parts[1] + ".props.darkest", StringComparison.OrdinalIgnoreCase);

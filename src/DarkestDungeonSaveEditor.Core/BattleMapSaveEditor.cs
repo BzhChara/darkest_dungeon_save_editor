@@ -262,6 +262,8 @@ internal static partial class BattleMapSaveEditor
         ArgumentNullException.ThrowIfNull(raidDocument);
         ArgumentNullException.ThrowIfNull(snapshot);
         ArgumentNullException.ThrowIfNull(attachment);
+        if (!attachment.IsAvailableInDungeon(snapshot.DungeonId, snapshot.Difficulty))
+            throw new InvalidOperationException(EditorText.Get("BattleMapSaveEditor_Content_002"));
         var (area, tile, staticTile, dynamicTile) = ResolveRoomBattleAttachmentTarget(
             mapDocument,
             raidDocument,
